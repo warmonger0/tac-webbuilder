@@ -3,6 +3,7 @@ import json
 from typing import Tuple, List
 from anthropic import Anthropic
 from core.data_models import GitHubIssue, ProjectContext
+from core.template_router import route_by_template, detect_characteristics
 
 
 async def analyze_intent(nl_input: str) -> dict:
@@ -153,38 +154,85 @@ def classify_issue_type(intent: dict) -> str:
     return intent.get("intent_type", "feature")
 
 
-def suggest_adw_workflow(issue_type: str, complexity: str) -> Tuple[str, str]:
+def suggest_adw_workflow(issue_type: str, complexity: str, characteristics: dict = None) -> Tuple[str, str]:
     """
-    Recommend ADW workflow and model set based on issue type and complexity.
+    Recommend ADW workflow and model set based on issue type, complexity, and characteristics.
 
-    This function implements a rule-based workflow recommendation system:
-    - Bugs always use adw_plan_build_test_iso with base model (need thorough testing)
-    - Chores use simpler adw_sdlc_iso with base model (less complexity)
-    - Features are tiered by complexity:
-      * Low complexity: adw_sdlc_iso with base model
-      * Medium complexity: adw_plan_build_test_iso with base model
-      * High complexity: adw_plan_build_test_iso with heavy model (more powerful)
+    This function implements a rule-based workflow recommendation system with lightweight
+    optimization:
+
+    Lightweight workflow ($0.20-0.50):
+    - UI-only changes (1-2 files)
+    - Documentation updates
+    - Simple chores without testing needs
+    - Single-file modifications
+
+    Standard SDLC ($3-5):
+    - Low complexity features (multi-file)
+    - Chores requiring some validation
+
+    Plan-Build-Test ($3-5):
+    - Bugs (need thorough testing)
+    - Medium complexity features
+
+    Plan-Build-Test with heavy model ($5-10):
+    - High complexity features
 
     Args:
         issue_type: "feature", "bug", or "chore"
         complexity: "low", "medium", or "high"
+        characteristics: Optional dict with:
+            - ui_only: bool
+            - backend_changes: bool
+            - testing_needed: bool
+            - docs_only: bool
+            - file_count_estimate: int
 
     Returns:
         Tuple of (workflow, model_set) where:
-        - workflow: ADW workflow identifier (e.g., "adw_sdlc_iso")
+        - workflow: ADW workflow identifier (e.g., "adw_lightweight_iso")
         - model_set: "base" or "heavy"
     """
-    # Workflow recommendation logic based on complexity and type
+    characteristics = characteristics or {}
+
+    # Check for lightweight patterns first (cost optimization)
+    is_ui_only = characteristics.get("ui_only", False)
+    is_docs_only = characteristics.get("docs_only", False)
+    file_count = characteristics.get("file_count_estimate", 2)
+    needs_testing = characteristics.get("testing_needed", False)
+    has_backend = characteristics.get("backend_changes", False)
+
+    # Lightweight criteria:
+    # - 1-2 files
+    # - No backend changes
+    # - UI or docs only
+    # - No testing needed
+    if (file_count <= 2 and
+        not has_backend and
+        not needs_testing and
+        (is_ui_only or is_docs_only)):
+        return ("adw_lightweight_iso", "base")
+
+    # Lightweight for simple chores
+    if issue_type == "chore" and complexity == "low" and not needs_testing:
+        return ("adw_lightweight_iso", "base")
+
+    # Bugs always need testing
     if issue_type == "bug":
         return ("adw_plan_build_test_iso", "base")
+
+    # Chores without special characteristics
     elif issue_type == "chore":
         return ("adw_sdlc_iso", "base")
+
+    # Features tiered by complexity
     else:  # feature
         if complexity == "high":
             return ("adw_plan_build_test_iso", "heavy")
         elif complexity == "medium":
             return ("adw_plan_build_test_iso", "base")
         else:  # low
+            # Low complexity features still use SDLC unless they match lightweight criteria
             return ("adw_sdlc_iso", "base")
 
 
@@ -196,15 +244,19 @@ async def process_request(nl_input: str, project_context: ProjectContext) -> Git
     all the steps needed to transform a natural language description into a complete,
     properly formatted GitHub issue with ADW workflow recommendations.
 
-    Processing Pipeline:
-    1. Analyze intent using Claude API
-    2. Extract technical requirements from the input
+    Processing Pipeline (Optimized):
+    0. Try template matching first (fast, free, deterministic)
+       - If matched: Skip Claude API calls, use template routing
+       - If not matched: Continue to structured prompts
+    1. Analyze intent using Claude API (if needed)
+    2. Extract technical requirements from the input (if needed)
     3. Classify issue type (feature/bug/chore)
-    4. Suggest appropriate ADW workflow based on type and complexity
-    5. Generate issue title from summary
-    6. Assemble issue body with description and requirements
-    7. Create labels based on classification and project context
-    8. Return complete GitHubIssue object
+    4. Detect characteristics (ui_only, backend_changes, etc.)
+    5. Suggest appropriate ADW workflow based on type, complexity, and characteristics
+    6. Generate issue title from summary
+    7. Assemble issue body with description and requirements
+    8. Create labels based on classification and project context
+    9. Return complete GitHubIssue object
 
     Args:
         nl_input: Natural language description of the desired feature/bug/chore
@@ -224,50 +276,87 @@ async def process_request(nl_input: str, project_context: ProjectContext) -> Git
                   extraction, or issue generation)
     """
     try:
-        # Step 1: Analyze intent
-        intent = await analyze_intent(nl_input)
+        # Step 0: Try template matching first (cost optimization)
+        template_match = route_by_template(nl_input)
 
-        # Step 2: Extract requirements
-        requirements = extract_requirements(nl_input, intent)
+        if template_match.matched:
+            # Template matched! Skip Claude API calls
+            classification = template_match.classification
+            workflow = template_match.workflow
+            model_set = template_match.model_set
 
-        # Step 3: Classify issue type
-        classification = classify_issue_type(intent)
+            # Generate simplified issue for template matches
+            # (we don't have detailed intent/requirements, but that's ok for simple requests)
+            title = nl_input[:100]  # Use truncated input as title
+            requirements = [nl_input]  # Use full input as single requirement
 
-        # Step 4: Suggest workflow based on complexity
-        workflow, model_set = suggest_adw_workflow(classification, project_context.complexity)
+            body_parts = [
+                "## Description",
+                f"{nl_input}",
+                "",
+                "## Classification",
+                f"Pattern matched: `{template_match.pattern_name}` (confidence: {template_match.confidence:.0%})",
+                "",
+                "## Workflow",
+                f"{workflow} with {model_set} model"
+            ]
 
-        # Step 5: Generate title
-        title = intent.get("summary", nl_input[:100])
+            body = "\n".join(body_parts)
+            labels = [classification, "auto-routed"]
 
-        # Step 6: Generate issue body (will be formatted by issue_formatter)
-        # For now, create a basic structure
-        body_parts = [
-            "## Description",
-            f"{intent.get('summary', nl_input)}",
-            "",
-            "## Requirements",
-        ]
+        else:
+            # No template match - use structured prompts (Claude API)
+            # Step 1: Analyze intent
+            intent = await analyze_intent(nl_input)
 
-        for req in requirements:
-            body_parts.append(f"- {req}")
+            # Step 2: Extract requirements
+            requirements = extract_requirements(nl_input, intent)
 
-        body_parts.extend([
-            "",
-            "## Technical Area",
-            f"{intent.get('technical_area', 'General')}",
-            "",
-            "## Workflow",
-            f"{workflow} model_set {model_set}"
-        ])
+            # Step 3: Classify issue type
+            classification = classify_issue_type(intent)
 
-        body = "\n".join(body_parts)
+            # Step 4: Detect characteristics for routing
+            characteristics = detect_characteristics(nl_input)
 
-        # Step 7: Generate labels
-        labels = [classification, intent.get('technical_area', 'general').lower()]
-        if project_context.framework:
-            labels.append(project_context.framework)
+            # Step 5: Suggest workflow based on complexity and characteristics
+            workflow, model_set = suggest_adw_workflow(
+                classification,
+                project_context.complexity,
+                characteristics
+            )
 
-        # Step 8: Create GitHubIssue object
+            # Step 6: Generate title
+            title = intent.get("summary", nl_input[:100])
+
+            # Step 7: Generate issue body (will be formatted by issue_formatter)
+            # For now, create a basic structure
+            body_parts = [
+                "## Description",
+                f"{intent.get('summary', nl_input)}",
+                "",
+                "## Requirements",
+            ]
+
+            for req in requirements:
+                body_parts.append(f"- {req}")
+
+            body_parts.extend([
+                "",
+                "## Technical Area",
+                f"{intent.get('technical_area', 'General')}",
+                "",
+                "## Workflow",
+                f"{workflow} with {model_set} model"
+            ])
+
+            body = "\n".join(body_parts)
+
+            # Step 8: Generate labels
+            labels = [classification, intent.get('technical_area', 'general').lower()]
+            if project_context.framework:
+                labels.append(project_context.framework)
+
+        # Step 9: Create GitHubIssue object
         return GitHubIssue(
             title=title,
             body=body,
