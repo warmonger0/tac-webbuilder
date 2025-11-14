@@ -6,7 +6,7 @@
     },
     "contextOptions": {
       "recordVideo": {
-        "dir": "./videos",
+        "dir": "/Users/Warmonger0/tac/tac-webbuilder/trees/d2ac5466/videos",
         "size": {
           "width": 1920,
           "height": 1080
