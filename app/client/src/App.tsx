@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TabBar } from './components/TabBar';
 import { RequestForm } from './components/RequestForm';
 import { WorkflowDashboard } from './components/WorkflowDashboard';
-import { HistoryView } from './components/HistoryView';
+import { WorkflowHistoryView } from './components/WorkflowHistoryView';
 import { RoutesView } from './components/RoutesView';
 
 const queryClient = new QueryClient();
@@ -38,7 +38,7 @@ function App() {
         <main className="container mx-auto px-4 py-8">
           {activeTab === 'request' && <RequestForm />}
           {activeTab === 'workflows' && <WorkflowDashboard />}
-          {activeTab === 'history' && <HistoryView />}
+          {activeTab === 'history' && <WorkflowHistoryView />}
           {activeTab === 'routes' && <RoutesView />}
         </main>
       </div>

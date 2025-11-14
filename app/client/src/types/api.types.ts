@@ -108,14 +108,78 @@ export interface RoutesResponse {
 }
 
 // History Types
-export interface HistoryItem {
-  id: string;
-  nl_input: string;
-  project: string;
+export interface TokenBreakdown {
+  input_tokens: number;
+  output_tokens: number;
+  cached_tokens: number;
+  cache_hit_tokens: number;
+  cache_miss_tokens: number;
+  total_tokens: number;
+}
+
+export interface CostBreakdown {
+  estimated_total: number;
+  actual_total: number;
+  estimated_per_step: number;
+  actual_per_step: number;
+  cost_per_token: number;
+  by_phase?: Record<string, number>;
+}
+
+export interface WorkflowHistoryItem {
+  // Core fields
+  id: number;
+  adw_id: string;
   issue_number?: number;
-  status: string;
-  timestamp: string;
+  nl_input?: string;
   github_url?: string;
+  workflow_template?: string;
+  model_used?: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+
+  // Time tracking
+  start_time?: string;
+  end_time?: string;
+  duration_seconds?: number;
+  created_at: string;
+  updated_at: string;
+
+  // Progress tracking
+  error_message?: string;
+  phase_count?: number;
+  current_phase?: string;
+  success_rate?: number;
+  retry_count: number;
+  steps_completed: number;
+  steps_total: number;
+
+  // Resource usage
+  worktree_path?: string;
+  backend_port?: number;
+  frontend_port?: number;
+  concurrent_workflows: number;
+  worktree_reused: boolean;
+
+  // Token metrics
+  input_tokens: number;
+  output_tokens: number;
+  cached_tokens: number;
+  cache_hit_tokens: number;
+  cache_miss_tokens: number;
+  total_tokens: number;
+  cache_efficiency_percent: number;
+
+  // Cost metrics
+  estimated_cost_total: number;
+  actual_cost_total: number;
+  estimated_cost_per_step: number;
+  actual_cost_per_step: number;
+  cost_per_token: number;
+
+  // Structured data (JSON fields)
+  structured_input?: Record<string, any>;
+  cost_breakdown?: CostBreakdown;
+  token_breakdown?: TokenBreakdown;
 }
 
 export interface HistoryAnalytics {
@@ -127,6 +191,10 @@ export interface HistoryAnalytics {
   workflows_by_model: Record<string, number>;
   workflows_by_template: Record<string, number>;
   workflows_by_status: Record<string, number>;
+  avg_cost: number;
+  total_cost: number;
+  avg_tokens: number;
+  avg_cache_efficiency: number;
 }
 
 export interface HistoryFilters {
@@ -139,6 +207,24 @@ export interface HistoryFilters {
   end_date?: string;
   search?: string;
   sort_by?: string;
+  sort_order?: 'ASC' | 'DESC';
+}
+
+export interface WorkflowHistoryResponse {
+  workflows: WorkflowHistoryItem[];
+  total_count: number;
+  analytics: HistoryAnalytics;
+}
+
+// Legacy type for backwards compatibility
+export interface HistoryItem {
+  id: string;
+  nl_input: string;
+  project: string;
+  issue_number?: number;
+  status: string;
+  timestamp: string;
+  github_url?: string;
 }
 
 // Cost tracking types

@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSock
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from datetime import datetime
-from typing import List, Set
+from typing import List, Set, Optional
 import os
 import sqlite3
 import traceback
@@ -32,6 +32,10 @@ from core.data_models import (
     WorkflowTemplate,
     WorkflowCatalogResponse,
     CostResponse,
+    WorkflowHistoryItem,
+    WorkflowHistoryResponse,
+    WorkflowHistoryAnalytics,
+    WorkflowHistoryFilters,
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
 from core.llm_processor import generate_sql, generate_random_query
@@ -45,6 +49,15 @@ from core.sql_security import (
 )
 from core.export_utils import generate_csv_from_data, generate_csv_from_table
 from core.cost_tracker import read_cost_history
+from core.workflow_history import (
+    init_db as init_workflow_history_db,
+    get_workflow_history,
+    get_history_analytics,
+    get_workflow_by_adw_id,
+    insert_workflow_history,
+    update_workflow_history,
+    sync_workflow_history,
+)
 
 # Load .env file from server directory
 load_dotenv()
@@ -89,6 +102,7 @@ class ConnectionManager:
         self.active_connections: Set[WebSocket] = set()
         self.last_workflow_state = None
         self.last_routes_state = None
+        self.last_history_state = None
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -279,6 +293,89 @@ async def watch_routes():
             await asyncio.sleep(2)  # Check every 2 seconds
         except Exception as e:
             logger.error(f"[WS] Error in routes watcher: {e}")
+            await asyncio.sleep(5)  # Back off on error
+
+def get_workflow_history_data(filters: Optional[WorkflowHistoryFilters] = None) -> WorkflowHistoryResponse:
+    """Helper function to get workflow history data"""
+    try:
+        # Sync workflow history from agents directory first
+        sync_workflow_history()
+
+        # Apply filters if provided
+        filter_params = {}
+        if filters:
+            filter_params = {
+                'limit': filters.limit or 20,
+                'offset': filters.offset or 0,
+                'status': filters.status,
+                'model': filters.model,
+                'template': filters.template,
+                'start_date': filters.start_date,
+                'end_date': filters.end_date,
+                'search': filters.search,
+                'sort_by': filters.sort_by or 'created_at',
+                'sort_order': filters.sort_order or 'DESC',
+            }
+        else:
+            filter_params = {'limit': 20, 'offset': 0, 'sort_by': 'created_at', 'sort_order': 'DESC'}
+
+        # Get workflow history
+        workflows, total_count = get_workflow_history(**filter_params)
+
+        # Get analytics
+        analytics = get_history_analytics()
+
+        # Convert database rows to Pydantic models
+        workflow_items = [WorkflowHistoryItem(**workflow) for workflow in workflows]
+        analytics_model = WorkflowHistoryAnalytics(**analytics)
+
+        return WorkflowHistoryResponse(
+            workflows=workflow_items,
+            total_count=total_count,
+            analytics=analytics_model
+        )
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to get workflow history data: {str(e)}")
+        # Return empty response on error
+        return WorkflowHistoryResponse(
+            workflows=[],
+            total_count=0,
+            analytics=WorkflowHistoryAnalytics()
+        )
+
+async def watch_workflow_history():
+    """Background task to watch for workflow history changes and broadcast updates"""
+    while True:
+        try:
+            if len(manager.active_connections) > 0:
+                # Get latest workflow history (limited to recent items for WebSocket)
+                history_data = get_workflow_history_data(WorkflowHistoryFilters(limit=50, offset=0))
+
+                # Convert to dict for comparison
+                current_state = json.dumps(
+                    {
+                        "workflows": [w.model_dump() for w in history_data.workflows],
+                        "analytics": history_data.analytics.model_dump()
+                    },
+                    sort_keys=True
+                )
+
+                # Only broadcast if state changed
+                if current_state != manager.last_history_state:
+                    manager.last_history_state = current_state
+                    await manager.broadcast({
+                        "type": "workflow_history_update",
+                        "data": {
+                            "workflows": [w.model_dump() for w in history_data.workflows],
+                            "total_count": history_data.total_count,
+                            "analytics": history_data.analytics.model_dump()
+                        }
+                    })
+                    logger.info(f"[WS] Broadcasted workflow history update to {len(manager.active_connections)} clients")
+
+            await asyncio.sleep(2)  # Check every 2 seconds
+        except Exception as e:
+            logger.error(f"[WS] Error in workflow history watcher: {e}")
             await asyncio.sleep(5)  # Back off on error
 
 @app.post("/api/upload", response_model=FileUploadResponse)
@@ -522,9 +619,15 @@ async def get_workflow_costs(adw_id: str) -> CostResponse:
 @app.on_event("startup")
 async def startup_event():
     """Start background tasks on server startup"""
+    # Initialize workflow history database
+    init_workflow_history_db()
+    logger.info("[STARTUP] Workflow history database initialized")
+
+    # Start background watchers
     asyncio.create_task(watch_workflows())
     asyncio.create_task(watch_routes())
-    logger.info("[STARTUP] Workflow and routes watchers started")
+    asyncio.create_task(watch_workflow_history())
+    logger.info("[STARTUP] Workflow, routes, and history watchers started")
 
 @app.websocket("/ws/workflows")
 async def websocket_workflows(websocket: WebSocket):
@@ -575,6 +678,75 @@ async def websocket_routes(websocket: WebSocket):
         logger.error(f"[WS] Error in WebSocket connection: {e}")
     finally:
         manager.disconnect(websocket)
+
+@app.websocket("/ws/workflow-history")
+async def websocket_workflow_history(websocket: WebSocket):
+    """WebSocket endpoint for real-time workflow history updates"""
+    await manager.connect(websocket)
+
+    try:
+        # Send initial data
+        history_data = get_workflow_history_data(WorkflowHistoryFilters(limit=50, offset=0))
+        await websocket.send_json({
+            "type": "workflow_history_update",
+            "data": {
+                "workflows": [w.model_dump() for w in history_data.workflows],
+                "total_count": history_data.total_count,
+                "analytics": history_data.analytics.model_dump()
+            }
+        })
+
+        # Keep connection alive and handle incoming messages
+        while True:
+            try:
+                # Wait for any client messages (ping/pong, etc.)
+                await websocket.receive_text()
+            except WebSocketDisconnect:
+                break
+    except Exception as e:
+        logger.error(f"[WS] Error in workflow history WebSocket connection: {e}")
+    finally:
+        manager.disconnect(websocket)
+
+@app.get("/api/workflow-history", response_model=WorkflowHistoryResponse)
+async def get_workflow_history_endpoint(
+    limit: int = 20,
+    offset: int = 0,
+    status: Optional[str] = None,
+    model: Optional[str] = None,
+    template: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    search: Optional[str] = None,
+    sort_by: str = "created_at",
+    sort_order: str = "DESC"
+) -> WorkflowHistoryResponse:
+    """Get workflow history with filtering, sorting, and pagination (REST endpoint for fallback)"""
+    try:
+        filters = WorkflowHistoryFilters(
+            limit=limit,
+            offset=offset,
+            status=status,
+            model=model,
+            template=template,
+            start_date=start_date,
+            end_date=end_date,
+            search=search,
+            sort_by=sort_by,
+            sort_order=sort_order  # type: ignore
+        )
+        history_data = get_workflow_history_data(filters)
+        logger.info(f"[SUCCESS] Retrieved {len(history_data.workflows)} workflow history items (total: {history_data.total_count})")
+        return history_data
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to retrieve workflow history: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        # Return empty response on error
+        return WorkflowHistoryResponse(
+            workflows=[],
+            total_count=0,
+            analytics=WorkflowHistoryAnalytics()
+        )
 
 @app.get("/api/workflows", response_model=List[Workflow])
 async def get_workflows() -> List[Workflow]:
