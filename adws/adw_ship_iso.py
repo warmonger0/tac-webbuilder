@@ -12,18 +12,18 @@ Usage:
 Workflow:
 1. Load state and validate worktree exists
 2. Validate ALL state fields are populated (not None)
-3. Perform manual git merge in main repository:
-   - Fetch latest from origin
-   - Checkout main
-   - Merge feature branch
-   - Push to origin/main
-4. Post success message to issue
+3. Find PR for the feature branch
+4. Merge PR via GitHub API (gh pr merge --squash)
+5. Post success message to issue
+
+This workflow uses GitHub's PR merge API which automatically:
+- Closes linked issues
+- Handles merge conflicts
+- Supports squash/merge strategies
+- Doesn't require clean working directory
 
 This workflow REQUIRES that all previous workflows have been run and that
 every field in ADWState has a value. This is our final approval step.
-
-Note: Merge operations happen in the main repository root, not in the worktree,
-to preserve the worktree's state.
 """
 
 import sys
@@ -49,102 +49,113 @@ from adw_modules.data_types import ADWStateData
 AGENT_SHIPPER = "shipper"
 
 
-def get_main_repo_root() -> str:
-    """Get the main repository root directory (parent of adws)."""
-    # This script is in adws/, so go up one level to get repo root
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def find_pr_for_branch(branch_name: str, repo_path: str, logger: logging.Logger) -> Optional[str]:
+    """Find the PR number for a given branch.
 
-
-def manual_merge_to_main(branch_name: str, logger: logging.Logger) -> Tuple[bool, Optional[str]]:
-    """Manually merge a branch to main using git commands.
-    
-    This runs in the main repository root, not in a worktree.
-    
     Args:
-        branch_name: The feature branch to merge
+        branch_name: Feature branch name
+        repo_path: Repository path (owner/repo)
         logger: Logger instance
-        
+
+    Returns:
+        PR number as string, or None if not found
+    """
+    try:
+        # Search for PR with this head branch
+        result = subprocess.run(
+            ["gh", "pr", "list",
+             "--repo", repo_path,
+             "--head", branch_name,
+             "--json", "number",
+             "--jq", ".[0].number"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            pr_number = result.stdout.strip()
+            logger.info(f"Found PR #{pr_number} for branch {branch_name}")
+            return pr_number
+
+        logger.warning(f"No PR found for branch {branch_name}")
+        return None
+
+    except Exception as e:
+        logger.error(f"Error finding PR: {e}")
+        return None
+
+
+def merge_pr_via_github(pr_number: str, repo_path: str, logger: logging.Logger) -> Tuple[bool, Optional[str]]:
+    """Merge a PR using GitHub's merge API via gh CLI.
+
+    Args:
+        pr_number: PR number to merge
+        repo_path: Repository path (owner/repo)
+        logger: Logger instance
+
     Returns:
         Tuple of (success, error_message)
     """
-    repo_root = get_main_repo_root()
-    logger.info(f"Performing manual merge in main repository: {repo_root}")
-    
     try:
-        # Save current branch to restore later
+        logger.info(f"Merging PR #{pr_number} using GitHub API...")
+
+        # Use squash merge to combine commits
         result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True, text=True, cwd=repo_root
+            ["gh", "pr", "merge", pr_number,
+             "--repo", repo_path,
+             "--squash",
+             "--delete-branch"],
+            capture_output=True,
+            text=True,
+            check=False
         )
-        original_branch = result.stdout.strip()
-        logger.debug(f"Original branch: {original_branch}")
-        
-        # Step 1: Fetch latest from origin
-        logger.info("Fetching latest from origin...")
-        result = subprocess.run(
-            ["git", "fetch", "origin"],
-            capture_output=True, text=True, cwd=repo_root
-        )
-        if result.returncode != 0:
-            return False, f"Failed to fetch from origin: {result.stderr}"
-        
-        # Step 2: Checkout main
-        logger.info("Checking out main branch...")
-        result = subprocess.run(
-            ["git", "checkout", "main"],
-            capture_output=True, text=True, cwd=repo_root
-        )
-        if result.returncode != 0:
-            return False, f"Failed to checkout main: {result.stderr}"
-        
-        # Step 3: Pull latest main
-        logger.info("Pulling latest main...")
-        result = subprocess.run(
-            ["git", "pull", "origin", "main"],
-            capture_output=True, text=True, cwd=repo_root
-        )
-        if result.returncode != 0:
-            # Try to restore original branch
-            subprocess.run(["git", "checkout", original_branch], cwd=repo_root)
-            return False, f"Failed to pull latest main: {result.stderr}"
-        
-        # Step 4: Merge the feature branch (no-ff to preserve all commits)
-        logger.info(f"Merging branch {branch_name} (no-ff to preserve all commits)...")
-        result = subprocess.run(
-            ["git", "merge", branch_name, "--no-ff", "-m", f"Merge branch '{branch_name}' via ADW Ship workflow"],
-            capture_output=True, text=True, cwd=repo_root
-        )
-        if result.returncode != 0:
-            # Try to restore original branch
-            subprocess.run(["git", "checkout", original_branch], cwd=repo_root)
-            return False, f"Failed to merge {branch_name}: {result.stderr}"
-        
-        # Step 5: Push to origin/main
-        logger.info("Pushing to origin/main...")
-        result = subprocess.run(
-            ["git", "push", "origin", "main"],
-            capture_output=True, text=True, cwd=repo_root
-        )
-        if result.returncode != 0:
-            # Try to restore original branch
-            subprocess.run(["git", "checkout", original_branch], cwd=repo_root)
-            return False, f"Failed to push to origin/main: {result.stderr}"
-        
-        # Step 6: Restore original branch
-        logger.info(f"Restoring original branch: {original_branch}")
-        subprocess.run(["git", "checkout", original_branch], cwd=repo_root)
-        
-        logger.info("✅ Successfully merged and pushed to main!")
-        return True, None
-        
+
+        if result.returncode == 0:
+            logger.info(f"✅ Successfully merged PR #{pr_number}")
+            return True, None
+        else:
+            # Check if it's just a branch deletion error (worktree in use)
+            if "cannot delete branch" in result.stderr and "used by worktree" in result.stderr:
+                logger.warning("PR merged but branch deletion failed (worktree in use)")
+                logger.info("Branch will be cleaned up with worktree removal")
+                return True, None
+
+            error_msg = f"Failed to merge PR #{pr_number}: {result.stderr}"
+            logger.error(error_msg)
+            return False, error_msg
+
     except Exception as e:
-        logger.error(f"Unexpected error during merge: {e}")
-        # Try to restore original branch
-        try:
-            subprocess.run(["git", "checkout", original_branch], cwd=repo_root)
-        except:
-            pass
-        return False, str(e)
+        error_msg = f"Exception during PR merge: {e}"
+        logger.error(error_msg)
+        return False, error_msg
+
+
+def ship_via_pr_merge(branch_name: str, repo_path: str, logger: logging.Logger) -> Tuple[bool, Optional[str]]:
+    """Ship by merging via GitHub PR.
+
+    This is the preferred method as it:
+    - Uses GitHub's merge conflict detection
+    - Automatically closes linked issues
+    - Handles squash/merge strategies
+    - Doesn't require clean working directory
+
+    Args:
+        branch_name: Feature branch name
+        repo_path: Repository path (owner/repo)
+        logger: Logger instance
+
+    Returns:
+        Tuple of (success, error_message)
+    """
+    # Step 1: Find the PR
+    pr_number = find_pr_for_branch(branch_name, repo_path, logger)
+
+    if not pr_number:
+        return False, f"No PR found for branch {branch_name}. Cannot merge via GitHub API."
+
+    # Step 2: Merge the PR
+    return merge_pr_via_github(pr_number, repo_path, logger)
 
 
 def validate_state_completeness(state: ADWState, logger: logging.Logger) -> tuple[bool, list[str]]:
@@ -262,42 +273,58 @@ def main():
     
     # Step 3: Get branch name
     branch_name = state.get("branch_name")
-    logger.info(f"Preparing to merge branch: {branch_name}")
-    
+    logger.info(f"Preparing to ship branch: {branch_name}")
+
     make_issue_comment(
         issue_number,
         format_issue_message(adw_id, AGENT_SHIPPER, f"📋 State validation complete\n"
-                           f"🔍 Preparing to merge branch: {branch_name}")
+                           f"🔍 Preparing to ship branch: {branch_name}")
     )
-    
-    # Step 4: Perform manual merge
-    logger.info(f"Starting manual merge of {branch_name} to main...")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, AGENT_SHIPPER, f"🔀 Merging {branch_name} to main...\n"
-                           "Using manual git operations in main repository")
-    )
-    
-    success, error = manual_merge_to_main(branch_name, logger)
-    
-    if not success:
-        logger.error(f"Failed to merge: {error}")
+
+    # Step 4: Get repository path
+    try:
+        repo_url = get_repo_url()
+        repo_path = extract_repo_path(repo_url)
+    except Exception as e:
+        logger.error(f"Failed to get repository info: {e}")
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, AGENT_SHIPPER, f"❌ Failed to merge: {error}")
+            format_issue_message(adw_id, AGENT_SHIPPER, f"❌ Failed to get repository info: {e}")
         )
         sys.exit(1)
-    
-    logger.info(f"✅ Successfully merged {branch_name} to main")
-    
-    # Step 5: Post success message
+
+    # Step 5: Ship via GitHub PR merge
+    logger.info(f"Shipping {branch_name} via GitHub PR merge...")
     make_issue_comment(
         issue_number,
-        format_issue_message(adw_id, AGENT_SHIPPER, 
+        format_issue_message(adw_id, AGENT_SHIPPER, f"🔀 Shipping {branch_name}...\n"
+                           "Using GitHub PR merge API")
+    )
+
+    success, error = ship_via_pr_merge(branch_name, repo_path, logger)
+
+    if not success:
+        logger.error(f"Failed to ship: {error}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_SHIPPER,
+                               f"❌ ZTE Failed - Ship phase failed\n\n"
+                               f"Could not automatically approve and merge the PR.\n"
+                               f"Please check the ship logs and merge manually if needed.\n\n"
+                               f"Error: {error}")
+        )
+        sys.exit(1)
+
+    logger.info(f"✅ Successfully shipped {branch_name}")
+
+    # Step 6: Post success message
+    make_issue_comment(
+        issue_number,
+        format_issue_message(adw_id, AGENT_SHIPPER,
                            f"🎉 **Successfully shipped!**\n\n"
                            f"✅ Validated all state fields\n"
-                           f"✅ Merged branch `{branch_name}` to main\n"
-                           f"✅ Pushed to origin/main\n\n"
+                           f"✅ Found and merged PR via GitHub API\n"
+                           f"✅ Branch `{branch_name}` merged to main\n\n"
                            f"🚢 Code has been deployed to production!")
     )
     

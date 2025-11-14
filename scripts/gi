@@ -1,0 +1,6 @@
+#!/bin/bash
+# Quick alias for create_issue_safe.sh
+# Usage: gi --title "title" --body-file file.md
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "${SCRIPT_DIR}/create_issue_safe.sh" "$@"

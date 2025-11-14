@@ -1,0 +1,53 @@
+# === HIGH-IMPACT TOKEN REDUCTION ===
+
+# LOGS (2.1M - Biggest problem!)
+logs/
+*.log
+
+# LOCK FILES (262K+ each)
+uv.lock
+poetry.lock
+package-lock.json
+yarn.lock
+projects/*/uv.lock
+
+# DOCUMENTATION TREES (320K+)
+trees/
+app_docs/
+agents/
+
+# ISSUE DOCS (not needed for development context)
+issue-*.md
+Create-*.md
+
+# DIAGNOSTIC TOOLS (temporary)
+##adw_token_*.py
+adw_token_*.txt
+
+# BINARY FILES
+*.png
+*.jpg
+*.gif
+*.pdf
+*.zip
+*.tar.gz
+
+# BUILD ARTIFACTS
+build/
+dist/
+__pycache__/
+.pytest_cache/
+node_modules/
+.venv/
+
+# IDE FILES
+.vscode/
+.idea/
+.DS_Store
+
+# KEEP BUT EXCLUDE LARGE SUBDIRS IN PROJECTS
+projects/*/build/
+projects/*/dist/
+projects/*/__pycache__/
+projects/*/node_modules/
+app_docs/assets/

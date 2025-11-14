@@ -125,8 +125,8 @@ async def github_webhook(request: Request):
                     model_set = extraction_result.model_set
                     trigger_reason = f"Comment with {workflow} workflow"
 
-        # Validate workflow constraints
-        if workflow in DEPENDENT_WORKFLOWS:
+        # Validate workflow constraints (case-insensitive)
+        if workflow and any(workflow.lower() == dep.lower() for dep in DEPENDENT_WORKFLOWS):
             if not provided_adw_id:
                 print(
                     f"{workflow} is a dependent workflow that requires an existing ADW ID"

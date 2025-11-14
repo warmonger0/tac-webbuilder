@@ -93,3 +93,42 @@ class ExportRequest(BaseModel):
 class QueryExportRequest(BaseModel):
     data: List[Dict[str, Any]] = Field(..., description="Query result data to export")
     columns: List[str] = Field(..., description="Column names for the export")
+
+# GitHub Issue Generation Models
+class GitHubIssue(BaseModel):
+    title: str = Field(..., description="Issue title")
+    body: str = Field(..., description="Issue body in GitHub markdown format")
+    labels: List[str] = Field(default_factory=list, description="Issue labels")
+    classification: Literal["feature", "bug", "chore"] = Field(..., description="Issue type classification")
+    workflow: str = Field(..., description="ADW workflow command (e.g., adw_sdlc_iso)")
+    model_set: Literal["base", "heavy"] = Field(..., description="Model set for ADW workflow")
+
+class ProjectContext(BaseModel):
+    path: str = Field(..., description="Project directory path")
+    is_new_project: bool = Field(..., description="Whether this is a new project")
+    framework: Optional[str] = Field(None, description="Detected framework (e.g., react-vite, nextjs, fastapi)")
+    backend: Optional[str] = Field(None, description="Detected backend framework")
+    complexity: Literal["low", "medium", "high"] = Field(..., description="Project complexity level")
+    build_tools: Optional[List[str]] = Field(default_factory=list, description="Detected build tools")
+    package_manager: Optional[str] = Field(None, description="Detected package manager")
+    has_git: bool = Field(default=False, description="Whether project has git initialized")
+
+class NLProcessRequest(BaseModel):
+    nl_input: str = Field(..., description="Natural language input describing the desired feature/bug/chore")
+    project_path: Optional[str] = Field(None, description="Path to project directory for context detection")
+
+class NLProcessResponse(BaseModel):
+    github_issue: GitHubIssue
+    project_context: ProjectContext
+    error: Optional[str] = None
+
+# Routes Visualization Models
+class Route(BaseModel):
+    path: str = Field(..., description="Route path (e.g., /api/upload)")
+    method: str = Field(..., description="HTTP method (GET, POST, PUT, DELETE, PATCH)")
+    handler: str = Field(..., description="Handler function name")
+    description: str = Field(..., description="Route description from docstring")
+
+class RoutesResponse(BaseModel):
+    routes: List[Route] = Field(..., description="List of routes")
+    total: int = Field(..., description="Total number of routes")

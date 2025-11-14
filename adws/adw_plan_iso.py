@@ -250,10 +250,24 @@ def main():
 
     # Get the plan file path directly from response
     logger.info("Getting plan file path")
-    plan_file_path = plan_response.output.strip()
-    
+    plan_file_path_raw = plan_response.output.strip()
+
+    # Extract just the file path if agent added extra text
+    # Look for lines that look like file paths (contain "specs/" and end with ".md")
+    for line in plan_file_path_raw.split('\n'):
+        line = line.strip()
+        if 'specs/' in line and line.endswith('.md'):
+            # Remove any leading/trailing quotes or backticks
+            line = line.strip('`').strip('"').strip("'")
+            # If line starts with specs/ or /, use it
+            if line.startswith('specs/') or line.startswith('/'):
+                plan_file_path_raw = line
+                break
+
+    logger.info(f"Extracted path: {plan_file_path_raw}")
+
     # Validate the path exists (within worktree)
-    if not plan_file_path:
+    if not plan_file_path_raw:
         error = "No plan file path returned from planning agent"
         logger.error(error)
         make_issue_comment(
@@ -261,24 +275,85 @@ def main():
             format_issue_message(adw_id, "ops", f"❌ {error}"),
         )
         sys.exit(1)
-    
-    # Check if file exists in worktree
-    worktree_plan_path = os.path.join(worktree_path, plan_file_path)
-    if not os.path.exists(worktree_plan_path):
-        error = f"Plan file does not exist in worktree: {plan_file_path}"
-        logger.error(error)
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", f"❌ {error}"),
-        )
-        sys.exit(1)
+
+    # Log what the agent reported
+    make_issue_comment(
+        issue_number,
+        format_issue_message(adw_id, AGENT_PLANNER, f"📍 Reported file location: `{plan_file_path_raw}`"),
+    )
+
+    # Handle both absolute and relative paths with fallback recovery
+    import shutil
+    plan_file_path = None
+    worktree_plan_path = None
+
+    if os.path.isabs(plan_file_path_raw):
+        # Agent returned absolute path
+        if os.path.exists(plan_file_path_raw):
+            if worktree_path in plan_file_path_raw:
+                # File is correctly in worktree
+                logger.info(f"Plan file found at absolute path in worktree: {plan_file_path_raw}")
+                worktree_plan_path = plan_file_path_raw
+                plan_file_path = os.path.relpath(plan_file_path_raw, worktree_path)
+            else:
+                # File is in parent repo - move it to worktree
+                logger.warning(f"Plan file created in parent repo, moving to worktree")
+                relative_path = os.path.basename(os.path.dirname(plan_file_path_raw)) + "/" + os.path.basename(plan_file_path_raw)
+                if relative_path.startswith("specs/"):
+                    relative_path = relative_path
+                else:
+                    relative_path = "specs/" + os.path.basename(plan_file_path_raw)
+                worktree_plan_path = os.path.join(worktree_path, relative_path)
+                os.makedirs(os.path.dirname(worktree_plan_path), exist_ok=True)
+                shutil.move(plan_file_path_raw, worktree_plan_path)
+                plan_file_path = relative_path
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "ops", f"⚠️ Plan file was in parent repo, moved to worktree: {relative_path}"),
+                )
+        else:
+            error = f"Plan file does not exist at reported absolute path: {plan_file_path_raw}"
+            logger.error(error)
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", f"❌ {error}"),
+            )
+            sys.exit(1)
+    else:
+        # Agent returned relative path - check worktree first
+        worktree_plan_path = os.path.join(worktree_path, plan_file_path_raw)
+        if os.path.exists(worktree_plan_path):
+            # File correctly in worktree
+            logger.info(f"Plan file found in worktree: {plan_file_path_raw}")
+            plan_file_path = plan_file_path_raw
+        else:
+            # Check parent repo as fallback
+            parent_repo_path = os.path.dirname(worktree_path)
+            parent_plan_path = os.path.join(parent_repo_path, plan_file_path_raw)
+            if os.path.exists(parent_plan_path):
+                logger.warning(f"Plan file created in parent repo, moving to worktree")
+                os.makedirs(os.path.dirname(worktree_plan_path), exist_ok=True)
+                shutil.move(parent_plan_path, worktree_plan_path)
+                plan_file_path = plan_file_path_raw
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "ops", f"⚠️ Plan file was in parent repo, moved to worktree: {plan_file_path_raw}"),
+                )
+            else:
+                error = f"Plan file does not exist in worktree or parent: {plan_file_path_raw}"
+                logger.error(error)
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "ops", f"❌ {error}"),
+                )
+                sys.exit(1)
 
     state.update(plan_file=plan_file_path)
     state.save("adw_plan_iso")
-    logger.info(f"Plan file created: {plan_file_path}")
+    logger.info(f"Plan file validated: {plan_file_path}")
     make_issue_comment(
         issue_number,
-        format_issue_message(adw_id, "ops", f"✅ Plan file created: {plan_file_path}"),
+        format_issue_message(adw_id, "ops", f"✅ Plan file validated in worktree: {plan_file_path}"),
     )
 
     # Create commit message

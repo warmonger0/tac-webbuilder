@@ -27,7 +27,6 @@ dist/
 *.db
 *.sqlite
 *.sqlite3
-!app/server/db/backup.db
 
 # IDE
 .vscode/
@@ -67,3 +66,24 @@ videos/
 # Bun lock files
 bun.lock
 bun.lockb
+
+# uv lock files
+uv.lock
+
+# Token optimization diagnostics
+adw_token_diagnostic.py
+adw_token_diagnostic_report.txt
+adw_token_monitor.py
+adw_token_optimizer.py
+adw_token_usage.jsonl
+
+# Issue tracking markdown files (temporary)
+issue-*.md
+Create-tac-webbuilder.md
+
+# MCP config backups
+.mcp.json.disabled
+.mcp.json
+
+# Playwright config (generated)
+playwright-mcp-config.json.codebase_index.json

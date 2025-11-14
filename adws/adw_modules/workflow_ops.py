@@ -37,6 +37,7 @@ AVAILABLE_ADW_WORKFLOWS = [
     "adw_review_iso",
     "adw_document_iso",
     "adw_ship_iso",
+    "adw_lightweight_iso",  # Optimized for simple changes ($0.20-0.50)
     "adw_sdlc_ZTE_iso",  # Zero Touch Execution workflow
     "adw_plan_build_iso",
     "adw_plan_build_test_iso",
@@ -85,13 +86,21 @@ def extract_adw_info(text: str, temp_adw_id: str) -> ADWExtractionResult:
             adw_id = data.get("adw_id")
             model_set = data.get("model_set", "base")  # Default to "base"
 
-            # Validate command
-            if adw_command and adw_command in AVAILABLE_ADW_WORKFLOWS:
-                return ADWExtractionResult(
-                    workflow_command=adw_command,
-                    adw_id=adw_id,
-                    model_set=model_set
-                )
+            # Validate command (case-insensitive)
+            if adw_command:
+                # Check if command matches any workflow (case-insensitive)
+                matching_workflow = None
+                for workflow in AVAILABLE_ADW_WORKFLOWS:
+                    if adw_command.lower() == workflow.lower():
+                        matching_workflow = workflow
+                        break
+
+                if matching_workflow:
+                    return ADWExtractionResult(
+                        workflow_command=matching_workflow,  # Use canonical form
+                        adw_id=adw_id,
+                        model_set=model_set
+                    )
 
             return ADWExtractionResult()  # Empty result
 
@@ -695,16 +704,96 @@ def create_and_implement_patch(
         )
 
     # Extract the patch plan file path from the response
-    patch_file_path = response.output.strip()
+    patch_file_path_raw = response.output.strip()
+
+    # Extract just the file path if agent added extra text
+    # Look for lines that look like file paths (contain "specs/patch/" and end with ".md")
+    for line in patch_file_path_raw.split('\n'):
+        line = line.strip()
+        if 'specs/patch/' in line and line.endswith('.md'):
+            # Remove any leading/trailing quotes or backticks
+            line = line.strip('`').strip('"').strip("'")
+            # If line starts with specs/ or /, use it
+            if line.startswith('specs/') or line.startswith('/'):
+                patch_file_path_raw = line
+                break
+
+    logger.info(f"Agent reported patch file: {patch_file_path_raw}")
+
+    # Handle both absolute and relative paths with fallback recovery
+    import shutil
+    patch_file_path = None
+
+    if os.path.isabs(patch_file_path_raw):
+        # Agent returned absolute path
+        if os.path.exists(patch_file_path_raw):
+            if working_dir and working_dir in patch_file_path_raw:
+                # File is correctly in worktree
+                logger.info(f"Patch file found at absolute path in worktree: {patch_file_path_raw}")
+                patch_file_path = os.path.relpath(patch_file_path_raw, working_dir)
+            elif working_dir:
+                # File is in parent repo - move it to worktree
+                logger.warning(f"Patch file created in parent repo, moving to worktree")
+                # Extract relative path from absolute path
+                if "specs/patch/" in patch_file_path_raw:
+                    relative_path = "specs/patch/" + os.path.basename(patch_file_path_raw)
+                else:
+                    relative_path = "specs/patch/" + os.path.basename(patch_file_path_raw)
+                worktree_patch_path = os.path.join(working_dir, relative_path)
+                os.makedirs(os.path.dirname(worktree_patch_path), exist_ok=True)
+                shutil.move(patch_file_path_raw, worktree_patch_path)
+                patch_file_path = relative_path
+                logger.warning(f"Moved patch file from parent to worktree: {relative_path}")
+            else:
+                # No worktree context, use absolute path
+                patch_file_path = patch_file_path_raw
+        else:
+            logger.error(f"Patch file does not exist at reported absolute path: {patch_file_path_raw}")
+            return None, AgentPromptResponse(
+                output=f"Patch file not found: {patch_file_path_raw}", success=False
+            )
+    else:
+        # Agent returned relative path
+        if working_dir:
+            # Check worktree first
+            worktree_patch_path = os.path.join(working_dir, patch_file_path_raw)
+            if os.path.exists(worktree_patch_path):
+                # File correctly in worktree
+                logger.info(f"Patch file found in worktree: {patch_file_path_raw}")
+                patch_file_path = patch_file_path_raw
+            else:
+                # Check parent repo as fallback
+                parent_repo_path = os.path.dirname(working_dir)
+                parent_patch_path = os.path.join(parent_repo_path, patch_file_path_raw)
+                if os.path.exists(parent_patch_path):
+                    logger.warning(f"Patch file created in parent repo, moving to worktree")
+                    os.makedirs(os.path.dirname(worktree_patch_path), exist_ok=True)
+                    shutil.move(parent_patch_path, worktree_patch_path)
+                    patch_file_path = patch_file_path_raw
+                    logger.warning(f"Moved patch file from parent to worktree: {patch_file_path_raw}")
+                else:
+                    logger.error(f"Patch file does not exist in worktree or parent: {patch_file_path_raw}")
+                    return None, AgentPromptResponse(
+                        output=f"Patch file not found: {patch_file_path_raw}", success=False
+                    )
+        else:
+            # No worktree, just validate it exists
+            if os.path.exists(patch_file_path_raw):
+                patch_file_path = patch_file_path_raw
+            else:
+                logger.error(f"Patch file does not exist: {patch_file_path_raw}")
+                return None, AgentPromptResponse(
+                    output=f"Patch file not found: {patch_file_path_raw}", success=False
+                )
 
     # Validate that it looks like a file path
     if "specs/patch/" not in patch_file_path or not patch_file_path.endswith(".md"):
-        logger.error(f"Invalid patch plan path returned: {patch_file_path}")
+        logger.error(f"Invalid patch plan path format: {patch_file_path}")
         return None, AgentPromptResponse(
             output=f"Invalid patch plan path: {patch_file_path}", success=False
         )
 
-    logger.info(f"Created patch plan: {patch_file_path}")
+    logger.info(f"Patch plan validated: {patch_file_path}")
 
     # Now implement the patch plan using the provided implementor agent name
     implement_response = implement_plan(
