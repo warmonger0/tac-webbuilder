@@ -7,6 +7,8 @@ import type {
   ConfirmResponse,
   RoutesResponse,
   CostResponse,
+  WorkflowHistoryResponse,
+  HistoryFilters,
 } from '../types';
 
 const API_BASE = '/api';
@@ -55,6 +57,30 @@ export async function listWorkflows(): Promise<Workflow[]> {
 
 export async function getHistory(limit: number = 20): Promise<HistoryItem[]> {
   return fetchJSON<HistoryItem[]>(`${API_BASE}/history?limit=${limit}`);
+}
+
+export async function getWorkflowHistory(
+  filters?: HistoryFilters
+): Promise<WorkflowHistoryResponse> {
+  const params = new URLSearchParams();
+
+  if (filters) {
+    if (filters.limit !== undefined) params.append('limit', filters.limit.toString());
+    if (filters.offset !== undefined) params.append('offset', filters.offset.toString());
+    if (filters.status) params.append('status', filters.status);
+    if (filters.model) params.append('model', filters.model);
+    if (filters.template) params.append('template', filters.template);
+    if (filters.start_date) params.append('start_date', filters.start_date);
+    if (filters.end_date) params.append('end_date', filters.end_date);
+    if (filters.search) params.append('search', filters.search);
+    if (filters.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters.sort_order) params.append('sort_order', filters.sort_order);
+  }
+
+  const queryString = params.toString();
+  const url = `${API_BASE}/history${queryString ? `?${queryString}` : ''}`;
+
+  return fetchJSON<WorkflowHistoryResponse>(url);
 }
 
 export async function getRoutes(): Promise<RoutesResponse> {

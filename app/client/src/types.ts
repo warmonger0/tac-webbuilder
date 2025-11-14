@@ -93,3 +93,65 @@ export interface CostResponse {
   cost_data?: CostData;
   error?: string;
 }
+
+// Workflow History Types
+export interface WorkflowHistoryItem {
+  id: number;
+  adw_id: string;
+  issue_number?: number;
+  nl_input?: string;
+  github_url?: string;
+  workflow_template?: string;
+  model_used?: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  start_time?: string;
+  end_time?: string;
+  duration_seconds?: number;
+  error_message?: string;
+  phase_count?: number;
+  current_phase?: string;
+  success_rate?: number;
+  retry_count?: number;
+  worktree_path?: string;
+  backend_port?: number;
+  frontend_port?: number;
+  concurrent_workflows?: number;
+  created_at: string;
+  updated_at: string;
+  cost_data?: CostData;
+}
+
+export interface HistoryAnalytics {
+  total_workflows: number;
+  completed_workflows: number;
+  failed_workflows: number;
+  avg_duration_seconds: number;
+  success_rate_percent: number;
+  workflows_by_model: Record<string, number>;
+  workflows_by_template: Record<string, number>;
+  workflows_by_status: Record<string, number>;
+}
+
+export interface HistoryFilters {
+  limit?: number;
+  offset?: number;
+  status?: string;
+  model?: string;
+  template?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+  sort_by?: string;
+  sort_order?: 'ASC' | 'DESC';
+}
+
+export interface WorkflowHistoryResponse {
+  workflows: WorkflowHistoryItem[];
+  total: number;
+  analytics: HistoryAnalytics;
+}
+
+export interface WorkflowHistoryWebSocketMessage {
+  type: 'history_initial' | 'history_update';
+  data: WorkflowHistoryItem[];
+}

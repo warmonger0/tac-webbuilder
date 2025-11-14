@@ -177,3 +177,60 @@ class CostData(BaseModel):
 class CostResponse(BaseModel):
     cost_data: Optional[CostData] = Field(None, description="Cost data if available")
     error: Optional[str] = Field(None, description="Error message if any")
+
+# Workflow History Models
+class WorkflowHistoryItem(BaseModel):
+    id: int = Field(..., description="Database record ID")
+    adw_id: str = Field(..., description="Unique ADW workflow identifier")
+    issue_number: Optional[int] = Field(None, description="GitHub issue number")
+    nl_input: Optional[str] = Field(None, description="Natural language input from user")
+    github_url: Optional[str] = Field(None, description="GitHub issue URL")
+    workflow_template: Optional[str] = Field(None, description="Workflow template name")
+    model_used: Optional[str] = Field(None, description="Model identifier")
+    status: str = Field(..., description="Workflow status: pending, running, completed, failed")
+    start_time: Optional[str] = Field(None, description="ISO 8601 start timestamp")
+    end_time: Optional[str] = Field(None, description="ISO 8601 end timestamp")
+    duration_seconds: Optional[int] = Field(None, description="Duration in seconds")
+    error_message: Optional[str] = Field(None, description="Error message if failed")
+    phase_count: Optional[int] = Field(None, description="Total number of phases")
+    current_phase: Optional[str] = Field(None, description="Current workflow phase")
+    success_rate: Optional[float] = Field(None, description="Success rate (0-100)")
+    retry_count: Optional[int] = Field(0, description="Number of retries")
+    worktree_path: Optional[str] = Field(None, description="Path to worktree")
+    backend_port: Optional[int] = Field(None, description="Backend port used")
+    frontend_port: Optional[int] = Field(None, description="Frontend port used")
+    concurrent_workflows: Optional[int] = Field(0, description="Number of concurrent workflows")
+    created_at: str = Field(..., description="ISO 8601 creation timestamp")
+    updated_at: str = Field(..., description="ISO 8601 last update timestamp")
+    cost_data: Optional[CostData] = Field(None, description="Cost data for this workflow")
+
+class HistoryAnalytics(BaseModel):
+    total_workflows: int = Field(..., description="Total number of workflows")
+    completed_workflows: int = Field(..., description="Number of completed workflows")
+    failed_workflows: int = Field(..., description="Number of failed workflows")
+    avg_duration_seconds: float = Field(..., description="Average duration in seconds")
+    success_rate_percent: float = Field(..., description="Overall success rate (0-100)")
+    workflows_by_model: Dict[str, int] = Field(..., description="Count by model type")
+    workflows_by_template: Dict[str, int] = Field(..., description="Count by template type")
+    workflows_by_status: Dict[str, int] = Field(..., description="Count by status")
+
+class HistoryFilters(BaseModel):
+    limit: int = Field(20, description="Maximum number of records to return")
+    offset: int = Field(0, description="Number of records to skip")
+    status: Optional[str] = Field(None, description="Filter by status")
+    model: Optional[str] = Field(None, description="Filter by model")
+    template: Optional[str] = Field(None, description="Filter by template")
+    start_date: Optional[str] = Field(None, description="Filter by start date (ISO 8601)")
+    end_date: Optional[str] = Field(None, description="Filter by end date (ISO 8601)")
+    search: Optional[str] = Field(None, description="Search query")
+    sort_by: str = Field("created_at", description="Field to sort by")
+    sort_order: str = Field("DESC", description="Sort order (ASC or DESC)")
+
+class WorkflowHistoryResponse(BaseModel):
+    workflows: List[WorkflowHistoryItem] = Field(..., description="List of workflow history items")
+    total: int = Field(..., description="Total number of workflows (before pagination)")
+    analytics: HistoryAnalytics = Field(..., description="Analytics summary")
+
+class WorkflowHistoryWebSocketMessage(BaseModel):
+    type: str = Field(..., description="Message type: 'history_update' or 'history_initial'")
+    data: List[WorkflowHistoryItem] = Field(..., description="Workflow history data")
