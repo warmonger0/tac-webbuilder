@@ -50,3 +50,17 @@ export interface RoutesResponse {
   routes: Route[];
   total: number;
 }
+
+export interface WorkflowTemplate {
+  name: string;
+  display_name: string;
+  phases: string[];
+  purpose: string;
+  cost_range: string;
+  best_for: string[];
+}
+
+export interface WorkflowCatalogResponse {
+  workflows: WorkflowTemplate[];
+  total: number;
+}

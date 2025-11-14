@@ -28,7 +28,9 @@ from core.data_models import (
     QueryExportRequest,
     Route,
     RoutesResponse,
-    Workflow
+    Workflow,
+    WorkflowTemplate,
+    WorkflowCatalogResponse
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
 from core.llm_processor import generate_sql, generate_random_query
@@ -112,7 +114,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 def get_workflows_data() -> List[Workflow]:
-    """Helper function to get workflow data"""
+    """Helper function to get workflow data - only returns OPEN workflows"""
     workflows = []
     agents_dir = os.path.join(os.path.dirname(__file__), "..", "..", "agents")
 
@@ -134,6 +136,30 @@ def get_workflows_data() -> List[Workflow]:
             with open(state_file, 'r') as f:
                 state = json.load(f)
 
+            issue_number = int(state.get("issue_number", 0))
+
+            # Check GitHub issue status - only include OPEN issues
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ["gh", "issue", "view", str(issue_number), "--json", "state"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    issue_data = json.loads(result.stdout)
+                    if issue_data.get("state") != "OPEN":
+                        # Skip closed workflows
+                        continue
+                else:
+                    # If gh command fails, skip this workflow
+                    logger.warning(f"[WARNING] Could not check status for issue #{issue_number}")
+                    continue
+            except Exception as e:
+                logger.warning(f"[WARNING] Failed to check GitHub status for issue #{issue_number}: {e}")
+                continue
+
             # Determine current phase by checking which phase directories exist
             phase_order = ["plan", "build", "test", "review", "document", "ship"]
             current_phase = "plan"  # Default
@@ -146,7 +172,6 @@ def get_workflows_data() -> List[Workflow]:
 
             # Get GitHub repo from git config
             github_repo = os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder")
-            issue_number = int(state.get("issue_number", 0))
             github_url = f"https://github.com/{github_repo}/issues/{issue_number}"
 
             # Create workflow object
@@ -536,6 +561,76 @@ async def get_workflows() -> List[Workflow]:
         logger.error(f"[ERROR] Failed to retrieve workflows: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         return []
+
+@app.get("/api/workflow-catalog", response_model=WorkflowCatalogResponse)
+async def get_workflow_catalog() -> WorkflowCatalogResponse:
+    """Get catalog of available ADW workflow templates"""
+    try:
+        workflows = [
+            WorkflowTemplate(
+                name="adw_lightweight_iso",
+                display_name="Lightweight Workflow",
+                phases=["Plan (minimal)", "Build", "Ship"],
+                purpose="Optimized for simple UI changes, docs updates, and single-file modifications. Skips extensive testing and review.",
+                cost_range="$0.20 - $0.50",
+                best_for=["UI-only changes", "Documentation updates", "Simple bug fixes", "Single-file modifications"]
+            ),
+            WorkflowTemplate(
+                name="adw_sdlc_iso",
+                display_name="Full SDLC Workflow",
+                phases=["Plan", "Build", "Test", "Review", "Document", "Ship"],
+                purpose="Complete software development lifecycle for standard features and improvements.",
+                cost_range="$3 - $5",
+                best_for=["Standard features", "Multi-file changes", "Features requiring validation", "General improvements"]
+            ),
+            WorkflowTemplate(
+                name="adw_plan_build_test_iso",
+                display_name="Plan-Build-Test Workflow",
+                phases=["Plan", "Build", "Test"],
+                purpose="Focused on implementation and testing without full documentation phase. Good for bugs and medium complexity features.",
+                cost_range="$3 - $5",
+                best_for=["Bug fixes requiring testing", "Medium complexity features", "Changes needing validation"]
+            ),
+            WorkflowTemplate(
+                name="adw_plan_iso",
+                display_name="Planning Only",
+                phases=["Plan"],
+                purpose="Generate implementation plan without executing. Useful for proposal review or complex planning.",
+                cost_range="$0.50 - $1",
+                best_for=["Architecture planning", "Proposal generation", "Complex feature scoping"]
+            ),
+            WorkflowTemplate(
+                name="adw_ship_iso",
+                display_name="Ship Only",
+                phases=["Ship"],
+                purpose="Create PR and merge existing branch work. Use after manual development.",
+                cost_range="$0.30 - $0.50",
+                best_for=["Shipping manual changes", "Creating PR for existing work", "Final merge step"]
+            ),
+            WorkflowTemplate(
+                name="adw_plan_build_iso",
+                display_name="Plan-Build",
+                phases=["Plan", "Build"],
+                purpose="Quick implementation without testing or documentation. Use when you'll test manually.",
+                cost_range="$2 - $3",
+                best_for=["Prototypes", "Quick implementations", "Manual testing workflows"]
+            ),
+            WorkflowTemplate(
+                name="adw_plan_build_test_review_iso",
+                display_name="Plan-Build-Test-Review",
+                phases=["Plan", "Build", "Test", "Review"],
+                purpose="Comprehensive workflow with code review but no documentation phase.",
+                cost_range="$4 - $6",
+                best_for=["High-quality implementations", "Critical features", "Production code requiring review"]
+            ),
+        ]
+
+        logger.info(f"[SUCCESS] Retrieved {len(workflows)} workflow templates")
+        return WorkflowCatalogResponse(workflows=workflows, total=len(workflows))
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to retrieve workflow catalog: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return WorkflowCatalogResponse(workflows=[], total=0)
 
 @app.delete("/api/table/{table_name}")
 async def delete_table(table_name: str):

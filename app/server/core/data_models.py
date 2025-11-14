@@ -132,3 +132,23 @@ class Route(BaseModel):
 class RoutesResponse(BaseModel):
     routes: List[Route] = Field(..., description="List of routes")
     total: int = Field(..., description="Total number of routes")
+
+# Workflow Models
+class Workflow(BaseModel):
+    adw_id: str = Field(..., description="Unique identifier for the workflow")
+    issue_number: int = Field(..., description="GitHub issue number")
+    phase: str = Field(..., description="Current workflow phase (plan, build, test, review, document, ship)")
+    github_url: str = Field(..., description="GitHub URL for the workflow")
+
+# ADW Workflow Catalog Models
+class WorkflowTemplate(BaseModel):
+    name: str = Field(..., description="Workflow filename (e.g., adw_sdlc_iso)")
+    display_name: str = Field(..., description="Human-readable name")
+    phases: List[str] = Field(..., description="List of phases in execution order")
+    purpose: str = Field(..., description="What this workflow does")
+    cost_range: str = Field(..., description="Estimated cost range (e.g., $0.20-0.50)")
+    best_for: List[str] = Field(..., description="Best use cases")
+
+class WorkflowCatalogResponse(BaseModel):
+    workflows: List[WorkflowTemplate] = Field(..., description="List of available workflow templates")
+    total: int = Field(..., description="Total number of workflows")
