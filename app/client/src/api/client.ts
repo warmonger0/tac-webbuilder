@@ -6,6 +6,7 @@ import type {
   SubmitRequestResponse,
   ConfirmResponse,
   RoutesResponse,
+  CostResponse,
 } from '../types';
 
 const API_BASE = '/api';
@@ -58,4 +59,8 @@ export async function getHistory(limit: number = 20): Promise<HistoryItem[]> {
 
 export async function getRoutes(): Promise<RoutesResponse> {
   return fetchJSON<RoutesResponse>(`${API_BASE}/routes`);
+}
+
+export async function fetchWorkflowCosts(adwId: string): Promise<CostResponse> {
+  return fetchJSON<CostResponse>(`${API_BASE}/workflows/${adwId}/costs`);
 }
