@@ -1,13 +1,17 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from datetime import datetime
+from typing import List, Set
 import os
 import sqlite3
 import traceback
 from dotenv import load_dotenv
 import logging
 import sys
+import asyncio
+import json
+from pathlib import Path
 
 from core.data_models import (
     FileUploadResponse,
@@ -23,7 +27,8 @@ from core.data_models import (
     ExportRequest,
     QueryExportRequest,
     Route,
-    RoutesResponse
+    RoutesResponse,
+    Workflow
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
 from core.llm_processor import generate_sql, generate_random_query
@@ -73,6 +78,181 @@ app_start_time = datetime.now()
 
 # Ensure database directory exists
 os.makedirs("db", exist_ok=True)
+
+# WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Set[WebSocket] = set()
+        self.last_workflow_state = None
+        self.last_routes_state = None
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.add(websocket)
+        logger.info(f"[WS] Client connected. Total connections: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.discard(websocket)
+        logger.info(f"[WS] Client disconnected. Total connections: {len(self.active_connections)}")
+
+    async def broadcast(self, message: dict):
+        """Broadcast message to all connected clients"""
+        disconnected = set()
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception as e:
+                logger.error(f"[WS] Error broadcasting to client: {e}")
+                disconnected.add(connection)
+
+        # Clean up disconnected clients
+        for connection in disconnected:
+            self.disconnect(connection)
+
+manager = ConnectionManager()
+
+def get_workflows_data() -> List[Workflow]:
+    """Helper function to get workflow data"""
+    workflows = []
+    agents_dir = os.path.join(os.path.dirname(__file__), "..", "..", "agents")
+
+    # Check if agents directory exists
+    if not os.path.exists(agents_dir):
+        return []
+
+    # Scan for workflow directories
+    for adw_id in os.listdir(agents_dir):
+        adw_dir = os.path.join(agents_dir, adw_id)
+        state_file = os.path.join(adw_dir, "adw_state.json")
+
+        # Skip if not a directory or no state file
+        if not os.path.isdir(adw_dir) or not os.path.exists(state_file):
+            continue
+
+        # Read state file
+        try:
+            with open(state_file, 'r') as f:
+                state = json.load(f)
+
+            # Determine current phase by checking which phase directories exist
+            phase_order = ["plan", "build", "test", "review", "document", "ship"]
+            current_phase = "plan"  # Default
+
+            for phase in reversed(phase_order):
+                phase_dir = os.path.join(adw_dir, f"adw_{phase}_iso")
+                if os.path.exists(phase_dir):
+                    current_phase = phase
+                    break
+
+            # Get GitHub repo from git config
+            github_repo = os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder")
+            issue_number = int(state.get("issue_number", 0))
+            github_url = f"https://github.com/{github_repo}/issues/{issue_number}"
+
+            # Create workflow object
+            workflow = Workflow(
+                adw_id=state["adw_id"],
+                issue_number=issue_number,
+                phase=current_phase,
+                github_url=github_url
+            )
+            workflows.append(workflow)
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to process workflow {adw_id}: {str(e)}")
+            continue
+
+    return workflows
+
+def get_routes_data() -> List[Route]:
+    """Helper function to get API routes data"""
+    route_list = []
+
+    try:
+        # Introspect FastAPI routes
+        for route in app.routes:
+            # Filter for HTTP routes (not WebSocket, static, etc.)
+            if hasattr(route, "methods") and hasattr(route, "path"):
+                # Skip internal routes
+                if route.path.startswith("/docs") or route.path.startswith("/redoc") or route.path.startswith("/openapi"):
+                    continue
+
+                # Extract route information
+                for method in route.methods:
+                    # Skip OPTIONS method (automatically added by CORS)
+                    if method == "OPTIONS":
+                        continue
+
+                    # Get handler name
+                    handler_name = route.endpoint.__name__ if hasattr(route, "endpoint") else "unknown"
+
+                    # Get description from docstring
+                    description = ""
+                    if hasattr(route, "endpoint") and route.endpoint.__doc__:
+                        # Get first line of docstring
+                        description = route.endpoint.__doc__.strip().split("\n")[0].strip()
+
+                    route_info = Route(
+                        method=method,
+                        path=route.path,
+                        handler=handler_name,
+                        description=description
+                    )
+                    route_list.append(route_info)
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to get routes data: {str(e)}")
+
+    return route_list
+
+async def watch_workflows():
+    """Background task to watch for workflow changes and broadcast updates"""
+    agents_dir = os.path.join(os.path.dirname(__file__), "..", "..", "agents")
+
+    while True:
+        try:
+            if len(manager.active_connections) > 0:
+                workflows = get_workflows_data()
+
+                # Convert to dict for comparison
+                current_state = json.dumps([w.model_dump() for w in workflows], sort_keys=True)
+
+                # Only broadcast if state changed
+                if current_state != manager.last_workflow_state:
+                    manager.last_workflow_state = current_state
+                    await manager.broadcast({
+                        "type": "workflows_update",
+                        "data": [w.model_dump() for w in workflows]
+                    })
+                    logger.info(f"[WS] Broadcasted workflow update to {len(manager.active_connections)} clients")
+
+            await asyncio.sleep(2)  # Check every 2 seconds
+        except Exception as e:
+            logger.error(f"[WS] Error in workflow watcher: {e}")
+            await asyncio.sleep(5)  # Back off on error
+
+async def watch_routes():
+    """Background task to watch for route changes and broadcast updates"""
+    while True:
+        try:
+            if len(manager.active_connections) > 0:
+                routes = get_routes_data()
+
+                # Convert to dict for comparison
+                current_state = json.dumps([r.model_dump() for r in routes], sort_keys=True)
+
+                # Only broadcast if state changed
+                if current_state != manager.last_routes_state:
+                    manager.last_routes_state = current_state
+                    await manager.broadcast({
+                        "type": "routes_update",
+                        "data": [r.model_dump() for r in routes]
+                    })
+                    logger.info(f"[WS] Broadcasted routes update to {len(manager.active_connections)} clients")
+
+            await asyncio.sleep(2)  # Check every 2 seconds
+        except Exception as e:
+            logger.error(f"[WS] Error in routes watcher: {e}")
+            await asyncio.sleep(5)  # Back off on error
 
 @app.post("/api/upload", response_model=FileUploadResponse)
 async def upload_file(file: UploadFile = File(...)) -> FileUploadResponse:
@@ -276,41 +456,9 @@ async def health_check() -> HealthCheckResponse:
 
 @app.get("/api/routes", response_model=RoutesResponse)
 async def get_routes() -> RoutesResponse:
-    """Get all registered FastAPI routes"""
+    """Get all registered FastAPI routes (REST endpoint for fallback)"""
     try:
-        route_list = []
-
-        # Introspect FastAPI routes
-        for route in app.routes:
-            # Filter for HTTP routes (not WebSocket, static, etc.)
-            if hasattr(route, "methods") and hasattr(route, "path"):
-                # Skip internal routes
-                if route.path.startswith("/docs") or route.path.startswith("/redoc") or route.path.startswith("/openapi"):
-                    continue
-
-                # Extract route information
-                for method in route.methods:
-                    # Skip OPTIONS method (automatically added by CORS)
-                    if method == "OPTIONS":
-                        continue
-
-                    # Get handler name
-                    handler_name = route.endpoint.__name__ if hasattr(route, "endpoint") else "unknown"
-
-                    # Get description from docstring
-                    description = ""
-                    if hasattr(route, "endpoint") and route.endpoint.__doc__:
-                        # Get first line of docstring
-                        description = route.endpoint.__doc__.strip().split("\n")[0].strip()
-
-                    route_info = Route(
-                        method=method,
-                        path=route.path,
-                        handler=handler_name,
-                        description=description
-                    )
-                    route_list.append(route_info)
-
+        route_list = get_routes_data()
         response = RoutesResponse(routes=route_list, total=len(route_list))
         logger.info(f"[SUCCESS] Retrieved {len(route_list)} routes")
         return response
@@ -319,6 +467,75 @@ async def get_routes() -> RoutesResponse:
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         # Return empty routes list on error
         return RoutesResponse(routes=[], total=0)
+
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks on server startup"""
+    asyncio.create_task(watch_workflows())
+    asyncio.create_task(watch_routes())
+    logger.info("[STARTUP] Workflow and routes watchers started")
+
+@app.websocket("/ws/workflows")
+async def websocket_workflows(websocket: WebSocket):
+    """WebSocket endpoint for real-time workflow updates"""
+    await manager.connect(websocket)
+
+    try:
+        # Send initial data
+        workflows = get_workflows_data()
+        await websocket.send_json({
+            "type": "workflows_update",
+            "data": [w.model_dump() for w in workflows]
+        })
+
+        # Keep connection alive and handle incoming messages
+        while True:
+            try:
+                # Wait for any client messages (ping/pong, etc.)
+                await websocket.receive_text()
+            except WebSocketDisconnect:
+                break
+    except Exception as e:
+        logger.error(f"[WS] Error in WebSocket connection: {e}")
+    finally:
+        manager.disconnect(websocket)
+
+@app.websocket("/ws/routes")
+async def websocket_routes(websocket: WebSocket):
+    """WebSocket endpoint for real-time route updates"""
+    await manager.connect(websocket)
+
+    try:
+        # Send initial data
+        routes = get_routes_data()
+        await websocket.send_json({
+            "type": "routes_update",
+            "data": [r.model_dump() for r in routes]
+        })
+
+        # Keep connection alive and handle incoming messages
+        while True:
+            try:
+                # Wait for any client messages (ping/pong, etc.)
+                await websocket.receive_text()
+            except WebSocketDisconnect:
+                break
+    except Exception as e:
+        logger.error(f"[WS] Error in WebSocket connection: {e}")
+    finally:
+        manager.disconnect(websocket)
+
+@app.get("/api/workflows", response_model=List[Workflow])
+async def get_workflows() -> List[Workflow]:
+    """Get all active ADW workflows (REST endpoint for fallback)"""
+    try:
+        workflows = get_workflows_data()
+        logger.info(f"[SUCCESS] Retrieved {len(workflows)} active workflows")
+        return workflows
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to retrieve workflows: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return []
 
 @app.delete("/api/table/{table_name}")
 async def delete_table(table_name: str):

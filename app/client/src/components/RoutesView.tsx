@@ -1,7 +1,18 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getRoutes } from '../api/client';
+import { useRoutesWebSocket } from '../hooks/useWebSocket';
 import type { Route } from '../types';
+
+function formatTimestamp(date: Date | null): string {
+  if (!date) return '';
+
+  const now = new Date();
+  const diffSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffSeconds < 5) return 'Just now';
+  if (diffSeconds < 60) return `${diffSeconds}s ago`;
+  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
+  return `${Math.floor(diffSeconds / 3600)}h ago`;
+}
 
 function MethodBadge({ method }: { method: string }) {
   const colors: Record<string, string> = {
@@ -26,20 +37,12 @@ function MethodBadge({ method }: { method: string }) {
 export function RoutesView() {
   const [searchText, setSearchText] = useState('');
   const [methodFilter, setMethodFilter] = useState<string>('ALL');
-
-  const {
-    data: routesData,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ['routes'],
-    queryFn: getRoutes,
-  });
+  const { routes, isConnected, lastUpdated } = useRoutesWebSocket();
 
   const filteredRoutes = useMemo(() => {
-    if (!routesData?.routes) return [];
+    if (!routes || routes.length === 0) return [];
 
-    return routesData.routes.filter((route: Route) => {
+    return routes.filter((route: Route) => {
       // Method filter
       if (methodFilter !== 'ALL' && route.method !== methodFilter) {
         return false;
@@ -57,41 +60,63 @@ export function RoutesView() {
 
       return true;
     });
-  }, [routesData, searchText, methodFilter]);
+  }, [routes, searchText, methodFilter]);
 
-  if (isLoading) {
+  if (!routes || routes.length === 0) {
     return (
-      <div className="flex justify-center items-center py-12">
-        <div className="text-gray-600">Loading routes...</div>
+      <div>
+        {/* Connection status banner */}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+              }`}
+            />
+            <span className="text-sm text-gray-600">
+              {isConnected ? 'Live updates' : 'Reconnecting...'}
+            </span>
+            {lastUpdated && (
+              <span className="text-xs text-gray-500">
+                • Updated {formatTimestamp(lastUpdated)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+          <p className="text-gray-600 text-lg">No routes found</p>
+          <p className="text-gray-500 text-sm mt-2">
+            Routes will appear here once the server is analyzed
+          </p>
+        </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
-        Error loading routes:{' '}
-        {error instanceof Error ? error.message : 'Unknown error'}
-      </div>
-    );
-  }
-
-  if (!routesData || routesData.routes.length === 0) {
-    return (
-      <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-        <p className="text-gray-600 text-lg">No routes found</p>
-        <p className="text-gray-500 text-sm mt-2">
-          Routes will appear here once the server is analyzed
-        </p>
-      </div>
-    );
-  }
-
-  const methods = ['ALL', ...Array.from(new Set(routesData.routes.map((r: Route) => r.method)))];
+  const methods = ['ALL', ...Array.from(new Set(routes.map((r: Route) => r.method)))];
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">API Routes</h2>
+      {/* Header with connection status */}
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">API Routes</h2>
+        <div className="flex items-center gap-2">
+          <div
+            className={`w-2 h-2 rounded-full ${
+              isConnected ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'
+            }`}
+          />
+          <span className="text-sm text-gray-600">
+            {isConnected ? 'Live updates' : 'Polling fallback'}
+          </span>
+          {lastUpdated && (
+            <span className="text-xs text-gray-500">
+              • Updated {formatTimestamp(lastUpdated)}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Filters */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
@@ -124,7 +149,7 @@ export function RoutesView() {
 
       {/* Summary */}
       <div className="mb-4 text-sm text-gray-600">
-        Showing {filteredRoutes.length} of {routesData.total} routes
+        Showing {filteredRoutes.length} of {routes.length} routes
       </div>
 
       {/* Routes table */}

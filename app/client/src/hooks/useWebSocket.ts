@@ -1,56 +1,178 @@
-import { useEffect, useState } from 'react';
-import type { Workflow } from '../types';
+import { useEffect, useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { listWorkflows, getRoutes } from '../api/client';
+import type { Workflow, Route } from '../types';
 
-interface WebSocketMessage {
-  type: string;
-  adw_id: string;
-  phase: string;
+interface WorkflowsWebSocketMessage {
+  type: 'workflows_update';
+  data: Workflow[];
 }
 
-export function useWebSocket() {
+interface RoutesWebSocketMessage {
+  type: 'routes_update';
+  data: Route[];
+}
+
+export function useWorkflowsWebSocket() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Fallback polling when WebSocket is disconnected
+  const { data: polledWorkflows } = useQuery({
+    queryKey: ['workflows'],
+    queryFn: listWorkflows,
+    refetchInterval: isConnected ? false : 3000, // Only poll when WS disconnected
+    enabled: !isConnected, // Only enable when WS is not connected
+  });
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8002/ws');
+    if (!isConnected && polledWorkflows) {
+      setWorkflows(polledWorkflows);
+      setLastUpdated(new Date());
+    }
+  }, [polledWorkflows, isConnected]);
 
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-      setIsConnected(true);
-    };
+  useEffect(() => {
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.hostname;
+      const wsUrl = `${protocol}//${host}:8000/ws/workflows`;
 
-    ws.onmessage = (event) => {
-      try {
-        const message: WebSocketMessage = JSON.parse(event.data);
+      console.log('[WS] Connecting to:', wsUrl);
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-        if (message.type === 'workflow_progress') {
-          setWorkflows((prev) =>
-            prev.map((w) =>
-              w.adw_id === message.adw_id
-                ? { ...w, phase: message.phase }
-                : w
-            )
-          );
+      ws.onopen = () => {
+        console.log('[WS] Connected to workflow updates');
+        setIsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message: WorkflowsWebSocketMessage = JSON.parse(event.data);
+
+          if (message.type === 'workflows_update') {
+            setWorkflows(message.data);
+            setLastUpdated(new Date());
+            console.log('[WS] Received workflow update:', message.data.length, 'workflows');
+          }
+        } catch (err) {
+          console.error('[WS] Error parsing message:', err);
         }
-      } catch (err) {
-        console.error('Error parsing WebSocket message:', err);
-      }
+      };
+
+      ws.onerror = (error) => {
+        console.error('[WS] Error:', error);
+        setIsConnected(false);
+      };
+
+      ws.onclose = () => {
+        console.log('[WS] Disconnected, will reconnect in 5s...');
+        setIsConnected(false);
+
+        // Reconnect after 5 seconds
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, 5000);
+      };
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setIsConnected(false);
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-      setIsConnected(false);
-    };
+    connect();
 
     return () => {
-      ws.close();
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     };
   }, []);
 
-  return { workflows, isConnected };
+  return { workflows, isConnected, lastUpdated };
+}
+
+export function useRoutesWebSocket() {
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Fallback polling when WebSocket is disconnected
+  const { data: polledRoutes } = useQuery({
+    queryKey: ['routes'],
+    queryFn: getRoutes,
+    refetchInterval: isConnected ? false : 3000, // Only poll when WS disconnected
+    enabled: !isConnected, // Only enable when WS is not connected
+  });
+
+  useEffect(() => {
+    if (!isConnected && polledRoutes) {
+      setRoutes(polledRoutes.routes);
+      setLastUpdated(new Date());
+    }
+  }, [polledRoutes, isConnected]);
+
+  useEffect(() => {
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.hostname;
+      const wsUrl = `${protocol}//${host}:8000/ws/routes`;
+
+      console.log('[WS] Connecting to:', wsUrl);
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('[WS] Connected to routes updates');
+        setIsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message: RoutesWebSocketMessage = JSON.parse(event.data);
+
+          if (message.type === 'routes_update') {
+            setRoutes(message.data);
+            setLastUpdated(new Date());
+            console.log('[WS] Received routes update:', message.data.length, 'routes');
+          }
+        } catch (err) {
+          console.error('[WS] Error parsing message:', err);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('[WS] Error:', error);
+        setIsConnected(false);
+      };
+
+      ws.onclose = () => {
+        console.log('[WS] Disconnected, will reconnect in 5s...');
+        setIsConnected(false);
+
+        // Reconnect after 5 seconds
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, 5000);
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
+  return { routes, isConnected, lastUpdated };
 }
