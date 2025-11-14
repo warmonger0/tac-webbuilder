@@ -181,6 +181,7 @@
 
 ### Routes & Validation Features
 - `app_docs/feature-04a76d25-validation-optimization-routes-viz.md` - API routes visualization, AST parsing, routes_analyzer.py, Routes tab UI
+- `app_docs/feature-4fc73599-api-routes-display.md` - Dynamic API routes introspection, /api/routes endpoint, route display functionality, FastAPI route discovery
 
 ### Templates & Integration Features
 - `app_docs/feature-0f04f66d-project-templates-docs.md` - Project templates, scaffolding scripts, setup_new_project.sh
