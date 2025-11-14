@@ -1,5 +1,6 @@
 import './style.css'
 import { api } from './api/client'
+import { getAllWorkflows, categoryNames, categoryDescriptions } from './workflows'
 
 // Global state
 
@@ -10,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeModal();
   initializeRandomQueryButton();
   loadDatabaseSchema();
+  displayWorkflows();
 });
 
 // Helper function to get download icon
@@ -524,7 +526,7 @@ function getTypeEmoji(type: string): string {
 async function loadSampleData(sampleType: string) {
   try {
     let filename: string;
-    
+
     if (sampleType === 'users') {
       filename = 'users.json';
     } else if (sampleType === 'products') {
@@ -534,19 +536,103 @@ async function loadSampleData(sampleType: string) {
     } else {
       throw new Error(`Unknown sample type: ${sampleType}`);
     }
-    
+
     const response = await fetch(`/sample-data/${filename}`);
-    
+
     if (!response.ok) {
       throw new Error('Failed to load sample data');
     }
-    
+
     const blob = await response.blob();
     const file = new File([blob], filename, { type: blob.type });
-    
+
     // Upload the file
     await handleFileUpload(file);
   } catch (error) {
     displayError(error instanceof Error ? error.message : 'Failed to load sample data');
   }
+}
+
+// Display workflows
+function displayWorkflows() {
+  const workflowsList = document.getElementById('workflows-list') as HTMLDivElement;
+  const workflows = getAllWorkflows();
+
+  // Group workflows by category
+  const categories: Array<Workflow['category']> = ['single-phase', 'multi-phase', 'full-sdlc'];
+
+  workflowsList.innerHTML = '';
+
+  categories.forEach(category => {
+    const categoryWorkflows = workflows.filter(w => w.category === category);
+
+    if (categoryWorkflows.length === 0) return;
+
+    // Category header
+    const categoryHeader = document.createElement('div');
+    categoryHeader.className = 'workflow-category-header';
+
+    const categoryTitle = document.createElement('h4');
+    categoryTitle.className = 'workflow-category-title';
+    categoryTitle.textContent = categoryNames[category];
+
+    const categoryDesc = document.createElement('p');
+    categoryDesc.className = 'workflow-category-description';
+    categoryDesc.textContent = categoryDescriptions[category];
+
+    categoryHeader.appendChild(categoryTitle);
+    categoryHeader.appendChild(categoryDesc);
+    workflowsList.appendChild(categoryHeader);
+
+    // Category workflows
+    const categoryContainer = document.createElement('div');
+    categoryContainer.className = 'workflow-category-container';
+
+    categoryWorkflows.forEach(workflow => {
+      const workflowItem = document.createElement('div');
+      workflowItem.className = 'workflow-item';
+
+      // Two-column layout
+      const workflowContent = document.createElement('div');
+      workflowContent.className = 'workflow-content';
+
+      // Left column: Name and script
+      const workflowLeft = document.createElement('div');
+      workflowLeft.className = 'workflow-left';
+
+      const workflowName = document.createElement('div');
+      workflowName.className = 'workflow-name';
+      workflowName.textContent = workflow.name;
+
+      const workflowScript = document.createElement('div');
+      workflowScript.className = 'workflow-script';
+      workflowScript.textContent = workflow.script_name;
+
+      workflowLeft.appendChild(workflowName);
+      workflowLeft.appendChild(workflowScript);
+
+      // Right column: Description and use case
+      const workflowRight = document.createElement('div');
+      workflowRight.className = 'workflow-right';
+
+      const workflowDescription = document.createElement('div');
+      workflowDescription.className = 'workflow-description';
+      workflowDescription.textContent = workflow.description;
+
+      const workflowUseCase = document.createElement('div');
+      workflowUseCase.className = 'workflow-use-case';
+      workflowUseCase.innerHTML = `<strong>When to use:</strong> ${workflow.use_case}`;
+
+      workflowRight.appendChild(workflowDescription);
+      workflowRight.appendChild(workflowUseCase);
+
+      workflowContent.appendChild(workflowLeft);
+      workflowContent.appendChild(workflowRight);
+      workflowItem.appendChild(workflowContent);
+
+      categoryContainer.appendChild(workflowItem);
+    });
+
+    workflowsList.appendChild(categoryContainer);
+  });
 }

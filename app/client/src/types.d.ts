@@ -84,3 +84,12 @@ interface HealthCheckResponse {
   version: string;
   uptime_seconds: number;
 }
+
+// Workflow Types
+interface Workflow {
+  name: string;
+  script_name: string;
+  description: string;
+  use_case: string;
+  category: "single-phase" | "multi-phase" | "full-sdlc";
+}
