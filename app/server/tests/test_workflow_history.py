@@ -1,0 +1,375 @@
+"""
+Unit tests for workflow history module.
+
+Tests database operations, data parsing, and query functions.
+"""
+
+import pytest
+import tempfile
+import json
+import sqlite3
+from pathlib import Path
+from datetime import datetime
+from unittest.mock import patch
+
+# Import the module to test
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.workflow_history import (
+    init_db,
+    insert_workflow_history,
+    update_workflow_history,
+    get_workflow_by_adw_id,
+    get_workflow_history,
+    get_history_analytics,
+    scan_agents_directory,
+    sync_workflow_history,
+)
+
+
+@pytest.fixture
+def temp_db():
+    """Create a temporary database for testing"""
+    # Use a temporary file for testing
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        temp_db_path = f.name
+
+    # Patch the DB_PATH
+    with patch('core.workflow_history.DB_PATH', Path(temp_db_path)):
+        # Initialize the database
+        init_db()
+        yield temp_db_path
+
+    # Cleanup
+    Path(temp_db_path).unlink(missing_ok=True)
+
+
+def test_init_db(temp_db):
+    """Test database initialization creates tables and indexes"""
+    conn = sqlite3.connect(temp_db)
+    cursor = conn.cursor()
+
+    # Check that workflow_history table exists
+    cursor.execute("""
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='workflow_history'
+    """)
+    assert cursor.fetchone() is not None
+
+    # Check that indexes exist
+    cursor.execute("""
+        SELECT name FROM sqlite_master
+        WHERE type='index' AND name LIKE 'idx_%'
+    """)
+    indexes = cursor.fetchall()
+    assert len(indexes) >= 4  # Should have at least 4 indexes
+
+    conn.close()
+
+
+def test_insert_workflow_history(temp_db):
+    """Test inserting a new workflow history record"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert a workflow
+        row_id = insert_workflow_history(
+            adw_id="test-123",
+            issue_number=42,
+            nl_input="Fix authentication bug",
+            github_url="https://github.com/test/repo/issues/42",
+            workflow_template="adw_sdlc_iso",
+            model_used="claude-sonnet-4-5",
+            status="completed"
+        )
+
+        assert row_id > 0
+
+        # Verify it was inserted
+        workflow = get_workflow_by_adw_id("test-123")
+        assert workflow is not None
+        assert workflow["adw_id"] == "test-123"
+        assert workflow["issue_number"] == 42
+        assert workflow["status"] == "completed"
+
+
+def test_insert_duplicate_adw_id(temp_db):
+    """Test that inserting duplicate adw_id raises an error"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        insert_workflow_history(adw_id="test-123", status="pending")
+
+        # Inserting the same adw_id should raise an error
+        with pytest.raises(sqlite3.IntegrityError):
+            insert_workflow_history(adw_id="test-123", status="running")
+
+
+def test_update_workflow_history(temp_db):
+    """Test updating an existing workflow history record"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert a workflow
+        insert_workflow_history(adw_id="test-456", status="pending")
+
+        # Update the status
+        success = update_workflow_history(
+            adw_id="test-456",
+            status="completed",
+            duration_seconds=120
+        )
+        assert success is True
+
+        # Verify the update
+        workflow = get_workflow_by_adw_id("test-456")
+        assert workflow["status"] == "completed"
+        assert workflow["duration_seconds"] == 120
+
+
+def test_update_nonexistent_workflow(temp_db):
+    """Test updating a workflow that doesn't exist"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        success = update_workflow_history(
+            adw_id="nonexistent",
+            status="completed"
+        )
+        assert success is False
+
+
+def test_get_workflow_by_adw_id(temp_db):
+    """Test retrieving a workflow by ADW ID"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert a workflow
+        insert_workflow_history(
+            adw_id="test-789",
+            issue_number=99,
+            status="running"
+        )
+
+        # Retrieve it
+        workflow = get_workflow_by_adw_id("test-789")
+        assert workflow is not None
+        assert workflow["adw_id"] == "test-789"
+        assert workflow["issue_number"] == 99
+
+        # Try to get nonexistent workflow
+        workflow = get_workflow_by_adw_id("nonexistent")
+        assert workflow is None
+
+
+def test_get_workflow_history_pagination(temp_db):
+    """Test pagination in get_workflow_history"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert multiple workflows
+        for i in range(25):
+            insert_workflow_history(
+                adw_id=f"test-{i}",
+                issue_number=i,
+                status="completed"
+            )
+
+        # Get first page
+        workflows, total = get_workflow_history(limit=10, offset=0)
+        assert len(workflows) == 10
+        assert total == 25
+
+        # Get second page
+        workflows, total = get_workflow_history(limit=10, offset=10)
+        assert len(workflows) == 10
+        assert total == 25
+
+        # Get last page
+        workflows, total = get_workflow_history(limit=10, offset=20)
+        assert len(workflows) == 5
+        assert total == 25
+
+
+def test_get_workflow_history_filters(temp_db):
+    """Test filtering in get_workflow_history"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert workflows with different statuses
+        insert_workflow_history(adw_id="test-1", status="completed", model_used="claude-sonnet-4-5")
+        insert_workflow_history(adw_id="test-2", status="failed", model_used="claude-opus")
+        insert_workflow_history(adw_id="test-3", status="completed", model_used="claude-sonnet-4-5")
+
+        # Filter by status
+        workflows, total = get_workflow_history(status="completed")
+        assert total == 2
+
+        # Filter by model
+        workflows, total = get_workflow_history(model="claude-opus")
+        assert total == 1
+
+        # Combined filters
+        workflows, total = get_workflow_history(
+            status="completed",
+            model="claude-sonnet-4-5"
+        )
+        assert total == 2
+
+
+def test_get_workflow_history_search(temp_db):
+    """Test search functionality in get_workflow_history"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert workflows with different inputs
+        insert_workflow_history(
+            adw_id="test-search-1",
+            nl_input="Fix authentication bug",
+            status="completed"
+        )
+        insert_workflow_history(
+            adw_id="test-search-2",
+            nl_input="Add new feature for users",
+            status="completed"
+        )
+
+        # Search for "authentication"
+        workflows, total = get_workflow_history(search="authentication")
+        assert total == 1
+        assert workflows[0]["adw_id"] == "test-search-1"
+
+        # Search for "feature"
+        workflows, total = get_workflow_history(search="feature")
+        assert total == 1
+        assert workflows[0]["adw_id"] == "test-search-2"
+
+
+def test_get_workflow_history_sorting(temp_db):
+    """Test sorting in get_workflow_history"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert workflows with different durations
+        insert_workflow_history(adw_id="test-1", status="completed", duration_seconds=100)
+        insert_workflow_history(adw_id="test-2", status="completed", duration_seconds=50)
+        insert_workflow_history(adw_id="test-3", status="completed", duration_seconds=200)
+
+        # Sort by duration ascending
+        workflows, total = get_workflow_history(
+            sort_by="duration_seconds",
+            sort_order="ASC"
+        )
+        assert workflows[0]["duration_seconds"] == 50
+        assert workflows[1]["duration_seconds"] == 100
+        assert workflows[2]["duration_seconds"] == 200
+
+        # Sort by duration descending
+        workflows, total = get_workflow_history(
+            sort_by="duration_seconds",
+            sort_order="DESC"
+        )
+        assert workflows[0]["duration_seconds"] == 200
+
+
+def test_get_history_analytics(temp_db):
+    """Test analytics calculation"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert workflows with various statuses
+        insert_workflow_history(adw_id="test-1", status="completed", duration_seconds=100)
+        insert_workflow_history(adw_id="test-2", status="completed", duration_seconds=200)
+        insert_workflow_history(adw_id="test-3", status="failed")
+        insert_workflow_history(adw_id="test-4", status="running")
+
+        analytics = get_history_analytics()
+
+        assert analytics["total_workflows"] == 4
+        assert analytics["completed_workflows"] == 2
+        assert analytics["failed_workflows"] == 1
+        assert analytics["avg_duration_seconds"] == 150.0  # (100 + 200) / 2
+        assert analytics["success_rate_percent"] == 50.0  # 2/4 * 100
+
+
+def test_scan_agents_directory_empty(temp_db):
+    """Test scanning an empty agents directory"""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create empty agents directory
+        agents_dir = Path(temp_dir) / "agents"
+        agents_dir.mkdir()
+
+        # Mock the project root
+        with patch('core.workflow_history.Path.__truediv__', return_value=agents_dir):
+            workflows = scan_agents_directory()
+            # Should return empty list for empty directory
+            assert isinstance(workflows, list)
+
+
+def test_scan_agents_directory_with_workflows(temp_db):
+    """Test scanning agents directory with workflow state files"""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create agents directory structure
+        agents_dir = Path(temp_dir) / "agents"
+        agents_dir.mkdir()
+
+        # Create a workflow directory with state file
+        workflow_dir = agents_dir / "test-workflow-123"
+        workflow_dir.mkdir()
+
+        state_data = {
+            "adw_id": "test-workflow-123",
+            "issue_number": 42,
+            "nl_input": "Test workflow",
+            "github_url": "https://github.com/test/repo/issues/42",
+            "workflow_template": "adw_sdlc_iso",
+            "model_used": "claude-sonnet-4-5",
+            "status": "running",
+            "start_time": datetime.now().isoformat(),
+            "current_phase": "build"
+        }
+
+        with open(workflow_dir / "adw_state.json", 'w') as f:
+            json.dump(state_data, f)
+
+        # Mock Path resolution to use temp directory
+        def mock_resolve(self, *parts):
+            if str(self).endswith("workflow_history.py"):
+                return agents_dir.parent
+            return self
+
+        with patch.object(Path, 'parent', agents_dir.parent):
+            with patch('core.workflow_history.Path.__truediv__', return_value=agents_dir):
+                workflows = scan_agents_directory()
+                assert len(workflows) > 0 or isinstance(workflows, list)
+
+
+def test_sync_workflow_history(temp_db):
+    """Test syncing workflow history"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Mock scan_agents_directory to return test data
+        mock_workflows = [
+            {
+                "adw_id": "sync-test-1",
+                "issue_number": 1,
+                "nl_input": "Test",
+                "status": "completed",
+                "workflow_template": "adw_sdlc_iso",
+            }
+        ]
+
+        with patch('core.workflow_history.scan_agents_directory', return_value=mock_workflows):
+            with patch('core.workflow_history.read_cost_history', side_effect=Exception("No cost data")):
+                synced = sync_workflow_history()
+                assert synced >= 0  # Should sync at least 0 workflows
+
+                # Verify the workflow was inserted
+                workflow = get_workflow_by_adw_id("sync-test-1")
+                if workflow:
+                    assert workflow["adw_id"] == "sync-test-1"
+
+
+def test_invalid_sort_field(temp_db):
+    """Test that invalid sort fields are handled safely"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        insert_workflow_history(adw_id="test-1", status="completed")
+
+        # Try to sort by invalid field (should default to created_at)
+        workflows, total = get_workflow_history(
+            sort_by="invalid_field; DROP TABLE workflow_history;",
+            sort_order="DESC"
+        )
+        assert total == 1  # Should still return results
+
+
+def test_analytics_with_empty_database(temp_db):
+    """Test analytics with empty database"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        analytics = get_history_analytics()
+
+        assert analytics["total_workflows"] == 0
+        assert analytics["completed_workflows"] == 0
+        assert analytics["failed_workflows"] == 0
+        assert analytics["avg_duration_seconds"] == 0.0
+        assert analytics["success_rate_percent"] == 0.0

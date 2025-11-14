@@ -117,3 +117,26 @@ export interface HistoryItem {
   timestamp: string;
   github_url?: string;
 }
+
+export interface HistoryAnalytics {
+  total_workflows: number;
+  completed_workflows: number;
+  failed_workflows: number;
+  avg_duration_seconds: number;
+  success_rate_percent: number;
+  workflows_by_model: Record<string, number>;
+  workflows_by_template: Record<string, number>;
+  workflows_by_status: Record<string, number>;
+}
+
+export interface HistoryFilters {
+  limit?: number;
+  offset?: number;
+  status?: string;
+  model?: string;
+  template?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+  sort_by?: string;
+}
