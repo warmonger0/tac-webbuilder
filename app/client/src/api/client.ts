@@ -1,12 +1,13 @@
 import type {
   GitHubIssue,
   Workflow,
-  HistoryItem,
   SubmitRequestData,
   SubmitRequestResponse,
   ConfirmResponse,
   RoutesResponse,
   CostResponse,
+  WorkflowHistoryResponse,
+  WorkflowHistoryFilter,
 } from '../types';
 
 const API_BASE = '/api';
@@ -53,8 +54,25 @@ export async function listWorkflows(): Promise<Workflow[]> {
   return fetchJSON<Workflow[]>(`${API_BASE}/workflows`);
 }
 
-export async function getHistory(limit: number = 20): Promise<HistoryItem[]> {
-  return fetchJSON<HistoryItem[]>(`${API_BASE}/history?limit=${limit}`);
+export async function getHistory(filters: WorkflowHistoryFilter): Promise<WorkflowHistoryResponse> {
+  // Build query string from filters
+  const params = new URLSearchParams();
+
+  if (filters.limit !== undefined) params.append('limit', filters.limit.toString());
+  if (filters.offset !== undefined) params.append('offset', filters.offset.toString());
+  if (filters.sort_by) params.append('sort_by', filters.sort_by);
+  if (filters.order) params.append('order', filters.order);
+  if (filters.filter_status) params.append('filter_status', filters.filter_status);
+  if (filters.filter_template) params.append('filter_template', filters.filter_template);
+  if (filters.filter_model) params.append('filter_model', filters.filter_model);
+  if (filters.date_from) params.append('date_from', filters.date_from);
+  if (filters.date_to) params.append('date_to', filters.date_to);
+  if (filters.search_query) params.append('search_query', filters.search_query);
+
+  const queryString = params.toString();
+  const url = queryString ? `${API_BASE}/history?${queryString}` : `${API_BASE}/history`;
+
+  return fetchJSON<WorkflowHistoryResponse>(url);
 }
 
 export async function getRoutes(): Promise<RoutesResponse> {

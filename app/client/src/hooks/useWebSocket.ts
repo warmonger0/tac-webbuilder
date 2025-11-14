@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listWorkflows, getRoutes } from '../api/client';
-import type { Workflow, Route } from '../types';
+import { listWorkflows, getRoutes, getHistory } from '../api/client';
+import type { Workflow, Route, WorkflowHistoryResponse } from '../types';
 
 interface WorkflowsWebSocketMessage {
   type: 'workflows_update';
@@ -11,6 +11,16 @@ interface WorkflowsWebSocketMessage {
 interface RoutesWebSocketMessage {
   type: 'routes_update';
   data: Route[];
+}
+
+interface WorkflowHistoryWebSocketMessage {
+  type: 'history_update';
+  data: {
+    items: WorkflowHistoryResponse['items'];
+    analytics: WorkflowHistoryResponse['analytics'];
+    total: number;
+    has_more: boolean;
+  };
 }
 
 export function useWorkflowsWebSocket() {
@@ -175,4 +185,91 @@ export function useRoutesWebSocket() {
   }, []);
 
   return { routes, isConnected, lastUpdated };
+}
+
+export function useWorkflowHistoryWebSocket() {
+  const [historyData, setHistoryData] = useState<WorkflowHistoryResponse | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Fallback polling when WebSocket is disconnected
+  const { data: polledHistory } = useQuery({
+    queryKey: ['history'],
+    queryFn: () => getHistory({}),
+    refetchInterval: isConnected ? false : 5000, // Only poll when WS disconnected
+    enabled: !isConnected, // Only enable when WS is not connected
+  });
+
+  useEffect(() => {
+    if (!isConnected && polledHistory) {
+      setHistoryData(polledHistory);
+      setLastUpdated(new Date());
+    }
+  }, [polledHistory, isConnected]);
+
+  useEffect(() => {
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.hostname;
+      const wsUrl = `${protocol}//${host}:8000/ws/workflow-history`;
+
+      console.log('[WS] Connecting to:', wsUrl);
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('[WS] Connected to workflow history updates');
+        setIsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message: WorkflowHistoryWebSocketMessage = JSON.parse(event.data);
+
+          if (message.type === 'history_update') {
+            setHistoryData({
+              items: message.data.items,
+              analytics: message.data.analytics,
+              total: message.data.total,
+              has_more: message.data.has_more,
+            });
+            setLastUpdated(new Date());
+            console.log('[WS] Received workflow history update:', message.data.items.length, 'items');
+          }
+        } catch (err) {
+          console.error('[WS] Error parsing message:', err);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('[WS] Error:', error);
+        setIsConnected(false);
+      };
+
+      ws.onclose = () => {
+        console.log('[WS] Disconnected from workflow history, will reconnect in 5s...');
+        setIsConnected(false);
+
+        // Reconnect after 5 seconds
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, 5000);
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
+  return { historyData, isConnected, lastUpdated };
 }

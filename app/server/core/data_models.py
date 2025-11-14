@@ -177,3 +177,75 @@ class CostData(BaseModel):
 class CostResponse(BaseModel):
     cost_data: Optional[CostData] = Field(None, description="Cost data if available")
     error: Optional[str] = Field(None, description="Error message if any")
+
+# Workflow History Models
+class WorkflowExecutionMetrics(BaseModel):
+    total_tokens: int = Field(..., description="Total number of tokens used")
+    input_tokens: int = Field(..., description="Number of input tokens")
+    cache_creation_tokens: int = Field(..., description="Number of cache creation tokens")
+    cache_read_tokens: int = Field(..., description="Number of cache read tokens")
+    output_tokens: int = Field(..., description="Number of output tokens")
+    cache_efficiency_percent: float = Field(..., description="Cache efficiency percentage (0-100)")
+    estimated_cost_total: float = Field(..., description="Estimated total cost in dollars")
+    actual_cost_total: float = Field(..., description="Actual total cost in dollars")
+    cost_per_token: float = Field(..., description="Average cost per token in dollars")
+
+class WorkflowPerformanceMetrics(BaseModel):
+    completion_time_seconds: Optional[float] = Field(None, description="Total completion time in seconds")
+    retry_count: int = Field(0, description="Number of retries across all steps")
+    success_rate: float = Field(0.0, description="Percentage of successful steps (0-100)")
+    concurrent_workflows_count: int = Field(0, description="Number of concurrent workflows during execution")
+
+class WorkflowResourceMetrics(BaseModel):
+    worktree_id: Optional[str] = Field(None, description="Worktree identifier")
+    worktree_reused: bool = Field(False, description="Whether worktree was reused")
+    ports_used: Dict[str, int] = Field(default_factory=dict, description="Port assignments (frontend, backend)")
+    structured_input: Optional[Dict[str, Any]] = Field(None, description="Structured workflow input as JSON")
+
+class WorkflowHistoryItem(BaseModel):
+    id: Optional[int] = Field(None, description="Database record ID")
+    adw_id: str = Field(..., description="Unique ADW identifier")
+    issue_number: Optional[int] = Field(None, description="GitHub issue number")
+    workflow_template: str = Field(..., description="Workflow template name (e.g., adw_plan_build_test_iso)")
+    start_timestamp: str = Field(..., description="Workflow start time (ISO 8601)")
+    end_timestamp: Optional[str] = Field(None, description="Workflow end time (ISO 8601)")
+    status: Literal["in_progress", "completed", "failed"] = Field(..., description="Workflow execution status")
+    nl_input: str = Field(..., description="Original natural language input from user")
+    model_used: Optional[str] = Field(None, description="Model used (e.g., claude-sonnet-4-5)")
+    error_message: Optional[str] = Field(None, description="Error message if workflow failed")
+    execution_metrics: WorkflowExecutionMetrics = Field(..., description="Token usage and cost metrics")
+    performance_metrics: WorkflowPerformanceMetrics = Field(..., description="Performance and timing metrics")
+    resource_metrics: WorkflowResourceMetrics = Field(..., description="Resource usage metrics")
+    phases: List[PhaseCost] = Field(default_factory=list, description="Per-phase cost breakdown")
+    created_at: str = Field(..., description="Record creation timestamp (ISO 8601)")
+    updated_at: str = Field(..., description="Record last update timestamp (ISO 8601)")
+
+class WorkflowAnalytics(BaseModel):
+    total_workflows: int = Field(0, description="Total number of workflows")
+    avg_cost_by_model: Dict[str, float] = Field(default_factory=dict, description="Average cost per model")
+    avg_cost_by_template: Dict[str, float] = Field(default_factory=dict, description="Average cost per template")
+    avg_completion_time: float = Field(0.0, description="Average completion time in seconds")
+    overall_success_rate: float = Field(0.0, description="Overall success rate percentage (0-100)")
+    cache_hit_rate: float = Field(0.0, description="Overall cache hit rate percentage (0-100)")
+    most_expensive_workflows: List[Dict[str, Any]] = Field(default_factory=list, description="Top 5 most expensive workflows")
+    token_efficiency_by_model: Dict[str, float] = Field(default_factory=dict, description="Average cost per token by model")
+    total_cost_all_time: float = Field(0.0, description="Total cost across all workflows in dollars")
+    total_tokens_all_time: int = Field(0, description="Total tokens used across all workflows")
+
+class WorkflowHistoryFilter(BaseModel):
+    limit: int = Field(20, description="Maximum number of results to return")
+    offset: int = Field(0, description="Number of results to skip")
+    sort_by: Literal["date", "cost", "duration", "success_rate", "model"] = Field("date", description="Sort field")
+    order: Literal["asc", "desc"] = Field("desc", description="Sort order")
+    filter_status: Optional[Literal["in_progress", "completed", "failed"]] = Field(None, description="Filter by status")
+    filter_template: Optional[str] = Field(None, description="Filter by workflow template")
+    filter_model: Optional[str] = Field(None, description="Filter by model")
+    date_from: Optional[str] = Field(None, description="Start date filter (ISO 8601)")
+    date_to: Optional[str] = Field(None, description="End date filter (ISO 8601)")
+    search_query: Optional[str] = Field(None, description="Search in nl_input or adw_id")
+
+class WorkflowHistoryResponse(BaseModel):
+    items: List[WorkflowHistoryItem] = Field(..., description="List of workflow history items")
+    analytics: WorkflowAnalytics = Field(..., description="Aggregated analytics")
+    total: int = Field(..., description="Total number of items matching filters")
+    has_more: bool = Field(..., description="Whether more results are available")
