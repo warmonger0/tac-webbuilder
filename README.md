@@ -9,6 +9,11 @@ A web application that converts natural language queries to SQL using AI, built 
 - 📊 Interactive table results display
 - 🔒 SQL injection protection
 - ⚡ Fast development with Vite and uv
+- 🏥 **Comprehensive System Health Monitoring** - Real-time status of all critical services
+- 🔍 **Pre-Submission Health Checks** - Validates system health before creating GitHub issues
+- 💾 **Smart Persistence** - Project paths and tab selections persist across page refreshes
+- 📡 **Service Monitoring** - Tracks Backend API, Database, Webhook, Cloudflare Tunnel, and Frontend
+- ✅ **Comprehensive Test Coverage** - 33+ test cases with Vitest and React Testing Library
 
 ## Prerequisites
 
@@ -108,6 +113,10 @@ cd app/client
 bun run dev                 # Start dev server
 bun run build              # Build for production
 bun run preview            # Preview production build
+bun run test               # Run tests in watch mode
+bun run test:run           # Run tests once
+bun run test:coverage      # Generate test coverage report
+bun run test:ui            # Run tests with UI
 ```
 
 ## Project Structure
@@ -128,11 +137,20 @@ bun run preview            # Preview production build
 
 ## API Endpoints
 
+### Core Functionality
 - `POST /api/upload` - Upload CSV/JSON file
 - `POST /api/query` - Process natural language query
 - `GET /api/schema` - Get database schema
 - `POST /api/insights` - Generate column insights
-- `GET /api/health` - Health check
+
+### Health & Monitoring
+- `GET /api/health` - Basic health check
+- `GET /api/system-status` - **NEW:** Comprehensive system health monitoring for all critical services
+
+### Workflow Management
+- `GET /api/workflows` - List active workflows
+- `GET /api/workflow-history` - Get workflow execution history
+- `GET /api/routes` - List all registered API routes
 
 ## Security
 
@@ -188,6 +206,57 @@ uv run pytest tests/test_sql_injection.py -v
 - File upload validation (CSV and JSON only)
 - Comprehensive error logging without exposing sensitive data
 - Database operations are isolated with proper connection handling
+
+## System Monitoring & Health Checks
+
+The application includes comprehensive real-time monitoring of all critical services to ensure system reliability and provide early warning of issues.
+
+### System Status Panel
+
+A real-time dashboard displays the health of all critical services:
+
+- **Backend API** - FastAPI server uptime and performance
+- **Database** - SQLite connection status and table count
+- **Webhook Service** - GitHub webhook processor health and statistics
+- **Cloudflare Tunnel** - Public endpoint connectivity status
+- **Frontend** - React development server availability
+
+**Features:**
+- Color-coded status indicators (🟢 Healthy, 🟡 Degraded, 🔴 Error, ⚪ Unknown)
+- Automatic refresh every 30 seconds
+- Manual refresh button
+- Detailed service metrics and uptime information
+- Overall system health percentage
+
+### Pre-Submission Health Checks
+
+Before creating GitHub issues, the system automatically checks service health and warns users if critical services are unavailable:
+
+- **Error State**: Displays warning listing unavailable services
+- **Degraded State**: Warns about potential delays but allows submission
+- **Healthy State**: Proceeds without warnings
+
+This prevents workflow failures due to service outages.
+
+### Smart Persistence
+
+User preferences automatically persist across sessions:
+
+- **Project Path Persistence**: Last-used project path saved to browser localStorage
+- **Tab Persistence**: Active tab selection restored after page refresh
+- **Session Continuity**: Maintains context across browser restarts
+
+### Monitoring Endpoint
+
+```bash
+# Check comprehensive system status
+curl http://localhost:8000/api/system-status | python3 -m json.tool
+
+# Response includes:
+# - overall_status: "healthy" | "degraded" | "error"
+# - services: { backend_api, database, webhook, cloudflare_tunnel, frontend }
+# - summary: { healthy_services, total_services, health_percentage }
+```
 
 ## AI Developer Workflow (ADW)
 

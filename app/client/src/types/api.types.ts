@@ -39,6 +39,27 @@ export interface HealthCheckResponse {
   uptime_seconds: number;
 }
 
+// System Status Types
+export interface ServiceHealth {
+  name: string;
+  status: "healthy" | "degraded" | "error" | "unknown";
+  uptime_seconds?: number;
+  uptime_human?: string;
+  message?: string;
+  details?: Record<string, any>;
+}
+
+export interface SystemStatusResponse {
+  overall_status: "healthy" | "degraded" | "error";
+  timestamp: string;
+  services: Record<string, ServiceHealth>;
+  summary: {
+    healthy_services: number;
+    total_services: number;
+    health_percentage: number;
+  };
+}
+
 // Random Query Generation Types
 export interface RandomQueryResponse {
   query: string;

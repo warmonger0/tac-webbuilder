@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { submitRequest, getPreview, confirmAndPost } from '../api/client';
+import { useState, useEffect } from 'react';
+import { submitRequest, getPreview, confirmAndPost, getSystemStatus } from '../api/client';
 import type { GitHubIssue } from '../types';
 import { IssuePreview } from './IssuePreview';
 import { ConfirmDialog } from './ConfirmDialog';
-import { WebhookStatusPanel } from './WebhookStatusPanel';
+import { SystemStatusPanel } from './SystemStatusPanel';
+
+const PROJECT_PATH_STORAGE_KEY = 'tac-webbuilder-project-path';
 
 export function RequestForm() {
   const [nlInput, setNlInput] = useState('');
@@ -15,6 +17,16 @@ export function RequestForm() {
   const [requestId, setRequestId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [systemHealthy, setSystemHealthy] = useState(true);
+  const [healthWarning, setHealthWarning] = useState<string | null>(null);
+
+  // Load project path from localStorage on mount
+  useEffect(() => {
+    const savedPath = localStorage.getItem(PROJECT_PATH_STORAGE_KEY);
+    if (savedPath) {
+      setProjectPath(savedPath);
+    }
+  }, []);
 
   const handleSubmit = async () => {
     if (!nlInput.trim()) {
@@ -22,11 +34,46 @@ export function RequestForm() {
       return;
     }
 
+    // Pre-flight health check
+    setHealthWarning(null);
+    try {
+      const healthStatus = await getSystemStatus();
+      if (healthStatus.overall_status === 'error') {
+        const unhealthyServices = Object.entries(healthStatus.services)
+          .filter(([_, service]: [string, any]) => service.status === 'error')
+          .map(([_, service]: [string, any]) => service.name);
+
+        setHealthWarning(
+          `Warning: Critical services are down: ${unhealthyServices.join(', ')}. ` +
+          `The workflow may fail. Do you want to proceed anyway?`
+        );
+        setSystemHealthy(false);
+
+        // Optionally, you can prevent submission
+        // return;
+      } else if (healthStatus.overall_status === 'degraded') {
+        setHealthWarning(
+          `Some services are degraded. The workflow may experience delays but should complete.`
+        );
+        setSystemHealthy(true);
+      } else {
+        setSystemHealthy(true);
+      }
+    } catch (err) {
+      // If health check fails, warn but allow submission
+      setHealthWarning('Unable to check system health. Proceeding anyway.');
+    }
+
     setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
 
     try {
+      // Save project path to localStorage if provided
+      if (projectPath && projectPath.trim()) {
+        localStorage.setItem(PROJECT_PATH_STORAGE_KEY, projectPath.trim());
+      }
+
       const response = await submitRequest({
         nl_input: nlInput,
         project_path: projectPath || undefined,
@@ -44,7 +91,7 @@ export function RequestForm() {
           `Issue #${confirmResponse.issue_number} created successfully! ${confirmResponse.github_url}`
         );
         setNlInput('');
-        setProjectPath('');
+        // Don't clear project path - it will persist from localStorage
         setPreview(null);
       } else {
         setShowConfirm(true);
@@ -70,7 +117,7 @@ export function RequestForm() {
       setShowConfirm(false);
       setPreview(null);
       setNlInput('');
-      setProjectPath('');
+      // Don't clear project path - it will persist from localStorage
       setRequestId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -140,6 +187,12 @@ export function RequestForm() {
           </label>
         </div>
 
+        {healthWarning && (
+          <div className={`p-4 border rounded-lg ${systemHealthy ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+            {healthWarning}
+          </div>
+        )}
+
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
             {error}
@@ -177,7 +230,7 @@ export function RequestForm() {
         )}
       </div>
 
-      <WebhookStatusPanel />
+      <SystemStatusPanel />
     </>
   );
 }

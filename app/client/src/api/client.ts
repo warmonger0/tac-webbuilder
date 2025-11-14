@@ -187,6 +187,10 @@ export async function getWebhookStatus(): Promise<any> {
   return fetchJSON<any>(`${API_BASE}/webhook-status`);
 }
 
+export async function getSystemStatus(): Promise<any> {
+  return fetchJSON<any>(`${API_BASE}/system-status`);
+}
+
 // Export as namespace object for compatibility with existing code
 export const api = {
   submitRequest,
@@ -204,4 +208,5 @@ export const api = {
   exportQueryResults,
   exportTable,
   getWebhookStatus,
+  getSystemStatus,
 };

@@ -86,6 +86,21 @@ class HealthCheckResponse(BaseModel):
     version: str = "1.0.0"
     uptime_seconds: float
 
+# System Status Models
+class ServiceHealth(BaseModel):
+    name: str
+    status: Literal["healthy", "degraded", "error", "unknown"]
+    uptime_seconds: Optional[float] = None
+    uptime_human: Optional[str] = None
+    message: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+
+class SystemStatusResponse(BaseModel):
+    overall_status: Literal["healthy", "degraded", "error"]
+    timestamp: str
+    services: Dict[str, ServiceHealth]
+    summary: Dict[str, Any]
+
 # Export Models
 class ExportRequest(BaseModel):
     table_name: str = Field(..., description="Name of the table to export")
