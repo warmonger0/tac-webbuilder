@@ -140,3 +140,15 @@ export interface HistoryFilters {
   search?: string;
   sort_by?: string;
 }
+
+// Cost tracking types
+export interface CostResponse {
+  total_cost: number;
+  cost_by_phase?: Record<string, number>;
+  estimated_cost?: number;
+  cost_breakdown?: Array<{
+    phase: string;
+    cost: number;
+    tokens_used?: number;
+  }>;
+}
