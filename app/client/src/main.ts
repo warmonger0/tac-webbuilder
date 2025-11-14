@@ -1,6 +1,8 @@
+/// <reference path="./types.d.ts" />
+
 import './style.css'
-import { api } from './api/client'
 import { getAllWorkflows, categoryNames, categoryDescriptions } from './workflows'
+import * as api from './api/client'
 
 // Global state
 
@@ -365,7 +367,7 @@ function displayTables(tables: TableSchema[]) {
     const tableColumns = document.createElement('div');
     tableColumns.className = 'table-columns';
     
-    table.columns.forEach(column => {
+    table.columns.forEach((column: ColumnInfo) => {
       const columnTag = document.createElement('span');
       columnTag.className = 'column-tag';
       

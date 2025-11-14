@@ -5,6 +5,8 @@
  * software development using isolated git worktrees.
  */
 
+/// <reference path="./types.d.ts" />
+
 // Workflow data with descriptions based on ADW documentation
 export const workflows: Workflow[] = [
   // === Single Phase Workflows ===

@@ -9,9 +9,8 @@ import json
 import logging
 import sqlite3
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional
 from datetime import datetime
-from collections import defaultdict
 
 from core.data_models import (
     WorkflowHistoryItem,
@@ -21,7 +20,6 @@ from core.data_models import (
     WorkflowPerformanceMetrics,
     WorkflowResourceMetrics,
     WorkflowAnalytics,
-    PhaseCost,
 )
 from core.cost_tracker import read_cost_history
 
@@ -399,7 +397,7 @@ def get_workflow_history(filters: WorkflowHistoryFilter) -> WorkflowHistoryRespo
                     try:
                         cost_data = read_cost_history(row["adw_id"])
                         phases = cost_data.phases
-                    except:
+                    except Exception:
                         pass
 
                     item = WorkflowHistoryItem(

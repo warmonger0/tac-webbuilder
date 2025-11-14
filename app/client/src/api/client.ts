@@ -1,3 +1,5 @@
+/// <reference path="../types.d.ts" />
+
 import type {
   GitHubIssue,
   Workflow,
@@ -81,4 +83,70 @@ export async function getRoutes(): Promise<RoutesResponse> {
 
 export async function fetchWorkflowCosts(adwId: string): Promise<CostResponse> {
   return fetchJSON<CostResponse>(`${API_BASE}/workflows/${adwId}/costs`);
+}
+
+// Database query API functions (placeholder implementations)
+export async function processQuery(request: QueryRequest): Promise<QueryResponse> {
+  return fetchJSON<QueryResponse>(`${API_BASE}/query`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+export async function generateRandomQuery(): Promise<RandomQueryResponse> {
+  return fetchJSON<RandomQueryResponse>(`${API_BASE}/random-query`);
+}
+
+export async function uploadFile(file: File): Promise<FileUploadResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE}/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`API Error: ${response.status} ${error}`);
+  }
+
+  return response.json();
+}
+
+export async function getSchema(): Promise<DatabaseSchemaResponse> {
+  return fetchJSON<DatabaseSchemaResponse>(`${API_BASE}/schema`);
+}
+
+export async function exportQueryResults(results: Record<string, any>[], columns: string[]): Promise<void> {
+  // Client-side CSV export
+  const csv = [
+    columns.join(','),
+    ...results.map(row => columns.map(col => JSON.stringify(row[col] ?? '')).join(','))
+  ].join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'query-results.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function exportTable(tableName: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/export/${tableName}`);
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`API Error: ${response.status} ${error}`);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${tableName}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
