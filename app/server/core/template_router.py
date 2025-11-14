@@ -8,8 +8,7 @@ Cost: $0 (template matching)
 Latency: <100ms
 """
 
-import re
-from typing import Optional, Tuple, Dict, List
+from typing import Optional, Dict
 from dataclasses import dataclass
 
 

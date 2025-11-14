@@ -11,7 +11,6 @@ import logging
 import sys
 import asyncio
 import json
-from pathlib import Path
 
 from core.data_models import (
     FileUploadResponse,
@@ -35,7 +34,6 @@ from core.data_models import (
     WorkflowHistoryItem,
     WorkflowHistoryResponse,
     HistoryAnalytics,
-    HistoryFilters,
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
 from core.llm_processor import generate_sql, generate_random_query
@@ -53,7 +51,6 @@ from core.workflow_history import (
     init_db as init_workflow_history_db,
     get_workflow_history,
     get_history_analytics,
-    get_workflow_by_adw_id,
     sync_workflow_history,
 )
 
@@ -244,8 +241,6 @@ def get_routes_data() -> List[Route]:
 
 async def watch_workflows():
     """Background task to watch for workflow changes and broadcast updates"""
-    agents_dir = os.path.join(os.path.dirname(__file__), "..", "..", "agents")
-
     while True:
         try:
             if len(manager.active_connections) > 0:

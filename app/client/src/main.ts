@@ -1,6 +1,7 @@
 import './style.css'
-import { api } from './api/client'
+import * as api from './api/client'
 import { getAllWorkflows, categoryNames, categoryDescriptions } from './workflows'
+import type { Workflow } from './types'
 
 // Global state
 
@@ -365,19 +366,19 @@ function displayTables(tables: TableSchema[]) {
     const tableColumns = document.createElement('div');
     tableColumns.className = 'table-columns';
     
-    table.columns.forEach(column => {
+    table.columns.forEach((column: ColumnInfo) => {
       const columnTag = document.createElement('span');
       columnTag.className = 'column-tag';
-      
+
       const columnName = document.createElement('span');
       columnName.className = 'column-name';
       columnName.textContent = column.name;
-      
+
       const columnType = document.createElement('span');
       columnType.className = 'column-type';
       const typeEmoji = getTypeEmoji(column.type);
       columnType.textContent = `${typeEmoji} ${column.type}`;
-      
+
       columnTag.appendChild(columnName);
       columnTag.appendChild(columnType);
       tableColumns.appendChild(columnTag);
@@ -559,7 +560,7 @@ function displayWorkflows() {
   const workflows = getAllWorkflows();
 
   // Group workflows by category
-  const categories: Array<Workflow['category']> = ['single-phase', 'multi-phase', 'full-sdlc'];
+  const categories: Array<WorkflowCatalogItem['category']> = ['single-phase', 'multi-phase', 'full-sdlc'];
 
   workflowsList.innerHTML = '';
 

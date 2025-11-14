@@ -85,8 +85,8 @@ interface HealthCheckResponse {
   uptime_seconds: number;
 }
 
-// Workflow Types
-interface Workflow {
+// Workflow Catalog Types
+interface WorkflowCatalogItem {
   name: string;
   script_name: string;
   description: string;

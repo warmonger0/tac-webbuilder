@@ -10,7 +10,7 @@ import json
 import sqlite3
 from pathlib import Path
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # Import the module to test
 import sys
@@ -25,7 +25,6 @@ from core.workflow_history import (
     get_history_analytics,
     scan_agents_directory,
     sync_workflow_history,
-    DB_PATH,
 )
 
 

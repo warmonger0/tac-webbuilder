@@ -14,7 +14,6 @@ from datetime import datetime
 from contextlib import contextmanager
 
 from core.cost_tracker import read_cost_history
-from core.data_models import CostData
 
 logger = logging.getLogger(__name__)
 
@@ -524,8 +523,6 @@ def sync_workflow_history() -> int:
 
             # Extract model from cost data if not in state
             if not workflow_data.get("model_used") and cost_data.phases:
-                # Get model from first phase
-                first_phase = cost_data.phases[0]
                 # The model is stored in the phase, we need to re-parse to get it
                 # For now, we'll use a default
                 workflow_data["model_used"] = "claude-sonnet-4-5"  # Default

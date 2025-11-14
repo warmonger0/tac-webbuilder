@@ -6,7 +6,7 @@
  */
 
 // Workflow data with descriptions based on ADW documentation
-export const workflows: Workflow[] = [
+export const workflows: WorkflowCatalogItem[] = [
   // === Single Phase Workflows ===
   {
     name: "Plan Only",
@@ -101,21 +101,21 @@ export const workflows: Workflow[] = [
 /**
  * Get all workflows
  */
-export function getAllWorkflows(): Workflow[] {
+export function getAllWorkflows(): WorkflowCatalogItem[] {
   return workflows;
 }
 
 /**
  * Get workflows by category
  */
-export function getWorkflowsByCategory(category: Workflow['category']): Workflow[] {
+export function getWorkflowsByCategory(category: WorkflowCatalogItem['category']): WorkflowCatalogItem[] {
   return workflows.filter(w => w.category === category);
 }
 
 /**
  * Get workflow by script name
  */
-export function getWorkflowByScriptName(scriptName: string): Workflow | undefined {
+export function getWorkflowByScriptName(scriptName: string): WorkflowCatalogItem | undefined {
   return workflows.find(w => w.script_name === scriptName);
 }
 
