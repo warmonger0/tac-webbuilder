@@ -64,3 +64,32 @@ export interface WorkflowCatalogResponse {
   workflows: WorkflowTemplate[];
   total: number;
 }
+
+// Cost Visualization Types
+export interface TokenBreakdown {
+  input_tokens: number;
+  cache_creation_tokens: number;
+  cache_read_tokens: number;
+  output_tokens: number;
+}
+
+export interface PhaseCost {
+  phase: string;
+  cost: number;
+  tokens: TokenBreakdown;
+  timestamp?: string;
+}
+
+export interface CostData {
+  adw_id: string;
+  phases: PhaseCost[];
+  total_cost: number;
+  cache_efficiency_percent: number;
+  cache_savings_amount: number;
+  total_tokens: number;
+}
+
+export interface CostResponse {
+  cost_data?: CostData;
+  error?: string;
+}

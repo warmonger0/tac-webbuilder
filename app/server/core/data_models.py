@@ -152,3 +152,28 @@ class WorkflowTemplate(BaseModel):
 class WorkflowCatalogResponse(BaseModel):
     workflows: List[WorkflowTemplate] = Field(..., description="List of available workflow templates")
     total: int = Field(..., description="Total number of workflows")
+
+# Cost Visualization Models
+class TokenBreakdown(BaseModel):
+    input_tokens: int = Field(..., description="Number of input tokens")
+    cache_creation_tokens: int = Field(..., description="Number of cache creation tokens")
+    cache_read_tokens: int = Field(..., description="Number of cache read tokens")
+    output_tokens: int = Field(..., description="Number of output tokens")
+
+class PhaseCost(BaseModel):
+    phase: str = Field(..., description="Workflow phase name (plan, build, test, review, document, ship)")
+    cost: float = Field(..., description="Cost in dollars for this phase")
+    tokens: TokenBreakdown = Field(..., description="Token breakdown for this phase")
+    timestamp: Optional[str] = Field(None, description="ISO 8601 timestamp")
+
+class CostData(BaseModel):
+    adw_id: str = Field(..., description="ADW workflow identifier")
+    phases: List[PhaseCost] = Field(..., description="List of phase costs")
+    total_cost: float = Field(..., description="Total cost in dollars")
+    cache_efficiency_percent: float = Field(..., description="Cache efficiency percentage (0-100)")
+    cache_savings_amount: float = Field(..., description="Estimated savings from caching in dollars")
+    total_tokens: int = Field(..., description="Total number of tokens used")
+
+class CostResponse(BaseModel):
+    cost_data: Optional[CostData] = Field(None, description="Cost data if available")
+    error: Optional[str] = Field(None, description="Error message if any")

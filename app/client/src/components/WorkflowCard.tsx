@@ -1,6 +1,7 @@
 import type { Workflow } from '../types';
 import { StatusBadge } from './StatusBadge';
 import { ProgressBar } from './ProgressBar';
+import { CostVisualization } from './CostVisualization';
 
 interface WorkflowCardProps {
   workflow: Workflow;
@@ -33,6 +34,8 @@ export function WorkflowCard({ workflow }: WorkflowCardProps) {
       >
         View on GitHub →
       </a>
+
+      <CostVisualization adwId={workflow.adw_id} />
     </div>
   );
 }

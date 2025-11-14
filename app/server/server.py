@@ -30,7 +30,8 @@ from core.data_models import (
     RoutesResponse,
     Workflow,
     WorkflowTemplate,
-    WorkflowCatalogResponse
+    WorkflowCatalogResponse,
+    CostResponse,
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
 from core.llm_processor import generate_sql, generate_random_query
@@ -43,6 +44,7 @@ from core.sql_security import (
     SQLSecurityError
 )
 from core.export_utils import generate_csv_from_data, generate_csv_from_table
+from core.cost_tracker import read_cost_history
 
 # Load .env file from server directory
 load_dotenv()
@@ -492,6 +494,30 @@ async def get_routes() -> RoutesResponse:
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         # Return empty routes list on error
         return RoutesResponse(routes=[], total=0)
+
+@app.get("/api/workflows/{adw_id}/costs", response_model=CostResponse)
+async def get_workflow_costs(adw_id: str) -> CostResponse:
+    """
+    Get cost data for a specific ADW workflow.
+
+    Returns cost breakdown by phase, cache efficiency metrics,
+    and token usage statistics.
+    """
+    try:
+        logger.info(f"[REQUEST] Fetching cost data for ADW ID: {adw_id}")
+        cost_data = read_cost_history(adw_id)
+        logger.info(f"[SUCCESS] Retrieved cost data for ADW ID: {adw_id}, total cost: ${cost_data.total_cost:.4f}")
+        return CostResponse(cost_data=cost_data)
+    except FileNotFoundError as e:
+        logger.warning(f"[WARNING] Cost data not found for ADW ID: {adw_id}: {str(e)}")
+        return CostResponse(error=f"Cost data not found for workflow {adw_id}")
+    except ValueError as e:
+        logger.warning(f"[WARNING] Invalid cost data for ADW ID: {adw_id}: {str(e)}")
+        return CostResponse(error=f"Invalid cost data for workflow {adw_id}")
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to retrieve cost data for ADW ID: {adw_id}: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        return CostResponse(error=f"Failed to retrieve cost data: {str(e)}")
 
 @app.on_event("startup")
 async def startup_event():
