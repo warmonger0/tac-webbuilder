@@ -21,7 +21,9 @@ from core.data_models import (
     ColumnInfo,
     RandomQueryResponse,
     ExportRequest,
-    QueryExportRequest
+    QueryExportRequest,
+    Route,
+    RoutesResponse
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
 from core.llm_processor import generate_sql, generate_random_query
@@ -251,9 +253,9 @@ async def health_check() -> HealthCheckResponse:
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = cursor.fetchall()
         conn.close()
-        
+
         uptime = (datetime.now() - app_start_time).total_seconds()
-        
+
         response = HealthCheckResponse(
             status="ok",
             database_connected=True,
@@ -271,6 +273,52 @@ async def health_check() -> HealthCheckResponse:
             tables_count=0,
             uptime_seconds=0
         )
+
+@app.get("/api/routes", response_model=RoutesResponse)
+async def get_routes() -> RoutesResponse:
+    """Get all registered FastAPI routes"""
+    try:
+        route_list = []
+
+        # Introspect FastAPI routes
+        for route in app.routes:
+            # Filter for HTTP routes (not WebSocket, static, etc.)
+            if hasattr(route, "methods") and hasattr(route, "path"):
+                # Skip internal routes
+                if route.path.startswith("/docs") or route.path.startswith("/redoc") or route.path.startswith("/openapi"):
+                    continue
+
+                # Extract route information
+                for method in route.methods:
+                    # Skip OPTIONS method (automatically added by CORS)
+                    if method == "OPTIONS":
+                        continue
+
+                    # Get handler name
+                    handler_name = route.endpoint.__name__ if hasattr(route, "endpoint") else "unknown"
+
+                    # Get description from docstring
+                    description = ""
+                    if hasattr(route, "endpoint") and route.endpoint.__doc__:
+                        # Get first line of docstring
+                        description = route.endpoint.__doc__.strip().split("\n")[0].strip()
+
+                    route_info = Route(
+                        method=method,
+                        path=route.path,
+                        handler=handler_name,
+                        description=description
+                    )
+                    route_list.append(route_info)
+
+        response = RoutesResponse(routes=route_list, total=len(route_list))
+        logger.info(f"[SUCCESS] Retrieved {len(route_list)} routes")
+        return response
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to retrieve routes: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        # Return empty routes list on error
+        return RoutesResponse(routes=[], total=0)
 
 @app.delete("/api/table/{table_name}")
 async def delete_table(table_name: str):
