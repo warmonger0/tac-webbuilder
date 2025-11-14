@@ -93,3 +93,58 @@ export interface CostResponse {
   cost_data?: CostData;
   error?: string;
 }
+
+// Workflow History Types
+export interface WorkflowHistoryItem {
+  id: number;
+  adw_id: string;
+  issue_number?: number;
+  workflow_template?: string;
+  model_set?: string;
+  status: string;
+  started_at: string;
+  completed_at?: string;
+  user_input?: string;
+  github_url?: string;
+  total_duration_seconds?: number;
+  worktree_path?: string;
+  backend_port?: number;
+  frontend_port?: number;
+  concurrent_workflows?: number;
+  error_message?: string;
+  cost_data?: CostData;
+}
+
+export interface WorkflowHistoryFilter {
+  sort_by?: string;
+  order?: string;
+  model_filter?: string;
+  template_filter?: string;
+  status_filter?: string;
+  date_from?: string;
+  date_to?: string;
+  search_query?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface WorkflowHistoryResponse {
+  items: WorkflowHistoryItem[];
+  total: number;
+  filters_applied: WorkflowHistoryFilter;
+}
+
+export interface WorkflowHistorySummary {
+  total_workflows: number;
+  avg_cost: number;
+  avg_duration: number;
+  success_rate: number;
+  cache_efficiency: number;
+  workflow_counts: Record<string, number>;
+  model_counts: Record<string, number>;
+}
+
+export interface WorkflowHistoryUpdateMessage {
+  type: 'workflow_history_update';
+  data: WorkflowHistoryItem[];
+}

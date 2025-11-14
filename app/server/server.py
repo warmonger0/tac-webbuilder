@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSock
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from datetime import datetime
-from typing import List, Set
+from typing import List, Set, Optional
 import os
 import sqlite3
 import traceback
@@ -32,6 +32,10 @@ from core.data_models import (
     WorkflowTemplate,
     WorkflowCatalogResponse,
     CostResponse,
+    WorkflowHistoryItem,
+    WorkflowHistoryResponse,
+    WorkflowHistoryFilter,
+    WorkflowHistorySummary,
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
 from core.llm_processor import generate_sql, generate_random_query
@@ -45,6 +49,14 @@ from core.sql_security import (
 )
 from core.export_utils import generate_csv_from_data, generate_csv_from_table
 from core.cost_tracker import read_cost_history
+from core.workflow_history import (
+    get_workflow_history,
+    get_workflow_history_summary,
+    enrich_with_cost_data,
+    record_workflow_start,
+    record_workflow_complete,
+    record_workflow_failed,
+)
 
 # Load .env file from server directory
 load_dotenv()
@@ -89,6 +101,7 @@ class ConnectionManager:
         self.active_connections: Set[WebSocket] = set()
         self.last_workflow_state = None
         self.last_routes_state = None
+        self.last_workflow_history_state = None
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -279,6 +292,45 @@ async def watch_routes():
             await asyncio.sleep(2)  # Check every 2 seconds
         except Exception as e:
             logger.error(f"[WS] Error in routes watcher: {e}")
+            await asyncio.sleep(5)  # Back off on error
+
+async def watch_workflow_history():
+    """Background task to watch for workflow history changes and broadcast updates"""
+    while True:
+        try:
+            if len(manager.active_connections) > 0:
+                # Get recent workflow history (last 50 items)
+                filters = WorkflowHistoryFilter(
+                    sort_by="date",
+                    order="desc",
+                    limit=50,
+                    offset=0,
+                )
+                history_response = get_workflow_history(filters)
+
+                # Enrich with cost data
+                for item in history_response.items:
+                    enrich_with_cost_data(item)
+
+                # Convert to JSON for comparison
+                current_state = json.dumps(
+                    [item.model_dump() for item in history_response.items],
+                    sort_keys=True,
+                    default=str  # Handle datetime serialization
+                )
+
+                # Only broadcast if state changed
+                if current_state != manager.last_workflow_history_state:
+                    manager.last_workflow_history_state = current_state
+                    await manager.broadcast({
+                        "type": "workflow_history_update",
+                        "data": [item.model_dump() for item in history_response.items]
+                    })
+                    logger.info(f"[WS] Broadcasted workflow history update to {len(manager.active_connections)} clients")
+
+            await asyncio.sleep(2)  # Check every 2 seconds
+        except Exception as e:
+            logger.error(f"[WS] Error in workflow history watcher: {e}")
             await asyncio.sleep(5)  # Back off on error
 
 @app.post("/api/upload", response_model=FileUploadResponse)
@@ -519,12 +571,150 @@ async def get_workflow_costs(adw_id: str) -> CostResponse:
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         return CostResponse(error=f"Failed to retrieve cost data: {str(e)}")
 
+@app.get("/api/workflow-history", response_model=WorkflowHistoryResponse)
+async def get_workflow_history_endpoint(
+    sort_by: str = "date",
+    order: str = "desc",
+    model_filter: str = "all",
+    template_filter: str = "all",
+    status_filter: str = "all",
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    search_query: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> WorkflowHistoryResponse:
+    """
+    Get workflow execution history with filtering, sorting, and pagination.
+
+    Query parameters:
+    - sort_by: Sort field (date, duration, status)
+    - order: Sort order (asc, desc)
+    - model_filter: Filter by model set (base, heavy, all)
+    - template_filter: Filter by workflow template
+    - status_filter: Filter by status (in_progress, completed, failed, all)
+    - date_from: Filter workflows from this date (ISO 8601)
+    - date_to: Filter workflows to this date (ISO 8601)
+    - search_query: Search in ADW ID, issue number, or user input
+    - limit: Maximum number of results (default 50)
+    - offset: Pagination offset (default 0)
+    """
+    try:
+        logger.info(f"[REQUEST] Fetching workflow history with filters")
+
+        filters = WorkflowHistoryFilter(
+            sort_by=sort_by,
+            order=order,
+            model_filter=model_filter,
+            template_filter=template_filter,
+            status_filter=status_filter,
+            date_from=date_from,
+            date_to=date_to,
+            search_query=search_query,
+            limit=limit,
+            offset=offset,
+        )
+
+        response = get_workflow_history(filters)
+
+        # Enrich with cost data
+        for item in response.items:
+            enrich_with_cost_data(item)
+
+        logger.info(f"[SUCCESS] Retrieved {len(response.items)} workflow history items (total: {response.total})")
+        return response
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to retrieve workflow history: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        # Return empty response on error
+        return WorkflowHistoryResponse(
+            items=[],
+            total=0,
+            filters_applied=WorkflowHistoryFilter(),
+        )
+
+@app.get("/api/workflow-history/summary", response_model=WorkflowHistorySummary)
+async def get_workflow_history_summary_endpoint() -> WorkflowHistorySummary:
+    """Get aggregate statistics for workflow history"""
+    try:
+        logger.info(f"[REQUEST] Fetching workflow history summary")
+        summary = get_workflow_history_summary()
+        logger.info(f"[SUCCESS] Retrieved workflow history summary")
+        return summary
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to retrieve workflow history summary: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        # Return empty summary on error
+        return WorkflowHistorySummary(
+            total_workflows=0,
+            avg_cost=0.0,
+            avg_duration=0.0,
+            success_rate=0.0,
+            cache_efficiency=0.0,
+            workflow_counts={},
+            model_counts={},
+        )
+
+@app.post("/api/workflow-history")
+async def record_workflow_history_event(item: WorkflowHistoryItem):
+    """
+    Record workflow history event (start, complete, or fail).
+
+    Based on the status field:
+    - in_progress: Records workflow start
+    - completed: Updates workflow to completed status
+    - failed: Updates workflow to failed status
+    """
+    try:
+        logger.info(f"[REQUEST] Recording workflow history event: {item.adw_id} - {item.status}")
+
+        if item.status == "in_progress":
+            record_workflow_start(
+                adw_id=item.adw_id,
+                issue_number=item.issue_number,
+                workflow_template=item.workflow_template,
+                model_set=item.model_set,
+                user_input=item.user_input,
+                github_url=item.github_url,
+                backend_port=item.backend_port,
+                frontend_port=item.frontend_port,
+                concurrent_workflows=item.concurrent_workflows,
+            )
+        elif item.status == "completed":
+            record_workflow_complete(
+                adw_id=item.adw_id,
+                total_duration_seconds=item.total_duration_seconds or 0.0,
+            )
+        elif item.status == "failed":
+            record_workflow_failed(
+                adw_id=item.adw_id,
+                error_message=item.error_message or "Unknown error",
+            )
+        else:
+            raise HTTPException(400, f"Invalid status: {item.status}")
+
+        # Broadcast update to WebSocket clients
+        await manager.broadcast({
+            "type": "workflow_history_update",
+            "data": "refresh"  # Signal clients to refresh
+        })
+
+        logger.info(f"[SUCCESS] Recorded workflow history event: {item.adw_id}")
+        return {"message": "Workflow history event recorded successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to record workflow history event: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(500, f"Error recording workflow history event: {str(e)}")
+
 @app.on_event("startup")
 async def startup_event():
     """Start background tasks on server startup"""
     asyncio.create_task(watch_workflows())
     asyncio.create_task(watch_routes())
-    logger.info("[STARTUP] Workflow and routes watchers started")
+    asyncio.create_task(watch_workflow_history())
+    logger.info("[STARTUP] Workflow, routes, and workflow history watchers started")
 
 @app.websocket("/ws/workflows")
 async def websocket_workflows(websocket: WebSocket):
@@ -562,6 +752,42 @@ async def websocket_routes(websocket: WebSocket):
         await websocket.send_json({
             "type": "routes_update",
             "data": [r.model_dump() for r in routes]
+        })
+
+        # Keep connection alive and handle incoming messages
+        while True:
+            try:
+                # Wait for any client messages (ping/pong, etc.)
+                await websocket.receive_text()
+            except WebSocketDisconnect:
+                break
+    except Exception as e:
+        logger.error(f"[WS] Error in WebSocket connection: {e}")
+    finally:
+        manager.disconnect(websocket)
+
+@app.websocket("/ws/workflow-history")
+async def websocket_workflow_history(websocket: WebSocket):
+    """WebSocket endpoint for real-time workflow history updates"""
+    await manager.connect(websocket)
+
+    try:
+        # Send initial data
+        filters = WorkflowHistoryFilter(
+            sort_by="date",
+            order="desc",
+            limit=50,
+            offset=0,
+        )
+        history_response = get_workflow_history(filters)
+
+        # Enrich with cost data
+        for item in history_response.items:
+            enrich_with_cost_data(item)
+
+        await websocket.send_json({
+            "type": "workflow_history_update",
+            "data": [item.model_dump() for item in history_response.items]
         })
 
         # Keep connection alive and handle incoming messages

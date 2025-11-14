@@ -177,3 +177,53 @@ class CostData(BaseModel):
 class CostResponse(BaseModel):
     cost_data: Optional[CostData] = Field(None, description="Cost data if available")
     error: Optional[str] = Field(None, description="Error message if any")
+
+# Workflow History Models
+class WorkflowHistoryItem(BaseModel):
+    id: int = Field(..., description="Database record ID")
+    adw_id: str = Field(..., description="ADW workflow identifier")
+    issue_number: Optional[int] = Field(None, description="GitHub issue number")
+    workflow_template: Optional[str] = Field(None, description="Workflow template name (e.g., adw_plan_build_test_iso)")
+    model_set: Optional[str] = Field(None, description="Model set used (base or heavy)")
+    status: str = Field(..., description="Workflow status (in_progress, completed, failed)")
+    started_at: str = Field(..., description="ISO 8601 timestamp when workflow started")
+    completed_at: Optional[str] = Field(None, description="ISO 8601 timestamp when workflow completed/failed")
+    user_input: Optional[str] = Field(None, description="Original natural language user input")
+    github_url: Optional[str] = Field(None, description="GitHub issue URL")
+    total_duration_seconds: Optional[float] = Field(None, description="Total workflow duration in seconds")
+    worktree_path: Optional[str] = Field(None, description="Worktree directory path")
+    backend_port: Optional[int] = Field(None, description="Backend port used")
+    frontend_port: Optional[int] = Field(None, description="Frontend port used")
+    concurrent_workflows: Optional[int] = Field(None, description="Number of concurrent workflows at start")
+    error_message: Optional[str] = Field(None, description="Error message if failed")
+    cost_data: Optional[CostData] = Field(None, description="Cost data from cost_tracker")
+
+class WorkflowHistoryFilter(BaseModel):
+    sort_by: str = Field(default="date", description="Sort field (date, duration, status)")
+    order: str = Field(default="desc", description="Sort order (asc, desc)")
+    model_filter: Optional[str] = Field(default="all", description="Filter by model set (base, heavy, all)")
+    template_filter: Optional[str] = Field(default="all", description="Filter by workflow template")
+    status_filter: Optional[str] = Field(default="all", description="Filter by status (in_progress, completed, failed, all)")
+    date_from: Optional[str] = Field(None, description="Filter workflows from this date (ISO 8601)")
+    date_to: Optional[str] = Field(None, description="Filter workflows to this date (ISO 8601)")
+    search_query: Optional[str] = Field(None, description="Search in ADW ID, issue number, or user input")
+    limit: int = Field(default=50, description="Maximum number of results to return")
+    offset: int = Field(default=0, description="Number of results to skip for pagination")
+
+class WorkflowHistoryResponse(BaseModel):
+    items: List[WorkflowHistoryItem] = Field(..., description="List of workflow history records")
+    total: int = Field(..., description="Total number of matching records")
+    filters_applied: WorkflowHistoryFilter = Field(..., description="Filters that were applied")
+
+class WorkflowHistorySummary(BaseModel):
+    total_workflows: int = Field(..., description="Total number of workflows")
+    avg_cost: float = Field(..., description="Average cost per workflow")
+    avg_duration: float = Field(..., description="Average duration in seconds")
+    success_rate: float = Field(..., description="Success rate percentage (0-100)")
+    cache_efficiency: float = Field(..., description="Average cache efficiency percentage (0-100)")
+    workflow_counts: Dict[str, int] = Field(default_factory=dict, description="Workflow counts by template")
+    model_counts: Dict[str, int] = Field(default_factory=dict, description="Workflow counts by model")
+
+class WorkflowHistoryUpdateMessage(BaseModel):
+    type: Literal["workflow_history_update"] = Field(..., description="Message type")
+    data: List[WorkflowHistoryItem] = Field(..., description="Updated workflow history items")
