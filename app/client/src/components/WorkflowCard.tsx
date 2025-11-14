@@ -1,17 +1,32 @@
-import type { Workflow } from '../types';
+import { useEffect, useState } from 'react';
+import type { WorkflowExecution } from '../types';
 import { StatusBadge } from './StatusBadge';
 import { ProgressBar } from './ProgressBar';
 import { CostVisualization } from './CostVisualization';
 
 interface WorkflowCardProps {
-  workflow: Workflow;
+  workflow: WorkflowExecution;
 }
 
 export function WorkflowCard({ workflow }: WorkflowCardProps) {
   const phases = ['plan', 'build', 'test', 'review', 'document', 'ship'];
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Trigger pulse animation when phase changes
+  useEffect(() => {
+    setIsUpdating(true);
+    const timer = setTimeout(() => setIsUpdating(false), 1000);
+    return () => clearTimeout(timer);
+  }, [workflow.phase]);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+    <div
+      className={`bg-white border rounded-lg p-6 hover:shadow-lg transition-all duration-300 ${
+        isUpdating
+          ? 'border-blue-500 shadow-md ring-2 ring-blue-200'
+          : 'border-gray-200'
+      }`}
+    >
       <div className="flex justify-between items-start mb-4">
         <div>
           <h4 className="text-lg font-bold text-gray-900">

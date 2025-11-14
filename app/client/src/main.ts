@@ -1,6 +1,7 @@
 import './style.css'
 import { api } from './api/client'
 import { getAllWorkflows, categoryNames, categoryDescriptions } from './workflows'
+import type { QueryResponse, TableSchema, FileUploadResponse, WorkflowTemplate } from './types'
 
 // Global state
 
@@ -559,7 +560,7 @@ function displayWorkflows() {
   const workflows = getAllWorkflows();
 
   // Group workflows by category
-  const categories: Array<Workflow['category']> = ['single-phase', 'multi-phase', 'full-sdlc'];
+  const categories: Array<WorkflowTemplate['category']> = ['single-phase', 'multi-phase', 'full-sdlc'];
 
   workflowsList.innerHTML = '';
 

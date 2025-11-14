@@ -5,8 +5,10 @@
  * software development using isolated git worktrees.
  */
 
+import type { WorkflowTemplate } from './types';
+
 // Workflow data with descriptions based on ADW documentation
-export const workflows: Workflow[] = [
+export const workflows: WorkflowTemplate[] = [
   // === Single Phase Workflows ===
   {
     name: "Plan Only",
@@ -101,21 +103,21 @@ export const workflows: Workflow[] = [
 /**
  * Get all workflows
  */
-export function getAllWorkflows(): Workflow[] {
+export function getAllWorkflows(): WorkflowTemplate[] {
   return workflows;
 }
 
 /**
  * Get workflows by category
  */
-export function getWorkflowsByCategory(category: Workflow['category']): Workflow[] {
+export function getWorkflowsByCategory(category: WorkflowTemplate['category']): WorkflowTemplate[] {
   return workflows.filter(w => w.category === category);
 }
 
 /**
  * Get workflow by script name
  */
-export function getWorkflowByScriptName(scriptName: string): Workflow | undefined {
+export function getWorkflowByScriptName(scriptName: string): WorkflowTemplate | undefined {
   return workflows.find(w => w.script_name === scriptName);
 }
 

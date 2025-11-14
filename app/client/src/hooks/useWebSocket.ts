@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { listWorkflows, getRoutes } from '../api/client';
-import type { Workflow, Route } from '../types';
+import type { WorkflowExecution, Route } from '../types';
 
 interface WorkflowsWebSocketMessage {
   type: 'workflows_update';
-  data: Workflow[];
+  data: WorkflowExecution[];
 }
 
 interface RoutesWebSocketMessage {
@@ -14,7 +14,7 @@ interface RoutesWebSocketMessage {
 }
 
 export function useWorkflowsWebSocket() {
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [workflows, setWorkflows] = useState<WorkflowExecution[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const wsRef = useRef<WebSocket | null>(null);

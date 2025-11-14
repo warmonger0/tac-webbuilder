@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { WorkflowTemplate } from '../types';
+import type { WorkflowTemplateDisplay } from '../types';
 
 export function WorkflowDashboard() {
   const { data, isLoading, error } = useQuery({
@@ -30,7 +30,7 @@ export function WorkflowDashboard() {
     );
   }
 
-  const workflows: WorkflowTemplate[] = data?.workflows || [];
+  const workflows: WorkflowTemplateDisplay[] = data?.workflows || [];
 
   return (
     <div>
