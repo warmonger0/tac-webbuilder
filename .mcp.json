@@ -1,3 +1,13 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--isolated",
+        "--config",
+        "/Users/Warmonger0/tac/tac-webbuilder/trees/4fc73599/playwright-mcp-config.json"
+      ]
+    }
+  }
 }
