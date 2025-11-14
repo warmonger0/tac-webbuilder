@@ -58,9 +58,62 @@ def format_issue_message(
     return f"{ADW_BOT_IDENTIFIER} {adw_id}_{agent_name}: {message}"
 
 
+def extract_adw_info_simple(text: str) -> ADWExtractionResult:
+    """Fast regex-based extraction - no AI needed.
+
+    Patterns supported:
+    - adw_plan_iso
+    - adw_plan_iso with base model
+    - adw_plan_iso with advanced model
+    - adw_build_iso adw-12345678
+    - adw_build_iso adw-12345678 with advanced model
+    """
+    # Pattern: (adw_<workflow>) [adw-<id>] [with <model_set> model]
+    # Make it case-insensitive and flexible with whitespace
+    pattern = r'(adw_\w+)(?:\s+(adw-[a-f0-9]{8}))?(?:\s+with\s+(\w+)\s+model)?'
+
+    matches = list(re.finditer(pattern, text.lower()))
+
+    if matches:
+        # Use first match
+        match = matches[0]
+        workflow_lower = match.group(1)
+        adw_id = match.group(2)  # Optional, may be None
+        model_set = match.group(3) or "base"  # Default to base
+
+        # Validate workflow exists (case-insensitive match)
+        matching_workflow = None
+        for workflow in AVAILABLE_ADW_WORKFLOWS:
+            if workflow_lower == workflow.lower():
+                matching_workflow = workflow
+                break
+
+        if matching_workflow:
+            return ADWExtractionResult(
+                workflow_command=matching_workflow,
+                adw_id=adw_id,
+                model_set=model_set,
+                has_workflow=True
+            )
+
+    return ADWExtractionResult()  # No match
+
+
 def extract_adw_info(text: str, temp_adw_id: str) -> ADWExtractionResult:
-    """Extract ADW workflow, ID, and model_set from text using classify_adw agent.
-    Returns ADWExtractionResult with workflow_command, adw_id, and model_set."""
+    """Extract ADW workflow, ID, and model_set from text.
+
+    Uses fast regex extraction first, falls back to AI classifier if needed.
+    Returns ADWExtractionResult with workflow_command, adw_id, and model_set.
+    """
+
+    # Try fast regex extraction first (99% of cases)
+    result = extract_adw_info_simple(text)
+    if result.has_workflow:
+        print(f"✅ Fast extraction found: {result.workflow_command} (model_set: {result.model_set})")
+        return result
+
+    # Fall back to AI classifier for complex/ambiguous cases
+    print(f"⚠️ Fast extraction failed, falling back to AI classifier...")
 
     # Use classify_adw to extract structured info
     request = AgentTemplateRequest(

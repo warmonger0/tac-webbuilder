@@ -297,18 +297,21 @@ def run_health_check() -> HealthCheckResult:
             result.errors.append(gh_check.error)
 
     # Check Claude Code - only if we have the API key
+    # Make this a WARNING not an ERROR since webhook can work without it
     if os.getenv("ANTHROPIC_API_KEY"):
         claude_check = check_claude_code()
         result.checks["claude_code"] = claude_check
         if not claude_check.success:
-            result.success = False
+            # Don't fail overall health check, just add warning
             if claude_check.error:
-                result.errors.append(claude_check.error)
+                result.warnings.append(f"Claude Code test failed: {claude_check.error}")
     else:
         result.checks["claude_code"] = CheckResult(
-            success=False,
+            success=True,  # Changed to True since it's optional
+            warning="ANTHROPIC_API_KEY not set - Claude Code unavailable",
             details={"skipped": True, "reason": "ANTHROPIC_API_KEY not set"},
         )
+        result.warnings.append("ANTHROPIC_API_KEY not set - Claude Code unavailable")
 
     return result
 

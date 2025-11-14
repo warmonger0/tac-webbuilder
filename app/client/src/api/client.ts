@@ -172,6 +172,21 @@ export async function exportTable(tableName: string): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+export async function getWebhookStatus(): Promise<any> {
+  // Try to fetch from webhook service directly
+  try {
+    const response = await fetch('http://localhost:8001/webhook-status');
+    if (response.ok) {
+      return response.json();
+    }
+  } catch (err) {
+    // Fallback to backend proxy if direct access fails
+  }
+
+  // Fallback to backend API proxy
+  return fetchJSON<any>(`${API_BASE}/webhook-status`);
+}
+
 // Export as namespace object for compatibility with existing code
 export const api = {
   submitRequest,
@@ -188,4 +203,5 @@ export const api = {
   getSchema,
   exportQueryResults,
   exportTable,
+  getWebhookStatus,
 };

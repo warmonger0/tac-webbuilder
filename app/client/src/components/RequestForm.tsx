@@ -3,6 +3,7 @@ import { submitRequest, getPreview, confirmAndPost } from '../api/client';
 import type { GitHubIssue } from '../types';
 import { IssuePreview } from './IssuePreview';
 import { ConfirmDialog } from './ConfirmDialog';
+import { WebhookStatusPanel } from './WebhookStatusPanel';
 
 export function RequestForm() {
   const [nlInput, setNlInput] = useState('');
@@ -85,8 +86,9 @@ export function RequestForm() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-lg shadow p-6 space-y-4">
+    <>
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <h2 className="text-2xl font-bold text-gray-900">
           Create New Request
         </h2>
@@ -166,13 +168,16 @@ export function RequestForm() {
         )}
       </div>
 
-      {showConfirm && preview && (
-        <ConfirmDialog
-          issue={preview}
-          onConfirm={handleConfirm}
-          onCancel={handleCancel}
-        />
-      )}
-    </div>
+        {showConfirm && preview && (
+          <ConfirmDialog
+            issue={preview}
+            onConfirm={handleConfirm}
+            onCancel={handleCancel}
+          />
+        )}
+      </div>
+
+      <WebhookStatusPanel />
+    </>
   );
 }

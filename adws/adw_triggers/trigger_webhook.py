@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run
 # /// script
-# dependencies = ["fastapi", "uvicorn", "python-dotenv"]
+# dependencies = ["fastapi", "uvicorn", "python-dotenv", "anthropic", "pydantic"]
 # ///
 
 """
@@ -21,8 +21,10 @@ import os
 import subprocess
 import sys
 import asyncio
+import time
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-from typing import Optional
+from typing import Optional, Dict, List
 from fastapi import FastAPI, Request, BackgroundTasks
 from dotenv import load_dotenv
 import uvicorn
@@ -67,7 +69,75 @@ app = FastAPI(
 # Thread pool for background classification with timeout
 executor = ThreadPoolExecutor(max_workers=4)
 
+# Global stats tracking
+webhook_stats = {
+    "start_time": time.time(),
+    "total_received": 0,
+    "successful": 0,
+    "failed": 0,
+    "recent_failures": [],
+    "last_successful": None,
+}
+
 print(f"Starting ADW Webhook Trigger on port {PORT}")
+
+
+def count_active_worktrees() -> int:
+    """Count number of active worktrees in trees/ directory."""
+    try:
+        trees_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "trees"
+        )
+        if os.path.exists(trees_dir):
+            return len([d for d in os.listdir(trees_dir) if os.path.isdir(os.path.join(trees_dir, d))])
+        return 0
+    except Exception:
+        return 0
+
+
+def get_disk_usage() -> float:
+    """Get disk usage percentage (0.0 to 1.0)."""
+    try:
+        import shutil
+        total, used, free = shutil.disk_usage("/")
+        return used / total
+    except Exception:
+        return 0.0
+
+
+def can_launch_workflow(workflow: str, issue_number: int, provided_adw_id: Optional[str]) -> tuple[bool, Optional[str]]:
+    """Comprehensive pre-flight check before launching workflow.
+
+    Returns:
+        (can_launch, error_message)
+    """
+    # 1. Check API quota
+    log_quota_warning()
+    can_proceed, quota_error = can_start_adw()
+    if not can_proceed:
+        return False, f"API quota unavailable: {quota_error}"
+
+    # 2. Check concurrency locks (only for new workflows)
+    if not provided_adw_id:
+        # This check is done in the main flow, so we skip here
+        pass
+
+    # 3. Check disk space
+    disk_usage = get_disk_usage()
+    if disk_usage > 0.95:
+        return False, f"Disk space critical (>95% used: {disk_usage*100:.1f}%)"
+
+    # 4. Check worktree availability
+    worktree_count = count_active_worktrees()
+    if worktree_count >= 15:
+        return False, f"Max worktrees reached ({worktree_count}/15)"
+
+    # 5. Validate workflow exists
+    if workflow not in AVAILABLE_ADW_WORKFLOWS:
+        return False, f"Unknown workflow: {workflow}"
+
+    return True, None
 
 
 def extract_adw_info_with_timeout(content: str, temp_id: str, timeout: int = CLASSIFIER_TIMEOUT):
@@ -111,17 +181,70 @@ async def process_webhook_background(
         content_to_check: Content to analyze (issue body or comment)
         trigger_source: Description of trigger (e.g., "New issue", "Comment")
     """
+    # Set up logger for error tracking
+    error_logger = setup_logger("webhook_error", "webhook_trigger")
+
     try:
         print(f"🔄 Background processing: {trigger_source} for issue #{issue_number}")
+        error_logger.info(f"Processing {trigger_source} for issue #{issue_number}")
 
         # Use temporary ID for classification
         temp_id = make_adw_id()
 
         # Extract workflow info with timeout
-        extraction_result = extract_adw_info_with_timeout(content_to_check, temp_id)
+        try:
+            extraction_result = extract_adw_info_with_timeout(content_to_check, temp_id)
+        except Exception as e:
+            error_msg = f"Workflow extraction failed: {str(e)}"
+            print(f"❌ {error_msg}")
+            error_logger.error(f"{error_msg} for issue #{issue_number}")
+            import traceback
+            error_logger.error(f"Traceback:\n{traceback.format_exc()}")
+
+            # Notify user on GitHub
+            try:
+                make_issue_comment(
+                    str(issue_number),
+                    f"⚠️ **Workflow Detection Failed**\n\n"
+                    f"Error: `{str(e)[:200]}`\n\n"
+                    f"To manually trigger, add a comment with:\n"
+                    f"`adw_plan_iso` or another workflow command\n\n"
+                    f"**Available workflows:**\n"
+                    f"- `adw_plan_iso` - Plan implementation\n"
+                    f"- `adw_lightweight_iso` - Quick fixes ($0.20-0.50)\n"
+                    f"- `adw_patch_iso` - Apply specific changes\n\n"
+                    f"{ADW_BOT_IDENTIFIER}",
+                )
+            except Exception as comment_error:
+                error_logger.error(f"Failed to post error comment: {comment_error}")
+            return
 
         if not extraction_result or not extraction_result.has_workflow:
             print(f"⚠️ No workflow detected in {trigger_source} for issue #{issue_number}")
+            error_logger.info(f"No workflow detected for issue #{issue_number}")
+
+            # If content contains "adw_" but couldn't parse, help the user
+            if "adw_" in content_to_check.lower():
+                error_logger.warning(f"Found 'adw_' in content but couldn't parse workflow for issue #{issue_number}")
+                try:
+                    make_issue_comment(
+                        str(issue_number),
+                        f"⚠️ **Could Not Parse Workflow Command**\n\n"
+                        f"I detected 'adw_' in your message but couldn't identify the workflow.\n\n"
+                        f"**Available workflows:**\n"
+                        f"- `adw_plan_iso` - Plan implementation with base model\n"
+                        f"- `adw_plan_iso with advanced model` - Use advanced model set\n"
+                        f"- `adw_lightweight_iso` - Quick fixes ($0.20-0.50)\n"
+                        f"- `adw_patch_iso` - Apply specific changes\n"
+                        f"- `adw_build_iso adw-12345678` - Build (requires ADW ID)\n"
+                        f"- `adw_test_iso adw-12345678` - Test (requires ADW ID)\n"
+                        f"- `adw_ship_iso adw-12345678` - Ship to main (requires ADW ID)\n\n"
+                        f"**Example usage:**\n"
+                        f"`adw_plan_iso with base model`\n\n"
+                        f"{ADW_BOT_IDENTIFIER}",
+                    )
+                except Exception as comment_error:
+                    error_logger.error(f"Failed to post help comment: {comment_error}")
             return
 
         workflow = extraction_result.workflow_command
@@ -145,21 +268,25 @@ async def process_webhook_background(
                     print(f"Failed to post error comment: {e}")
                 return
 
-        # Check API quota before proceeding
-        log_quota_warning()
-        can_proceed, quota_error = can_start_adw()
+        # Run comprehensive pre-flight checks
+        can_proceed, preflight_error = can_launch_workflow(workflow, issue_number, provided_adw_id)
         if not can_proceed:
-            print(f"❌ Cannot start ADW workflow - API quota unavailable: {quota_error}")
+            print(f"❌ Pre-flight check failed: {preflight_error}")
+            error_logger.warning(f"Pre-flight check failed for issue #{issue_number}: {preflight_error}")
             try:
                 make_issue_comment(
                     str(issue_number),
                     f"❌ **Cannot Start ADW Workflow**\n\n"
-                    f"API quota unavailable: {quota_error}\n\n"
-                    f"The workflow will automatically retry when quota is restored.\n\n"
+                    f"{preflight_error}\n\n"
+                    f"**System Status:**\n"
+                    f"- Active worktrees: {count_active_worktrees()}/15\n"
+                    f"- Disk usage: {get_disk_usage()*100:.1f}%\n\n"
+                    f"The workflow will automatically retry when resources are available.\n\n"
                     f"{ADW_BOT_IDENTIFIER}",
                 )
             except Exception as e:
-                print(f"Failed to post quota error comment: {e}")
+                print(f"Failed to post preflight error comment: {e}")
+                error_logger.error(f"Failed to post preflight error comment: {e}")
             return
 
         # Check if issue is already locked by another ADW (concurrency control)
@@ -254,11 +381,60 @@ async def process_webhook_background(
 
         print(f"✅ Background process started for issue #{issue_number} with ADW ID: {adw_id}")
         print(f"Logs will be written to: agents/{adw_id}/{workflow}/execution.log")
+        error_logger.info(f"Successfully launched {workflow} for issue #{issue_number} with ADW ID {adw_id}")
+
+        # Track success
+        webhook_stats["successful"] += 1
+        webhook_stats["last_successful"] = {
+            "issue": issue_number,
+            "adw_id": adw_id,
+            "workflow": workflow,
+            "timestamp": datetime.now().isoformat(),
+        }
 
     except Exception as e:
-        print(f"❌ Error in background processing: {e}")
+        error_msg = f"Error in background processing: {e}"
+        print(f"❌ {error_msg}")
         import traceback
-        traceback.print_exc()
+        tb = traceback.format_exc()
+        print(tb)
+
+        # Log to file with full context
+        error_logger.error(f"Webhook processing failed for issue #{issue_number}")
+        error_logger.error(f"Error: {e}")
+        error_logger.error(f"Traceback:\n{tb}")
+
+        # Track failure
+        webhook_stats["failed"] += 1
+        failure_record = {
+            "issue": issue_number,
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e)[:200],
+        }
+        webhook_stats["recent_failures"].append(failure_record)
+        # Keep only last 10 failures
+        if len(webhook_stats["recent_failures"]) > 10:
+            webhook_stats["recent_failures"] = webhook_stats["recent_failures"][-10:]
+
+        # Post detailed error to GitHub issue
+        try:
+            make_issue_comment(
+                str(issue_number),
+                f"❌ **ADW Webhook Processing Failed**\n\n"
+                f"Error: `{str(e)[:200]}`\n\n"
+                f"The webhook received your request but failed during processing.\n\n"
+                f"**Next Steps:**\n"
+                f"1. Check webhook logs in `agents/webhook_error/webhook_trigger/`\n"
+                f"2. Run health check: `cd adws && uv run adw_tests/health_check.py`\n"
+                f"3. Manually trigger: `cd adws && uv run adw_plan_iso.py {issue_number}`\n\n"
+                f"**Common Issues:**\n"
+                f"- API quota exhausted (wait for reset)\n"
+                f"- Invalid workflow command (check spelling)\n"
+                f"- System resources unavailable\n\n"
+                f"{ADW_BOT_IDENTIFIER}",
+            )
+        except Exception as comment_error:
+            error_logger.error(f"Failed to post error comment: {comment_error}")
 
 
 @app.post("/gh-webhook")
@@ -269,7 +445,39 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         event_type = request.headers.get("X-GitHub-Event", "")
 
         # Parse webhook payload
-        payload = await request.json()
+        # GitHub can send either JSON or form-urlencoded
+        content_type = request.headers.get("content-type", "")
+
+        try:
+            if "application/json" in content_type:
+                payload = await request.json()
+            elif "application/x-www-form-urlencoded" in content_type:
+                # GitHub webhooks configured with form encoding send payload=<json>
+                import json as json_module
+                import urllib.parse
+                form_data = await request.body()
+                decoded = urllib.parse.unquote(form_data.decode())
+                # Remove "payload=" prefix if present
+                if decoded.startswith("payload="):
+                    decoded = decoded[8:]
+                payload = json_module.loads(decoded)
+            else:
+                # Try JSON as default
+                payload = await request.json()
+        except Exception as json_error:
+            # GitHub sometimes sends ping events with empty body
+            print(f"⚠️ Failed to parse payload: {json_error}")
+            print(f"Content-Type: {content_type}")
+            print(f"Headers: {dict(request.headers)}")
+            body = await request.body()
+            print(f"Raw body (first 200 chars): {body[:200]}")
+
+            # If this is a ping event, return success
+            if event_type == "ping":
+                return {"status": "ok", "message": "Webhook ping received"}
+
+            # Otherwise, this is an error
+            return {"status": "error", "message": f"Invalid payload: {str(json_error)}"}
 
         # Extract event details
         action = payload.get("action", "")
@@ -314,6 +522,9 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
                 trigger_source = "Comment"
 
         if should_process:
+            # Track received webhook
+            webhook_stats["total_received"] += 1
+
             # Add background task for processing
             background_tasks.add_task(
                 process_webhook_background,
@@ -347,6 +558,38 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         traceback.print_exc()
         # Always return 200 to GitHub to prevent retries
         return {"status": "error", "message": "Internal error processing webhook"}
+
+
+@app.get("/webhook-status")
+async def webhook_status():
+    """Get webhook processing status and statistics."""
+    uptime_seconds = time.time() - webhook_stats["start_time"]
+    uptime_hours = uptime_seconds / 3600
+
+    # Calculate success rate
+    total_processed = webhook_stats["successful"] + webhook_stats["failed"]
+    success_rate = (
+        (webhook_stats["successful"] / total_processed * 100)
+        if total_processed > 0
+        else 0
+    )
+
+    return {
+        "status": "healthy" if webhook_stats["failed"] == 0 or success_rate > 80 else "degraded",
+        "uptime": {
+            "seconds": int(uptime_seconds),
+            "hours": round(uptime_hours, 2),
+            "human": f"{int(uptime_hours)}h {int((uptime_seconds % 3600) / 60)}m",
+        },
+        "stats": {
+            "total_received": webhook_stats["total_received"],
+            "successful": webhook_stats["successful"],
+            "failed": webhook_stats["failed"],
+            "success_rate": f"{success_rate:.1f}%",
+        },
+        "recent_failures": webhook_stats["recent_failures"][-5:],  # Last 5 failures
+        "last_successful": webhook_stats["last_successful"],
+    }
 
 
 @app.get("/health")
