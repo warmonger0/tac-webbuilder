@@ -260,6 +260,11 @@ export interface WorkflowHistoryItem {
 
   // Phase 3B: Scoring version tracking
   scoring_version?: string;
+
+  // Phase 3: Pattern metadata
+  similar_workflow_ids?: string[];
+  anomaly_flags?: string[];
+  optimization_recommendations?: string[];
 }
 
 export interface HistoryAnalytics {
