@@ -622,6 +622,34 @@ def sync_workflow_history() -> int:
             if cost_data and hasattr(cost_data, 'total_cost'):
                 workflow_data["actual_cost_total"] = cost_data.total_cost
 
+                # Populate cost_breakdown with by_phase data
+                if hasattr(cost_data, 'phases') and cost_data.phases:
+                    by_phase = {phase.phase: phase.cost for phase in cost_data.phases}
+                    workflow_data["cost_breakdown"] = {
+                        "estimated_total": workflow_data.get("estimated_cost_total", 0.0),
+                        "actual_total": cost_data.total_cost,
+                        "estimated_per_step": workflow_data.get("estimated_cost_per_step", 0.0),
+                        "actual_per_step": workflow_data.get("actual_cost_per_step", 0.0),
+                        "cost_per_token": workflow_data.get("cost_per_token", 0.0),
+                        "by_phase": by_phase
+                    }
+
+                # Populate token_breakdown
+                if hasattr(cost_data, 'phases') and cost_data.phases:
+                    # Aggregate tokens across all phases
+                    total_input = sum(p.tokens.input_tokens for p in cost_data.phases)
+                    total_cache_creation = sum(p.tokens.cache_creation_tokens for p in cost_data.phases)
+                    total_cache_read = sum(p.tokens.cache_read_tokens for p in cost_data.phases)
+                    total_output = sum(p.tokens.output_tokens for p in cost_data.phases)
+
+                    workflow_data["input_tokens"] = total_input
+                    workflow_data["cached_tokens"] = total_cache_creation
+                    workflow_data["cache_hit_tokens"] = total_cache_read
+                    workflow_data["cache_miss_tokens"] = total_input  # Approximation
+                    workflow_data["output_tokens"] = total_output
+                    workflow_data["total_tokens"] = total_input + total_cache_creation + total_cache_read + total_output
+                    workflow_data["cache_efficiency_percent"] = cost_data.cache_efficiency_percent
+
         except Exception as e:
             logger.debug(f"[SYNC] No cost data for {adw_id}: {e}")
 
@@ -648,6 +676,18 @@ def sync_workflow_history() -> int:
 
             if duration_seconds and not existing["duration_seconds"]:
                 updates["duration_seconds"] = duration_seconds
+
+            # Update cost data if available and not already set
+            if workflow_data.get("cost_breakdown") and not existing.get("cost_breakdown"):
+                updates["cost_breakdown"] = workflow_data["cost_breakdown"]
+                updates["actual_cost_total"] = workflow_data.get("actual_cost_total", 0.0)
+                updates["input_tokens"] = workflow_data.get("input_tokens", 0)
+                updates["cached_tokens"] = workflow_data.get("cached_tokens", 0)
+                updates["cache_hit_tokens"] = workflow_data.get("cache_hit_tokens", 0)
+                updates["cache_miss_tokens"] = workflow_data.get("cache_miss_tokens", 0)
+                updates["output_tokens"] = workflow_data.get("output_tokens", 0)
+                updates["total_tokens"] = workflow_data.get("total_tokens", 0)
+                updates["cache_efficiency_percent"] = workflow_data.get("cache_efficiency_percent", 0.0)
 
             if updates:
                 update_workflow_history(adw_id, **updates)
