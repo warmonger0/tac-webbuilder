@@ -482,17 +482,21 @@ def detect_anomalies(workflow: Dict, historical_data: List[Dict]) -> List[Dict]:
     Detect anomalies in workflow execution.
 
     Detects:
-    - Cost anomaly: actual_cost > 1.5x average
-    - Duration anomaly: duration > 1.5x average
-    - Retry anomaly: retry_count >= 2
+    - Cost anomaly: actual_cost > 2x average
+    - Duration anomaly: duration > 2x average
+    - Retry anomaly: retry_count >= 3
     - Cache anomaly: cache_efficiency < 20%
+    - Error category anomaly: unexpected error types
+
+    Requires minimum 3 similar workflows for statistical comparison.
+    Filters historical data by same classification_type and workflow_template.
 
     Args:
         workflow: Workflow to analyze
         historical_data: Historical workflows for comparison
 
     Returns:
-        List of detected anomalies with type, severity, and details
+        List of detected anomalies with type, severity, message, actual, expected, threshold
     """
     anomalies = []
 
@@ -503,45 +507,57 @@ def detect_anomalies(workflow: Dict, historical_data: List[Dict]) -> List[Dict]:
         retry_count = workflow.get("retry_count", 0) or 0
         cache_read_tokens = workflow.get("cache_read_tokens", 0) or 0
         total_input_tokens = workflow.get("total_input_tokens", 0) or 0
+        error_category = workflow.get("error_category", "")
+        workflow_template = workflow.get("workflow_template", "")
+        classification_type = workflow.get("classification_type", "")
+        current_adw_id = workflow.get("adw_id", "")
 
-        # Calculate averages from historical data
-        if historical_data:
-            costs = [wf.get("actual_cost_total", 0) or 0 for wf in historical_data if wf.get("actual_cost_total")]
-            durations = [wf.get("duration_seconds", 0) or 0 for wf in historical_data if wf.get("duration_seconds")]
+        # Filter historical data to similar workflows (same template and classification, exclude self)
+        similar_workflows = [
+            wf for wf in historical_data
+            if wf.get("workflow_template") == workflow_template
+            and wf.get("classification_type") == classification_type
+            and wf.get("adw_id") != current_adw_id
+        ]
+
+        # Require minimum 3 similar workflows for statistical validity
+        if len(similar_workflows) >= 3:
+            costs = [wf.get("actual_cost_total", 0) or 0 for wf in similar_workflows if wf.get("actual_cost_total")]
+            durations = [wf.get("duration_seconds", 0) or 0 for wf in similar_workflows if wf.get("duration_seconds")]
 
             avg_cost = sum(costs) / len(costs) if costs else 0
             avg_duration = sum(durations) / len(durations) if durations else 0
 
-            # Cost anomaly detection (>1.5x average) - TIGHTENED from 2x
-            if avg_cost > 0 and actual_cost > avg_cost * 1.5:
+            # Cost anomaly detection (>2x average)
+            if avg_cost > 0 and actual_cost > avg_cost * 2.0:
                 anomalies.append({
                     "type": "cost_anomaly",
-                    "severity": "high" if actual_cost > avg_cost * 2.0 else "medium",
+                    "severity": "high" if actual_cost > avg_cost * 3.0 else "medium",
                     "message": f"Cost ${actual_cost:.4f} is {actual_cost/avg_cost:.1f}x higher than average ${avg_cost:.4f}",
                     "actual": actual_cost,
                     "expected": avg_cost,
-                    "threshold": 1.5
+                    "threshold": 2.0
                 })
 
-            # Duration anomaly detection (>1.5x average) - TIGHTENED from 2x
-            if avg_duration > 0 and duration > avg_duration * 1.5:
+            # Duration anomaly detection (>2x average)
+            if avg_duration > 0 and duration > avg_duration * 2.0:
                 anomalies.append({
                     "type": "duration_anomaly",
-                    "severity": "high" if duration > avg_duration * 2.0 else "medium",
+                    "severity": "high" if duration > avg_duration * 3.0 else "medium",
                     "message": f"Duration {duration}s is {duration/avg_duration:.1f}x longer than average {avg_duration:.0f}s",
                     "actual": duration,
                     "expected": avg_duration,
-                    "threshold": 1.5
+                    "threshold": 2.0
                 })
 
-        # Retry anomaly detection (>=2 retries) - TIGHTENED from >=3
-        if retry_count >= 2:
+        # Retry anomaly detection (>=3 retries)
+        if retry_count >= 3:
             anomalies.append({
                 "type": "retry_anomaly",
                 "severity": "high" if retry_count >= 5 else "medium",
                 "message": f"Workflow required {retry_count} retries",
                 "actual": retry_count,
-                "threshold": 2
+                "threshold": 3
             })
 
         # Cache anomaly detection (<20% efficiency)
@@ -556,6 +572,18 @@ def detect_anomalies(workflow: Dict, historical_data: List[Dict]) -> List[Dict]:
                     "threshold": 0.2
                 })
 
+        # Error category anomaly detection (unexpected error types)
+        # Common expected errors: timeout, rate_limit, validation
+        # Unexpected errors: syntax_error, runtime_error, system_error
+        if error_category and error_category in ["syntax_error", "runtime_error", "system_error", "fatal_error"]:
+            anomalies.append({
+                "type": "error_category_anomaly",
+                "severity": "high",
+                "message": f"Unexpected error category: {error_category}",
+                "actual": error_category,
+                "threshold": "expected_categories"
+            })
+
         return anomalies
 
     except Exception as e:
@@ -565,78 +593,137 @@ def detect_anomalies(workflow: Dict, historical_data: List[Dict]) -> List[Dict]:
 
 def generate_optimization_recommendations(workflow: Dict, anomalies: List[Dict]) -> List[str]:
     """
-    Generate actionable optimization recommendations.
+    Generate actionable optimization recommendations with emoji prefixes.
 
-    Based on detected anomalies, suggests:
-    - Model downgrade for cost anomalies
-    - Bottleneck investigation for duration anomalies
-    - Error handling improvements for retry anomalies
-    - Prompt optimization for cache anomalies
+    Recommendation categories:
+    - 💡 Model selection (Haiku for simple, Sonnet for complex)
+    - 📦 Cache optimization (improve cache hit rate)
+    - 📝 Input quality (add details, structure, acceptance criteria)
+    - ⏱️ Workflow restructuring (break down bottleneck phases)
+    - 💰 Cost reduction (reduce retries, improve error handling)
+    - 🐛 Error prevention (validation steps, better error handling)
+    - 🚀 Performance optimization (remove unnecessary steps)
+
+    Returns max 5 recommendations prioritized by impact.
 
     Args:
         workflow: Workflow data
         anomalies: List of detected anomalies
 
     Returns:
-        List of recommendation strings
+        List of recommendation strings with emoji prefixes
     """
     recommendations = []
 
     try:
         if not anomalies:
-            return ["Workflow performing well - no anomalies detected"]
+            return ["✅ Workflow performing well - no anomalies detected"]
+
+        # Get workflow details
+        model = workflow.get("model_used", "")
+        phase_durations = workflow.get("phase_durations", {})
+        error_count = workflow.get("error_count", 0)
+        retry_count = workflow.get("retry_count", 0)
+        nl_input = workflow.get("nl_input", "")
+
+        # Detect workflow complexity for model recommendations
+        complexity = detect_complexity(workflow)
 
         for anomaly in anomalies:
             anomaly_type = anomaly.get("type", "")
 
             if anomaly_type == "cost_anomaly":
-                model = workflow.get("model_used", "")
-                if "sonnet" in model.lower():
+                # Model selection recommendations
+                if "sonnet" in model.lower() and complexity == "simple":
                     recommendations.append(
-                        "Consider using Haiku model for simpler tasks to reduce costs"
+                        "💡 Consider using Haiku model for this simple task to reduce costs by ~80%"
                     )
+                elif "opus" in model.lower():
+                    recommendations.append(
+                        "💡 Consider using Sonnet instead of Opus to reduce costs by ~50%"
+                    )
+
+                # Cost reduction recommendations
                 recommendations.append(
-                    f"Cost is {anomaly.get('actual', 0) / anomaly.get('expected', 1):.1f}x higher than expected - "
-                    "review prompt complexity and consider optimization"
+                    f"💰 Cost is {anomaly.get('actual', 0) / anomaly.get('expected', 1):.1f}x higher than expected - "
+                    "review prompt complexity and reduce unnecessary context"
                 )
 
             elif anomaly_type == "duration_anomaly":
-                phase_durations = workflow.get("phase_durations", {})
+                # Bottleneck analysis
                 if phase_durations:
-                    slowest_phase = max(phase_durations.items(), key=lambda x: x[1])[0]
-                    recommendations.append(
-                        f"Investigate bottleneck in '{slowest_phase}' phase - "
-                        f"takes {phase_durations[slowest_phase]}s"
-                    )
+                    total_duration = sum(phase_durations.values())
+                    slowest_phase = max(phase_durations.items(), key=lambda x: x[1])
+                    phase_name, phase_time = slowest_phase
+
+                    if phase_time > total_duration * 0.3:  # >30% of total time
+                        recommendations.append(
+                            f"⏱️ Bottleneck in '{phase_name}' phase (takes {phase_time}s, {phase_time/total_duration*100:.0f}% of total) - "
+                            "consider breaking down into smaller tasks"
+                        )
                 else:
                     recommendations.append(
-                        "Duration is significantly longer than average - "
-                        "review workflow steps for optimization opportunities"
+                        "🚀 Duration is significantly longer than average - "
+                        "review workflow steps and remove unnecessary operations"
                     )
 
             elif anomaly_type == "retry_anomaly":
-                error_count = workflow.get("error_count", 0)
+                # Error handling and cost reduction
                 if error_count > 0:
                     recommendations.append(
-                        f"Workflow required {anomaly.get('actual', 0)} retries with {error_count} errors - "
-                        "improve error handling and input validation"
+                        f"🐛 Workflow required {anomaly.get('actual', 0)} retries with {error_count} errors - "
+                        "add input validation and improve error handling to reduce costs"
                     )
                 else:
                     recommendations.append(
-                        f"Workflow required {anomaly.get('actual', 0)} retries - "
-                        "review workflow stability and external dependencies"
+                        f"💰 Workflow required {anomaly.get('actual', 0)} retries - "
+                        "review workflow stability and external dependencies to reduce retry costs"
                     )
 
             elif anomaly_type == "cache_anomaly":
+                # Cache optimization
                 cache_efficiency = anomaly.get("actual", 0)
                 recommendations.append(
-                    f"Low cache efficiency ({cache_efficiency*100:.1f}%) - "
-                    "consider using more consistent prompts or system messages to improve caching"
+                    f"📦 Low cache efficiency ({cache_efficiency*100:.1f}%) - "
+                    "use more consistent prompts and system messages to improve caching and reduce costs"
                 )
 
-        # Deduplicate recommendations
-        return list(dict.fromkeys(recommendations))
+            elif anomaly_type == "error_category_anomaly":
+                # Error prevention
+                error_category = anomaly.get("actual", "")
+                recommendations.append(
+                    f"🐛 Unexpected error category '{error_category}' - "
+                    "add validation steps and improve error handling to prevent runtime errors"
+                )
+
+        # Add input quality recommendation if input is too brief or unclear
+        if nl_input and len(nl_input.split()) < 20:
+            recommendations.append(
+                "📝 Natural language input is very brief (<20 words) - "
+                "add more details, specific requirements, and acceptance criteria for better results"
+            )
+
+        # Model upgrade recommendation for complex workflows using Haiku
+        if "haiku" in model.lower() and complexity == "complex" and error_count > 2:
+            recommendations.append(
+                "💡 Complex workflow with multiple errors - "
+                "consider upgrading to Sonnet model for better reasoning and fewer retries"
+            )
+
+        # Deduplicate and limit to top 5 recommendations by priority
+        unique_recommendations = list(dict.fromkeys(recommendations))
+
+        # Prioritize by emoji (cost/model first, then errors, then performance)
+        priority_order = ["💡", "💰", "🐛", "📦", "📝", "⏱️", "🚀"]
+        def get_priority(rec: str) -> int:
+            for i, emoji in enumerate(priority_order):
+                if rec.startswith(emoji):
+                    return i
+            return len(priority_order)
+
+        sorted_recommendations = sorted(unique_recommendations, key=get_priority)
+        return sorted_recommendations[:5]  # Return max 5 recommendations
 
     except Exception as e:
         logger.error(f"Error generating recommendations: {e}")
-        return ["Unable to generate recommendations due to error"]
+        return ["⚠️ Unable to generate recommendations due to error"]
