@@ -40,6 +40,7 @@ from core.data_models import (
     SubmitRequestData,
     SubmitRequestResponse,
     ConfirmResponse,
+    CostEstimate,
     GitHubIssue,
     ProjectContext,
 )
@@ -66,6 +67,11 @@ from core.github_poster import GitHubPoster
 from core.project_detector import detect_project_context
 import uuid
 import httpx
+
+# Import ADW complexity analyzer for cost estimation
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'adws'))
+from adw_modules.complexity_analyzer import analyze_issue_complexity
+from adw_modules.data_types import GitHubIssue as ADWGitHubIssue
 
 # Load .env file from server directory
 load_dotenv()
@@ -1098,7 +1104,7 @@ async def export_query_results(request: QueryExportRequest) -> Response:
 # GitHub Issue Request Endpoints
 @app.post("/api/request", response_model=SubmitRequestResponse)
 async def submit_nl_request(request: SubmitRequestData) -> SubmitRequestResponse:
-    """Process natural language request and generate GitHub issue preview"""
+    """Process natural language request and generate GitHub issue preview WITH cost estimate"""
     try:
         logger.info(f"[INFO] Processing NL request: {request.nl_input[:100]}...")
 
@@ -1117,16 +1123,52 @@ async def submit_nl_request(request: SubmitRequestData) -> SubmitRequestResponse
         # Process the request to generate GitHub issue
         github_issue = await process_request(request.nl_input, project_context)
 
+        # 🆕 ADD COST ESTIMATION
+        # Create ADW-compatible issue object for complexity analysis
+        # ADW GitHubIssue expects: number, title, body, user (str), labels (List[GitHubLabel])
+        # We'll use a simplified structure since we're just analyzing, not creating a real issue
+        adw_issue = ADWGitHubIssue(
+            number=0,  # Placeholder - not created yet
+            title=github_issue.title,
+            body=github_issue.body,
+            state="open",
+            author={"login": "user", "avatar_url": "", "url": ""},  # Placeholder user
+            assignees=[],
+            labels=[],  # Convert string labels to ADW format if needed
+            milestone=None,
+            comments=[],
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+            closed_at=None,
+            url=""
+        )
+
+        # Analyze complexity and get cost estimate
+        # Pass classification as issue_class (e.g., "/feature", "/bug", "/chore")
+        issue_class = f"/{github_issue.classification}"
+        cost_analysis = analyze_issue_complexity(adw_issue, issue_class)
+
         # Generate unique request ID
         request_id = str(uuid.uuid4())
 
-        # Store in pending requests
+        # Store in pending requests WITH cost estimate
         pending_requests[request_id] = {
             'issue': github_issue,
-            'project_context': project_context
+            'project_context': project_context,
+            'cost_estimate': {  # 🆕 NEW FIELD
+                'level': cost_analysis.level,
+                'min_cost': cost_analysis.estimated_cost_range[0],
+                'max_cost': cost_analysis.estimated_cost_range[1],
+                'confidence': cost_analysis.confidence,
+                'reasoning': cost_analysis.reasoning,
+                'recommended_workflow': cost_analysis.recommended_workflow
+            }
         }
 
-        logger.info(f"[SUCCESS] Request processed and stored with ID: {request_id}")
+        logger.info(
+            f"[SUCCESS] Request processed with cost estimate: {cost_analysis.level} "
+            f"(${cost_analysis.estimated_cost_range[0]:.2f}-${cost_analysis.estimated_cost_range[1]:.2f})"
+        )
         return SubmitRequestResponse(request_id=request_id)
 
     except Exception as e:
@@ -1151,6 +1193,27 @@ async def get_issue_preview(request_id: str) -> GitHubIssue:
         logger.error(f"[ERROR] Failed to get preview: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(500, f"Error retrieving preview: {str(e)}")
+
+@app.get("/api/preview/{request_id}/cost", response_model=CostEstimate)
+async def get_cost_estimate(request_id: str) -> CostEstimate:
+    """Get cost estimate for a pending request"""
+    try:
+        if request_id not in pending_requests:
+            raise HTTPException(404, f"Request ID '{request_id}' not found")
+
+        cost_estimate = pending_requests[request_id].get('cost_estimate')
+        if not cost_estimate:
+            raise HTTPException(404, "No cost estimate available for this request")
+
+        logger.info(f"[SUCCESS] Retrieved cost estimate for request: {request_id}")
+        return CostEstimate(**cost_estimate)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to get cost estimate: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(500, f"Error retrieving cost estimate: {str(e)}")
 
 async def check_webhook_trigger_health() -> dict:
     """

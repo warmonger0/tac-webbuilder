@@ -115,6 +115,16 @@ export interface ConfirmResponse {
   github_url: string;
 }
 
+// Cost Estimation Types
+export interface CostEstimate {
+  level: 'lightweight' | 'standard' | 'complex';
+  min_cost: number;
+  max_cost: number;
+  confidence: number;
+  reasoning: string;
+  recommended_workflow: string;
+}
+
 // Routes Types
 export interface Route {
   path: string;

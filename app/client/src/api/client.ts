@@ -5,6 +5,7 @@ import type {
   SubmitRequestData,
   SubmitRequestResponse,
   ConfirmResponse,
+  CostEstimate,
   RoutesResponse,
   CostResponse,
   QueryRequest,
@@ -46,6 +47,10 @@ export async function submitRequest(
 
 export async function getPreview(request_id: string): Promise<GitHubIssue> {
   return fetchJSON<GitHubIssue>(`${API_BASE}/preview/${request_id}`);
+}
+
+export async function getCostEstimate(request_id: string): Promise<CostEstimate> {
+  return fetchJSON<CostEstimate>(`${API_BASE}/preview/${request_id}/cost`);
 }
 
 export async function confirmAndPost(
@@ -195,6 +200,7 @@ export async function getSystemStatus(): Promise<any> {
 export const api = {
   submitRequest,
   getPreview,
+  getCostEstimate,
   confirmAndPost,
   listWorkflows,
   getHistory,

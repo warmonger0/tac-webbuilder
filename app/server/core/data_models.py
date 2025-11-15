@@ -150,6 +150,16 @@ class ConfirmResponse(BaseModel):
     issue_number: int = Field(..., description="GitHub issue number")
     github_url: str = Field(..., description="GitHub issue URL")
 
+# Cost Estimation Models
+class CostEstimate(BaseModel):
+    """Cost estimate for a workflow execution"""
+    level: Literal["lightweight", "standard", "complex"] = Field(..., description="Complexity level")
+    min_cost: float = Field(..., description="Minimum estimated cost in dollars")
+    max_cost: float = Field(..., description="Maximum estimated cost in dollars")
+    confidence: float = Field(..., description="Confidence score (0.0-1.0)")
+    reasoning: str = Field(..., description="Explanation of the estimate")
+    recommended_workflow: str = Field(..., description="Recommended ADW workflow")
+
 # Routes Visualization Models
 class Route(BaseModel):
     path: str = Field(..., description="Route path (e.g., /api/upload)")

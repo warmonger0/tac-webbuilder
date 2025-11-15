@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { submitRequest, getPreview, confirmAndPost, getSystemStatus } from '../api/client';
-import type { GitHubIssue } from '../types';
+import { submitRequest, getPreview, getCostEstimate, confirmAndPost, getSystemStatus } from '../api/client';
+import type { GitHubIssue, CostEstimate } from '../types';
 import { IssuePreview } from './IssuePreview';
+import { CostEstimateCard } from './CostEstimateCard';
 import { ConfirmDialog } from './ConfirmDialog';
 import { SystemStatusPanel } from './SystemStatusPanel';
 
@@ -14,6 +15,7 @@ export function RequestForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<GitHubIssue | null>(null);
+  const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -82,8 +84,14 @@ export function RequestForm() {
 
       setRequestId(response.request_id);
 
-      const previewData = await getPreview(response.request_id);
+      // Fetch both preview and cost estimate in parallel
+      const [previewData, costData] = await Promise.all([
+        getPreview(response.request_id),
+        getCostEstimate(response.request_id)
+      ]);
+
       setPreview(previewData);
+      setCostEstimate(costData);
 
       if (autoPost) {
         const confirmResponse = await confirmAndPost(response.request_id);
@@ -93,6 +101,7 @@ export function RequestForm() {
         setNlInput('');
         // Don't clear project path - it will persist from localStorage
         setPreview(null);
+        setCostEstimate(null);
       } else {
         setShowConfirm(true);
       }
@@ -116,6 +125,7 @@ export function RequestForm() {
       );
       setShowConfirm(false);
       setPreview(null);
+      setCostEstimate(null);
       setNlInput('');
       // Don't clear project path - it will persist from localStorage
       setRequestId(null);
@@ -129,6 +139,7 @@ export function RequestForm() {
   const handleCancel = () => {
     setShowConfirm(false);
     setPreview(null);
+    setCostEstimate(null);
     setRequestId(null);
   };
 
@@ -214,8 +225,15 @@ export function RequestForm() {
         </button>
 
         {preview && !showConfirm && !autoPost && (
-          <div className="mt-6">
-            <h3 className="text-xl font-bold mb-4">Preview</h3>
+          <div className="mt-6 space-y-6">
+            <h3 className="text-xl font-bold">Preview</h3>
+
+            {/* Cost Estimate Card - Displayed FIRST for visibility */}
+            {costEstimate && (
+              <CostEstimateCard estimate={costEstimate} />
+            )}
+
+            {/* GitHub Issue Preview */}
             <IssuePreview issue={preview} />
           </div>
         )}
@@ -224,6 +242,7 @@ export function RequestForm() {
         {showConfirm && preview && (
           <ConfirmDialog
             issue={preview}
+            costEstimate={costEstimate}
             onConfirm={handleConfirm}
             onCancel={handleCancel}
           />
