@@ -4,14 +4,15 @@ interface ScoreCardProps {
   description: string;
 }
 
-type ColorKey = 'green' | 'yellow' | 'red';
+type ColorKey = 'green' | 'blue' | 'yellow' | 'orange';
 
 export function ScoreCard({ title, score, description }: ScoreCardProps) {
   // Determine color based on score
   const getScoreColor = (score: number): ColorKey => {
-    if (score >= 80) return 'green';
+    if (score >= 90) return 'green';
+    if (score >= 70) return 'blue';
     if (score >= 50) return 'yellow';
-    return 'red';
+    return 'orange';
   };
 
   const color = getScoreColor(score);
@@ -21,26 +22,34 @@ export function ScoreCard({ title, score, description }: ScoreCardProps) {
     green: {
       bg: 'bg-green-50',
       border: 'border-green-200',
-      text: 'text-green-700',
-      progress: 'text-green-600',
+      text: 'text-green-800',
+      progress: 'text-green-700',
       ring: 'stroke-green-600',
       track: 'stroke-green-200',
+    },
+    blue: {
+      bg: 'bg-blue-50',
+      border: 'border-blue-200',
+      text: 'text-blue-800',
+      progress: 'text-blue-700',
+      ring: 'stroke-blue-600',
+      track: 'stroke-blue-200',
     },
     yellow: {
       bg: 'bg-yellow-50',
       border: 'border-yellow-200',
-      text: 'text-yellow-700',
-      progress: 'text-yellow-600',
+      text: 'text-yellow-800',
+      progress: 'text-yellow-700',
       ring: 'stroke-yellow-600',
       track: 'stroke-yellow-200',
     },
-    red: {
-      bg: 'bg-red-50',
-      border: 'border-red-200',
-      text: 'text-red-700',
-      progress: 'text-red-600',
-      ring: 'stroke-red-600',
-      track: 'stroke-red-200',
+    orange: {
+      bg: 'bg-orange-50',
+      border: 'border-orange-200',
+      text: 'text-orange-800',
+      progress: 'text-orange-700',
+      ring: 'stroke-orange-600',
+      track: 'stroke-orange-200',
     },
   };
 
