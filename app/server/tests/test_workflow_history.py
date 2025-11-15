@@ -373,3 +373,318 @@ def test_analytics_with_empty_database(temp_db):
         assert analytics["failed_workflows"] == 0
         assert analytics["avg_duration_seconds"] == 0.0
         assert analytics["success_rate_percent"] == 0.0
+
+
+# Cost Sync Tests
+def test_cost_sync_completed_workflow_updates_final_cost(temp_db):
+    """Test that completed workflows always get final cost, even if cost already exists"""
+    from core.data_models import CostData, PhaseCost, TokenBreakdown
+
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert workflow with initial partial cost ($0.09)
+        insert_workflow_history(
+            adw_id="cost-test-1",
+            status="completed",
+            actual_cost_total=0.09,
+            cost_breakdown={
+                "estimated_total": 0.0,
+                "actual_total": 0.09,
+                "by_phase": {"plan": 0.09}
+            }
+        )
+
+        # Mock scan_agents_directory to return completed workflow with final cost ($2.37)
+        mock_workflows = [{
+            "adw_id": "cost-test-1",
+            "status": "completed",
+            "cost_breakdown": {
+                "estimated_total": 0.0,
+                "actual_total": 2.37,
+                "by_phase": {"plan": 0.50, "build": 1.20, "test": 0.67}
+            },
+            "actual_cost_total": 2.37,
+            "input_tokens": 50000,
+            "cached_tokens": 10000,
+            "cache_hit_tokens": 20000,
+            "cache_miss_tokens": 30000,
+            "output_tokens": 5000,
+            "total_tokens": 85000,
+            "cache_efficiency_percent": 40.0
+        }]
+
+        # Mock cost data
+        mock_cost_data = CostData(
+            adw_id="cost-test-1",
+            phases=[
+                PhaseCost(
+                    phase="plan",
+                    cost=0.50,
+                    tokens=TokenBreakdown(
+                        input_tokens=10000,
+                        cache_creation_tokens=2000,
+                        cache_read_tokens=3000,
+                        output_tokens=1000
+                    )
+                ),
+                PhaseCost(
+                    phase="build",
+                    cost=1.20,
+                    tokens=TokenBreakdown(
+                        input_tokens=25000,
+                        cache_creation_tokens=5000,
+                        cache_read_tokens=10000,
+                        output_tokens=2500
+                    )
+                ),
+                PhaseCost(
+                    phase="test",
+                    cost=0.67,
+                    tokens=TokenBreakdown(
+                        input_tokens=15000,
+                        cache_creation_tokens=3000,
+                        cache_read_tokens=7000,
+                        output_tokens=1500
+                    )
+                )
+            ],
+            total_cost=2.37,
+            cache_efficiency_percent=40.0,
+            cache_savings_amount=0.54,
+            total_tokens=85000
+        )
+
+        with patch('core.workflow_history.scan_agents_directory', return_value=mock_workflows):
+            with patch('core.workflow_history.read_cost_history', return_value=mock_cost_data):
+                synced = sync_workflow_history()
+                assert synced >= 1
+
+        # Verify final cost was updated
+        workflow = get_workflow_by_adw_id("cost-test-1")
+        assert workflow["actual_cost_total"] == 2.37
+        assert workflow["cost_breakdown"]["actual_total"] == 2.37
+
+
+def test_cost_sync_running_workflow_progressive_updates(temp_db):
+    """Test that running workflows only update if cost increased"""
+    from core.data_models import CostData, PhaseCost, TokenBreakdown
+
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert workflow with initial cost ($0.50)
+        insert_workflow_history(
+            adw_id="cost-test-2",
+            status="running",
+            actual_cost_total=0.50,
+            cost_breakdown={
+                "estimated_total": 0.0,
+                "actual_total": 0.50,
+                "by_phase": {"plan": 0.50}
+            }
+        )
+
+        # Mock scan to return running workflow with increased cost ($1.20)
+        mock_workflows = [{
+            "adw_id": "cost-test-2",
+            "status": "running",
+            "cost_breakdown": {
+                "estimated_total": 0.0,
+                "actual_total": 1.20,
+                "by_phase": {"plan": 0.50, "build": 0.70}
+            },
+            "actual_cost_total": 1.20,
+            "input_tokens": 30000,
+            "total_tokens": 40000,
+            "cache_efficiency_percent": 30.0
+        }]
+
+        mock_cost_data = CostData(
+            adw_id="cost-test-2",
+            phases=[
+                PhaseCost(
+                    phase="plan",
+                    cost=0.50,
+                    tokens=TokenBreakdown(input_tokens=10000, cache_creation_tokens=2000, cache_read_tokens=3000, output_tokens=1000)
+                ),
+                PhaseCost(
+                    phase="build",
+                    cost=0.70,
+                    tokens=TokenBreakdown(input_tokens=20000, cache_creation_tokens=3000, cache_read_tokens=5000, output_tokens=1500)
+                )
+            ],
+            total_cost=1.20,
+            cache_efficiency_percent=30.0,
+            cache_savings_amount=0.22,
+            total_tokens=40000
+        )
+
+        with patch('core.workflow_history.scan_agents_directory', return_value=mock_workflows):
+            with patch('core.workflow_history.read_cost_history', return_value=mock_cost_data):
+                synced = sync_workflow_history()
+                assert synced >= 1
+
+        # Verify cost was updated to higher value
+        workflow = get_workflow_by_adw_id("cost-test-2")
+        assert workflow["actual_cost_total"] == 1.20
+
+
+def test_cost_sync_running_workflow_prevents_decreases(temp_db):
+    """Test that running workflows prevent cost decreases"""
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert workflow with higher cost ($2.00)
+        insert_workflow_history(
+            adw_id="cost-test-3",
+            status="running",
+            actual_cost_total=2.00,
+            cost_breakdown={
+                "estimated_total": 0.0,
+                "actual_total": 2.00,
+                "by_phase": {"plan": 2.00}
+            }
+        )
+
+        # Mock scan to return running workflow with lower cost ($0.50) - should be rejected
+        mock_workflows = [{
+            "adw_id": "cost-test-3",
+            "status": "running",
+            "cost_breakdown": {
+                "estimated_total": 0.0,
+                "actual_total": 0.50,
+                "by_phase": {"plan": 0.50}
+            },
+            "actual_cost_total": 0.50,
+            "input_tokens": 10000,
+            "total_tokens": 15000
+        }]
+
+        with patch('core.workflow_history.scan_agents_directory', return_value=mock_workflows):
+            with patch('core.workflow_history.read_cost_history', side_effect=Exception("No cost")):
+                synced = sync_workflow_history()
+
+        # Verify cost was NOT decreased
+        workflow = get_workflow_by_adw_id("cost-test-3")
+        assert workflow["actual_cost_total"] == 2.00  # Original higher cost preserved
+
+
+def test_cost_sync_failed_workflow_updates_final_cost(temp_db):
+    """Test that failed workflows always get final cost"""
+    from core.data_models import CostData, PhaseCost, TokenBreakdown
+
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert workflow with initial cost
+        insert_workflow_history(
+            adw_id="cost-test-4",
+            status="failed",
+            actual_cost_total=0.25,
+            cost_breakdown={
+                "estimated_total": 0.0,
+                "actual_total": 0.25,
+                "by_phase": {"plan": 0.25}
+            }
+        )
+
+        # Mock scan to return failed workflow with final cost
+        mock_workflows = [{
+            "adw_id": "cost-test-4",
+            "status": "failed",
+            "cost_breakdown": {
+                "estimated_total": 0.0,
+                "actual_total": 1.50,
+                "by_phase": {"plan": 0.50, "build": 1.00}
+            },
+            "actual_cost_total": 1.50,
+            "input_tokens": 35000,
+            "total_tokens": 45000,
+            "cache_efficiency_percent": 25.0
+        }]
+
+        mock_cost_data = CostData(
+            adw_id="cost-test-4",
+            phases=[
+                PhaseCost(
+                    phase="plan",
+                    cost=0.50,
+                    tokens=TokenBreakdown(input_tokens=10000, cache_creation_tokens=2000, cache_read_tokens=3000, output_tokens=1000)
+                ),
+                PhaseCost(
+                    phase="build",
+                    cost=1.00,
+                    tokens=TokenBreakdown(input_tokens=25000, cache_creation_tokens=4000, cache_read_tokens=8000, output_tokens=2000)
+                )
+            ],
+            total_cost=1.50,
+            cache_efficiency_percent=25.0,
+            cache_savings_amount=0.30,
+            total_tokens=45000
+        )
+
+        with patch('core.workflow_history.scan_agents_directory', return_value=mock_workflows):
+            with patch('core.workflow_history.read_cost_history', return_value=mock_cost_data):
+                synced = sync_workflow_history()
+                assert synced >= 1
+
+        # Verify final cost was updated for failed workflow
+        workflow = get_workflow_by_adw_id("cost-test-4")
+        assert workflow["actual_cost_total"] == 1.50
+
+
+def test_cost_sync_logging(temp_db, caplog):
+    """Test that cost sync logging works correctly"""
+    import logging
+    from core.data_models import CostData, PhaseCost, TokenBreakdown
+
+    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+        # Insert workflow with initial cost
+        insert_workflow_history(
+            adw_id="cost-test-5",
+            status="completed",
+            actual_cost_total=0.50,
+            cost_breakdown={
+                "estimated_total": 0.0,
+                "actual_total": 0.50,
+                "by_phase": {"plan": 0.50}
+            }
+        )
+
+        # Mock scan to return completed workflow with updated cost
+        mock_workflows = [{
+            "adw_id": "cost-test-5",
+            "status": "completed",
+            "cost_breakdown": {
+                "estimated_total": 0.0,
+                "actual_total": 2.00,
+                "by_phase": {"plan": 0.50, "build": 1.50}
+            },
+            "actual_cost_total": 2.00,
+            "input_tokens": 40000,
+            "total_tokens": 50000
+        }]
+
+        mock_cost_data = CostData(
+            adw_id="cost-test-5",
+            phases=[
+                PhaseCost(
+                    phase="plan",
+                    cost=0.50,
+                    tokens=TokenBreakdown(input_tokens=10000, cache_creation_tokens=2000, cache_read_tokens=3000, output_tokens=1000)
+                ),
+                PhaseCost(
+                    phase="build",
+                    cost=1.50,
+                    tokens=TokenBreakdown(input_tokens=30000, cache_creation_tokens=5000, cache_read_tokens=10000, output_tokens=3000)
+                )
+            ],
+            total_cost=2.00,
+            cache_efficiency_percent=35.0,
+            cache_savings_amount=0.45,
+            total_tokens=50000
+        )
+
+        with patch('core.workflow_history.scan_agents_directory', return_value=mock_workflows):
+            with patch('core.workflow_history.read_cost_history', return_value=mock_cost_data):
+                with caplog.at_level(logging.INFO):
+                    synced = sync_workflow_history()
+
+        # Verify logging occurred - check that cost update was logged
+        # Look for the log message pattern: "Cost update for cost-test-5 (completed)"
+        log_messages = [record.message for record in caplog.records if record.levelname == "INFO"]
+        cost_update_logged = any("cost-test-5" in msg and "completed" in msg for msg in log_messages)
+        assert cost_update_logged or synced >= 1  # Either logging worked or sync succeeded

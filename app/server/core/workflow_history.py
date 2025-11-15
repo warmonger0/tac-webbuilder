@@ -860,17 +860,43 @@ def sync_workflow_history() -> int:
             if duration_seconds and not existing["duration_seconds"]:
                 updates["duration_seconds"] = duration_seconds
 
-            # Update cost data if available and not already set
-            if workflow_data.get("cost_breakdown") and not existing.get("cost_breakdown"):
-                updates["cost_breakdown"] = workflow_data["cost_breakdown"]
-                updates["actual_cost_total"] = workflow_data.get("actual_cost_total", 0.0)
-                updates["input_tokens"] = workflow_data.get("input_tokens", 0)
-                updates["cached_tokens"] = workflow_data.get("cached_tokens", 0)
-                updates["cache_hit_tokens"] = workflow_data.get("cache_hit_tokens", 0)
-                updates["cache_miss_tokens"] = workflow_data.get("cache_miss_tokens", 0)
-                updates["output_tokens"] = workflow_data.get("output_tokens", 0)
-                updates["total_tokens"] = workflow_data.get("total_tokens", 0)
-                updates["cache_efficiency_percent"] = workflow_data.get("cache_efficiency_percent", 0.0)
+            # Update cost data with status-aware logic to prevent staleness
+            # - Always update completed/failed workflows (final cost is authoritative)
+            # - For running workflows, only update if cost increased (progressive tracking)
+            # - Never allow cost decreases (prevents data corruption from out-of-order syncs)
+            if workflow_data.get("cost_breakdown"):
+                old_cost = existing.get("actual_cost_total", 0.0)
+                new_cost = workflow_data.get("actual_cost_total", 0.0)
+                status = workflow_data.get("status", "unknown")
+
+                should_update = False
+                update_reason = ""
+
+                # Always update completed/failed workflows with final cost
+                if status in ["completed", "failed"]:
+                    should_update = True
+                    update_reason = f"final cost for {status} workflow"
+                # For running workflows, only update if cost increased
+                elif status == "running" and new_cost > old_cost:
+                    should_update = True
+                    update_reason = f"progressive increase from ${old_cost:.4f} to ${new_cost:.4f}"
+                # Skip if running and cost didn't increase or decreased
+                elif status == "running":
+                    update_reason = f"no increase (${old_cost:.4f} → ${new_cost:.4f})"
+
+                if should_update:
+                    updates["cost_breakdown"] = workflow_data["cost_breakdown"]
+                    updates["actual_cost_total"] = new_cost
+                    updates["input_tokens"] = workflow_data.get("input_tokens", 0)
+                    updates["cached_tokens"] = workflow_data.get("cached_tokens", 0)
+                    updates["cache_hit_tokens"] = workflow_data.get("cache_hit_tokens", 0)
+                    updates["cache_miss_tokens"] = workflow_data.get("cache_miss_tokens", 0)
+                    updates["output_tokens"] = workflow_data.get("output_tokens", 0)
+                    updates["total_tokens"] = workflow_data.get("total_tokens", 0)
+                    updates["cache_efficiency_percent"] = workflow_data.get("cache_efficiency_percent", 0.0)
+                    logger.info(f"[SYNC] Cost update for {adw_id} ({status}): ${old_cost:.4f} → ${new_cost:.4f} ({update_reason})")
+                else:
+                    logger.debug(f"[SYNC] Cost update skipped for {adw_id} ({status}): {update_reason}")
 
             # Update performance metrics if available and not already set
             if workflow_data.get("phase_durations") and not existing.get("phase_durations"):
