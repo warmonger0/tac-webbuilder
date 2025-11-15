@@ -43,7 +43,6 @@ from core.data_models import (
     CostEstimate,
     GitHubIssue,
     ProjectContext,
-    ResyncRequest,
     ResyncResponse,
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
