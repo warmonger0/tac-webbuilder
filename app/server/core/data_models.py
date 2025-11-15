@@ -288,6 +288,21 @@ class WorkflowHistoryItem(BaseModel):
     cost_breakdown: Optional[WorkflowHistoryCostBreakdown] = Field(None, description="Cost breakdown details")
     token_breakdown: Optional[WorkflowHistoryTokenBreakdown] = Field(None, description="Token breakdown details")
 
+    # Performance metrics
+    phase_durations: Optional[Dict[str, int]] = Field(None, description="Duration in seconds per phase")
+    idle_time_seconds: Optional[int] = Field(None, description="Idle time between phases")
+    bottleneck_phase: Optional[str] = Field(None, description="Phase that took longest")
+
+    # Error analysis
+    error_category: Optional[str] = Field(None, description="Categorized error type")
+    retry_reasons: Optional[List[str]] = Field(None, description="List of retry trigger reasons")
+    error_phase_distribution: Optional[Dict[str, int]] = Field(None, description="Error count by phase")
+    recovery_time_seconds: Optional[int] = Field(None, description="Time spent in error recovery")
+
+    # Complexity tracking
+    complexity_estimated: Optional[str] = Field(None, description="Estimated complexity (low/medium/high)")
+    complexity_actual: Optional[str] = Field(None, description="Actual complexity (low/medium/high)")
+
 class WorkflowHistoryAnalytics(BaseModel):
     total_workflows: int = Field(0, description="Total number of workflows")
     completed_workflows: int = Field(0, description="Number of completed workflows")

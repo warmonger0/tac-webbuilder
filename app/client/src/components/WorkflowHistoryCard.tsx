@@ -5,6 +5,7 @@ import { CostBreakdownChart } from './CostBreakdownChart';
 import { CumulativeCostChart } from './CumulativeCostChart';
 import { CacheEfficiencyBadge } from './CacheEfficiencyBadge';
 import { TokenBreakdownChart } from './TokenBreakdownChart';
+import { PhaseDurationChart } from './PhaseDurationChart';
 
 interface WorkflowHistoryCardProps {
   workflow: WorkflowHistoryItem;
@@ -444,17 +445,94 @@ export function WorkflowHistoryCard({ workflow }: WorkflowHistoryCardProps) {
             </div>
           )}
 
-          {/* Cost of Errors Section */}
+          {/* Performance Analysis Section */}
+          {workflow.phase_durations && (
+            <div className="border-b border-gray-200 pb-6">
+              <h3 className="text-base font-semibold text-gray-800 mb-4">
+                ⚡ Performance Analysis
+              </h3>
+
+              {/* Phase Duration Bar Chart */}
+              <div className="mb-4">
+                <PhaseDurationChart phaseDurations={workflow.phase_durations} />
+              </div>
+
+              {/* Bottleneck Alert */}
+              {workflow.bottleneck_phase && (
+                <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="text-sm font-medium text-yellow-800">
+                    ⚠️ Bottleneck Detected: {workflow.bottleneck_phase} phase
+                  </div>
+                  <div className="text-xs text-yellow-700 mt-1">
+                    This phase took significantly longer than others (&gt;30% of total time)
+                  </div>
+                </div>
+              )}
+
+              {/* Idle Time */}
+              {(workflow.idle_time_seconds !== undefined && workflow.idle_time_seconds > 0) && (
+                <div className="mt-2 text-sm text-gray-600">
+                  Idle time between phases: {formatDuration(workflow.idle_time_seconds)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Error Analysis Section */}
           {(workflow.retry_count > 0 || workflow.status === 'failed') && (
             <div className="border-b border-gray-200 pb-6">
               <h3 className="text-base font-semibold text-gray-800 mb-4">
-                ⚠️ Cost of Errors
+                ⚠️ Error Analysis
               </h3>
 
+              {/* Error Category Badge */}
+              {workflow.error_category && (
+                <div className="mb-3">
+                  <span className="inline-block bg-red-100 text-red-800 text-sm px-3 py-1 rounded border border-red-200">
+                    {workflow.error_category.replace('_', ' ').toUpperCase()}
+                  </span>
+                </div>
+              )}
+
+              {/* Error Message */}
               {workflow.error_message && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
                   <div className="text-sm font-medium text-red-800 mb-2">Error Message:</div>
                   <p className="text-sm text-red-900">{workflow.error_message}</p>
+                </div>
+              )}
+
+              {/* Retry Reasons */}
+              {(workflow.retry_reasons && workflow.retry_reasons.length > 0) && (
+                <div className="mb-4">
+                  <div className="text-sm font-medium text-gray-700 mb-2">Retry Triggers:</div>
+                  <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    {workflow.retry_reasons.map((reason, idx) => (
+                      <li key={idx}>{reason.replace('_', ' ')}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Error Phase Distribution */}
+              {(workflow.error_phase_distribution && Object.keys(workflow.error_phase_distribution).length > 0) && (
+                <div className="mb-4">
+                  <div className="text-sm font-medium text-gray-700 mb-2">Errors by Phase:</div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {Object.entries(workflow.error_phase_distribution).map(([phase, count]) => (
+                      <div key={phase} className="bg-red-50 border border-red-200 rounded p-2 text-sm">
+                        <div className="text-gray-600 capitalize">{phase}</div>
+                        <div className="font-semibold text-red-700">{count} {count === 1 ? 'error' : 'errors'}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recovery Time */}
+              {(workflow.recovery_time_seconds !== undefined && workflow.recovery_time_seconds > 0) && (
+                <div className="text-sm text-gray-600 mb-4">
+                  Total recovery time: {formatDuration(workflow.recovery_time_seconds)}
                 </div>
               )}
 

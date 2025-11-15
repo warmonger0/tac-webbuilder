@@ -234,6 +234,21 @@ export interface WorkflowHistoryItem {
   structured_input?: StructuredInputData;
   cost_breakdown?: CostBreakdown;
   token_breakdown?: TokenBreakdown;
+
+  // Performance metrics
+  phase_durations?: Record<string, number>;
+  idle_time_seconds?: number;
+  bottleneck_phase?: string;
+
+  // Error analysis
+  error_category?: string;
+  retry_reasons?: string[];
+  error_phase_distribution?: Record<string, number>;
+  recovery_time_seconds?: number;
+
+  // Complexity tracking
+  complexity_estimated?: string;
+  complexity_actual?: string;
 }
 
 export interface HistoryAnalytics {
