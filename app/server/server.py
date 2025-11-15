@@ -11,6 +11,8 @@ import logging
 import sys
 import asyncio
 import json
+import subprocess
+import urllib.request
 
 from core.data_models import (
     FileUploadResponse,
@@ -772,7 +774,7 @@ async def get_system_status() -> SystemStatusResponse:
                         message="Webhook endpoint accessible",
                         details={"webhook_url": "webhook.directmyagent.com"}
                     )
-            except:
+            except Exception:
                 services["github_webhook"] = ServiceHealth(
                     name="GitHub Webhook",
                     status="unknown",
@@ -875,7 +877,7 @@ async def start_webhook_service():
                         "status": "started",
                         "message": "Webhook service started successfully on port 8001"
                     }
-        except:
+        except Exception:
             pass
 
         return {
@@ -978,7 +980,7 @@ async def get_github_webhook_health():
                         try:
                             delivery = json.loads(line)
                             deliveries.append(delivery)
-                        except:
+                        except json.JSONDecodeError:
                             pass
 
                 # Check if most recent delivery was successful
@@ -1002,7 +1004,7 @@ async def get_github_webhook_health():
                     return {
                         "status": status,
                         "message": message,
-                        "webhook_url": f"https://webhook.directmyagent.com",
+                        "webhook_url": "https://webhook.directmyagent.com",
                         "recent_deliveries": deliveries[:3],
                         "webhook_id": webhook_id
                     }
@@ -1016,7 +1018,7 @@ async def get_github_webhook_health():
                         "message": "Webhook endpoint is accessible",
                         "webhook_url": "https://webhook.directmyagent.com"
                     }
-        except:
+        except Exception:
             pass
 
         return {
@@ -1067,7 +1069,7 @@ async def redeliver_github_webhook():
                     timeout=3
                 )
                 diagnostics.append("⚙ Attempted to restart webhook service")
-            except:
+            except Exception:
                 diagnostics.append("✗ Failed to restart webhook service automatically")
 
         # Step 2: Check Cloudflare tunnel health
@@ -1135,7 +1137,7 @@ async def redeliver_github_webhook():
             if redeliver_result.returncode == 0:
                 return {
                     "status": "success",
-                    "message": f"Webhook redelivered successfully",
+                    "message": "Webhook redelivered successfully",
                     "diagnostics": diagnostics,
                     "delivery_id": delivery_id
                 }
@@ -1418,21 +1420,21 @@ async def get_workflow_analytics(adw_id: str) -> WorkflowAnalyticsDetail:
         if workflow.get("similar_workflow_ids"):
             try:
                 similar_workflow_ids = json.loads(workflow["similar_workflow_ids"])
-            except:
+            except json.JSONDecodeError:
                 pass
 
         anomaly_flags = []
         if workflow.get("anomaly_flags"):
             try:
                 anomaly_flags = json.loads(workflow["anomaly_flags"])
-            except:
+            except json.JSONDecodeError:
                 pass
 
         optimization_recommendations = []
         if workflow.get("optimization_recommendations"):
             try:
                 optimization_recommendations = json.loads(workflow["optimization_recommendations"])
-            except:
+            except json.JSONDecodeError:
                 pass
 
         analytics = WorkflowAnalyticsDetail(

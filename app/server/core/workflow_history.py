@@ -267,6 +267,10 @@ def init_db():
                 -- Phase 3B: Scoring version tracking
                 scoring_version TEXT DEFAULT '1.0',
 
+                -- Phase 3D: Insights & Recommendations
+                anomaly_flags TEXT,  -- JSON array of anomaly objects
+                optimization_recommendations TEXT,  -- JSON array of recommendation strings
+
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
@@ -452,7 +456,8 @@ def get_workflow_by_adw_id(adw_id: str) -> Optional[Dict]:
             # Parse JSON fields
             json_fields = [
                 "structured_input", "cost_breakdown", "token_breakdown",
-                "phase_durations", "retry_reasons", "error_phase_distribution"
+                "phase_durations", "retry_reasons", "error_phase_distribution",
+                "anomaly_flags", "optimization_recommendations"  # Phase 3D
             ]
             for field in json_fields:
                 if result.get(field):
@@ -461,6 +466,10 @@ def get_workflow_by_adw_id(adw_id: str) -> Optional[Dict]:
                     except json.JSONDecodeError:
                         logger.warning(f"[DB] Failed to parse JSON for {field} in ADW {adw_id}")
                         result[field] = None
+                else:
+                    # Default to empty arrays for Phase 3D fields
+                    if field in ["anomaly_flags", "optimization_recommendations"]:
+                        result[field] = []
             return result
         return None
 
@@ -566,7 +575,8 @@ def get_workflow_history(
             # Parse JSON fields
             json_fields = [
                 "structured_input", "cost_breakdown", "token_breakdown",
-                "phase_durations", "retry_reasons", "error_phase_distribution"
+                "phase_durations", "retry_reasons", "error_phase_distribution",
+                "anomaly_flags", "optimization_recommendations"  # Phase 3D
             ]
             for field in json_fields:
                 if result.get(field):
@@ -575,6 +585,10 @@ def get_workflow_history(
                     except json.JSONDecodeError:
                         logger.warning(f"[DB] Failed to parse JSON for {field}")
                         result[field] = None
+                else:
+                    # Default to empty arrays for Phase 3D fields
+                    if field in ["anomaly_flags", "optimization_recommendations"]:
+                        result[field] = []
             results.append(result)
 
         logger.info(
@@ -899,6 +913,29 @@ def sync_workflow_history() -> int:
             logger.warning(f"[SYNC] Failed to calculate quality score for {adw_id}: {e}")
             workflow_data["quality_score"] = 0.0
 
+        # Phase 3D: Generate insights and recommendations
+        try:
+            # Get all workflows for comparison
+            all_workflows = get_workflow_history()
+
+            # Detect anomalies
+            from core.workflow_analytics import detect_anomalies, generate_optimization_recommendations
+            anomalies = detect_anomalies(workflow_data, all_workflows)
+
+            # Generate recommendations
+            recommendations = generate_optimization_recommendations(workflow_data, anomalies)
+
+            # Serialize to JSON for database storage
+            import json
+            workflow_data["anomaly_flags"] = json.dumps([a["message"] for a in anomalies])  # Simplified for UI
+            workflow_data["optimization_recommendations"] = json.dumps(recommendations)
+
+            logger.debug(f"[SYNC] Generated {len(anomalies)} anomalies and {len(recommendations)} recommendations for {adw_id}")
+        except Exception as e:
+            logger.warning(f"[SYNC] Failed to generate insights for {adw_id}: {e}")
+            workflow_data["anomaly_flags"] = "[]"
+            workflow_data["optimization_recommendations"] = "[]"
+
         if existing:
             # Update existing record if status or other fields changed
             updates = {}
@@ -963,6 +1000,12 @@ def sync_workflow_history() -> int:
             # Update complexity if available and not already set
             if workflow_data.get("complexity_actual") and not existing.get("complexity_actual"):
                 updates["complexity_actual"] = workflow_data["complexity_actual"]
+
+            # Phase 3D: Always update insights when they change
+            if workflow_data.get("anomaly_flags") != existing.get("anomaly_flags"):
+                updates["anomaly_flags"] = workflow_data["anomaly_flags"]
+            if workflow_data.get("optimization_recommendations") != existing.get("optimization_recommendations"):
+                updates["optimization_recommendations"] = workflow_data["optimization_recommendations"]
 
             if updates:
                 update_workflow_history(adw_id, **updates)
