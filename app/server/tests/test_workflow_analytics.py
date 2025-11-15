@@ -9,7 +9,6 @@ Tests cover:
 """
 
 import pytest
-from datetime import datetime
 from core.workflow_analytics import (
     extract_hour,
     extract_day_of_week,
@@ -146,10 +145,6 @@ class TestClarityScoring:
 
     def test_clarity_criteria_bonus(self):
         """Test that criteria indicators increase score."""
-        # Input without criteria
-        workflow1 = {"nl_input": " ".join(["word"] * 100)}
-        score1 = calculate_nl_input_clarity_score(workflow1)
-
         # Input with criteria
         workflow2 = {
             "nl_input": "Requirements: 1. Feature A 2. Feature B - Must complete - Should test"

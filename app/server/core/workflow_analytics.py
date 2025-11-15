@@ -15,7 +15,7 @@ Additionally provides:
 - Optimization recommendations
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 from datetime import datetime
 import logging
 
