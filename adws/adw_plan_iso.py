@@ -223,6 +223,15 @@ def main():
                            f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}"),
     )
 
+    # PRE-COMPUTE the plan file path (don't rely on agent to tell us where it saved it!)
+    # Generate a descriptive name from issue title (simplified version of what the template would generate)
+    import re
+    import shutil
+    title_slug = re.sub(r'[^a-z0-9]+', '-', issue.title.lower()).strip('-')[:50]
+    expected_plan_file = f"specs/issue-{issue_number}-adw-{adw_id}-sdlc_planner-{title_slug}.md"
+
+    logger.info(f"Plan file expected at: {expected_plan_file}")
+
     # Build the implementation plan (now executing in worktree)
     logger.info("Building implementation plan in worktree")
     make_issue_comment(
@@ -230,7 +239,12 @@ def main():
         format_issue_message(adw_id, AGENT_PLANNER, "✅ Building implementation plan in isolated environment"),
     )
 
-    plan_response = build_plan(issue, issue_command, adw_id, logger, working_dir=worktree_path)
+    # Pass the pre-computed plan file path to the agent
+    plan_response = build_plan(
+        issue, issue_command, adw_id, logger,
+        working_dir=worktree_path,
+        plan_file_path=expected_plan_file
+    )
 
     if not plan_response.success:
         logger.error(f"Error building plan: {plan_response.output}")
@@ -248,42 +262,12 @@ def main():
         format_issue_message(adw_id, AGENT_PLANNER, "✅ Implementation plan created"),
     )
 
-    # Get the plan file path directly from response
-    logger.info("Getting plan file path")
-    plan_file_path_raw = plan_response.output.strip()
-
-    # Extract just the file path if agent added extra text
-    # Look for lines that look like file paths (contain "specs/" and end with ".md")
-    for line in plan_file_path_raw.split('\n'):
-        line = line.strip()
-        if 'specs/' in line and line.endswith('.md'):
-            # Remove any leading/trailing quotes or backticks
-            line = line.strip('`').strip('"').strip("'")
-            # If line starts with specs/ or /, use it
-            if line.startswith('specs/') or line.startswith('/'):
-                plan_file_path_raw = line
-                break
-
-    logger.info(f"Extracted path: {plan_file_path_raw}")
-
-    # Validate the path exists (within worktree)
-    if not plan_file_path_raw:
-        error = "No plan file path returned from planning agent"
-        logger.error(error)
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", f"❌ {error}"),
-        )
-        sys.exit(1)
-
-    # Log what the agent reported
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, AGENT_PLANNER, f"📍 Reported file location: `{plan_file_path_raw}`"),
-    )
+    # Use our pre-computed path instead of parsing agent output
+    plan_file_path_raw = expected_plan_file
+    logger.info(f"Using expected plan file path: {plan_file_path_raw}")
 
     # Handle both absolute and relative paths with fallback recovery
-    import shutil
+    # (Keep existing validation logic to handle edge cases)
     plan_file_path = None
     worktree_plan_path = None
 

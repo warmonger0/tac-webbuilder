@@ -223,6 +223,7 @@ def build_plan(
     adw_id: str,
     logger: logging.Logger,
     working_dir: Optional[str] = None,
+    plan_file_path: Optional[str] = None,
 ) -> AgentPromptResponse:
     """Build implementation plan for the issue using the specified command."""
     # Use minimal payload like classify_issue does
@@ -230,10 +231,15 @@ def build_plan(
         by_alias=True, include={"number", "title", "body"}
     )
 
+    # Build args list - include plan_file_path if provided
+    args = [str(issue.number), adw_id, minimal_issue_json]
+    if plan_file_path:
+        args.append(plan_file_path)
+
     issue_plan_template_request = AgentTemplateRequest(
         agent_name=AGENT_PLANNER,
         slash_command=command,
-        args=[str(issue.number), adw_id, minimal_issue_json],
+        args=args,
         adw_id=adw_id,
         working_dir=working_dir,
     )
