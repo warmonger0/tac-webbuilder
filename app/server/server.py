@@ -1402,6 +1402,68 @@ async def resync_workflow_history(
 
 # Phase 3: Advanced Analytics Endpoints
 
+@app.post("/api/workflows/batch", response_model=List[WorkflowHistoryItem])
+async def get_workflows_batch(workflow_ids: List[str]) -> List[WorkflowHistoryItem]:
+    """
+    Fetch multiple workflows by ADW IDs in a single request.
+
+    This endpoint is optimized for Phase 3E's similar workflows feature,
+    allowing the frontend to fetch multiple workflows efficiently instead
+    of making N separate requests.
+
+    Args:
+        workflow_ids: List of ADW IDs to fetch (max 20)
+
+    Returns:
+        List of workflow history items
+
+    Raises:
+        HTTPException 400: If more than 20 workflow IDs requested
+        HTTPException 500: If database error occurs
+
+    Example:
+        POST /api/workflows/batch
+        Body: ["adw-abc123", "adw-def456", "adw-ghi789"]
+        Returns: [{ workflow data }, { workflow data }, ...]
+    """
+    try:
+        # Validate input
+        if not workflow_ids:
+            return []
+
+        if len(workflow_ids) > 20:
+            raise HTTPException(
+                status_code=400,
+                detail="Maximum 20 workflows can be fetched at once"
+            )
+
+        # Fetch workflows
+        from core.workflow_history import get_workflow_by_adw_id
+
+        workflows = []
+        for adw_id in workflow_ids:
+            workflow = get_workflow_by_adw_id(adw_id)
+            if workflow:
+                # Parse JSON fields if they're strings
+                if isinstance(workflow.get("similar_workflow_ids"), str):
+                    import json
+                    try:
+                        workflow["similar_workflow_ids"] = json.loads(workflow["similar_workflow_ids"])
+                    except (json.JSONDecodeError, TypeError):
+                        workflow["similar_workflow_ids"] = []
+
+                workflows.append(WorkflowHistoryItem(**workflow))
+
+        logger.info(f"[BATCH] Fetched {len(workflows)}/{len(workflow_ids)} workflows")
+        return workflows
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[BATCH] Error fetching workflows: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/workflow-analytics/{adw_id}", response_model=WorkflowAnalyticsDetail)
 async def get_workflow_analytics(adw_id: str) -> WorkflowAnalyticsDetail:
     """Get advanced analytics for a specific workflow"""

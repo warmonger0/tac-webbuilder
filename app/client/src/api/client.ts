@@ -14,6 +14,7 @@ import type {
   DatabaseSchemaResponse,
   RandomQueryResponse,
   WorkflowHistoryResponse,
+  WorkflowHistoryItem,
   HistoryFilters,
 } from '../types';
 
@@ -89,6 +90,34 @@ export async function getWorkflowHistory(
     ? `${API_BASE}/workflow-history?${params.toString()}`
     : `${API_BASE}/workflow-history`;
   return fetchJSON<WorkflowHistoryResponse>(url);
+}
+
+export async function fetchWorkflowsBatch(
+  workflowIds: string[]
+): Promise<WorkflowHistoryItem[]> {
+  /**
+   * Fetch multiple workflows by ADW IDs in a single request.
+   *
+   * This is optimized for Phase 3E's similar workflows feature.
+   * Instead of making N separate requests, this batches them into one.
+   *
+   * @param workflowIds - Array of ADW IDs to fetch (max 20)
+   * @returns Array of workflow history items
+   * @throws Error if request fails or more than 20 IDs provided
+   */
+  const response = await fetch(`${API_BASE}/workflows/batch`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(workflowIds),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch workflows: ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
 export async function getRoutes(): Promise<RoutesResponse> {

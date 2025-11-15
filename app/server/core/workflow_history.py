@@ -993,6 +993,52 @@ def sync_workflow_history() -> int:
             insert_workflow_history(**insert_data)
             synced_count += 1
 
+    # Phase 3E: Second pass - Calculate similar_workflow_ids for all workflows
+    logger.info("[SYNC] Phase 3E: Calculating similar workflows...")
+    try:
+        from .workflow_analytics import find_similar_workflows
+        import json
+
+        # Fetch all workflows from database for comparison
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM workflow_history")
+            all_workflows = [dict(row) for row in cursor.fetchall()]
+
+        logger.info(f"[SYNC] Found {len(all_workflows)} workflows for similarity analysis")
+
+        # Calculate similar workflows for each workflow
+        similarity_updates = 0
+        for workflow in all_workflows:
+            try:
+                # Find similar workflows (returns list of ADW IDs)
+                similar_ids = find_similar_workflows(workflow, all_workflows)
+
+                if similar_ids:
+                    # Serialize to JSON for storage
+                    similar_ids_json = json.dumps(similar_ids)
+
+                    # Update database
+                    with get_db_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "UPDATE workflow_history SET similar_workflow_ids = ? WHERE adw_id = ?",
+                            (similar_ids_json, workflow['adw_id'])
+                        )
+                        conn.commit()
+
+                    logger.debug(f"[SYNC] Updated similar workflows for {workflow['adw_id']}: {len(similar_ids)} matches")
+                    similarity_updates += 1
+
+            except Exception as e:
+                logger.warning(f"[SYNC] Failed to calculate similar workflows for {workflow['adw_id']}: {e}")
+
+        logger.info(f"[SYNC] Updated similar workflows for {similarity_updates} workflows")
+
+    except Exception as e:
+        logger.error(f"[SYNC] Failed to calculate similar workflows (Phase 3E): {e}")
+        # Don't fail the entire sync if similarity detection fails
+
     logger.info(f"[SYNC] Synchronized {synced_count} workflows")
     return synced_count
 

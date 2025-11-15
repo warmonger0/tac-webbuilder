@@ -434,43 +434,167 @@ def calculate_quality_score(workflow: Dict) -> float:
 # Advanced Analytics Functions
 # ============================================================================
 
-def find_similar_workflows(workflow: Dict, all_workflows: List[Dict]) -> List[Dict]:
+def calculate_text_similarity(text1: str, text2: str) -> float:
     """
-    Find similar workflows based on template and model.
+    Calculate similarity between two text strings using Jaccard index.
+
+    The Jaccard index measures similarity as the intersection over union of word sets.
+    This is a simple but effective measure for comparing natural language inputs.
+
+    Args:
+        text1: First text string to compare
+        text2: Second text string to compare
+
+    Returns:
+        Similarity score from 0.0 (no overlap) to 1.0 (identical)
+
+    Examples:
+        >>> calculate_text_similarity("hello world", "hello world")
+        1.0
+        >>> calculate_text_similarity("foo bar", "baz qux")
+        0.0
+        >>> calculate_text_similarity("implement auth system", "add authentication")
+        0.2  # "auth"/"authentication" don't match in simple word overlap
+    """
+    # Handle edge cases
+    if not text1 or not text2:
+        return 0.0
+
+    # Normalize and tokenize
+    words1 = set(text1.lower().split())
+    words2 = set(text2.lower().split())
+
+    if not words1 or not words2:
+        return 0.0
+
+    # Calculate Jaccard similarity: |intersection| / |union|
+    intersection = len(words1 & words2)
+    union = len(words1 | words2)
+
+    return intersection / union if union > 0 else 0.0
+
+
+def detect_complexity(workflow: Dict) -> str:
+    """
+    Detect workflow complexity level based on multiple factors.
+
+    Complexity is determined by analyzing:
+    - Natural language input length (word count)
+    - Execution duration
+    - Error count
+
+    Args:
+        workflow: Workflow dictionary with metrics
+
+    Returns:
+        "simple", "medium", or "complex"
+
+    Complexity thresholds:
+        Simple: <50 words AND <300s duration AND <3 errors
+        Complex: >200 words OR >1800s duration OR >5 errors
+        Medium: Everything else
+    """
+    try:
+        word_count = workflow.get('nl_input_word_count', 0)
+        duration = workflow.get('total_duration_seconds', 0)
+        errors = workflow.get('errors', [])
+        error_count = len(errors) if isinstance(errors, list) else 0
+
+        # Simple: All metrics are low
+        if word_count < 50 and duration < 300 and error_count < 3:
+            return "simple"
+
+        # Complex: Any metric is very high
+        elif word_count > 200 or duration > 1800 or error_count > 5:
+            return "complex"
+
+        # Medium: Everything else
+        else:
+            return "medium"
+
+    except Exception as e:
+        logger.error(f"Error detecting complexity: {e}")
+        return "medium"  # Default to medium on error
+
+
+def find_similar_workflows(workflow: Dict, all_workflows: List[Dict]) -> List[str]:
+    """
+    Find similar workflows using multi-factor similarity scoring.
+
+    Similarity is determined by combining multiple factors:
+    - Classification type match: 30 points
+    - Workflow template match: 30 points
+    - Complexity level match: 20 points
+    - Natural language input similarity: 0-20 points (text similarity * 20)
+
+    Only workflows with a total score >= 70 points are considered similar.
+    Returns the top 10 most similar workflows, sorted by score.
 
     Args:
         workflow: Target workflow to find matches for
         all_workflows: List of all historical workflows
 
     Returns:
-        List of top 5 most similar workflows sorted by similarity
+        List of ADW IDs for top 10 similar workflows (sorted by similarity score)
+
+    Example:
+        >>> workflow = {
+        ...     'adw_id': '1',
+        ...     'classification_type': 'feature',
+        ...     'workflow_template': 'adw_plan_build_test',
+        ...     'nl_input': 'implement user authentication',
+        ...     # ... other fields
+        ... }
+        >>> similar_ids = find_similar_workflows(workflow, all_workflows)
+        >>> print(similar_ids)  # ['adw-abc123', 'adw-def456', ...]
     """
     try:
-        target_template = workflow.get("workflow_template", "")
-        target_model = workflow.get("model_used", "")
-        workflow_id = workflow.get("id")
-
-        if not target_template:
+        current_id = workflow.get('adw_id')
+        if not current_id:
+            logger.warning("Workflow missing adw_id, cannot find similar workflows")
             return []
 
-        similar = []
-        for wf in all_workflows:
+        candidates = []
+
+        for candidate in all_workflows:
             # Skip the same workflow
-            if wf.get("id") == workflow_id:
+            if candidate.get('adw_id') == current_id:
                 continue
 
-            # Match on template and model
-            if (wf.get("workflow_template") == target_template and
-                wf.get("model_used") == target_model):
-                similar.append(wf)
+            similarity_score = 0.0
 
-        # Sort by duration similarity (closest duration first)
-        target_duration = workflow.get("duration_seconds", 0) or 0
-        if target_duration > 0:
-            similar.sort(key=lambda x: abs((x.get("duration_seconds", 0) or 0) - target_duration))
+            # Factor 1: Same classification type (30 points)
+            if workflow.get('classification_type') == candidate.get('classification_type'):
+                similarity_score += 30
 
-        # Return top 5
-        return similar[:5]
+            # Factor 2: Same workflow template (30 points)
+            if workflow.get('workflow_template') == candidate.get('workflow_template'):
+                similarity_score += 30
+
+            # Factor 3: Similar complexity (20 points)
+            current_complexity = detect_complexity(workflow)
+            candidate_complexity = detect_complexity(candidate)
+            if current_complexity == candidate_complexity:
+                similarity_score += 20
+
+            # Factor 4: Similar NL input (0-20 points based on text similarity)
+            current_nl = workflow.get('nl_input', '')
+            candidate_nl = candidate.get('nl_input', '')
+            text_sim = calculate_text_similarity(current_nl, candidate_nl)
+            similarity_score += text_sim * 20
+
+            # Only include if similarity >= 70 points (strong match)
+            if similarity_score >= 70:
+                candidates.append({
+                    'adw_id': candidate['adw_id'],
+                    'similarity_score': similarity_score
+                })
+
+        # Sort by similarity score (highest first)
+        candidates.sort(key=lambda x: x['similarity_score'], reverse=True)
+
+        # Return top 10 ADW IDs only
+        return [c['adw_id'] for c in candidates[:10]]
 
     except Exception as e:
         logger.error(f"Error finding similar workflows: {e}")
