@@ -196,6 +196,43 @@ export async function getSystemStatus(): Promise<any> {
   return fetchJSON<any>(`${API_BASE}/system-status`);
 }
 
+export async function startWebhookService(): Promise<any> {
+  const response = await fetch(`${API_BASE}/services/webhook/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to start webhook service: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function restartCloudflare(): Promise<any> {
+  const response = await fetch(`${API_BASE}/services/cloudflare/restart`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to restart Cloudflare: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getGitHubWebhookHealth(): Promise<any> {
+  return fetchJSON<any>(`${API_BASE}/services/github-webhook/health`);
+}
+
+export async function redeliverGitHubWebhook(): Promise<any> {
+  const response = await fetch(`${API_BASE}/services/github-webhook/redeliver`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to redeliver webhook: ${response.statusText}`);
+  }
+  return response.json();
+}
+
 // Export as namespace object for compatibility with existing code
 export const api = {
   submitRequest,

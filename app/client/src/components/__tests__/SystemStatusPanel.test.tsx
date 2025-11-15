@@ -4,8 +4,8 @@
  * Tests for the comprehensive system health monitoring panel
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SystemStatusPanel } from '../SystemStatusPanel';
 import * as client from '../../api/client';
@@ -14,13 +14,8 @@ import * as client from '../../api/client';
 vi.mock('../../api/client');
 
 describe('SystemStatusPanel', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.useRealTimers();
   });
 
   it('should render loading state initially', () => {
@@ -207,6 +202,8 @@ describe('SystemStatusPanel', () => {
   });
 
   it('should auto-refresh every 30 seconds', async () => {
+    vi.useFakeTimers();
+
     const mockStatus = {
       overall_status: 'healthy' as const,
       timestamp: '2025-11-14T14:00:00Z',
@@ -225,18 +222,24 @@ describe('SystemStatusPanel', () => {
     });
 
     // Fast-forward 30 seconds
-    vi.advanceTimersByTime(30000);
+    await act(async () => {
+      vi.advanceTimersByTime(30000);
+    });
 
     await waitFor(() => {
       expect(getSystemStatusSpy).toHaveBeenCalledTimes(2);
     });
 
     // Fast-forward another 30 seconds
-    vi.advanceTimersByTime(30000);
+    await act(async () => {
+      vi.advanceTimersByTime(30000);
+    });
 
     await waitFor(() => {
       expect(getSystemStatusSpy).toHaveBeenCalledTimes(3);
     });
+
+    vi.useRealTimers();
   });
 
   it('should display service uptime information', async () => {
@@ -290,6 +293,280 @@ describe('SystemStatusPanel', () => {
       expect(screen.getByText(/tables count/i)).toBeInTheDocument();
       expect(screen.getByText('5')).toBeInTheDocument();
       expect(screen.getByText(/path/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should show start button for webhook service when not running', async () => {
+    const mockStatus = {
+      overall_status: 'error' as const,
+      timestamp: '2025-11-14T14:00:00Z',
+      services: {
+        webhook: {
+          name: 'Webhook Service',
+          status: 'error' as const,
+          message: 'Not running (port 8001)',
+        },
+      },
+      summary: { healthy_services: 0, total_services: 1, health_percentage: 0 },
+    };
+
+    vi.spyOn(client, 'getSystemStatus').mockResolvedValue(mockStatus);
+
+    render(<SystemStatusPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Start Service')).toBeInTheDocument();
+    });
+  });
+
+  it('should disable start button when webhook service is healthy', async () => {
+    const mockStatus = {
+      overall_status: 'healthy' as const,
+      timestamp: '2025-11-14T14:00:00Z',
+      services: {
+        webhook: {
+          name: 'Webhook Service',
+          status: 'healthy' as const,
+          message: 'Port 8001 • 5/10 webhooks processed',
+          details: { port: 8001, webhooks_processed: '5/10' },
+        },
+      },
+      summary: { healthy_services: 1, total_services: 1, health_percentage: 100 },
+    };
+
+    vi.spyOn(client, 'getSystemStatus').mockResolvedValue(mockStatus);
+
+    render(<SystemStatusPanel />);
+
+    await waitFor(() => {
+      const startButton = screen.getByText('Start Service');
+      expect(startButton).toBeDisabled();
+    });
+  });
+
+  it('should start webhook service when button clicked', async () => {
+    const mockStatus = {
+      overall_status: 'error' as const,
+      timestamp: '2025-11-14T14:00:00Z',
+      services: {
+        webhook: {
+          name: 'Webhook Service',
+          status: 'error' as const,
+          message: 'Not running (port 8001)',
+        },
+      },
+      summary: { healthy_services: 0, total_services: 1, health_percentage: 0 },
+    };
+
+    const updatedStatus = {
+      ...mockStatus,
+      overall_status: 'healthy' as const,
+      services: {
+        webhook: {
+          name: 'Webhook Service',
+          status: 'healthy' as const,
+          message: 'Port 8001 • 0/0 webhooks processed',
+        },
+      },
+      summary: { healthy_services: 1, total_services: 1, health_percentage: 100 },
+    };
+
+    vi.spyOn(client, 'getSystemStatus')
+      .mockResolvedValueOnce(mockStatus)
+      .mockResolvedValueOnce(updatedStatus);
+
+    vi.spyOn(client, 'startWebhookService').mockResolvedValue({
+      status: 'started',
+      message: 'Webhook service started successfully on port 8001',
+    });
+
+    render(<SystemStatusPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Start Service')).toBeInTheDocument();
+    });
+
+    const startButton = screen.getByText('Start Service');
+    await userEvent.click(startButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Webhook service started successfully/)).toBeInTheDocument();
+    });
+  });
+
+  it('should show restart button for Cloudflare tunnel', async () => {
+    const mockStatus = {
+      overall_status: 'healthy' as const,
+      timestamp: '2025-11-14T14:00:00Z',
+      services: {
+        cloudflare_tunnel: {
+          name: 'Cloudflare Tunnel',
+          status: 'healthy' as const,
+          message: 'Tunnel is running',
+        },
+      },
+      summary: { healthy_services: 1, total_services: 1, health_percentage: 100 },
+    };
+
+    vi.spyOn(client, 'getSystemStatus').mockResolvedValue(mockStatus);
+
+    render(<SystemStatusPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Restart Tunnel')).toBeInTheDocument();
+    });
+  });
+
+  it('should restart Cloudflare tunnel when button clicked', async () => {
+    const mockStatus = {
+      overall_status: 'error' as const,
+      timestamp: '2025-11-14T14:00:00Z',
+      services: {
+        cloudflare_tunnel: {
+          name: 'Cloudflare Tunnel',
+          status: 'error' as const,
+          message: 'Tunnel process not found',
+        },
+      },
+      summary: { healthy_services: 0, total_services: 1, health_percentage: 0 },
+    };
+
+    vi.spyOn(client, 'getSystemStatus').mockResolvedValue(mockStatus);
+    vi.spyOn(client, 'restartCloudflare').mockResolvedValue({
+      status: 'restarted',
+      message: 'Cloudflare tunnel restarted successfully',
+    });
+
+    render(<SystemStatusPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Restart Tunnel')).toBeInTheDocument();
+    });
+
+    const restartButton = screen.getByText('Restart Tunnel');
+    await userEvent.click(restartButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Cloudflare tunnel restarted successfully/)).toBeInTheDocument();
+    });
+  });
+
+  it('should show GitHub webhook panel with redeliver button', async () => {
+    const mockStatus = {
+      overall_status: 'error' as const,
+      timestamp: '2025-11-14T14:00:00Z',
+      services: {
+        github_webhook: {
+          name: 'GitHub Webhook',
+          status: 'error' as const,
+          message: 'Latest delivery failed (HTTP 502)',
+          details: { webhook_url: 'webhook.directmyagent.com' },
+        },
+      },
+      summary: { healthy_services: 0, total_services: 1, health_percentage: 0 },
+    };
+
+    vi.spyOn(client, 'getSystemStatus').mockResolvedValue(mockStatus);
+
+    render(<SystemStatusPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('GitHub Webhook')).toBeInTheDocument();
+      expect(screen.getByText('Redeliver Failed')).toBeInTheDocument();
+    });
+  });
+
+  it('should redeliver GitHub webhook when button clicked', async () => {
+    const mockStatus = {
+      overall_status: 'error' as const,
+      timestamp: '2025-11-14T14:00:00Z',
+      services: {
+        github_webhook: {
+          name: 'GitHub Webhook',
+          status: 'error' as const,
+          message: 'Latest delivery failed (HTTP 502)',
+        },
+      },
+      summary: { healthy_services: 0, total_services: 1, health_percentage: 0 },
+    };
+
+    vi.spyOn(client, 'getSystemStatus').mockResolvedValue(mockStatus);
+    vi.spyOn(client, 'redeliverGitHubWebhook').mockResolvedValue({
+      status: 'success',
+      message: 'Webhook delivery 12345 redelivered',
+    });
+
+    render(<SystemStatusPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Redeliver Failed')).toBeInTheDocument();
+    });
+
+    const redeliverButton = screen.getByText('Redeliver Failed');
+    await userEvent.click(redeliverButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Webhook delivery.*redelivered/)).toBeInTheDocument();
+    });
+  });
+
+  it('should show port information for webhook service', async () => {
+    const mockStatus = {
+      overall_status: 'healthy' as const,
+      timestamp: '2025-11-14T14:00:00Z',
+      services: {
+        webhook: {
+          name: 'Webhook Service',
+          status: 'healthy' as const,
+          message: 'Port 8001 • 10/15 webhooks processed',
+          details: {
+            port: 8001,
+            webhooks_processed: '10/15',
+            failed: 5,
+          },
+        },
+      },
+      summary: { healthy_services: 1, total_services: 1, health_percentage: 100 },
+    };
+
+    vi.spyOn(client, 'getSystemStatus').mockResolvedValue(mockStatus);
+
+    render(<SystemStatusPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Port 8001/)).toBeInTheDocument();
+      expect(screen.getByText(/10\/15 webhooks processed/)).toBeInTheDocument();
+    });
+  });
+
+  it('should render services in correct order', async () => {
+    const mockStatus = {
+      overall_status: 'healthy' as const,
+      timestamp: '2025-11-14T14:00:00Z',
+      services: {
+        backend: { name: 'Backend API', status: 'healthy' as const, message: 'Running' },
+        database: { name: 'Database', status: 'healthy' as const, message: 'Connected' },
+        webhook: { name: 'Webhook Service', status: 'healthy' as const, message: 'Running' },
+        frontend: { name: 'Frontend', status: 'healthy' as const, message: 'Serving' },
+        cloudflare_tunnel: { name: 'Cloudflare Tunnel', status: 'healthy' as const, message: 'Running' },
+        github_webhook: { name: 'GitHub Webhook', status: 'healthy' as const, message: 'Active' },
+      },
+      summary: { healthy_services: 6, total_services: 6, health_percentage: 100 },
+    };
+
+    vi.spyOn(client, 'getSystemStatus').mockResolvedValue(mockStatus);
+
+    render(<SystemStatusPanel />);
+
+    await waitFor(() => {
+      const serviceCards = screen.getAllByRole('heading', { level: 4 });
+      // Expected order: Backend, Database, Webhook, Frontend, Cloudflare, GitHub Webhook
+      expect(serviceCards[0]).toHaveTextContent('Backend API');
+      expect(serviceCards[1]).toHaveTextContent('Database');
+      expect(serviceCards[2]).toHaveTextContent('Webhook Service');
+      expect(serviceCards[3]).toHaveTextContent('Frontend');
+      expect(serviceCards[4]).toHaveTextContent('Cloudflare Tunnel');
+      expect(serviceCards[5]).toHaveTextContent('GitHub Webhook');
     });
   });
 });

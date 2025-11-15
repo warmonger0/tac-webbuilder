@@ -1,5 +1,24 @@
 # Phase 3: Workflow History Advanced Analytics & Optimization Insights
 
+> **⚠️ IMPORTANT: Phase 3 has been broken down into smaller sub-phases for better cost efficiency and manageability.**
+>
+> **Use these instead:**
+> - **PHASE_3A_ANALYTICS_INFRASTRUCTURE.md** - Infrastructure setup ($0.20-0.30, run locally)
+> - **PHASE_3B_SCORING_ENGINE.md** - Core scoring algorithms ($2-4, ADW)
+> - **PHASE_3C_SCORE_DISPLAY_UI.md** - Score visualization ($0.50-1, ADW)
+> - **PHASE_3D_INSIGHTS_RECOMMENDATIONS.md** - Anomaly detection ($1-2, ADW)
+> - **PHASE_3E_SIMILAR_WORKFLOWS.md** - Similarity detection ($1-2, ADW)
+>
+> **Total cost breakdown: $4.70-9.30 (vs $6-11 monolithic)**
+>
+> See `WORKFLOW_HISTORY_ENHANCEMENT_SUMMARY.md` for updated execution recommendations.
+
+---
+
+## Original Monolithic Specification (For Reference Only)
+
+This document contains the original Phase 3 specification as a single large phase. It has been preserved for reference, but should not be used for implementation. Use the sub-phase documents listed above instead.
+
 ## Overview
 Add advanced analytics, pattern detection, and optimization recommendations to workflow history. Enable data-driven decision making through trend analysis, cost modeling, and efficiency scoring.
 

@@ -44,6 +44,10 @@ from core.data_models import (
     GitHubIssue,
     ProjectContext,
     ResyncResponse,
+    WorkflowAnalyticsDetail,
+    WorkflowTrends,
+    CostPrediction,
+    TrendDataPoint,
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
 from core.llm_processor import generate_sql, generate_random_query
@@ -660,31 +664,39 @@ async def get_system_status() -> SystemStatusResponse:
         with urllib.request.urlopen("http://localhost:8001/webhook-status", timeout=2) as response:
             if response.status == 200:
                 webhook_data = json.loads(response.read().decode())
+                stats = webhook_data.get('stats', {})
+                total_received = stats.get('total_received', 0)
+                successful = stats.get('successful', 0)
+
                 services["webhook"] = ServiceHealth(
                     name="Webhook Service",
                     status=webhook_data.get("status", "unknown"),
                     uptime_seconds=webhook_data.get("uptime", {}).get("seconds"),
                     uptime_human=webhook_data.get("uptime", {}).get("human"),
-                    message=f"Success rate: {webhook_data.get('stats', {}).get('success_rate', 'N/A')}",
-                    details=webhook_data.get("stats", {})
+                    message=f"Port 8001 • {successful}/{total_received} webhooks processed",
+                    details={
+                        "port": 8001,
+                        "webhooks_processed": f"{successful}/{total_received}",
+                        "failed": stats.get('failed', 0)
+                    }
                 )
             else:
                 services["webhook"] = ServiceHealth(
                     name="Webhook Service",
                     status="error",
-                    message=f"HTTP {response.status}"
+                    message=f"HTTP {response.status} on port 8001"
                 )
     except urllib.error.URLError:
         services["webhook"] = ServiceHealth(
             name="Webhook Service",
             status="error",
-            message="Service not responding on port 8001"
+            message="Not running (port 8001)"
         )
     except Exception as e:
         services["webhook"] = ServiceHealth(
             name="Webhook Service",
             status="error",
-            message=str(e)
+            message=f"Error on port 8001: {str(e)}"
         )
 
     # 4. Cloudflare Tunnel
@@ -714,7 +726,67 @@ async def get_system_status() -> SystemStatusResponse:
             message=f"Check failed: {str(e)}"
         )
 
-    # 5. Frontend (if accessible)
+    # 5. GitHub Webhook
+    try:
+        webhook_id = os.environ.get("GITHUB_WEBHOOK_ID", "580534779")
+        repo = "warmonger0/tac-webbuilder"
+
+        # Check recent webhook deliveries
+        result = subprocess.run(
+            ["gh", "api", f"repos/{repo}/hooks/{webhook_id}/deliveries", "--jq", ".[0].status_code"],
+            capture_output=True,
+            text=True,
+            timeout=3
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            status_code = int(result.stdout.strip())
+            if status_code == 200:
+                services["github_webhook"] = ServiceHealth(
+                    name="GitHub Webhook",
+                    status="healthy",
+                    message=f"Latest delivery successful (HTTP {status_code})",
+                    details={"webhook_url": "webhook.directmyagent.com"}
+                )
+            elif status_code >= 500:
+                services["github_webhook"] = ServiceHealth(
+                    name="GitHub Webhook",
+                    status="error",
+                    message=f"Latest delivery failed (HTTP {status_code})",
+                    details={"webhook_url": "webhook.directmyagent.com"}
+                )
+            else:
+                services["github_webhook"] = ServiceHealth(
+                    name="GitHub Webhook",
+                    status="degraded",
+                    message=f"Latest delivery status: HTTP {status_code}",
+                    details={"webhook_url": "webhook.directmyagent.com"}
+                )
+        else:
+            # Fallback: try to access webhook endpoint
+            try:
+                with urllib.request.urlopen("https://webhook.directmyagent.com/health", timeout=3) as response:
+                    services["github_webhook"] = ServiceHealth(
+                        name="GitHub Webhook",
+                        status="healthy",
+                        message="Webhook endpoint accessible",
+                        details={"webhook_url": "webhook.directmyagent.com"}
+                    )
+            except:
+                services["github_webhook"] = ServiceHealth(
+                    name="GitHub Webhook",
+                    status="unknown",
+                    message="Cannot verify deliveries",
+                    details={"webhook_url": "webhook.directmyagent.com"}
+                )
+    except Exception as e:
+        services["github_webhook"] = ServiceHealth(
+            name="GitHub Webhook",
+            status="unknown",
+            message=f"Check failed: {str(e)[:50]}"
+        )
+
+    # 6. Frontend (if accessible)
     try:
         frontend_port = os.environ.get("FRONTEND_PORT", "5173")
         with urllib.request.urlopen(f"http://localhost:{frontend_port}", timeout=2) as response:
@@ -760,6 +832,334 @@ async def get_system_status() -> SystemStatusResponse:
             "health_percentage": round((healthy_count / total_count) * 100, 1) if total_count > 0 else 0
         }
     )
+
+@app.post("/api/services/webhook/start")
+async def start_webhook_service():
+    """Start the webhook service on port 8001"""
+    try:
+        # Check if already running
+        result = subprocess.run(
+            ["lsof", "-i", ":8001"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            return {
+                "status": "already_running",
+                "message": "Webhook service is already running on port 8001"
+            }
+
+        # Get the adws directory path
+        server_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(server_dir)
+        adws_dir = os.path.join(project_root, "adws")
+
+        # Start the webhook service in background
+        subprocess.Popen(
+            ["uv", "run", "adw_triggers/trigger_webhook.py"],
+            cwd=adws_dir,
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+        # Wait a moment for service to start
+        import time
+        time.sleep(2)
+
+        # Verify it started
+        try:
+            with urllib.request.urlopen("http://localhost:8001/health", timeout=3) as response:
+                if response.status == 200:
+                    return {
+                        "status": "started",
+                        "message": "Webhook service started successfully on port 8001"
+                    }
+        except:
+            pass
+
+        return {
+            "status": "started",
+            "message": "Webhook service start command issued (port 8001)"
+        }
+    except Exception as e:
+        logger.error(f"Failed to start webhook service: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to start webhook service: {str(e)}"
+        }
+
+@app.post("/api/services/cloudflare/restart")
+async def restart_cloudflare_tunnel():
+    """Restart the Cloudflare tunnel"""
+    try:
+        # Check if CLOUDFLARED_TUNNEL_TOKEN is set
+        tunnel_token = os.environ.get("CLOUDFLARED_TUNNEL_TOKEN")
+        if not tunnel_token:
+            return {
+                "status": "error",
+                "message": "CLOUDFLARED_TUNNEL_TOKEN environment variable not set"
+            }
+
+        # Kill existing cloudflared process
+        subprocess.run(
+            ["pkill", "-f", "cloudflared tunnel run"],
+            capture_output=True
+        )
+
+        # Wait a moment
+        import time
+        time.sleep(1)
+
+        # Start new tunnel in background
+        subprocess.Popen(
+            ["cloudflared", "tunnel", "run", "--token", tunnel_token],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+        time.sleep(2)
+
+        # Verify it's running
+        result = subprocess.run(
+            ["ps", "aux"],
+            capture_output=True,
+            text=True
+        )
+        if "cloudflared tunnel run" in result.stdout:
+            return {
+                "status": "restarted",
+                "message": "Cloudflare tunnel restarted successfully"
+            }
+
+        return {
+            "status": "started",
+            "message": "Cloudflare tunnel restart command issued"
+        }
+    except Exception as e:
+        logger.error(f"Failed to restart Cloudflare tunnel: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to restart Cloudflare tunnel: {str(e)}"
+        }
+
+@app.get("/api/services/github-webhook/health")
+async def get_github_webhook_health():
+    """Check GitHub webhook health by testing recent deliveries"""
+    try:
+        # Get GitHub PAT
+        github_pat = os.environ.get("GITHUB_PAT")
+        if not github_pat:
+            return {
+                "status": "error",
+                "message": "GITHUB_PAT not configured"
+            }
+
+        # Get webhook ID from environment or use default
+        webhook_id = os.environ.get("GITHUB_WEBHOOK_ID", "580534779")
+        repo = "warmonger0/tac-webbuilder"
+
+        # Check recent webhook deliveries using gh CLI
+        result = subprocess.run(
+            ["gh", "api", f"repos/{repo}/hooks/{webhook_id}/deliveries", "--jq", ".[0:5] | .[] | {id: .id, status: .status_code, delivered_at: .delivered_at}"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode == 0:
+            deliveries_output = result.stdout.strip()
+            if deliveries_output:
+                # Parse the deliveries
+                deliveries = []
+                for line in deliveries_output.split('\n'):
+                    if line.strip():
+                        try:
+                            delivery = json.loads(line)
+                            deliveries.append(delivery)
+                        except:
+                            pass
+
+                # Check if most recent delivery was successful
+                if deliveries:
+                    latest = deliveries[0]
+                    status_code = latest.get('status', 0)
+
+                    if status_code == 200:
+                        status = "healthy"
+                        message = f"Latest delivery successful (HTTP {status_code})"
+                    elif status_code >= 500:
+                        status = "error"
+                        message = f"Latest delivery failed with HTTP {status_code} (Server Error)"
+                    elif status_code >= 400:
+                        status = "degraded"
+                        message = f"Latest delivery failed with HTTP {status_code} (Client Error)"
+                    else:
+                        status = "unknown"
+                        message = f"Latest delivery status: HTTP {status_code}"
+
+                    return {
+                        "status": status,
+                        "message": message,
+                        "webhook_url": f"https://webhook.directmyagent.com",
+                        "recent_deliveries": deliveries[:3],
+                        "webhook_id": webhook_id
+                    }
+
+        # Fallback: try to ping the webhook endpoint directly
+        try:
+            with urllib.request.urlopen("https://webhook.directmyagent.com/health", timeout=3) as response:
+                if response.status == 200:
+                    return {
+                        "status": "healthy",
+                        "message": "Webhook endpoint is accessible",
+                        "webhook_url": "https://webhook.directmyagent.com"
+                    }
+        except:
+            pass
+
+        return {
+            "status": "unknown",
+            "message": "Unable to verify webhook health"
+        }
+    except Exception as e:
+        logger.error(f"Failed to check GitHub webhook health: {e}")
+        return {
+            "status": "error",
+            "message": f"Health check failed: {str(e)}"
+        }
+
+@app.post("/api/services/github-webhook/redeliver")
+async def redeliver_github_webhook():
+    """
+    Redeliver the most recent failed GitHub webhook with intelligent diagnostics.
+
+    This endpoint will:
+    1. Check if webhook and tunnel services are healthy
+    2. Automatically restart services if they're down (best effort)
+    3. Redeliver the most recent failed webhook delivery
+    4. Provide detailed diagnostics about any issues
+    """
+    import subprocess
+    import urllib.request
+    import urllib.error
+
+    try:
+        diagnostics = []
+        auto_fix_attempted = False
+
+        # Step 1: Check webhook service health
+        webhook_healthy = False
+        try:
+            with urllib.request.urlopen("http://localhost:8001/webhook-status", timeout=2) as response:
+                webhook_healthy = response.status == 200
+                diagnostics.append("✓ Webhook service is running (port 8001)")
+        except urllib.error.URLError:
+            diagnostics.append("✗ Webhook service is DOWN (port 8001)")
+            auto_fix_attempted = True
+            # Attempt to restart webhook service
+            try:
+                restart_result = subprocess.run(
+                    ["bash", "-c", "cd adws && uv run adw_triggers/trigger_webhook.py &"],
+                    capture_output=True,
+                    text=True,
+                    timeout=3
+                )
+                diagnostics.append("⚙ Attempted to restart webhook service")
+            except:
+                diagnostics.append("✗ Failed to restart webhook service automatically")
+
+        # Step 2: Check Cloudflare tunnel health
+        tunnel_healthy = False
+        try:
+            result = subprocess.run(
+                ["ps", "aux"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            tunnel_healthy = "cloudflared tunnel run" in result.stdout
+            if tunnel_healthy:
+                diagnostics.append("✓ Cloudflare tunnel is running")
+            else:
+                diagnostics.append("✗ Cloudflare tunnel is DOWN")
+        except Exception:
+            diagnostics.append("? Unable to check Cloudflare tunnel status")
+
+        # Step 3: Check public webhook endpoint
+        public_endpoint_healthy = False
+        try:
+            with urllib.request.urlopen("https://webhook.directmyagent.com/webhook-status", timeout=3) as response:
+                public_endpoint_healthy = response.status == 200
+                diagnostics.append("✓ Public webhook endpoint is accessible")
+        except Exception as e:
+            diagnostics.append(f"✗ Public webhook endpoint failed: {str(e)[:50]}")
+
+        # Step 4: Get webhook info and attempt redelivery
+        webhook_id = os.environ.get("GITHUB_WEBHOOK_ID", "580534779")
+        repo = "warmonger0/tac-webbuilder"
+
+        # Get most recent failed delivery
+        result = subprocess.run(
+            ["gh", "api", f"repos/{repo}/hooks/{webhook_id}/deliveries", "--jq", '.[] | select(.status_code != 200) | .id'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            delivery_id = result.stdout.strip().split('\n')[0]
+            diagnostics.append(f"Found failed delivery: {delivery_id}")
+
+            # Only attempt redelivery if services are healthy
+            if not webhook_healthy or not tunnel_healthy:
+                return {
+                    "status": "warning",
+                    "message": "Services need attention before redelivery",
+                    "diagnostics": diagnostics,
+                    "recommendations": [
+                        "Webhook service is down - restart it" if not webhook_healthy else None,
+                        "Cloudflare tunnel is down - restart it" if not tunnel_healthy else None,
+                    ]
+                }
+
+            # Redeliver
+            redeliver_result = subprocess.run(
+                ["gh", "api", "-X", "POST", f"repos/{repo}/hooks/{webhook_id}/deliveries/{delivery_id}/attempts"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if redeliver_result.returncode == 0:
+                return {
+                    "status": "success",
+                    "message": f"Webhook redelivered successfully",
+                    "diagnostics": diagnostics,
+                    "delivery_id": delivery_id
+                }
+            else:
+                diagnostics.append(f"✗ Redelivery failed: {redeliver_result.stderr}")
+                return {
+                    "status": "error",
+                    "message": "Failed to redeliver webhook",
+                    "diagnostics": diagnostics
+                }
+
+        diagnostics.append("No failed deliveries found to redeliver")
+        return {
+            "status": "info",
+            "message": "No failed deliveries to redeliver (all recent deliveries succeeded)",
+            "diagnostics": diagnostics
+        }
+    except Exception as e:
+        logger.error(f"Failed to redeliver webhook: {e}")
+        return {
+            "status": "error",
+            "message": f"Redelivery failed: {str(e)}",
+            "diagnostics": diagnostics if 'diagnostics' in locals() else []
+        }
 
 @app.get("/api/routes", response_model=RoutesResponse)
 async def get_routes() -> RoutesResponse:
@@ -999,6 +1399,246 @@ async def resync_workflow_history(
             errors=[f"Unexpected error: {str(e)}"],
             message="Resync failed"
         )
+
+# Phase 3: Advanced Analytics Endpoints
+
+@app.get("/api/workflow-analytics/{adw_id}", response_model=WorkflowAnalyticsDetail)
+async def get_workflow_analytics(adw_id: str) -> WorkflowAnalyticsDetail:
+    """Get advanced analytics for a specific workflow"""
+    try:
+        from core.workflow_history import get_workflow_by_adw_id
+        import json
+
+        workflow = get_workflow_by_adw_id(adw_id)
+        if not workflow:
+            raise HTTPException(status_code=404, detail=f"Workflow {adw_id} not found")
+
+        # Parse JSON fields
+        similar_workflow_ids = []
+        if workflow.get("similar_workflow_ids"):
+            try:
+                similar_workflow_ids = json.loads(workflow["similar_workflow_ids"])
+            except:
+                pass
+
+        anomaly_flags = []
+        if workflow.get("anomaly_flags"):
+            try:
+                anomaly_flags = json.loads(workflow["anomaly_flags"])
+            except:
+                pass
+
+        optimization_recommendations = []
+        if workflow.get("optimization_recommendations"):
+            try:
+                optimization_recommendations = json.loads(workflow["optimization_recommendations"])
+            except:
+                pass
+
+        analytics = WorkflowAnalyticsDetail(
+            adw_id=adw_id,
+            cost_efficiency_score=workflow.get("cost_efficiency_score"),
+            performance_score=workflow.get("performance_score"),
+            quality_score=workflow.get("quality_score"),
+            similar_workflow_ids=similar_workflow_ids,
+            anomaly_flags=anomaly_flags,
+            optimization_recommendations=optimization_recommendations,
+            nl_input_clarity_score=workflow.get("nl_input_clarity_score"),
+            nl_input_word_count=workflow.get("nl_input_word_count")
+        )
+
+        logger.info(f"[SUCCESS] Retrieved analytics for workflow {adw_id}")
+        return analytics
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to retrieve analytics for {adw_id}: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve analytics: {str(e)}")
+
+@app.get("/api/workflow-trends", response_model=WorkflowTrends)
+async def get_workflow_trends(
+    days: int = 30,
+    group_by: str = "day"
+) -> WorkflowTrends:
+    """Get trend data over time"""
+    try:
+        from core.workflow_history import get_workflow_history
+        from datetime import datetime, timedelta
+        from collections import defaultdict
+
+        # Calculate date range
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+
+        # Fetch workflows in date range
+        workflows, _ = get_workflow_history(
+            limit=10000,
+            offset=0,
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat()
+        )
+
+        # Group by time period
+        cost_by_period = defaultdict(lambda: {"total": 0.0, "count": 0})
+        duration_by_period = defaultdict(lambda: {"total": 0, "count": 0})
+        success_by_period = defaultdict(lambda: {"success": 0, "total": 0})
+        cache_by_period = defaultdict(lambda: {"total": 0.0, "count": 0})
+
+        for workflow in workflows:
+            if not workflow.get("created_at"):
+                continue
+
+            try:
+                created_dt = datetime.fromisoformat(workflow["created_at"].replace("Z", "+00:00"))
+
+                # Determine period key based on group_by
+                if group_by == "hour":
+                    period_key = created_dt.strftime("%Y-%m-%d %H:00")
+                elif group_by == "week":
+                    period_key = created_dt.strftime("%Y-W%U")
+                else:  # day
+                    period_key = created_dt.strftime("%Y-%m-%d")
+
+                # Aggregate metrics
+                if workflow.get("actual_cost_total"):
+                    cost_by_period[period_key]["total"] += workflow["actual_cost_total"]
+                    cost_by_period[period_key]["count"] += 1
+
+                if workflow.get("duration_seconds"):
+                    duration_by_period[period_key]["total"] += workflow["duration_seconds"]
+                    duration_by_period[period_key]["count"] += 1
+
+                if workflow.get("status") in ["completed", "failed"]:
+                    success_by_period[period_key]["total"] += 1
+                    if workflow["status"] == "completed":
+                        success_by_period[period_key]["success"] += 1
+
+                if workflow.get("cache_efficiency_percent") is not None:
+                    cache_by_period[period_key]["total"] += workflow["cache_efficiency_percent"]
+                    cache_by_period[period_key]["count"] += 1
+
+            except Exception as e:
+                logger.debug(f"Error processing workflow {workflow.get('adw_id')}: {e}")
+                continue
+
+        # Convert to trend data points
+        cost_trend = [
+            TrendDataPoint(
+                timestamp=period,
+                value=data["total"] / data["count"] if data["count"] > 0 else 0,
+                count=data["count"]
+            )
+            for period, data in sorted(cost_by_period.items())
+        ]
+
+        duration_trend = [
+            TrendDataPoint(
+                timestamp=period,
+                value=data["total"] / data["count"] if data["count"] > 0 else 0,
+                count=data["count"]
+            )
+            for period, data in sorted(duration_by_period.items())
+        ]
+
+        success_rate_trend = [
+            TrendDataPoint(
+                timestamp=period,
+                value=(data["success"] / data["total"] * 100) if data["total"] > 0 else 0,
+                count=data["total"]
+            )
+            for period, data in sorted(success_by_period.items())
+        ]
+
+        cache_efficiency_trend = [
+            TrendDataPoint(
+                timestamp=period,
+                value=data["total"] / data["count"] if data["count"] > 0 else 0,
+                count=data["count"]
+            )
+            for period, data in sorted(cache_by_period.items())
+        ]
+
+        trends = WorkflowTrends(
+            cost_trend=cost_trend,
+            duration_trend=duration_trend,
+            success_rate_trend=success_rate_trend,
+            cache_efficiency_trend=cache_efficiency_trend
+        )
+
+        logger.info(f"[SUCCESS] Retrieved workflow trends for {days} days grouped by {group_by}")
+        return trends
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to retrieve workflow trends: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve trends: {str(e)}")
+
+@app.get("/api/cost-predictions", response_model=CostPrediction)
+async def predict_workflow_cost(
+    classification: str,
+    complexity: str,
+    model: str
+) -> CostPrediction:
+    """Predict workflow cost based on historical data"""
+    try:
+        from core.workflow_history import get_workflow_history
+
+        # Fetch similar historical workflows
+        workflows, _ = get_workflow_history(
+            limit=1000,
+            offset=0,
+            template=classification,
+            model=model
+        )
+
+        # Filter by complexity if specified
+        if complexity:
+            workflows = [
+                w for w in workflows
+                if w.get("complexity_actual") == complexity or w.get("complexity_estimated") == complexity
+            ]
+
+        # Extract costs
+        costs = [
+            w["actual_cost_total"]
+            for w in workflows
+            if w.get("actual_cost_total") and w["actual_cost_total"] > 0
+        ]
+
+        if not costs:
+            # No historical data, return conservative estimate
+            return CostPrediction(
+                predicted_cost=0.05,
+                confidence=0.0,
+                sample_size=0,
+                min_cost=0.0,
+                max_cost=0.0,
+                avg_cost=0.0
+            )
+
+        # Calculate statistics
+        avg_cost = sum(costs) / len(costs)
+        min_cost = min(costs)
+        max_cost = max(costs)
+
+        # Confidence based on sample size (diminishing returns)
+        confidence = min(100.0, (len(costs) / 10) * 100)
+
+        prediction = CostPrediction(
+            predicted_cost=round(avg_cost, 4),
+            confidence=round(confidence, 2),
+            sample_size=len(costs),
+            min_cost=round(min_cost, 4),
+            max_cost=round(max_cost, 4),
+            avg_cost=round(avg_cost, 4)
+        )
+
+        logger.info(f"[SUCCESS] Generated cost prediction for {classification}/{complexity}/{model}: ${avg_cost:.4f}")
+        return prediction
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to predict workflow cost: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to predict cost: {str(e)}")
 
 @app.get("/api/workflows", response_model=List[Workflow])
 async def get_workflows() -> List[Workflow]:

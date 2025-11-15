@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getSystemStatus } from '../api/client';
+import { getSystemStatus, startWebhookService, restartCloudflare, redeliverGitHubWebhook } from '../api/client';
 import type { SystemStatusResponse, ServiceHealth } from '../types';
 
 export function SystemStatusPanel() {
@@ -7,6 +7,8 @@ export function SystemStatusPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const fetchStatus = async () => {
     setIsLoading(true);
@@ -33,6 +35,14 @@ export function SystemStatusPanel() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-clear action messages after 5 seconds
+  useEffect(() => {
+    if (actionMessage) {
+      const timer = setTimeout(() => setActionMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [actionMessage]);
 
   const getStatusColor = (serviceStatus: string) => {
     switch (serviceStatus) {
@@ -73,6 +83,158 @@ export function SystemStatusPanel() {
     }
   };
 
+  const handleStartWebhook = async () => {
+    setActionLoading('webhook');
+    setActionMessage(null);
+    try {
+      const result = await startWebhookService();
+      setActionMessage({ type: 'success', text: result.message || 'Webhook service started' });
+      // Refresh status after a moment
+      setTimeout(() => fetchStatus(), 2000);
+    } catch (err) {
+      setActionMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to start webhook service'
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRestartCloudflare = async () => {
+    setActionLoading('cloudflare');
+    setActionMessage(null);
+    try {
+      const result = await restartCloudflare();
+      setActionMessage({ type: 'success', text: result.message || 'Cloudflare tunnel restarted' });
+      // Refresh status after a moment
+      setTimeout(() => fetchStatus(), 2000);
+    } catch (err) {
+      setActionMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to restart Cloudflare tunnel'
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRedeliverWebhook = async () => {
+    setActionLoading('github-webhook');
+    setActionMessage(null);
+    try {
+      const result = await redeliverGitHubWebhook();
+
+      // Format diagnostics if available
+      let messageText = result.message || 'Webhook redelivered';
+      if (result.diagnostics && Array.isArray(result.diagnostics)) {
+        messageText += '\n\nDiagnostics:\n' + result.diagnostics.join('\n');
+      }
+      if (result.recommendations) {
+        const recs = result.recommendations.filter((r: string | null) => r !== null);
+        if (recs.length > 0) {
+          messageText += '\n\nRecommendations:\n' + recs.join('\n');
+        }
+      }
+
+      // Determine message type based on status
+      const messageType = result.status === 'success' ? 'success' :
+                         result.status === 'warning' ? 'error' :
+                         result.status === 'info' ? 'success' : 'error';
+
+      setActionMessage({ type: messageType, text: messageText });
+
+      // Refresh status after a moment
+      setTimeout(() => fetchStatus(), 2000);
+    } catch (err) {
+      setActionMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to redeliver webhook'
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const renderServiceCard = (key: string, service: ServiceHealth) => {
+    const hasAction = key === 'webhook' || key === 'cloudflare_tunnel' || key === 'github_webhook';
+    const isActionDisabled = service.status === 'healthy' && key !== 'github_webhook';
+
+    return (
+      <div
+        key={key}
+        className={`p-4 rounded-lg border ${getStatusColor(service.status)}`}
+      >
+        <div className="flex items-start justify-between mb-2">
+          <h4 className="font-semibold text-sm">{service.name}</h4>
+          <span className="text-2xl">{getStatusIcon(service.status)}</span>
+        </div>
+
+        {service.message && (
+          <p className="text-xs mb-2 opacity-90">{service.message}</p>
+        )}
+
+        {service.uptime_human && (
+          <p className="text-xs opacity-75">Uptime: {service.uptime_human}</p>
+        )}
+
+        {service.details && Object.keys(service.details).length > 0 && (
+          <div className="mt-2 pt-2 border-t border-current border-opacity-20">
+            {Object.entries(service.details).map(([detailKey, detailValue]) => (
+              <div key={detailKey} className="flex justify-between text-xs opacity-75">
+                <span>{detailKey.replace(/_/g, ' ')}:</span>
+                <span className="font-medium">{String(detailValue)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {hasAction && (
+          <div className="mt-3 pt-2 border-t border-current border-opacity-20">
+            {key === 'webhook' && (
+              <button
+                onClick={handleStartWebhook}
+                disabled={actionLoading === 'webhook' || isActionDisabled}
+                className={`w-full px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                  isActionDisabled
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-400'
+                }`}
+              >
+                {actionLoading === 'webhook' ? 'Starting...' : 'Start Service'}
+              </button>
+            )}
+            {key === 'cloudflare_tunnel' && (
+              <button
+                onClick={handleRestartCloudflare}
+                disabled={actionLoading === 'cloudflare'}
+                className="w-full px-3 py-1.5 rounded text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+              >
+                {actionLoading === 'cloudflare' ? 'Restarting...' : 'Restart Tunnel'}
+              </button>
+            )}
+            {key === 'github_webhook' && (
+              <button
+                onClick={handleRedeliverWebhook}
+                disabled={actionLoading === 'github-webhook'}
+                className="w-full px-3 py-1.5 rounded text-xs font-medium bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-400 transition-colors"
+              >
+                {actionLoading === 'github-webhook'
+                  ? 'Redelivering...'
+                  : service.status === 'healthy'
+                    ? 'Test Webhook'
+                    : 'Redeliver Failed'}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Define service order (swapping frontend and cloudflare_tunnel)
+  const serviceOrder = ['backend_api', 'database', 'webhook', 'frontend', 'cloudflare_tunnel', 'github_webhook'];
+
   return (
     <div className="max-w-4xl mx-auto mt-6">
       <div className="bg-white rounded-lg shadow p-6">
@@ -90,6 +252,18 @@ export function SystemStatusPanel() {
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
             {error}
+          </div>
+        )}
+
+        {actionMessage && (
+          <div className={`mb-4 p-3 rounded text-sm border ${
+            actionMessage.type === 'success'
+              ? 'bg-green-50 border-green-200 text-green-800'
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            <div className="whitespace-pre-wrap font-mono text-xs">
+              {actionMessage.text}
+            </div>
           </div>
         )}
 
@@ -115,36 +289,10 @@ export function SystemStatusPanel() {
 
             {/* Individual Services Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(status.services).map(([key, service]: [string, ServiceHealth]) => (
-                <div
-                  key={key}
-                  className={`p-4 rounded-lg border ${getStatusColor(service.status)}`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-semibold text-sm">{service.name}</h4>
-                    <span className="text-2xl">{getStatusIcon(service.status)}</span>
-                  </div>
-
-                  {service.message && (
-                    <p className="text-xs mb-2 opacity-90">{service.message}</p>
-                  )}
-
-                  {service.uptime_human && (
-                    <p className="text-xs opacity-75">Uptime: {service.uptime_human}</p>
-                  )}
-
-                  {service.details && Object.keys(service.details).length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-current border-opacity-20">
-                      {Object.entries(service.details).map(([detailKey, detailValue]) => (
-                        <div key={detailKey} className="flex justify-between text-xs opacity-75">
-                          <span>{detailKey.replace(/_/g, ' ')}:</span>
-                          <span className="font-medium">{String(detailValue)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {serviceOrder.map((key) => {
+                const service = status.services[key];
+                return service ? renderServiceCard(key, service) : null;
+              })}
             </div>
           </>
         )}
