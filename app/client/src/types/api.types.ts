@@ -158,6 +158,18 @@ export interface CostBreakdown {
   by_phase?: Record<string, number>;
 }
 
+// Structured Input Data for ADW workflows
+export interface StructuredInputData {
+  issue_number?: number;
+  classification?: string;
+  workflow?: string;
+  model?: string;
+  classification_reasoning?: string;
+  model_selection_reasoning?: string;
+  // Allow additional properties for extensibility
+  [key: string]: any;
+}
+
 export interface WorkflowHistoryItem {
   // Core fields
   id: number;
@@ -209,7 +221,7 @@ export interface WorkflowHistoryItem {
   cost_per_token: number;
 
   // Structured data (JSON fields)
-  structured_input?: Record<string, any>;
+  structured_input?: StructuredInputData;
   cost_breakdown?: CostBreakdown;
   token_breakdown?: TokenBreakdown;
 }

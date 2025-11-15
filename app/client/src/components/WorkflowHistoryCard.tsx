@@ -68,6 +68,35 @@ function calculateCacheSavings(workflow: WorkflowHistoryItem): number {
   return savings;
 }
 
+// Helper function to truncate text
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+}
+
+// Helper function to get classification badge color
+function getClassificationColor(classification?: string): string {
+  switch (classification?.toLowerCase()) {
+    case 'feature':
+      return 'bg-blue-100 text-blue-800 border-blue-300';
+    case 'bug':
+      return 'bg-red-100 text-red-800 border-red-300';
+    case 'chore':
+      return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+    default:
+      return 'bg-gray-100 text-gray-800 border-gray-300';
+  }
+}
+
+// Helper function to format structured input for display
+function formatStructuredInputForDisplay(input?: Record<string, any>): Array<{ key: string; value: any }> {
+  if (!input) return [];
+
+  return Object.entries(input)
+    .filter(([_, value]) => value !== null && value !== undefined)
+    .map(([key, value]) => ({ key, value }));
+}
+
 export function WorkflowHistoryCard({ workflow }: WorkflowHistoryCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
@@ -100,12 +129,22 @@ export function WorkflowHistoryCard({ workflow }: WorkflowHistoryCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h3 className="text-lg font-semibold text-gray-900">
               ADW: {workflow.adw_id}
             </h3>
             <StatusBadge status={workflow.status} />
+            {workflow.structured_input?.classification && (
+              <span className={`text-xs px-2 py-1 rounded border ${getClassificationColor(workflow.structured_input.classification)}`}>
+                {workflow.structured_input.classification.toUpperCase()}
+              </span>
+            )}
           </div>
+          {workflow.nl_input && (
+            <div className="text-sm text-gray-700 mt-2">
+              "{truncateText(workflow.nl_input, 60)}"
+            </div>
+          )}
           {workflow.issue_number && (
             <a
               href={workflow.github_url}
@@ -116,6 +155,20 @@ export function WorkflowHistoryCard({ workflow }: WorkflowHistoryCardProps) {
               Issue #{workflow.issue_number}
             </a>
           )}
+          {(workflow.workflow_template || workflow.model_used) && (
+            <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600">
+              {workflow.workflow_template && (
+                <span>
+                  <span className="font-medium">Workflow:</span> {workflow.workflow_template}
+                </span>
+              )}
+              {workflow.model_used && (
+                <span>
+                  <span className="font-medium">Model:</span> {workflow.model_used}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="text-right text-sm text-gray-600">
           <div>{formatDate(workflow.created_at)}</div>
@@ -125,30 +178,8 @@ export function WorkflowHistoryCard({ workflow }: WorkflowHistoryCardProps) {
         </div>
       </div>
 
-      {/* Natural Language Input */}
-      {workflow.nl_input && (
-        <div className="mb-4">
-          <div className="text-sm font-medium text-gray-700 mb-1">Request:</div>
-          <div className="text-sm text-gray-900 bg-gray-50 rounded p-3">
-            {workflow.nl_input}
-          </div>
-        </div>
-      )}
-
       {/* Metadata Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
-        {workflow.model_used && (
-          <div>
-            <div className="text-gray-600">Model</div>
-            <div className="font-medium text-gray-900">{workflow.model_used}</div>
-          </div>
-        )}
-        {workflow.workflow_template && (
-          <div>
-            <div className="text-gray-600">Template</div>
-            <div className="font-medium text-gray-900">{workflow.workflow_template}</div>
-          </div>
-        )}
         {workflow.current_phase && (
           <div>
             <div className="text-gray-600">Phase</div>
@@ -494,60 +525,91 @@ export function WorkflowHistoryCard({ workflow }: WorkflowHistoryCardProps) {
             </div>
           </div>
 
-          {/* Structured Input Section */}
-          {workflow.structured_input && (
-            <div>
+          {/* Workflow Journey Section */}
+          {(workflow.nl_input || workflow.structured_input) && (
+            <div className="border-b border-gray-200 pb-6">
               <h3 className="text-base font-semibold text-gray-800 mb-4">
-                📋 Structured Input
+                🗺️ Workflow Journey
               </h3>
+              <div className="space-y-4">
+                {/* Original Request */}
+                {workflow.nl_input && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-700 mb-2">Original Request</h4>
+                    <p className="text-sm text-gray-900">{workflow.nl_input}</p>
+                  </div>
+                )}
 
-              {/* Formatted View */}
-              <div className="mb-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                    {workflow.structured_input.issue_number && (
+                {/* Classification & Reasoning */}
+                {workflow.structured_input && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-700 mb-2">Classification</h4>
+                    <dl className="text-sm space-y-2">
                       <div>
-                        <dt className="text-gray-600 font-medium">Issue</dt>
-                        <dd className="text-gray-900">#{workflow.structured_input.issue_number}</dd>
-                      </div>
-                    )}
-                    {workflow.structured_input.classification && (
-                      <div>
-                        <dt className="text-gray-600 font-medium">Classification</dt>
-                        <dd>
-                          <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                            {workflow.structured_input.classification}
-                          </span>
+                        <dt className="text-gray-600">Type:</dt>
+                        <dd className="font-medium">
+                          {workflow.structured_input.classification || 'Not specified'}
                         </dd>
                       </div>
-                    )}
-                    {workflow.structured_input.workflow && (
                       <div>
-                        <dt className="text-gray-600 font-medium">Workflow</dt>
-                        <dd className="text-gray-900">{workflow.structured_input.workflow}</dd>
+                        <dt className="text-gray-600">Reasoning:</dt>
+                        <dd>
+                          {workflow.structured_input.classification_reasoning || 'Not recorded'}
+                        </dd>
                       </div>
-                    )}
-                    {workflow.structured_input.model && (
-                      <div>
-                        <dt className="text-gray-600 font-medium">Model</dt>
-                        <dd className="text-gray-900">{workflow.structured_input.model}</dd>
-                      </div>
-                    )}
-                  </dl>
-                </div>
-              </div>
+                    </dl>
+                  </div>
+                )}
 
-              {/* Raw JSON View */}
-              <details className="group">
-                <summary className="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer mb-2">
-                  View Raw JSON
-                </summary>
-                <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto border border-gray-200">
-                  {JSON.stringify(workflow.structured_input, null, 2)}
-                </pre>
-              </details>
+                {/* Model Selection Reasoning */}
+                {workflow.structured_input && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-700 mb-2">Model Selection</h4>
+                    <dl className="text-sm space-y-2">
+                      <div>
+                        <dt className="text-gray-600">Selected:</dt>
+                        <dd className="font-medium">{workflow.model_used || 'Not specified'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-gray-600">Reason:</dt>
+                        <dd>
+                          {workflow.structured_input.model_selection_reasoning || 'Not recorded'}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                )}
+
+                {/* Structured Input */}
+                {workflow.structured_input && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-700 mb-2">Structured Input</h4>
+                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
+                      {formatStructuredInputForDisplay(workflow.structured_input).map(
+                        ({ key, value }) => (
+                          <div key={key}>
+                            <dt className="text-gray-600 font-medium">{key}:</dt>
+                            <dd className="text-gray-900">
+                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                            </dd>
+                          </div>
+                        )
+                      )}
+                    </dl>
+                    <details className="mt-3">
+                      <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-800">
+                        View Raw JSON
+                      </summary>
+                      <pre className="text-xs bg-white rounded p-2 mt-2 overflow-x-auto border border-gray-300">
+                        {JSON.stringify(workflow.structured_input, null, 2)}
+                      </pre>
+                    </details>
+                  </div>
+                )}
+              </div>
             </div>
           )}
+
         </div>
       )}
     </div>
