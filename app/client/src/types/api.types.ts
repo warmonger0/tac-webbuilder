@@ -249,6 +249,17 @@ export interface WorkflowHistoryItem {
   // Complexity tracking
   complexity_estimated?: string;
   complexity_actual?: string;
+
+  // Phase 3A: Analytics fields (temporal and scoring)
+  hour_of_day: number;
+  day_of_week: number;
+  nl_input_clarity_score: number;
+  cost_efficiency_score: number;
+  performance_score: number;
+  quality_score: number;
+
+  // Phase 3B: Scoring version tracking
+  scoring_version?: string;
 }
 
 export interface HistoryAnalytics {

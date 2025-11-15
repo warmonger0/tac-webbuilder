@@ -16,6 +16,14 @@ from contextlib import contextmanager
 
 from core.cost_tracker import read_cost_history
 from core.data_models import CostData
+from core.workflow_analytics import (
+    extract_hour,
+    extract_day_of_week,
+    calculate_nl_input_clarity_score,
+    calculate_cost_efficiency_score,
+    calculate_performance_score,
+    calculate_quality_score,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +255,17 @@ def init_db():
                 worktree_reused INTEGER DEFAULT 0,  -- Boolean (0 or 1)
                 steps_completed INTEGER DEFAULT 0,
                 steps_total INTEGER DEFAULT 0,
+
+                -- Phase 3A: Analytics fields (temporal and scoring)
+                hour_of_day INTEGER DEFAULT -1,
+                day_of_week INTEGER DEFAULT -1,
+                nl_input_clarity_score REAL DEFAULT 0.0,
+                cost_efficiency_score REAL DEFAULT 0.0,
+                performance_score REAL DEFAULT 0.0,
+                quality_score REAL DEFAULT 0.0,
+
+                -- Phase 3B: Scoring version tracking
+                scoring_version TEXT DEFAULT '1.0',
 
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -846,6 +865,39 @@ def sync_workflow_history() -> int:
         steps_total = workflow_data.get("steps_total", 0)
         if steps_total > 0 and duration_seconds:
             workflow_data["complexity_actual"] = estimate_complexity(steps_total, duration_seconds)
+
+        # Phase 3A/3B: Calculate temporal fields and scoring metrics
+        if workflow_data.get("start_time"):
+            workflow_data["hour_of_day"] = extract_hour(workflow_data["start_time"])
+            workflow_data["day_of_week"] = extract_day_of_week(workflow_data["start_time"])
+
+        # Set scoring version
+        workflow_data["scoring_version"] = "1.0"
+
+        # Calculate scores (with error handling to prevent sync failures)
+        try:
+            workflow_data["nl_input_clarity_score"] = calculate_nl_input_clarity_score(workflow_data)
+        except Exception as e:
+            logger.warning(f"[SYNC] Failed to calculate clarity score for {adw_id}: {e}")
+            workflow_data["nl_input_clarity_score"] = 0.0
+
+        try:
+            workflow_data["cost_efficiency_score"] = calculate_cost_efficiency_score(workflow_data)
+        except Exception as e:
+            logger.warning(f"[SYNC] Failed to calculate cost efficiency score for {adw_id}: {e}")
+            workflow_data["cost_efficiency_score"] = 0.0
+
+        try:
+            workflow_data["performance_score"] = calculate_performance_score(workflow_data)
+        except Exception as e:
+            logger.warning(f"[SYNC] Failed to calculate performance score for {adw_id}: {e}")
+            workflow_data["performance_score"] = 0.0
+
+        try:
+            workflow_data["quality_score"] = calculate_quality_score(workflow_data)
+        except Exception as e:
+            logger.warning(f"[SYNC] Failed to calculate quality score for {adw_id}: {e}")
+            workflow_data["quality_score"] = 0.0
 
         if existing:
             # Update existing record if status or other fields changed
