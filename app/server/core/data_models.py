@@ -137,6 +137,19 @@ class NLProcessResponse(BaseModel):
     project_context: ProjectContext
     error: Optional[str] = None
 
+# Web UI Request Models
+class SubmitRequestData(BaseModel):
+    nl_input: str = Field(..., description="Natural language description of the request")
+    project_path: Optional[str] = Field(None, description="Optional project path for context")
+    auto_post: bool = Field(False, description="If True, auto-post to GitHub without confirmation")
+
+class SubmitRequestResponse(BaseModel):
+    request_id: str = Field(..., description="Unique ID for this request")
+
+class ConfirmResponse(BaseModel):
+    issue_number: int = Field(..., description="GitHub issue number")
+    github_url: str = Field(..., description="GitHub issue URL")
+
 # Routes Visualization Models
 class Route(BaseModel):
     path: str = Field(..., description="Route path (e.g., /api/upload)")

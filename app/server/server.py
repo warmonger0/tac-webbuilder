@@ -38,6 +38,11 @@ from core.data_models import (
     WorkflowHistoryResponse,
     WorkflowHistoryAnalytics,
     WorkflowHistoryFilters,
+    SubmitRequestData,
+    SubmitRequestResponse,
+    ConfirmResponse,
+    GitHubIssue,
+    ProjectContext,
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
 from core.llm_processor import generate_sql, generate_random_query
@@ -60,6 +65,11 @@ from core.workflow_history import (
     update_workflow_history,
     sync_workflow_history,
 )
+from core.nl_processor import process_request
+from core.github_poster import GitHubPoster
+from core.project_detector import detect_project_context
+import uuid
+import httpx
 
 # Load .env file from server directory
 load_dotenv()
@@ -94,6 +104,7 @@ app.add_middleware(
 
 # Global app state
 app_start_time = datetime.now()
+pending_requests = {}  # Store pending GitHub issue requests
 
 # Ensure database directory exists
 os.makedirs("db", exist_ok=True)
@@ -1089,6 +1100,152 @@ async def export_query_results(request: QueryExportRequest) -> Response:
         logger.error(f"[ERROR] Query export failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(500, f"Error exporting query results: {str(e)}")
+
+# GitHub Issue Request Endpoints
+@app.post("/api/request", response_model=SubmitRequestResponse)
+async def submit_nl_request(request: SubmitRequestData) -> SubmitRequestResponse:
+    """Process natural language request and generate GitHub issue preview"""
+    try:
+        logger.info(f"[INFO] Processing NL request: {request.nl_input[:100]}...")
+
+        # Detect project context
+        if request.project_path:
+            project_context = detect_project_context(request.project_path)
+        else:
+            # Default context if no project path provided
+            project_context = ProjectContext(
+                path=os.getcwd(),
+                is_new_project=False,
+                complexity="medium",
+                has_git=True
+            )
+
+        # Process the request to generate GitHub issue
+        github_issue = await process_request(request.nl_input, project_context)
+
+        # Generate unique request ID
+        request_id = str(uuid.uuid4())
+
+        # Store in pending requests
+        pending_requests[request_id] = {
+            'issue': github_issue,
+            'project_context': project_context
+        }
+
+        logger.info(f"[SUCCESS] Request processed and stored with ID: {request_id}")
+        return SubmitRequestResponse(request_id=request_id)
+
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to process NL request: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(500, f"Error processing request: {str(e)}")
+
+@app.get("/api/preview/{request_id}", response_model=GitHubIssue)
+async def get_issue_preview(request_id: str) -> GitHubIssue:
+    """Get the GitHub issue preview for a pending request"""
+    try:
+        if request_id not in pending_requests:
+            raise HTTPException(404, f"Request ID '{request_id}' not found")
+
+        issue = pending_requests[request_id]['issue']
+        logger.info(f"[SUCCESS] Retrieved preview for request: {request_id}")
+        return issue
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to get preview: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(500, f"Error retrieving preview: {str(e)}")
+
+async def check_webhook_trigger_health() -> dict:
+    """
+    Check if the ADW webhook trigger service is online and healthy.
+
+    Returns:
+        dict: Health status from webhook trigger service
+
+    Raises:
+        HTTPException: If webhook trigger is offline or unhealthy
+    """
+    webhook_url = os.environ.get("WEBHOOK_TRIGGER_URL", "http://localhost:8001")
+    health_endpoint = f"{webhook_url}/health"
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(health_endpoint)
+            response.raise_for_status()
+            health_data = response.json()
+
+            # Check if service reports healthy status
+            if health_data.get("status") != "healthy":
+                errors = health_data.get("health_check", {}).get("errors", [])
+                error_msg = ", ".join(errors) if errors else "Service reported unhealthy status"
+                raise HTTPException(
+                    503,
+                    f"ADW webhook trigger is unhealthy: {error_msg}. "
+                    f"Please start the trigger service: cd adws && uv run adw_triggers/trigger_webhook.py"
+                )
+
+            return health_data
+
+    except httpx.TimeoutException:
+        logger.error(f"[ERROR] Webhook trigger health check timed out at {health_endpoint}")
+        raise HTTPException(
+            503,
+            "ADW webhook trigger is not responding (timeout). "
+            "Please start the trigger service: cd adws && uv run adw_triggers/trigger_webhook.py"
+        )
+    except httpx.ConnectError:
+        logger.error(f"[ERROR] Cannot connect to webhook trigger at {health_endpoint}")
+        raise HTTPException(
+            503,
+            "ADW webhook trigger is offline. "
+            "Please start the trigger service: cd adws && uv run adw_triggers/trigger_webhook.py"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Unexpected error checking webhook trigger health: {str(e)}")
+        raise HTTPException(
+            503,
+            f"Failed to verify ADW webhook trigger status: {str(e)}"
+        )
+
+@app.post("/api/confirm/{request_id}", response_model=ConfirmResponse)
+async def confirm_and_post_issue(request_id: str) -> ConfirmResponse:
+    """Confirm and post the GitHub issue"""
+    try:
+        # Pre-flight check: Ensure webhook trigger is online
+        await check_webhook_trigger_health()
+        logger.info("[SUCCESS] Webhook trigger health check passed")
+
+        if request_id not in pending_requests:
+            raise HTTPException(404, f"Request ID '{request_id}' not found")
+
+        # Get the issue from pending requests
+        issue = pending_requests[request_id]['issue']
+
+        # Post to GitHub
+        github_poster = GitHubPoster()
+        issue_number = github_poster.post_issue(issue, confirm=False)
+
+        # Get GitHub repo from environment
+        github_repo = os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder")
+        github_url = f"https://github.com/{github_repo}/issues/{issue_number}"
+
+        # Clean up pending request
+        del pending_requests[request_id]
+
+        logger.info(f"[SUCCESS] Posted issue #{issue_number}: {github_url}")
+        return ConfirmResponse(issue_number=issue_number, github_url=github_url)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to post issue: {str(e)}")
+        logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(500, f"Error posting issue: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
