@@ -69,7 +69,6 @@ def calculate_phase_metrics(cost_data: CostData) -> Dict:
             phase_durations[phase_name] = duration_seconds
 
         # Add duration for last phase (if we have end time, otherwise skip)
-        last_phase = timestamps[-1][0]
         # We don't have end time for last phase, so we skip it
         # Could estimate based on average or leave as-is
 
