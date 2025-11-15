@@ -15,11 +15,160 @@ from datetime import datetime
 from contextlib import contextmanager
 
 from core.cost_tracker import read_cost_history
+from core.data_models import CostData
 
 logger = logging.getLogger(__name__)
 
 # Database path
 DB_PATH = Path(__file__).parent.parent / "db" / "workflow_history.db"
+
+
+def calculate_phase_metrics(cost_data: CostData) -> Dict:
+    """
+    Calculate phase-level performance metrics from cost_data.
+
+    Args:
+        cost_data: CostData object containing phase information with timestamps
+
+    Returns:
+        Dict containing:
+            - phase_durations: Dict[str, int] - Duration in seconds per phase
+            - bottleneck_phase: Optional[str] - Phase that took >30% of total time
+            - idle_time_seconds: int - Idle time between phases
+    """
+    if not cost_data or not cost_data.phases:
+        return {
+            "phase_durations": None,
+            "bottleneck_phase": None,
+            "idle_time_seconds": None,
+        }
+
+    phase_durations = {}
+    timestamps = []
+
+    # Extract timestamps and calculate durations
+    for phase in cost_data.phases:
+        if phase.timestamp:
+            try:
+                # Parse ISO timestamp
+                timestamp = datetime.fromisoformat(phase.timestamp.replace("Z", "+00:00"))
+                timestamps.append((phase.phase, timestamp))
+            except Exception as e:
+                logger.debug(f"Could not parse timestamp for phase {phase.phase}: {e}")
+
+    # Calculate durations between consecutive phases
+    if len(timestamps) >= 2:
+        # Sort by timestamp
+        timestamps.sort(key=lambda x: x[1])
+
+        for i in range(len(timestamps) - 1):
+            phase_name = timestamps[i][0]
+            start_time = timestamps[i][1]
+            end_time = timestamps[i + 1][1]
+            duration_seconds = int((end_time - start_time).total_seconds())
+            phase_durations[phase_name] = duration_seconds
+
+        # Add duration for last phase (if we have end time, otherwise skip)
+        last_phase = timestamps[-1][0]
+        # We don't have end time for last phase, so we skip it
+        # Could estimate based on average or leave as-is
+
+    if not phase_durations:
+        return {
+            "phase_durations": None,
+            "bottleneck_phase": None,
+            "idle_time_seconds": None,
+        }
+
+    # Calculate total duration
+    total_duration = sum(phase_durations.values())
+
+    # Detect bottleneck (phase taking >30% of total time)
+    bottleneck_phase = None
+    if total_duration > 0:
+        for phase, duration in phase_durations.items():
+            if duration / total_duration > 0.30:
+                bottleneck_phase = phase
+                break  # Take first bottleneck found
+
+    # Calculate idle time (for now, set to 0 as we don't have explicit idle tracking)
+    # This would require more detailed timestamp tracking in the cost data
+    idle_time_seconds = 0
+
+    return {
+        "phase_durations": phase_durations,
+        "bottleneck_phase": bottleneck_phase,
+        "idle_time_seconds": idle_time_seconds,
+    }
+
+
+def categorize_error(error_message: str) -> str:
+    """
+    Categorize error message into standard types.
+
+    Args:
+        error_message: The error message string
+
+    Returns:
+        str: Error category - "syntax_error", "timeout", "api_quota", "validation", or "unknown"
+    """
+    if not error_message:
+        return "unknown"
+
+    error_lower = error_message.lower()
+
+    # Check for syntax errors
+    if any(keyword in error_lower for keyword in [
+        "syntaxerror", "syntax error", "indentationerror", "indentation error",
+        "parsing error", "parse error", "invalid syntax"
+    ]):
+        return "syntax_error"
+
+    # Check for timeout errors
+    if any(keyword in error_lower for keyword in [
+        "timeout", "timeouterror", "connection timeout", "timed out",
+        "deadline exceeded"
+    ]):
+        return "timeout"
+
+    # Check for API quota/rate limit errors
+    if any(keyword in error_lower for keyword in [
+        "quota", "rate limit", "429", "too many requests",
+        "quota exceeded", "rate_limit_error"
+    ]):
+        return "api_quota"
+
+    # Check for validation errors
+    if any(keyword in error_lower for keyword in [
+        "validationerror", "validation error", "invalid input",
+        "schema error", "schema validation", "invalid data"
+    ]):
+        return "validation"
+
+    return "unknown"
+
+
+def estimate_complexity(steps_total: int, duration_seconds: int) -> str:
+    """
+    Estimate workflow complexity based on steps and duration.
+
+    Args:
+        steps_total: Total number of steps in the workflow
+        duration_seconds: Total duration in seconds
+
+    Returns:
+        str: Complexity level - "low", "medium", or "high"
+    """
+    # Low complexity: few steps OR short duration
+    if steps_total <= 5 or duration_seconds < 60:
+        return "low"
+
+    # High complexity: many steps OR long duration
+    if steps_total > 15 or duration_seconds > 300:
+        return "high"
+
+    # Everything else is medium
+    return "medium"
 
 
 @contextmanager
@@ -180,15 +329,22 @@ def insert_workflow_history(
             "estimated_cost_total", "actual_cost_total", "estimated_cost_per_step",
             "actual_cost_per_step", "cost_per_token", "structured_input",
             "cost_breakdown", "token_breakdown", "worktree_reused",
-            "steps_completed", "steps_total"
+            "steps_completed", "steps_total",
+            "phase_durations", "idle_time_seconds", "bottleneck_phase",
+            "error_category", "retry_reasons", "error_phase_distribution",
+            "recovery_time_seconds", "complexity_estimated", "complexity_actual"
         ]
 
         for field in optional_fields:
             if field in kwargs:
                 fields.append(field)
-                # Convert dicts to JSON strings
-                if field in ["structured_input", "cost_breakdown", "token_breakdown"]:
-                    if isinstance(kwargs[field], dict):
+                # Convert dicts and lists to JSON strings
+                json_fields = [
+                    "structured_input", "cost_breakdown", "token_breakdown",
+                    "phase_durations", "retry_reasons", "error_phase_distribution"
+                ]
+                if field in json_fields:
+                    if isinstance(kwargs[field], (dict, list)):
                         values.append(json.dumps(kwargs[field]))
                     else:
                         values.append(kwargs[field])
@@ -228,9 +384,13 @@ def update_workflow_history(
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
-        # Convert dicts to JSON strings
-        for field in ["structured_input", "cost_breakdown", "token_breakdown"]:
-            if field in kwargs and isinstance(kwargs[field], dict):
+        # Convert dicts and lists to JSON strings
+        json_fields = [
+            "structured_input", "cost_breakdown", "token_breakdown",
+            "phase_durations", "retry_reasons", "error_phase_distribution"
+        ]
+        for field in json_fields:
+            if field in kwargs and isinstance(kwargs[field], (dict, list)):
                 kwargs[field] = json.dumps(kwargs[field])
 
         # Build update query
@@ -272,7 +432,11 @@ def get_workflow_by_adw_id(adw_id: str) -> Optional[Dict]:
         if row:
             result = dict(row)
             # Parse JSON fields
-            for field in ["structured_input", "cost_breakdown", "token_breakdown"]:
+            json_fields = [
+                "structured_input", "cost_breakdown", "token_breakdown",
+                "phase_durations", "retry_reasons", "error_phase_distribution"
+            ]
+            for field in json_fields:
                 if result.get(field):
                     try:
                         result[field] = json.loads(result[field])
@@ -382,7 +546,11 @@ def get_workflow_history(
         for row in rows:
             result = dict(row)
             # Parse JSON fields
-            for field in ["structured_input", "cost_breakdown", "token_breakdown"]:
+            json_fields = [
+                "structured_input", "cost_breakdown", "token_breakdown",
+                "phase_durations", "retry_reasons", "error_phase_distribution"
+            ]
+            for field in json_fields:
                 if result.get(field):
                     try:
                         result[field] = json.loads(result[field])
@@ -650,8 +818,19 @@ def sync_workflow_history() -> int:
                     workflow_data["total_tokens"] = total_input + total_cache_creation + total_cache_read + total_output
                     workflow_data["cache_efficiency_percent"] = cost_data.cache_efficiency_percent
 
+                # Calculate performance metrics
+                phase_metrics = calculate_phase_metrics(cost_data)
+                if phase_metrics["phase_durations"]:
+                    workflow_data["phase_durations"] = phase_metrics["phase_durations"]
+                    workflow_data["bottleneck_phase"] = phase_metrics["bottleneck_phase"]
+                    workflow_data["idle_time_seconds"] = phase_metrics["idle_time_seconds"]
+
         except Exception as e:
             logger.debug(f"[SYNC] No cost data for {adw_id}: {e}")
+
+        # Categorize error if error_message exists
+        if workflow_data.get("error_message"):
+            workflow_data["error_category"] = categorize_error(workflow_data["error_message"])
 
         # Calculate duration if we have start and end times
         duration_seconds = None
@@ -663,6 +842,11 @@ def sync_workflow_history() -> int:
                 duration_seconds = int((end_dt - start_dt).total_seconds())
             except Exception as e:
                 logger.debug(f"[SYNC] Could not calculate duration for {adw_id}: {e}")
+
+        # Estimate complexity if we have steps_total and duration
+        steps_total = workflow_data.get("steps_total", 0)
+        if steps_total > 0 and duration_seconds:
+            workflow_data["complexity_actual"] = estimate_complexity(steps_total, duration_seconds)
 
         if existing:
             # Update existing record if status or other fields changed
@@ -688,6 +872,20 @@ def sync_workflow_history() -> int:
                 updates["output_tokens"] = workflow_data.get("output_tokens", 0)
                 updates["total_tokens"] = workflow_data.get("total_tokens", 0)
                 updates["cache_efficiency_percent"] = workflow_data.get("cache_efficiency_percent", 0.0)
+
+            # Update performance metrics if available and not already set
+            if workflow_data.get("phase_durations") and not existing.get("phase_durations"):
+                updates["phase_durations"] = workflow_data["phase_durations"]
+                updates["bottleneck_phase"] = workflow_data.get("bottleneck_phase")
+                updates["idle_time_seconds"] = workflow_data.get("idle_time_seconds")
+
+            # Update error category if available and not already set
+            if workflow_data.get("error_category") and not existing.get("error_category"):
+                updates["error_category"] = workflow_data["error_category"]
+
+            # Update complexity if available and not already set
+            if workflow_data.get("complexity_actual") and not existing.get("complexity_actual"):
+                updates["complexity_actual"] = workflow_data["complexity_actual"]
 
             if updates:
                 update_workflow_history(adw_id, **updates)
