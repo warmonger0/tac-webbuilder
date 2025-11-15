@@ -138,6 +138,17 @@ export interface TokenBreakdown {
   total_tokens: number;
 }
 
+export interface PhaseCost {
+  phase: string;
+  cost: number;
+  tokens: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_creation_tokens: number;
+    cache_read_tokens: number;
+  };
+}
+
 export interface CostBreakdown {
   estimated_total: number;
   actual_total: number;
