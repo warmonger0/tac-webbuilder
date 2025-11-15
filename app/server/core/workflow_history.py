@@ -930,3 +930,183 @@ def sync_workflow_history() -> int:
 
     logger.info(f"[SYNC] Synchronized {synced_count} workflows")
     return synced_count
+
+
+def resync_workflow_cost(adw_id: str, force: bool = False) -> Dict:
+    """
+    Resync cost data for a single workflow from source files.
+
+    Args:
+        adw_id: ADW workflow identifier
+        force: If True, clears existing cost data before resync
+
+    Returns:
+        Dict with keys:
+            - success: bool - Whether resync succeeded
+            - adw_id: str - The workflow ID
+            - error: Optional[str] - Error message if failed
+            - cost_updated: bool - Whether cost was actually updated
+    """
+    try:
+        # Check if workflow exists
+        existing = get_workflow_by_adw_id(adw_id)
+        if not existing:
+            return {
+                "success": False,
+                "adw_id": adw_id,
+                "error": f"Workflow not found: {adw_id}",
+                "cost_updated": False
+            }
+
+        # Read authoritative cost data from source files
+        try:
+            cost_data = read_cost_history(adw_id)
+        except FileNotFoundError as e:
+            return {
+                "success": False,
+                "adw_id": adw_id,
+                "error": f"Cost files not found: {str(e)}",
+                "cost_updated": False
+            }
+        except ValueError as e:
+            return {
+                "success": False,
+                "adw_id": adw_id,
+                "error": f"Invalid cost data: {str(e)}",
+                "cost_updated": False
+            }
+
+        # Prepare cost update data
+        updates = {}
+
+        # If force mode, we'll update regardless of current values
+        if force:
+            logger.info(f"[RESYNC] Force resync for {adw_id} - clearing existing data")
+
+        # Extract cost information
+        if cost_data and hasattr(cost_data, 'total_cost'):
+            updates["actual_cost_total"] = cost_data.total_cost
+
+            # Populate cost_breakdown with by_phase data
+            if hasattr(cost_data, 'phases') and cost_data.phases:
+                by_phase = {phase.phase: phase.cost for phase in cost_data.phases}
+                updates["cost_breakdown"] = {
+                    "estimated_total": existing.get("estimated_cost_total", 0.0),
+                    "actual_total": cost_data.total_cost,
+                    "estimated_per_step": existing.get("estimated_cost_per_step", 0.0),
+                    "actual_per_step": existing.get("actual_cost_per_step", 0.0),
+                    "cost_per_token": existing.get("cost_per_token", 0.0),
+                    "by_phase": by_phase
+                }
+
+            # Populate token_breakdown
+            if hasattr(cost_data, 'phases') and cost_data.phases:
+                # Aggregate tokens across all phases
+                total_input = sum(p.tokens.input_tokens for p in cost_data.phases)
+                total_cache_creation = sum(p.tokens.cache_creation_tokens for p in cost_data.phases)
+                total_cache_read = sum(p.tokens.cache_read_tokens for p in cost_data.phases)
+                total_output = sum(p.tokens.output_tokens for p in cost_data.phases)
+
+                updates["input_tokens"] = total_input
+                updates["cached_tokens"] = total_cache_creation
+                updates["cache_hit_tokens"] = total_cache_read
+                updates["cache_miss_tokens"] = total_input  # Approximation
+                updates["output_tokens"] = total_output
+                updates["total_tokens"] = total_input + total_cache_creation + total_cache_read + total_output
+                updates["cache_efficiency_percent"] = cost_data.cache_efficiency_percent
+
+            # Calculate performance metrics
+            phase_metrics = calculate_phase_metrics(cost_data)
+            if phase_metrics["phase_durations"]:
+                updates["phase_durations"] = phase_metrics["phase_durations"]
+                updates["bottleneck_phase"] = phase_metrics["bottleneck_phase"]
+                updates["idle_time_seconds"] = phase_metrics["idle_time_seconds"]
+
+        # Update the workflow
+        if updates:
+            success = update_workflow_history(adw_id, **updates)
+            if success:
+                logger.info(f"[RESYNC] Successfully resynced cost data for {adw_id}")
+                return {
+                    "success": True,
+                    "adw_id": adw_id,
+                    "error": None,
+                    "cost_updated": True
+                }
+            else:
+                return {
+                    "success": False,
+                    "adw_id": adw_id,
+                    "error": "Failed to update database",
+                    "cost_updated": False
+                }
+        else:
+            return {
+                "success": True,
+                "adw_id": adw_id,
+                "error": None,
+                "cost_updated": False
+            }
+
+    except Exception as e:
+        logger.error(f"[RESYNC] Error resyncing {adw_id}: {e}")
+        return {
+            "success": False,
+            "adw_id": adw_id,
+            "error": str(e),
+            "cost_updated": False
+        }
+
+
+def resync_all_completed_workflows(force: bool = False) -> Tuple[int, List[Dict], List[str]]:
+    """
+    Resync cost data for all completed workflows.
+
+    Args:
+        force: If True, clears existing cost data before resync
+
+    Returns:
+        Tuple containing:
+            - resynced_count: int - Number of workflows successfully resynced
+            - workflows: List[Dict] - List of workflow summaries
+            - errors: List[str] - List of error messages
+    """
+    try:
+        # Get all completed workflows
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT adw_id, status FROM workflow_history WHERE status IN ('completed', 'failed')"
+            )
+            rows = cursor.fetchall()
+
+        workflows_to_resync = [dict(row) for row in rows]
+        logger.info(f"[RESYNC] Found {len(workflows_to_resync)} completed/failed workflows to resync")
+
+        resynced_count = 0
+        workflows = []
+        errors = []
+
+        for workflow in workflows_to_resync:
+            adw_id = workflow["adw_id"]
+            result = resync_workflow_cost(adw_id, force=force)
+
+            if result["success"]:
+                if result["cost_updated"]:
+                    resynced_count += 1
+                workflows.append({
+                    "adw_id": adw_id,
+                    "status": workflow["status"],
+                    "cost_updated": result["cost_updated"]
+                })
+            else:
+                error_msg = f"{adw_id}: {result['error']}"
+                errors.append(error_msg)
+                logger.warning(f"[RESYNC] Failed to resync {adw_id}: {result['error']}")
+
+        logger.info(f"[RESYNC] Completed bulk resync: {resynced_count} updated, {len(errors)} errors")
+        return resynced_count, workflows, errors
+
+    except Exception as e:
+        logger.error(f"[RESYNC] Error in bulk resync: {e}")
+        return 0, [], [f"Bulk resync failed: {str(e)}"]

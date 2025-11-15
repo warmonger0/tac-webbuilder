@@ -333,3 +333,14 @@ class WorkflowHistoryResponse(BaseModel):
     workflows: List[WorkflowHistoryItem] = Field(..., description="List of workflow history items")
     total_count: int = Field(..., description="Total count of workflows (before pagination)")
     analytics: WorkflowHistoryAnalytics = Field(..., description="Analytics summary")
+
+# Workflow History Resync Models
+class ResyncRequest(BaseModel):
+    adw_id: Optional[str] = Field(None, description="Optional ADW ID to resync single workflow")
+    force: bool = Field(False, description="Clear existing cost data before resync")
+
+class ResyncResponse(BaseModel):
+    resynced_count: int = Field(..., description="Number of workflows resynced")
+    workflows: List[Dict[str, Any]] = Field(..., description="List of resynced workflow summaries")
+    errors: List[str] = Field(default_factory=list, description="List of error messages")
+    message: Optional[str] = Field(None, description="Optional status message")
