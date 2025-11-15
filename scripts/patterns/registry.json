@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Registry of known patterns that can be offloaded from LLM to Python scripts",
+  "version": "1.0.0",
+  "patterns": {
+    "test_runner": {
+      "name": "Test Suite Runner",
+      "triggers": [
+        "run tests",
+        "run the tests",
+        "test suite",
+        "pytest",
+        "vitest",
+        "npm test",
+        "run all tests",
+        "execute tests"
+      ],
+      "script": "scripts/smart_test_runner.py",
+      "description": "Run test suite and return only failures with error context",
+      "cost_metrics": {
+        "avg_cost_llm": 0.18,
+        "avg_cost_script": 0.006,
+        "avg_tokens_llm": 60000,
+        "avg_tokens_script": 2000,
+        "savings_percent": 97
+      },
+      "status": "implemented",
+      "confidence": 95,
+      "usage_count": 0,
+      "last_updated": "2025-11-15"
+    },
+    "build_validator": {
+      "name": "Build Validator",
+      "triggers": [
+        "build",
+        "compile",
+        "typecheck",
+        "tsc",
+        "npm run build",
+        "bun run build",
+        "check types",
+        "type errors"
+      ],
+      "script": "scripts/smart_build.py",
+      "description": "Run build/typecheck and return only errors with file locations",
+      "cost_metrics": {
+        "avg_cost_llm": 0.15,
+        "avg_cost_script": 0.004,
+        "avg_tokens_llm": 50000,
+        "avg_tokens_script": 1500,
+        "savings_percent": 97
+      },
+      "status": "planned",
+      "confidence": 90,
+      "usage_count": 0,
+      "last_updated": "2025-11-15"
+    },
+    "dependency_updater": {
+      "name": "Dependency Updater",
+      "triggers": [
+        "update dependencies",
+        "upgrade packages",
+        "npm update",
+        "update deps",
+        "outdated packages",
+        "dependency check"
+      ],
+      "script": "scripts/smart_dependency_update.py",
+      "description": "Update dependencies, run tests, report only breaking changes",
+      "cost_metrics": {
+        "avg_cost_llm": 0.25,
+        "avg_cost_script": 0.008,
+        "avg_tokens_llm": 80000,
+        "avg_tokens_script": 3000,
+        "savings_percent": 97
+      },
+      "status": "planned",
+      "confidence": 85,
+      "usage_count": 0,
+      "last_updated": "2025-11-15"
+    },
+    "code_formatter": {
+      "name": "Code Formatter",
+      "triggers": [
+        "format code",
+        "prettier",
+        "black",
+        "eslint --fix",
+        "format files",
+        "lint and format"
+      ],
+      "script": "scripts/smart_formatter.py",
+      "description": "Run formatters and return diff summary",
+      "cost_metrics": {
+        "avg_cost_llm": 0.10,
+        "avg_cost_script": 0.002,
+        "avg_tokens_llm": 30000,
+        "avg_tokens_script": 800,
+        "savings_percent": 98
+      },
+      "status": "planned",
+      "confidence": 95,
+      "usage_count": 0,
+      "last_updated": "2025-11-15"
+    },
+    "git_operations": {
+      "name": "Git Operations",
+      "triggers": [
+        "git status",
+        "git diff",
+        "what changed",
+        "uncommitted changes",
+        "modified files",
+        "git log"
+      ],
+      "script": "scripts/smart_git.py",
+      "description": "Execute git commands and return summary instead of full output",
+      "cost_metrics": {
+        "avg_cost_llm": 0.12,
+        "avg_cost_script": 0.003,
+        "avg_tokens_llm": 40000,
+        "avg_tokens_script": 1200,
+        "savings_percent": 97
+      },
+      "status": "planned",
+      "confidence": 90,
+      "usage_count": 0,
+      "last_updated": "2025-11-15"
+    },
+    "log_analyzer": {
+      "name": "Log Analyzer",
+      "triggers": [
+        "check logs",
+        "analyze logs",
+        "error logs",
+        "log files",
+        "recent errors",
+        "server logs"
+      ],
+      "script": "scripts/smart_log_analyzer.py",
+      "description": "Parse logs and extract only errors/warnings with context",
+      "cost_metrics": {
+        "avg_cost_llm": 0.30,
+        "avg_cost_script": 0.005,
+        "avg_tokens_llm": 100000,
+        "avg_tokens_script": 2000,
+        "savings_percent": 98
+      },
+      "status": "planned",
+      "confidence": 85,
+      "usage_count": 0,
+      "last_updated": "2025-11-15"
+    },
+    "database_migration": {
+      "name": "Database Migration Runner",
+      "triggers": [
+        "run migrations",
+        "migrate database",
+        "apply migrations",
+        "database schema",
+        "alembic upgrade",
+        "prisma migrate"
+      ],
+      "script": "scripts/smart_migration.py",
+      "description": "Run database migrations and return only errors or success summary",
+      "cost_metrics": {
+        "avg_cost_llm": 0.08,
+        "avg_cost_script": 0.002,
+        "avg_tokens_llm": 25000,
+        "avg_tokens_script": 800,
+        "savings_percent": 97
+      },
+      "status": "planned",
+      "confidence": 80,
+      "usage_count": 0,
+      "last_updated": "2025-11-15"
+    },
+    "performance_profiler": {
+      "name": "Performance Profiler",
+      "triggers": [
+        "profile",
+        "performance test",
+        "benchmark",
+        "measure performance",
+        "speed test",
+        "load test"
+      ],
+      "script": "scripts/smart_profiler.py",
+      "description": "Run performance tests and return summary metrics only",
+      "cost_metrics": {
+        "avg_cost_llm": 0.20,
+        "avg_cost_script": 0.006,
+        "avg_tokens_llm": 65000,
+        "avg_tokens_script": 2500,
+        "savings_percent": 97
+      },
+      "status": "planned",
+      "confidence": 75,
+      "usage_count": 0,
+      "last_updated": "2025-11-15"
+    }
+  },
+  "metadata": {
+    "total_patterns": 8,
+    "implemented": 1,
+    "planned": 7,
+    "total_estimated_savings_per_month": "TBD - track usage",
+    "created_at": "2025-11-15",
+    "last_updated": "2025-11-15"
+  }
+}

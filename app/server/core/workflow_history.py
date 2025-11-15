@@ -575,6 +575,19 @@ def get_workflow_history(
                     except json.JSONDecodeError:
                         logger.warning(f"[DB] Failed to parse JSON for {field}")
                         result[field] = None
+
+            # Convert None to defaults for score fields (legacy data compatibility)
+            score_fields = {
+                "nl_input_clarity_score": 0.0,
+                "cost_efficiency_score": 0.0,
+                "performance_score": 0.0,
+                "quality_score": 0.0,
+                "estimated_cost_total": 0.0,
+            }
+            for field, default_value in score_fields.items():
+                if result.get(field) is None:
+                    result[field] = default_value
+
             results.append(result)
 
         logger.info(

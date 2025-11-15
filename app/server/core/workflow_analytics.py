@@ -204,15 +204,15 @@ def calculate_cost_efficiency_score(workflow: Dict) -> float:
 
     Returns:
         Cost efficiency score between 0.0 and 100.0
-
-    Raises:
-        ValueError: If estimated_cost_total is missing (should never happen per requirements)
+        Returns 0.0 for legacy workflows without estimated_cost_total
     """
     try:
         # Validate required data
         estimated_cost = workflow.get("estimated_cost_total")
         if estimated_cost is None or estimated_cost == 0:
-            raise ValueError("Missing estimated_cost_total - this should never happen per requirements")
+            # Legacy workflow without cost estimate - return default score
+            logger.debug(f"[SCORING] No estimated_cost_total for workflow {workflow.get('adw_id', 'unknown')} - using default score")
+            return 0.0
 
         actual_cost = workflow.get("actual_cost_total", 0) or 0
 

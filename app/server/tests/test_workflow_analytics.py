@@ -191,20 +191,20 @@ class TestCostEfficiencyScoring:
         assert score < 40
 
     def test_cost_missing_estimate(self):
-        """Test missing estimated cost raises ValueError."""
+        """Test missing estimated cost returns 0.0 (legacy data compatibility)."""
         workflow = {
             "estimated_cost_total": None,
             "actual_cost_total": 1.0
         }
-        with pytest.raises(ValueError, match="Missing estimated_cost_total"):
-            calculate_cost_efficiency_score(workflow)
+        score = calculate_cost_efficiency_score(workflow)
+        assert score == 0.0
 
         workflow = {
             "estimated_cost_total": 0,
             "actual_cost_total": 1.0
         }
-        with pytest.raises(ValueError, match="Missing estimated_cost_total"):
-            calculate_cost_efficiency_score(workflow)
+        score = calculate_cost_efficiency_score(workflow)
+        assert score == 0.0
 
     def test_cost_model_appropriateness_perfect(self):
         """Test perfect model match gets bonus points."""
