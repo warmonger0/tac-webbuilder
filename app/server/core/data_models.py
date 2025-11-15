@@ -303,6 +303,17 @@ class WorkflowHistoryItem(BaseModel):
     complexity_estimated: Optional[str] = Field(None, description="Estimated complexity (low/medium/high)")
     complexity_actual: Optional[str] = Field(None, description="Actual complexity (low/medium/high)")
 
+    # Phase 3A: Analytics fields (temporal and scoring)
+    hour_of_day: int = Field(-1, description="Hour of day (0-23) when workflow started")
+    day_of_week: int = Field(-1, description="Day of week (0=Monday, 6=Sunday) when workflow started")
+    nl_input_clarity_score: float = Field(0.0, description="Natural language input clarity score (0-100)")
+    cost_efficiency_score: float = Field(0.0, description="Cost efficiency score (0-100)")
+    performance_score: float = Field(0.0, description="Performance score (0-100)")
+    quality_score: float = Field(0.0, description="Quality score (0-100)")
+
+    # Phase 3B: Scoring version tracking
+    scoring_version: Optional[str] = Field("1.0", description="Scoring algorithm version")
+
 class WorkflowHistoryAnalytics(BaseModel):
     total_workflows: int = Field(0, description="Total number of workflows")
     completed_workflows: int = Field(0, description="Number of completed workflows")
