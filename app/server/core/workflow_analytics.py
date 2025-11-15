@@ -623,7 +623,6 @@ def generate_optimization_recommendations(workflow: Dict, anomalies: List[Dict])
         model = workflow.get("model_used", "")
         phase_durations = workflow.get("phase_durations", {})
         error_count = workflow.get("error_count", 0)
-        retry_count = workflow.get("retry_count", 0)
         nl_input = workflow.get("nl_input", "")
 
         # Detect workflow complexity for model recommendations
