@@ -557,7 +557,7 @@ def test_cost_sync_running_workflow_prevents_decreases(temp_db):
 
         with patch('core.workflow_history.scan_agents_directory', return_value=mock_workflows):
             with patch('core.workflow_history.read_cost_history', side_effect=Exception("No cost")):
-                synced = sync_workflow_history()
+                sync_workflow_history()
 
         # Verify cost was NOT decreased
         workflow = get_workflow_by_adw_id("cost-test-3")
