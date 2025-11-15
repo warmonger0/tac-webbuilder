@@ -43,6 +43,7 @@ from core.data_models import (
     CostEstimate,
     GitHubIssue,
     ProjectContext,
+    ResyncResponse,
 )
 from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
 from core.llm_processor import generate_sql, generate_random_query
@@ -61,6 +62,8 @@ from core.workflow_history import (
     get_workflow_history,
     get_history_analytics,
     sync_workflow_history,
+    resync_workflow_cost,
+    resync_all_completed_workflows,
 )
 from core.nl_processor import process_request
 from core.github_poster import GitHubPoster
@@ -926,6 +929,75 @@ async def get_workflow_history_endpoint(
             workflows=[],
             total_count=0,
             analytics=WorkflowHistoryAnalytics()
+        )
+
+@app.post("/api/workflow-history/resync", response_model=ResyncResponse)
+async def resync_workflow_history(
+    adw_id: Optional[str] = None,
+    force: bool = False
+) -> ResyncResponse:
+    """
+    Manually resync workflow history cost data from source files.
+
+    Query Parameters:
+    - adw_id: Optional ADW ID to resync single workflow
+    - force: If true, clears existing cost data before resync
+
+    Returns:
+    - resynced_count: Number of workflows resynced
+    - workflows: List of resynced workflow summaries
+    - errors: List of error messages encountered
+    """
+    try:
+        logger.info(f"[RESYNC] Starting resync: adw_id={adw_id}, force={force}")
+
+        if adw_id:
+            # Resync single workflow
+            result = resync_workflow_cost(adw_id, force=force)
+
+            if result["success"]:
+                response = ResyncResponse(
+                    resynced_count=1 if result["cost_updated"] else 0,
+                    workflows=[{
+                        "adw_id": result["adw_id"],
+                        "cost_updated": result["cost_updated"]
+                    }],
+                    errors=[],
+                    message=f"Successfully resynced workflow {adw_id}"
+                )
+                logger.info(f"[RESYNC] Single workflow resync completed: {adw_id}")
+                return response
+            else:
+                # Return error response
+                response = ResyncResponse(
+                    resynced_count=0,
+                    workflows=[],
+                    errors=[result["error"]],
+                    message=f"Failed to resync workflow {adw_id}"
+                )
+                logger.error(f"[RESYNC] Failed to resync {adw_id}: {result['error']}")
+                return response
+        else:
+            # Resync all completed workflows
+            resynced_count, workflows, errors = resync_all_completed_workflows(force=force)
+
+            response = ResyncResponse(
+                resynced_count=resynced_count,
+                workflows=workflows,
+                errors=errors,
+                message=f"Bulk resync completed: {resynced_count} workflows updated, {len(errors)} errors"
+            )
+            logger.info(f"[RESYNC] Bulk resync completed: {resynced_count} updated, {len(errors)} errors")
+            return response
+
+    except Exception as e:
+        logger.error(f"[RESYNC] Unexpected error: {str(e)}")
+        logger.error(f"[RESYNC] Full traceback:\n{traceback.format_exc()}")
+        return ResyncResponse(
+            resynced_count=0,
+            workflows=[],
+            errors=[f"Unexpected error: {str(e)}"],
+            message="Resync failed"
         )
 
 @app.get("/api/workflows", response_model=List[Workflow])

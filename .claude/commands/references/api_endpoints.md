@@ -289,6 +289,142 @@ Get API route information (via routes_analyzer.py).
 }
 ```
 
+## Workflow History Management
+
+### GET /api/workflow-history
+Get workflow history with filtering, sorting, and pagination.
+
+**Query Parameters:**
+- `limit` (optional): Maximum number of records (default: 20)
+- `offset` (optional): Number of records to skip (default: 0)
+- `status` (optional): Filter by status (pending, running, completed, failed)
+- `model` (optional): Filter by model
+- `template` (optional): Filter by workflow template
+- `start_date` (optional): Filter by start date (ISO format)
+- `end_date` (optional): Filter by end date (ISO format)
+- `search` (optional): Search in ADW ID, nl_input, or github_url
+- `sort_by` (optional): Field to sort by (default: created_at)
+- `sort_order` (optional): Sort order ASC or DESC (default: DESC)
+
+**Response:**
+```json
+{
+  "workflows": [
+    {
+      "id": 1,
+      "adw_id": "abc12345",
+      "issue_number": 123,
+      "status": "completed",
+      "actual_cost_total": 0.45,
+      "total_tokens": 125000,
+      "cache_efficiency_percent": 35.5,
+      "duration_seconds": 180,
+      "created_at": "2025-01-13T10:30:00Z"
+    }
+  ],
+  "total_count": 50,
+  "analytics": {
+    "total_workflows": 50,
+    "completed_workflows": 45,
+    "failed_workflows": 3,
+    "avg_duration_seconds": 165.5,
+    "success_rate_percent": 90.0,
+    "avg_cost": 0.42,
+    "total_cost": 21.00
+  }
+}
+```
+
+### POST /api/workflow-history/resync
+Manually resync workflow history cost data from source files.
+
+**Query Parameters:**
+- `adw_id` (optional): ADW ID to resync single workflow
+- `force` (optional): Clear existing cost data before resync (default: false)
+
+**Use Cases:**
+- Repair corrupted historical cost data
+- Force recalculation after cost file updates
+- Verify cost data integrity
+- Bulk update all completed workflows
+
+**Examples:**
+
+**Single Workflow Resync:**
+```bash
+curl -X POST "http://localhost:8000/api/workflow-history/resync?adw_id=abc12345"
+```
+
+**Bulk Resync All Completed Workflows:**
+```bash
+curl -X POST "http://localhost:8000/api/workflow-history/resync"
+```
+
+**Force Resync (Clear and Recalculate):**
+```bash
+curl -X POST "http://localhost:8000/api/workflow-history/resync?adw_id=abc12345&force=true"
+```
+
+**Response (Success):**
+```json
+{
+  "resynced_count": 1,
+  "workflows": [
+    {
+      "adw_id": "abc12345",
+      "cost_updated": true
+    }
+  ],
+  "errors": [],
+  "message": "Successfully resynced workflow abc12345"
+}
+```
+
+**Response (Bulk Success):**
+```json
+{
+  "resynced_count": 15,
+  "workflows": [
+    {"adw_id": "w1", "status": "completed", "cost_updated": true},
+    {"adw_id": "w2", "status": "completed", "cost_updated": true},
+    {"adw_id": "w3", "status": "failed", "cost_updated": true}
+  ],
+  "errors": [],
+  "message": "Bulk resync completed: 15 workflows updated, 0 errors"
+}
+```
+
+**Response (Error):**
+```json
+{
+  "resynced_count": 0,
+  "workflows": [],
+  "errors": ["Workflow not found: abc12345"],
+  "message": "Failed to resync workflow abc12345"
+}
+```
+
+**Response (Partial Success):**
+```json
+{
+  "resynced_count": 12,
+  "workflows": [
+    {"adw_id": "w1", "status": "completed", "cost_updated": true},
+    {"adw_id": "w2", "status": "completed", "cost_updated": false}
+  ],
+  "errors": ["w3: Cost files not found", "w4: Invalid cost data"],
+  "message": "Bulk resync completed: 12 workflows updated, 2 errors"
+}
+```
+
+**Notes:**
+- This is an administrative endpoint - use with caution in production
+- Cost data is read from authoritative source files: `agents/<adw_id>/costs/*.jsonl`
+- Force mode clears existing cost data before recalculation
+- Bulk resync only processes completed and failed workflows (not running workflows)
+- The endpoint is idempotent - running multiple times produces consistent results
+- Requires completed workflows with valid cost files to exist
+
 ## Error Codes
 
 ### 400 Bad Request
