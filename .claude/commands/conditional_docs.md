@@ -178,6 +178,7 @@
 - `app_docs/feature-23bd15ec-integration-cleanup.md` - Full-stack startup scripts, health checking, graceful shutdown, start_full.sh
 - `app_docs/feature-09115cf1-zte-hopper-queue-system.md` - ZTE Hopper queue system, batch processing, zte_hopper.sh
 - `app_docs/feature-d2ac5466-workflows-documentation-tab.md` - ADW workflow documentation display, workflow categorization, workflows section UI
+- `app_docs/feature-a5b80595-workflow-history-ui-enhancements.md` - Workflow history UI enhancements, classification badges, workflow journey display, structured input visualization, WorkflowHistoryCard component
 
 ### Routes & Validation Features
 - `app_docs/feature-04a76d25-validation-optimization-routes-viz.md` - API routes visualization, AST parsing, routes_analyzer.py, Routes tab UI
