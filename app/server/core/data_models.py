@@ -355,3 +355,44 @@ class ResyncResponse(BaseModel):
     workflows: List[Dict[str, Any]] = Field(..., description="List of resynced workflow summaries")
     errors: List[str] = Field(default_factory=list, description="List of error messages")
     message: Optional[str] = Field(None, description="Optional status message")
+
+# Phase 3: Advanced Analytics Models
+class WorkflowAnalyticsDetail(BaseModel):
+    """Detailed analytics for a specific workflow"""
+    adw_id: str = Field(..., description="ADW workflow identifier")
+
+    # Efficiency scores
+    cost_efficiency_score: Optional[float] = Field(None, description="Cost efficiency score (0-100)")
+    performance_score: Optional[float] = Field(None, description="Performance score (0-100)")
+    quality_score: Optional[float] = Field(None, description="Quality score (0-100)")
+
+    # Comparisons
+    similar_workflow_ids: List[str] = Field(default_factory=list, description="Similar workflow IDs")
+    anomaly_flags: List[str] = Field(default_factory=list, description="Detected anomalies")
+    optimization_recommendations: List[str] = Field(default_factory=list, description="Optimization tips")
+
+    # Input quality
+    nl_input_clarity_score: Optional[float] = Field(None, description="NL input clarity (0-100)")
+    nl_input_word_count: Optional[int] = Field(None, description="Word count")
+
+class TrendDataPoint(BaseModel):
+    """Single data point in trend analysis"""
+    timestamp: str = Field(..., description="Timestamp (ISO format)")
+    value: float = Field(..., description="Metric value")
+    count: int = Field(0, description="Number of workflows in this period")
+
+class WorkflowTrends(BaseModel):
+    """Trend data over time"""
+    cost_trend: List[TrendDataPoint] = Field(default_factory=list, description="Cost over time")
+    duration_trend: List[TrendDataPoint] = Field(default_factory=list, description="Duration over time")
+    success_rate_trend: List[TrendDataPoint] = Field(default_factory=list, description="Success rate over time")
+    cache_efficiency_trend: List[TrendDataPoint] = Field(default_factory=list, description="Cache efficiency over time")
+
+class CostPrediction(BaseModel):
+    """Cost prediction for a workflow configuration"""
+    predicted_cost: float = Field(..., description="Predicted cost in USD")
+    confidence: float = Field(..., description="Prediction confidence (0-100)")
+    sample_size: int = Field(..., description="Number of historical workflows used")
+    min_cost: float = Field(..., description="Minimum cost from historical data")
+    max_cost: float = Field(..., description="Maximum cost from historical data")
+    avg_cost: float = Field(..., description="Average cost from historical data")
