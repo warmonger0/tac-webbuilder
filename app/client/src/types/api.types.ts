@@ -260,8 +260,19 @@ export interface HistoryItem {
 }
 
 // Cost tracking types
-export interface CostResponse {
+export interface CostData {
   total_cost: number;
+  total_tokens: number;
+  cache_efficiency_percent: number;
+  cache_savings_amount: number;
+  phases: PhaseCost[];
+}
+
+export interface CostResponse {
+  error?: string;
+  cost_data?: CostData;
+  // Legacy fields for backwards compatibility
+  total_cost?: number;
   cost_by_phase?: Record<string, number>;
   estimated_cost?: number;
   cost_breakdown?: Array<{

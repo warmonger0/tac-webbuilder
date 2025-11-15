@@ -11,9 +11,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from core.template_router import (
     route_by_template,
     detect_characteristics,
-    match_lightweight,
-    match_standard,
-    match_bug
 )
 from core.nl_processor import suggest_adw_workflow
 
@@ -167,13 +164,13 @@ def test_suggest_workflow_backward_compatibility():
 
     # Old usage (without characteristics)
     workflow, model_set = suggest_adw_workflow("bug", "low")
-    print(f"\nOld usage: suggest_adw_workflow('bug', 'low')")
+    print("\nOld usage: suggest_adw_workflow('bug', 'low')")
     print(f"  Result: {workflow}, {model_set}")
     assert workflow == "adw_plan_build_test_iso", "Bug should use plan-build-test"
     assert model_set == "base", "Bug should use base model"
 
     workflow, model_set = suggest_adw_workflow("feature", "high")
-    print(f"\nOld usage: suggest_adw_workflow('feature', 'high')")
+    print("\nOld usage: suggest_adw_workflow('feature', 'high')")
     print(f"  Result: {workflow}, {model_set}")
     assert workflow == "adw_plan_build_test_iso", "High complexity feature should use plan-build-test"
     assert model_set == "heavy", "High complexity should use heavy model"
@@ -194,7 +191,7 @@ def test_suggest_workflow_with_characteristics():
         "file_count_estimate": 1
     }
     workflow, model_set = suggest_adw_workflow("feature", "low", characteristics)
-    print(f"\nUI-only feature:")
+    print("\nUI-only feature:")
     print(f"  Characteristics: {characteristics}")
     print(f"  Result: {workflow}, {model_set}")
     assert workflow == "adw_lightweight_iso", "UI-only should use lightweight"
@@ -208,7 +205,7 @@ def test_suggest_workflow_with_characteristics():
         "file_count_estimate": 3
     }
     workflow, model_set = suggest_adw_workflow("feature", "low", characteristics)
-    print(f"\nBackend feature:")
+    print("\nBackend feature:")
     print(f"  Characteristics: {characteristics}")
     print(f"  Result: {workflow}, {model_set}")
     assert workflow == "adw_sdlc_iso", "Backend changes should use standard SDLC"
@@ -227,18 +224,18 @@ def test_end_to_end_routing():
 
     # Step 1: Template matching
     template_match = route_by_template(nl_input)
-    print(f"\n  Template Match:")
+    print("\n  Template Match:")
     print(f"    Matched: {template_match.matched}")
     if template_match.matched:
         print(f"    Workflow: {template_match.workflow}")
         print(f"    Pattern: {template_match.pattern_name}")
         print(f"    Confidence: {template_match.confidence:.0%}")
-        print(f"    💰 Cost: $0 (template routing)")
-        print(f"    ⚡ Latency: <100ms")
+        print("    💰 Cost: $0 (template routing)")
+        print("    ⚡ Latency: <100ms")
 
     # Step 2: Characteristics detection (for fallback)
     characteristics = detect_characteristics(nl_input)
-    print(f"\n  Characteristics:")
+    print("\n  Characteristics:")
     for key, value in characteristics.items():
         print(f"    {key}: {value}")
 
@@ -249,7 +246,7 @@ def test_end_to_end_routing():
     else:
         workflow, model_set = suggest_adw_workflow("feature", "low", characteristics)
 
-    print(f"\n  Final Routing:")
+    print("\n  Final Routing:")
     print(f"    Workflow: {workflow}")
     print(f"    Model Set: {model_set}")
 
@@ -258,7 +255,7 @@ def test_end_to_end_routing():
         "This UI-only change should route to lightweight workflow"
 
     print("\n✅ End-to-end routing test passed!")
-    print(f"\n🎉 This request would cost $0.20-0.50 instead of $3-5!")
+    print("\n🎉 This request would cost $0.20-0.50 instead of $3-5!")
 
 
 if __name__ == "__main__":

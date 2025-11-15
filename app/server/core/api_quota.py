@@ -35,7 +35,7 @@ def check_anthropic_quota() -> Tuple[bool, Optional[str]]:
     try:
         # Make minimal API call to check quota
         # Using smallest model and minimal tokens to conserve quota
-        response = anthropic_client.messages.create(
+        anthropic_client.messages.create(
             model="claude-3-haiku-20240307",
             max_tokens=10,
             messages=[{"role": "user", "content": "ping"}]
@@ -149,7 +149,7 @@ def ensure_quota_available() -> bool:
 
     if not can_start:
         logger.error(f"❌ [API Quota] Cannot proceed: {reason}")
-        print(f"\n❌ API Quota Unavailable\n")
+        print("\n❌ API Quota Unavailable\n")
         print(f"Reason: {reason}\n")
         print("ADW workflow cannot start. Please wait for quota reset or upgrade your plan.\n")
 

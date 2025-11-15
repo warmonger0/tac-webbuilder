@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchWorkflowCosts } from '../api/client';
-import type { CostData } from '../types';
+import type { CostData, PhaseCost } from '../types';
 import { CacheEfficiencyBadge } from './CacheEfficiencyBadge';
 import { CostBreakdownChart } from './CostBreakdownChart';
 import { CumulativeCostChart } from './CumulativeCostChart';
@@ -164,7 +164,7 @@ export function CostVisualization({ adwId }: CostVisualizationProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {costData.phases.map((phase) => (
+                  {costData.phases.map((phase: PhaseCost) => (
                     <tr key={phase.phase} className="hover:bg-gray-50">
                       <td className="px-3 py-2 font-medium text-gray-900">
                         {phase.phase}
