@@ -138,6 +138,17 @@ export interface TokenBreakdown {
   total_tokens: number;
 }
 
+export interface PhaseCost {
+  phase: string;
+  cost: number;
+  tokens: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_creation_tokens: number;
+    cache_read_tokens: number;
+  };
+}
+
 export interface CostBreakdown {
   estimated_total: number;
   actual_total: number;
@@ -249,8 +260,19 @@ export interface HistoryItem {
 }
 
 // Cost tracking types
-export interface CostResponse {
+export interface CostData {
   total_cost: number;
+  total_tokens: number;
+  cache_efficiency_percent: number;
+  cache_savings_amount: number;
+  phases: PhaseCost[];
+}
+
+export interface CostResponse {
+  error?: string;
+  cost_data?: CostData;
+  // Legacy fields for backwards compatibility
+  total_cost?: number;
   cost_by_phase?: Record<string, number>;
   estimated_cost?: number;
   cost_breakdown?: Array<{
