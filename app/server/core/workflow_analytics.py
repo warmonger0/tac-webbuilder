@@ -15,7 +15,7 @@ Additionally provides:
 - Optimization recommendations
 """
 
-from typing import Dict, List
+from typing import Dict, List, Union
 from datetime import datetime
 import logging
 
@@ -495,10 +495,24 @@ def detect_complexity(workflow: Dict) -> str:
         Medium: Everything else
     """
     try:
+        # Support both old and new field names for backward compatibility
         word_count = workflow.get('nl_input_word_count', 0)
+        if word_count == 0 and 'nl_input' in workflow:
+            # Old format: count words from nl_input text
+            nl_input = workflow.get('nl_input', '')
+            word_count = len(nl_input.split()) if nl_input else 0
+
+        # Support both old (duration_seconds) and new (total_duration_seconds) field names
         duration = workflow.get('total_duration_seconds', 0)
-        errors = workflow.get('errors', [])
-        error_count = len(errors) if isinstance(errors, list) else 0
+        if duration == 0:
+            duration = workflow.get('duration_seconds', 0)
+
+        # Support both old (error_count) and new (errors list) field names
+        if 'errors' in workflow:
+            errors = workflow.get('errors', [])
+            error_count = len(errors) if isinstance(errors, list) else 0
+        else:
+            error_count = workflow.get('error_count', 0)
 
         # Simple: All metrics are low
         if word_count < 50 and duration < 300 and error_count < 3:
@@ -517,9 +531,13 @@ def detect_complexity(workflow: Dict) -> str:
         return "medium"  # Default to medium on error
 
 
-def find_similar_workflows(workflow: Dict, all_workflows: List[Dict]) -> List[str]:
+def find_similar_workflows(workflow: Dict, all_workflows: List[Dict]) -> Union[List[str], List[Dict]]:
     """
     Find similar workflows using multi-factor similarity scoring.
+
+    Supports two modes for backward compatibility:
+    - New mode (Phase 3E): Uses 'adw_id' field, returns list of ADW ID strings
+    - Old mode: Uses 'id' field, returns list of full workflow dictionaries
 
     Similarity is determined by combining multiple factors:
     - Classification type match: 30 points
@@ -535,7 +553,7 @@ def find_similar_workflows(workflow: Dict, all_workflows: List[Dict]) -> List[st
         all_workflows: List of all historical workflows
 
     Returns:
-        List of ADW IDs for top 10 similar workflows (sorted by similarity score)
+        List of ADW IDs (new mode) or list of workflow dictionaries (old mode)
 
     Example:
         >>> workflow = {
@@ -549,11 +567,45 @@ def find_similar_workflows(workflow: Dict, all_workflows: List[Dict]) -> List[st
         >>> print(similar_ids)  # ['adw-abc123', 'adw-def456', ...]
     """
     try:
+        # Determine mode: new (adw_id) or old (id)
         current_id = workflow.get('adw_id')
+        old_mode = False
         if not current_id:
-            logger.warning("Workflow missing adw_id, cannot find similar workflows")
+            current_id = workflow.get('id')
+            old_mode = True
+
+        if not current_id:
+            logger.warning("Workflow missing adw_id or id, cannot find similar workflows")
             return []
 
+        # Old mode: simple template + model matching for backward compatibility
+        if old_mode:
+            candidates = []
+            for candidate in all_workflows:
+                # Skip the same workflow
+                if candidate.get('id') == current_id:
+                    continue
+
+                # Match on workflow_template and model_used
+                if (workflow.get('workflow_template') == candidate.get('workflow_template') and
+                    workflow.get('model_used') == candidate.get('model_used')):
+                    # Calculate duration proximity for sorting
+                    current_duration = workflow.get('duration_seconds', 0)
+                    candidate_duration = candidate.get('duration_seconds', 0)
+                    duration_diff = abs(current_duration - candidate_duration)
+
+                    candidates.append({
+                        'workflow': candidate,
+                        'duration_diff': duration_diff
+                    })
+
+            # Sort by duration proximity (closest first)
+            candidates.sort(key=lambda x: x['duration_diff'])
+
+            # Return workflow objects
+            return [c['workflow'] for c in candidates]
+
+        # New mode: multi-factor scoring
         candidates = []
 
         for candidate in all_workflows:
