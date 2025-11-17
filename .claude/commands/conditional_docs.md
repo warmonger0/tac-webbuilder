@@ -180,6 +180,15 @@
 - `app_docs/feature-d2ac5466-workflows-documentation-tab.md` - ADW workflow documentation display, workflow categorization, workflows section UI
 - `app_docs/feature-a5b80595-workflow-history-ui-enhancements.md` - Workflow history UI enhancements, classification badges, workflow journey display, structured input visualization, WorkflowHistoryCard component
 
+### Analytics & Insights Features
+- `app_docs/feature-a7c948e2-insights-recommendations.md` - Phase 3D anomaly detection, optimization recommendations, workflow analytics insights, complexity detection, statistical thresholds
+  - Conditions:
+    - Working with workflow analytics or scoring systems
+    - Implementing anomaly detection or recommendation engines
+    - Troubleshooting workflow insights calculation
+    - Modifying workflow_analytics.py or workflow_history.py
+    - Adding new recommendation categories or anomaly types
+
 ### Routes & Validation Features
 - `app_docs/feature-04a76d25-validation-optimization-routes-viz.md` - API routes visualization, AST parsing, routes_analyzer.py, Routes tab UI
 - `app_docs/feature-4fc73599-api-routes-display.md` - Dynamic API routes introspection, /api/routes endpoint, route display functionality, FastAPI route discovery

@@ -314,6 +314,10 @@ class WorkflowHistoryItem(BaseModel):
     # Phase 3B: Scoring version tracking
     scoring_version: Optional[str] = Field("1.0", description="Scoring algorithm version")
 
+    # Phase 3D: Insights & Recommendations
+    anomaly_flags: Optional[List[str]] = Field(None, description="List of anomaly messages")
+    optimization_recommendations: Optional[List[str]] = Field(None, description="List of optimization recommendations")
+
 class WorkflowHistoryAnalytics(BaseModel):
     total_workflows: int = Field(0, description="Total number of workflows")
     completed_workflows: int = Field(0, description="Number of completed workflows")

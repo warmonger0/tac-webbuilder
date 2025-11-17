@@ -383,8 +383,11 @@ class TestAnomalyDetection:
     """Test anomaly detection function."""
 
     def test_detect_anomalies_cost_high(self):
-        """Test cost anomaly detection with 1.5x threshold."""
+        """Test cost anomaly detection with 2x threshold."""
         workflow = {
+            "adw_id": "test123",
+            "workflow_template": "sdlc_planner",
+            "classification_type": "feature",
             "actual_cost_total": 3.0,
             "duration_seconds": 100,
             "retry_count": 0,
@@ -392,18 +395,21 @@ class TestAnomalyDetection:
             "total_input_tokens": 10000
         }
         historical = [
-            {"actual_cost_total": 1.0, "duration_seconds": 100},
-            {"actual_cost_total": 1.2, "duration_seconds": 110},
-            {"actual_cost_total": 0.9, "duration_seconds": 90}
+            {"adw_id": "hist1", "workflow_template": "sdlc_planner", "classification_type": "feature", "actual_cost_total": 1.0, "duration_seconds": 100},
+            {"adw_id": "hist2", "workflow_template": "sdlc_planner", "classification_type": "feature", "actual_cost_total": 1.2, "duration_seconds": 110},
+            {"adw_id": "hist3", "workflow_template": "sdlc_planner", "classification_type": "feature", "actual_cost_total": 0.9, "duration_seconds": 90}
         ]
-        # Average cost = 1.03, threshold = 1.5x = 1.55
-        # Actual = 3.0, should trigger anomaly
+        # Average cost = 1.03, threshold = 2x = 2.06
+        # Actual = 3.0, should trigger anomaly (3.0 > 2.06)
         anomalies = detect_anomalies(workflow, historical)
         assert any(a["type"] == "cost_anomaly" for a in anomalies)
 
     def test_detect_anomalies_duration_slow(self):
-        """Test duration anomaly detection with 1.5x threshold."""
+        """Test duration anomaly detection with 2x threshold."""
         workflow = {
+            "adw_id": "test123",
+            "workflow_template": "sdlc_planner",
+            "classification_type": "feature",
             "actual_cost_total": 1.0,
             "duration_seconds": 300,
             "retry_count": 0,
@@ -411,12 +417,12 @@ class TestAnomalyDetection:
             "total_input_tokens": 10000
         }
         historical = [
-            {"actual_cost_total": 1.0, "duration_seconds": 100},
-            {"actual_cost_total": 1.0, "duration_seconds": 120},
-            {"actual_cost_total": 1.0, "duration_seconds": 80}
+            {"adw_id": "hist1", "workflow_template": "sdlc_planner", "classification_type": "feature", "actual_cost_total": 1.0, "duration_seconds": 100},
+            {"adw_id": "hist2", "workflow_template": "sdlc_planner", "classification_type": "feature", "actual_cost_total": 1.0, "duration_seconds": 120},
+            {"adw_id": "hist3", "workflow_template": "sdlc_planner", "classification_type": "feature", "actual_cost_total": 1.0, "duration_seconds": 80}
         ]
-        # Average duration = 100, threshold = 1.5x = 150
-        # Actual = 300, should trigger anomaly
+        # Average duration = 100, threshold = 2x = 200
+        # Actual = 300, should trigger anomaly (300 > 200)
         anomalies = detect_anomalies(workflow, historical)
         assert any(a["type"] == "duration_anomaly" for a in anomalies)
 
