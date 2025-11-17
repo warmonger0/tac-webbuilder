@@ -189,6 +189,15 @@
     - Modifying workflow_analytics.py or workflow_history.py
     - Adding new recommendation categories or anomaly types
 
+- `app_docs/feature-f2a7920f-core-pattern-signatures.md` - Core pattern signature system, signature generation, category/subcategory/target detection, validation and normalization, pattern_signatures.py
+  - Conditions:
+    - Working with pattern detection or workflow classification
+    - Implementing operation categorization or signature generation
+    - Modifying pattern_signatures.py or pattern_matcher.py
+    - Adding new operation categories or subcategories
+    - Troubleshooting workflow signature detection
+    - Integrating pattern-based routing or cost optimization
+
 ### Routes & Validation Features
 - `app_docs/feature-04a76d25-validation-optimization-routes-viz.md` - API routes visualization, AST parsing, routes_analyzer.py, Routes tab UI
 - `app_docs/feature-4fc73599-api-routes-display.md` - Dynamic API routes introspection, /api/routes endpoint, route display functionality, FastAPI route discovery
