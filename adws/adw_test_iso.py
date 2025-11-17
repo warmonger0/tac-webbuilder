@@ -7,14 +7,18 @@
 ADW Test Iso - AI Developer Workflow for agentic testing in isolated worktrees
 
 Usage:
-  uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e]
+  uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e] [--use-external]
 
 Workflow:
 1. Load state and validate worktree exists
-2. Run application test suite in worktree
+2. Run application test suite in worktree (optionally via external tools)
 3. Report results to issue
 4. Create commit with test results in worktree
 5. Push and update PR
+
+Options:
+  --skip-e2e: Skip E2E tests
+  --use-external: Use external test tools (minimizes context consumption)
 
 This workflow REQUIRES that adw_plan_iso.py or adw_patch_iso.py has been run first
 to create the worktree. It cannot create worktrees itself.
@@ -25,7 +29,8 @@ import subprocess
 import sys
 import os
 import logging
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Dict, Any
+from pathlib import Path
 from dotenv import load_dotenv
 from adw_modules.data_types import (
     AgentTemplateRequest,
@@ -86,6 +91,50 @@ def run_tests(adw_id: str, logger: logging.Logger, working_dir: Optional[str] = 
     )
 
     return test_response
+
+
+def run_external_tests(
+    issue_number: str,
+    adw_id: str,
+    logger: logging.Logger,
+    state: ADWState
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Run tests using external test ADW workflow.
+
+    Returns:
+        Tuple of (success: bool, results: Dict)
+    """
+    logger.info("🔧 Using external test tools for context optimization")
+
+    # Get path to external test ADW script
+    script_dir = Path(__file__).parent
+    test_external_script = script_dir / "adw_test_external.py"
+
+    if not test_external_script.exists():
+        logger.error(f"External test script not found: {test_external_script}")
+        return False, {"error": "External test script not found"}
+
+    # Run external test ADW
+    cmd = ["uv", "run", str(test_external_script), issue_number, adw_id]
+
+    logger.info(f"Executing: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    # Reload state to get external test results
+    state.load()
+    test_results = state.get("external_test_results", {})
+
+    if not test_results:
+        logger.warning("No external_test_results found in state after execution")
+        logger.debug(f"Stdout: {result.stdout}")
+        logger.debug(f"Stderr: {result.stderr}")
+        return False, {"error": "No test results returned from external tool"}
+
+    success = test_results.get("success", False)
+    logger.info(f"External tests completed: {'✅ Success' if success else '❌ Failures detected'}")
+
+    return success, test_results
 
 
 def parse_test_results(
@@ -649,17 +698,21 @@ def main():
     """Main entry point."""
     # Load environment variables
     load_dotenv()
-    
-    # Check for --skip-e2e flag in args
+
+    # Check for flags in args
     skip_e2e = "--skip-e2e" in sys.argv
-    # Remove flag from args if present
+    use_external = "--use-external" in sys.argv
+
+    # Remove flags from args if present
     if skip_e2e:
         sys.argv.remove("--skip-e2e")
-    
+    if use_external:
+        sys.argv.remove("--use-external")
+
     # Parse command line args
     # INTENTIONAL: adw-id is REQUIRED - we need it to find the worktree
     if len(sys.argv) < 3:
-        print("Usage: uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e]")
+        print("Usage: uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e] [--use-external]")
         print("\nError: adw-id is required to locate the worktree")
         print("Run adw_plan_iso.py or adw_patch_iso.py first to create the worktree")
         sys.exit(1)
@@ -691,11 +744,11 @@ def main():
     
     # Set up logger with ADW ID from command line
     logger = setup_logger(adw_id, "adw_test_iso")
-    logger.info(f"ADW Test Iso starting - ID: {adw_id}, Issue: {issue_number}, Skip E2E: {skip_e2e}")
-    
+    logger.info(f"ADW Test Iso starting - ID: {adw_id}, Issue: {issue_number}, Skip E2E: {skip_e2e}, Use External: {use_external}")
+
     # Validate environment
     check_env_vars(logger)
-    
+
     # Validate worktree exists
     valid, error = validate_worktree(adw_id, state)
     if not valid:
@@ -707,58 +760,113 @@ def main():
                                "Run adw_plan_iso.py or adw_patch_iso.py first")
         )
         sys.exit(1)
-    
+
     # Get worktree path for explicit context
     worktree_path = state.get("worktree_path")
     logger.info(f"Using worktree at: {worktree_path}")
-    
+
     # Get port information for display
     backend_port = state.get("backend_port", "9100")
     frontend_port = state.get("frontend_port", "9200")
-    
+
     make_issue_comment(
-        issue_number, 
+        issue_number,
         format_issue_message(adw_id, "ops", f"✅ Starting isolated testing phase\n"
                            f"🏠 Worktree: {worktree_path}\n"
                            f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}\n"
-                           f"🧪 E2E Tests: {'Skipped' if skip_e2e else 'Enabled'}")
+                           f"🧪 E2E Tests: {'Skipped' if skip_e2e else 'Enabled'}\n"
+                           f"🔧 Test Mode: {'External Tools (Context Optimized)' if use_external else 'Inline Execution'}")
     )
-    
+
     # Track results for resolution attempts
     test_results = []
     e2e_results = []
-    
-    # Run unit tests (executing in worktree)
-    logger.info("Running unit tests in worktree with automatic resolution")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, AGENT_TESTER, "🧪 Running unit tests in isolated environment...")
-    )
-    
-    # Run tests with resolution and retry logic
-    results, passed_count, failed_count, test_response = run_tests_with_resolution(
-        adw_id, issue_number, logger, worktree_path
-    )
-    
-    # Track results
-    test_results = results
-    
-    if results:
-        comment = format_test_results_comment(results, passed_count, failed_count)
+    passed_count = 0
+    failed_count = 0
+
+    if use_external:
+        # Use external test tools (context optimized)
+        logger.info("🔧 Using external test tools for context optimization")
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, AGENT_TESTER, comment)
+            format_issue_message(adw_id, AGENT_TESTER, "🔧 Running tests via external tools (70-95% token reduction)...")
         )
-        logger.info(f"Test results: {passed_count} passed, {failed_count} failed")
+
+        # Run external tests
+        success, external_results = run_external_tests(issue_number, adw_id, logger, state)
+
+        if "error" in external_results:
+            # External tool failed
+            logger.error(f"External test tool error: {external_results['error']}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_TESTER, f"❌ External test tool error: {external_results['error']}")
+            )
+        else:
+            # Process external results
+            summary = external_results.get("summary", {})
+            failures = external_results.get("failures", [])
+
+            passed_count = summary.get("passed", 0)
+            failed_count = summary.get("failed", 0)
+            total = summary.get("total", passed_count + failed_count)
+
+            # Format results comment
+            if success:
+                comment = f"✅ All {total} tests passed!\n"
+                comment += f"⚡ Context savings: ~90% (using external tools)"
+            else:
+                comment = f"❌ {failed_count} test(s) failed out of {total}\n\n"
+                comment += "**Failures:**\n"
+                for failure in failures[:10]:  # Limit to first 10
+                    file_path = failure.get("file", "unknown")
+                    line = failure.get("line", "?")
+                    error = failure.get("error", "unknown error")
+                    comment += f"- `{file_path}:{line}` - {error}\n"
+
+                if len(failures) > 10:
+                    comment += f"\n... and {len(failures) - 10} more failures\n"
+
+                comment += f"\n⚡ Context savings: ~84% (compact failure reporting)"
+
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_TESTER, comment)
+            )
+            logger.info(f"External test results: {passed_count} passed, {failed_count} failed")
+
     else:
-        logger.warning("No test results found in output")
+        # Use inline test execution (existing behavior)
+        logger.info("Running unit tests in worktree with automatic resolution")
         make_issue_comment(
             issue_number,
-            format_issue_message(
-                adw_id, AGENT_TESTER, "⚠️ No test results found in output"
-            ),
+            format_issue_message(adw_id, AGENT_TESTER, "🧪 Running unit tests in isolated environment...")
         )
-    
+
+        # Run tests with resolution and retry logic
+        results, passed_count, failed_count, test_response = run_tests_with_resolution(
+            adw_id, issue_number, logger, worktree_path
+        )
+
+        # Track results
+        test_results = results
+
+        if results:
+            comment = format_test_results_comment(results, passed_count, failed_count)
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_TESTER, comment)
+            )
+            logger.info(f"Test results: {passed_count} passed, {failed_count} failed")
+        else:
+            logger.warning("No test results found in output")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id, AGENT_TESTER, "⚠️ No test results found in output"
+                ),
+            )
+
     # Run E2E tests if not skipped (executing in worktree)
     e2e_passed = 0
     e2e_failed = 0

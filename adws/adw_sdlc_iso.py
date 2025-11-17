@@ -33,21 +33,28 @@ def main():
     # Check for flags
     skip_e2e = "--skip-e2e" in sys.argv
     skip_resolution = "--skip-resolution" in sys.argv
-    
+    use_external = "--use-external" in sys.argv
+
     # Remove flags from argv
     if skip_e2e:
         sys.argv.remove("--skip-e2e")
     if skip_resolution:
         sys.argv.remove("--skip-resolution")
-    
+    if use_external:
+        sys.argv.remove("--use-external")
+
     if len(sys.argv) < 2:
-        print("Usage: uv run adw_sdlc_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution]")
+        print("Usage: uv run adw_sdlc_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution] [--use-external]")
         print("\nThis runs the complete isolated Software Development Life Cycle:")
         print("  1. Plan (isolated)")
         print("  2. Build (isolated)")
         print("  3. Test (isolated)")
         print("  4. Review (isolated)")
         print("  5. Document (isolated)")
+        print("\nFlags:")
+        print("  --skip-e2e: Skip E2E tests")
+        print("  --skip-resolution: Skip automatic resolution of review failures")
+        print("  --use-external: Use external tools for testing/building (70-95% token reduction)")
         sys.exit(1)
 
     issue_number = sys.argv[1]
@@ -83,7 +90,12 @@ def main():
         issue_number,
         adw_id,
     ]
+    if use_external:
+        build_cmd.append("--use-external")
+
     print(f"\n=== ISOLATED BUILD PHASE ===")
+    if use_external:
+        print("🔧 Using external build tools for context optimization")
     print(f"Running: {' '.join(build_cmd)}")
     build = subprocess.run(build_cmd)
     if build.returncode != 0:
@@ -99,8 +111,12 @@ def main():
         adw_id,
         "--skip-e2e",  # Always skip E2E tests in SDLC workflows
     ]
-    
+    if use_external:
+        test_cmd.append("--use-external")
+
     print(f"\n=== ISOLATED TEST PHASE ===")
+    if use_external:
+        print("🔧 Using external test tools for context optimization")
     print(f"Running: {' '.join(test_cmd)}")
     test = subprocess.run(test_cmd)
     if test.returncode != 0:

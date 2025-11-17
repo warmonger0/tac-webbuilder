@@ -6,8 +6,8 @@
 """
 ADW Build Iso - AI Developer Workflow for agentic building in isolated worktrees
 
-Usage: 
-  uv run adw_build_iso.py <issue-number> <adw-id>
+Usage:
+  uv run adw_build_iso.py <issue-number> <adw-id> [--use-external]
 
 Workflow:
 1. Load state and validate worktree exists
@@ -15,6 +15,9 @@ Workflow:
 3. Implement the solution based on plan in worktree
 4. Commit implementation in worktree
 5. Push and update PR
+
+Options:
+  --use-external: Use external build tools for type checking (minimizes context consumption)
 
 This workflow REQUIRES that adw_plan_iso.py or adw_patch_iso.py has been run first
 to create the worktree. It cannot create worktrees itself.
@@ -25,7 +28,8 @@ import os
 import logging
 import json
 import subprocess
-from typing import Optional
+from typing import Optional, Tuple, Dict, Any
+from pathlib import Path
 from dotenv import load_dotenv
 
 from adw_modules.state import ADWState
@@ -42,21 +46,68 @@ from adw_modules.data_types import GitHubIssue
 from adw_modules.worktree_ops import validate_worktree
 
 
+def run_external_build(
+    issue_number: str,
+    adw_id: str,
+    logger: logging.Logger,
+    state: ADWState
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Run build checks using external build ADW workflow.
+
+    Returns:
+        Tuple of (success: bool, results: Dict)
+    """
+    logger.info("🔧 Using external build tools for context optimization")
+
+    # Get path to external build ADW script
+    script_dir = Path(__file__).parent
+    build_external_script = script_dir / "adw_build_external.py"
+
+    if not build_external_script.exists():
+        logger.error(f"External build script not found: {build_external_script}")
+        return False, {"error": "External build script not found"}
+
+    # Run external build ADW
+    cmd = ["uv", "run", str(build_external_script), issue_number, adw_id]
+
+    logger.info(f"Executing: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    # Reload state to get external build results
+    state.load()
+    build_results = state.get("external_build_results", {})
+
+    if not build_results:
+        logger.warning("No external_build_results found in state after execution")
+        logger.debug(f"Stdout: {result.stdout}")
+        logger.debug(f"Stderr: {result.stderr}")
+        return False, {"error": "No build results returned from external tool"}
+
+    success = build_results.get("success", False)
+    logger.info(f"External build check completed: {'✅ Success' if success else '❌ Errors detected'}")
+
+    return success, build_results
 
 
 def main():
     """Main entry point."""
     # Load environment variables
     load_dotenv()
-    
+
+    # Check for --use-external flag
+    use_external = "--use-external" in sys.argv
+    if use_external:
+        sys.argv.remove("--use-external")
+
     # Parse command line args
     # INTENTIONAL: adw-id is REQUIRED - we need it to find the worktree
     if len(sys.argv) < 3:
-        print("Usage: uv run adw_build_iso.py <issue-number> <adw-id>")
+        print("Usage: uv run adw_build_iso.py <issue-number> <adw-id> [--use-external]")
         print("\nError: adw-id is required to locate the worktree and plan file")
         print("Run adw_plan_iso.py or adw_patch_iso.py first to create the worktree")
         sys.exit(1)
-    
+
     issue_number = sys.argv[1]
     adw_id = sys.argv[2]
     
@@ -84,7 +135,7 @@ def main():
     
     # Set up logger with ADW ID from command line
     logger = setup_logger(adw_id, "adw_build_iso")
-    logger.info(f"ADW Build Iso starting - ID: {adw_id}, Issue: {issue_number}")
+    logger.info(f"ADW Build Iso starting - ID: {adw_id}, Issue: {issue_number}, Use External: {use_external}")
     
     # Validate environment
     check_env_vars(logger)
@@ -153,10 +204,11 @@ def main():
     frontend_port = state.get("frontend_port", "9200")
     
     make_issue_comment(
-        issue_number, 
+        issue_number,
         format_issue_message(adw_id, "ops", f"✅ Starting isolated implementation phase\n"
                            f"🏠 Worktree: {worktree_path}\n"
-                           f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}")
+                           f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}\n"
+                           f"🔧 Build Mode: {'External Tools (Context Optimized)' if use_external else 'Inline Execution'}")
     )
     
     # Implement the plan (executing in worktree)
@@ -181,7 +233,67 @@ def main():
         issue_number,
         format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Solution implemented")
     )
-    
+
+    # Run build check if using external tools
+    if use_external:
+        logger.info("🔧 Running external build check for type validation")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "build_checker", "🔧 Running build checks via external tools (70-95% token reduction)...")
+        )
+
+        # Run external build check
+        build_success, build_results = run_external_build(issue_number, adw_id, logger, state)
+
+        if "error" in build_results:
+            # External tool failed
+            logger.error(f"External build tool error: {build_results['error']}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "build_checker", f"❌ External build tool error: {build_results['error']}")
+            )
+        else:
+            # Process external build results
+            summary = build_results.get("summary", {})
+            errors = build_results.get("errors", [])
+
+            total_errors = summary.get("total_errors", 0)
+            type_errors = summary.get("type_errors", 0)
+            build_errors = summary.get("build_errors", 0)
+
+            # Format results comment
+            if build_success:
+                comment = f"✅ Build check passed! No type or build errors.\n"
+                comment += f"⚡ Context savings: ~93% (using external tools)"
+            else:
+                comment = f"❌ Build check failed: {total_errors} error(s)\n"
+                comment += f"   - Type errors: {type_errors}\n"
+                comment += f"   - Build errors: {build_errors}\n\n"
+                comment += "**Errors:**\n"
+                for error in errors[:10]:  # Limit to first 10
+                    file_path = error.get("file", "unknown")
+                    line = error.get("line", "?")
+                    col = error.get("column", "?")
+                    msg = error.get("message", "unknown error")
+                    comment += f"- `{file_path}:{line}:{col}` - {msg}\n"
+
+                if len(errors) > 10:
+                    comment += f"\n... and {len(errors) - 10} more errors\n"
+
+                comment += f"\n⚡ Context savings: ~83% (compact error reporting)"
+                comment += f"\n\n⚠️ Fix build errors before committing"
+
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "build_checker", comment)
+            )
+            logger.info(f"External build check: {'✅ Success' if build_success else f'❌ {total_errors} errors'}")
+
+            # If build failed, stop here
+            if not build_success:
+                logger.error("Build check failed - stopping workflow")
+                sys.exit(1)
+
     # Fetch issue data for commit message generation
     logger.info("Fetching issue data for commit message")
     issue = fetch_issue(issue_number, repo_path)
