@@ -8,10 +8,15 @@ Technical documentation and integration guides for tac-webbuilder. This director
 
 Documentation is organized into the following categories:
 
-- **[Architecture/](Architecture/)** - System architecture and technical design documents
-- **[Guides/](Guides/)** - How-to guides, quick starts, and setup instructions
+- **[ADW/](ADW/)** - Autonomous Digital Worker system documentation, architecture, and external tools integration
+- **[Architecture/](Architecture/)** - System architecture, technical design, cleanup, and performance optimization
+- **[Cost-Optimization/](Cost-Optimization/)** - API cost optimization, usage analysis, and estimation strategies
+- **[Webhooks/](Webhooks/)** - Webhook setup, configuration, and GitHub integration guides
+- **[Testing/](Testing/)** - Testing guides, test coverage reports, and test deliverables
 - **[Implementation Plans/](Implementation%20Plans/)** - Feature planning and implementation plan documents
+- **[Guides/](Guides/)** - How-to guides, quick starts, and setup instructions
 - **[Analysis/](Analysis/)** - Research, investigation, and analysis documents
+- **[Archive/](Archive/)** - Historical documentation and session notes
 - **[Archived Issues/](Archived%20Issues/)** - Completed issue documentation with specs and summaries
 - **[features/](features/)** - Feature-specific implementation documentation
 
@@ -30,10 +35,13 @@ Documentation is organized into the following categories:
 - [Examples](examples.md) - Usage examples, common workflows, and best practices
 - [Troubleshooting](troubleshooting.md) - Common issues, debugging tips, and solutions
 
-### Integrations
+### Integrations & Advanced Topics
 
 - [Playwright MCP](playwright-mcp.md) - Model Context Protocol integration for end-to-end testing with browser automation
 - [ADW Optimization](adw-optimization.md) - Automated development workflow performance tuning and best practices
+- [ADW Documentation](ADW/) - Complete ADW system documentation
+- [Cost Optimization](Cost-Optimization/) - API cost optimization and estimation
+- [Webhooks](Webhooks/) - Webhook integration and setup guides
 
 ## Quick Links
 
@@ -52,6 +60,8 @@ Documentation is organized into the following categories:
 - System architecture: [architecture.md](architecture.md)
 - ADW workflows: [adw-optimization.md](adw-optimization.md)
 - E2E testing: [playwright-mcp.md](playwright-mcp.md)
+- Testing guides: [Testing/](Testing/)
+- Cost optimization: [Cost-Optimization/](Cost-Optimization/)
 
 ## Documentation Structure
 
