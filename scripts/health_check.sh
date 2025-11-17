@@ -202,7 +202,7 @@ echo ""
 echo -e "${BLUE}[3/6] Webhook Service (port $WEBHOOK_PORT)${NC}"
 check_port $WEBHOOK_PORT "Webhook"
 if [ $? -eq 0 ]; then
-    check_endpoint "http://localhost:$WEBHOOK_PORT/health" "Webhook Health Endpoint"
+    check_endpoint "http://localhost:$WEBHOOK_PORT/ping" "Webhook Health Endpoint"
 fi
 echo ""
 

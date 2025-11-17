@@ -176,7 +176,14 @@ def get_workflows_data() -> List[Workflow]:
             with open(state_file, 'r') as f:
                 state = json.load(f)
 
-            issue_number = int(state.get("issue_number", 0))
+            # Validate issue_number - must be convertible to int
+            issue_num_raw = state.get("issue_number", 0)
+            try:
+                issue_number = int(issue_num_raw)
+            except (ValueError, TypeError):
+                # Skip workflows with invalid issue numbers
+                logger.warning(f"[WARNING] Skipping workflow {adw_id} with invalid issue_number: {issue_num_raw}")
+                continue
 
             # Check GitHub issue status - only include OPEN issues
             try:

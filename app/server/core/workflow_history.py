@@ -870,8 +870,18 @@ def sync_workflow_history() -> int:
                     workflow_data["bottleneck_phase"] = phase_metrics["bottleneck_phase"]
                     workflow_data["idle_time_seconds"] = phase_metrics["idle_time_seconds"]
 
+                # Extract model from cost_data if not already set
+                if not workflow_data.get("model_used") and hasattr(cost_data, 'phases') and cost_data.phases:
+                    # Use the model from the first phase (they're usually all the same)
+                    workflow_data["model_used"] = cost_data.phases[0].model if cost_data.phases else None
+
         except Exception as e:
             logger.debug(f"[SYNC] No cost data for {adw_id}: {e}")
+
+        # Set default workflow_template if not set (use issue_class from state)
+        if not workflow_data.get("workflow_template"):
+            # Derive from issue_class or use generic "sdlc"
+            workflow_data["workflow_template"] = "sdlc"  # Default template
 
         # Categorize error if error_message exists
         if workflow_data.get("error_message"):
@@ -928,8 +938,8 @@ def sync_workflow_history() -> int:
 
         # Phase 3D: Generate insights and recommendations
         try:
-            # Get all workflows for comparison
-            all_workflows = get_workflow_history()
+            # Get all workflows for comparison (unpack tuple: workflows list and total count)
+            all_workflows, _ = get_workflow_history()
 
             # Detect anomalies
             from core.workflow_analytics import detect_anomalies, generate_optimization_recommendations

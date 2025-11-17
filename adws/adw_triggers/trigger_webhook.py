@@ -592,9 +592,19 @@ async def webhook_status():
     }
 
 
+@app.get("/ping")
+async def ping():
+    """Fast health check endpoint - returns immediately."""
+    return {
+        "status": "healthy",
+        "service": "adw-webhook-trigger",
+        "timestamp": time.time()
+    }
+
+
 @app.get("/health")
 async def health():
-    """Health check endpoint - runs comprehensive system health check."""
+    """Comprehensive health check endpoint - runs full system health check (slow)."""
     try:
         # Run the health check script
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -675,6 +685,7 @@ async def health():
 if __name__ == "__main__":
     print(f"Starting server on http://0.0.0.0:{PORT}")
     print(f"Webhook endpoint: POST /gh-webhook")
-    print(f"Health check: GET /health")
+    print(f"Fast health check: GET /ping")
+    print(f"Full health check: GET /health")
 
     uvicorn.run(app, host="0.0.0.0", port=PORT)

@@ -44,7 +44,7 @@ BRANCH_NAME=$(git worktree list --porcelain | grep -A1 "worktree.*${WORKTREE_PAT
 if [ -z "$BRANCH_NAME" ]; then
     # Look for branches that contain the ADW ID (convert to lowercase for branch search)
     ADW_ID_LOWER=$(echo "$ADW_ID" | tr '[:upper:]' '[:lower:]')
-    POSSIBLE_BRANCHES=$(git branch -a | grep -i "adw-${ADW_ID_LOWER}" | sed 's/^[* ]*//' | grep -v "remotes/")
+    POSSIBLE_BRANCHES=$(git branch -a | grep -i "adw-${ADW_ID_LOWER}" | sed 's/^[*+ ]*//' | grep -v "remotes/")
     
     if [ ! -z "$POSSIBLE_BRANCHES" ]; then
         # If we found exactly one match, use it
