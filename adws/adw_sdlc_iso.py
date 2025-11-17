@@ -33,18 +33,21 @@ def main():
     # Check for flags
     skip_e2e = "--skip-e2e" in sys.argv
     skip_resolution = "--skip-resolution" in sys.argv
-    use_external = "--use-external" in sys.argv
+    # Default to using external tools (opt-out with --no-external)
+    use_external = "--no-external" not in sys.argv
 
     # Remove flags from argv
     if skip_e2e:
         sys.argv.remove("--skip-e2e")
     if skip_resolution:
         sys.argv.remove("--skip-resolution")
-    if use_external:
+    if "--use-external" in sys.argv:
         sys.argv.remove("--use-external")
+    if "--no-external" in sys.argv:
+        sys.argv.remove("--no-external")
 
     if len(sys.argv) < 2:
-        print("Usage: uv run adw_sdlc_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution] [--use-external]")
+        print("Usage: uv run adw_sdlc_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution] [--no-external]")
         print("\nThis runs the complete isolated Software Development Life Cycle:")
         print("  1. Plan (isolated)")
         print("  2. Build (isolated)")
@@ -54,7 +57,8 @@ def main():
         print("\nFlags:")
         print("  --skip-e2e: Skip E2E tests")
         print("  --skip-resolution: Skip automatic resolution of review failures")
-        print("  --use-external: Use external tools for testing/building (70-95% token reduction)")
+        print("  --no-external: Disable external tools (uses inline execution, higher token usage)")
+        print("\nNote: External tools are ENABLED by default for 70-95% token reduction")
         sys.exit(1)
 
     issue_number = sys.argv[1]
