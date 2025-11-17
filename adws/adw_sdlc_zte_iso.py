@@ -15,6 +15,7 @@ This script runs the complete ADW SDLC pipeline with automatic shipping:
 4. adw_review_iso.py - Review phase (isolated)
 5. adw_document_iso.py - Documentation phase (isolated)
 6. adw_ship_iso.py - Ship phase (approve & merge PR)
+7. adw_cleanup_iso.py - Cleanup phase (organize documentation)
 
 ZTE = Zero Touch Execution: The entire workflow runs to completion without
 human intervention, automatically shipping code to production if all phases pass.
@@ -26,11 +27,14 @@ Each phase runs on the same git worktree with dedicated ports.
 import subprocess
 import sys
 import os
+import logging
 
 # Add the parent directory to Python path to import modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from adw_modules.workflow_ops import ensure_adw_id
-from adw_modules.github import make_issue_comment
+from adw_modules.github import make_issue_comment, format_issue_message
+from adw_modules.cleanup_operations import cleanup_shipped_issue
+from adw_modules.utils import setup_logger
 
 
 def main():
@@ -211,6 +215,64 @@ def main():
             pass
         sys.exit(1)
 
+    # Run cleanup directly as Python (no subprocess, no LLM)
+    print(f"\n=== CLEANUP PHASE (Python) ===")
+    print(f"Running cleanup operations directly...")
+
+    try:
+        # Set up logger for cleanup
+        cleanup_logger = setup_logger(adw_id, "cleanup_operations")
+
+        # Post initial cleanup message
+        make_issue_comment(
+            issue_number,
+            f"{adw_id}_ops: 🧹 Starting cleanup (pure Python, no LLM calls)..."
+        )
+
+        # Run cleanup directly
+        cleanup_result = cleanup_shipped_issue(
+            issue_number=issue_number,
+            adw_id=adw_id,
+            skip_worktree=False,
+            dry_run=False,
+            logger=cleanup_logger
+        )
+
+        if cleanup_result["success"]:
+            print(f"✅ Cleanup completed: {cleanup_result['summary']}")
+
+            # Post success message
+            summary_msg = f"✅ **Cleanup completed**\n\n"
+            if cleanup_result["docs_moved"] > 0:
+                summary_msg += f"📁 Organized {cleanup_result['docs_moved']} documentation files\n"
+            if cleanup_result["worktree_removed"]:
+                summary_msg += f"🗑️ Removed worktree and freed resources\n"
+            if cleanup_result["errors"]:
+                summary_msg += f"\n⚠️ {len(cleanup_result['errors'])} warnings (non-fatal)\n"
+
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "cleanup", summary_msg)
+            )
+        else:
+            print(f"⚠️ Cleanup had errors: {cleanup_result['errors']}")
+            # Cleanup failure shouldn't block ZTE completion
+            print("WARNING: Cleanup had errors but ZTE is still considered successful")
+
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    "cleanup",
+                    f"⚠️ Cleanup completed with warnings\n\n"
+                    f"Errors: {', '.join(cleanup_result['errors'][:3])}"
+                )
+            )
+    except Exception as e:
+        print(f"⚠️ Cleanup exception: {e}")
+        # Cleanup failure shouldn't block ZTE completion
+        print("WARNING: Cleanup failed but ZTE is still considered successful")
+
     print(f"\n=== 🎉 ZERO TOUCH EXECUTION COMPLETED ===")
     print(f"ADW ID: {adw_id}")
     print(f"All phases completed successfully!")
@@ -227,7 +289,8 @@ def main():
             "✅ Test phase completed\n"
             "✅ Review phase completed\n"
             "✅ Documentation phase completed\n"
-            "✅ Ship phase completed\n\n"
+            "✅ Ship phase completed\n"
+            "✅ Cleanup phase completed\n\n"
             "🚢 **Code has been automatically shipped to production!**",
         )
     except:

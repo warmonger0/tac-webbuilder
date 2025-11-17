@@ -4,9 +4,20 @@
 
 Technical documentation and integration guides for tac-webbuilder. This directory contains detailed references for developers working with or extending the system.
 
-## Contents
+## Folder Structure
 
-### Core Documentation
+Documentation is organized into the following categories:
+
+- **[Architecture/](Architecture/)** - System architecture and technical design documents
+- **[Guides/](Guides/)** - How-to guides, quick starts, and setup instructions
+- **[Implementation Plans/](Implementation%20Plans/)** - Feature planning and implementation plan documents
+- **[Analysis/](Analysis/)** - Research, investigation, and analysis documents
+- **[Archived Issues/](Archived%20Issues/)** - Completed issue documentation with specs and summaries
+- **[features/](features/)** - Feature-specific implementation documentation
+
+## Core Documentation
+
+### Main References
 
 - [Architecture](architecture.md) - Detailed system architecture, components, data flows, and design decisions
 - [API Reference](api.md) - REST API endpoints, request/response formats, and usage examples

@@ -7,7 +7,7 @@ AI Developer Workflow - Automated development via isolated git worktrees + Claud
 - **Isolation:** Each workflow runs in `trees/{adw_id}/` (complete repo copy)
 - **Ports:** Backend 9100-9114, Frontend 9200-9214 (supports 15 concurrent)
 - **State:** `agents/{adw_id}/adw_state.json` tracks progress
-- **Phases:** Plan → Build → Test → Review → Document → Ship
+- **Phases:** Plan → Build → Test → Review → Document → Ship → Cleanup
 
 ## Cost Optimization
 - **Lightweight:** $0.20-0.50 for simple changes (CSS, text, single-file)
@@ -50,6 +50,7 @@ uv run adw_build_iso.py <issue-number> <adw-id>
 uv run adw_test_iso.py <issue-number> <adw-id>
 uv run adw_review_iso.py <issue-number> <adw-id>
 uv run adw_ship_iso.py <issue-number> <adw-id>
+uv run adw_cleanup_iso.py <issue-number> <adw-id>
 ```
 
 ## Trigger Systems
@@ -80,8 +81,18 @@ Logs: `agents/{adw_id}/{phase}/raw_output.jsonl`
 
 ### Cleanup
 ```bash
-git worktree list                # List worktrees
-git worktree remove trees/{adw_id}  # Remove worktree
+# Automatic cleanup after ship (in ZTE workflow)
+# - Organizes docs to appropriate folders
+# - Removes worktree and frees resources
+# - 100% Python, zero LLM calls
+
+# Manual cleanup
+uv run adw_cleanup_iso.py <issue-number> <adw-id>
+./scripts/cleanup_archived_issue.sh <issue-number> <adw-id>
+
+# Programmatic cleanup
+python3 -c "from adw_modules.cleanup_operations import cleanup_shipped_issue; \
+  cleanup_shipped_issue('33', '88405eb3')"
 ```
 
 ## When to Load Full Docs

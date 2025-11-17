@@ -121,20 +121,27 @@ def get_worktree_path(adw_id: str) -> str:
 
 def remove_worktree(adw_id: str, logger: logging.Logger) -> Tuple[bool, Optional[str]]:
     """Remove a worktree and clean up.
-    
+
     Args:
         adw_id: The ADW ID for the worktree to remove
         logger: Logger instance
-        
+
     Returns:
         Tuple of (success, error_message)
     """
+    import shutil
+
     worktree_path = get_worktree_path(adw_id)
-    
+
+    # Check if worktree exists
+    if not os.path.exists(worktree_path):
+        logger.info(f"Worktree does not exist: {worktree_path}")
+        return True, None
+
     # First remove via git
     cmd = ["git", "worktree", "remove", worktree_path, "--force"]
     result = subprocess.run(cmd, capture_output=True, text=True)
-    
+
     if result.returncode != 0:
         # Try to clean up manually if git command failed
         if os.path.exists(worktree_path):
@@ -143,7 +150,7 @@ def remove_worktree(adw_id: str, logger: logging.Logger) -> Tuple[bool, Optional
                 logger.warning(f"Manually removed worktree directory: {worktree_path}")
             except Exception as e:
                 return False, f"Failed to remove worktree: {result.stderr}, manual cleanup failed: {e}"
-    
+
     logger.info(f"Removed worktree at {worktree_path}")
     return True, None
 
