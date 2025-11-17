@@ -8,17 +8,21 @@ Technical documentation and integration guides for tac-webbuilder. This director
 
 Documentation is organized into the following categories:
 
-- **[ADW/](ADW/)** - Autonomous Digital Worker system documentation, architecture, and external tools integration
-- **[Architecture/](Architecture/)** - System architecture, technical design, cleanup, and performance optimization
-- **[Cost-Optimization/](Cost-Optimization/)** - API cost optimization, usage analysis, and estimation strategies
-- **[Webhooks/](Webhooks/)** - Webhook setup, configuration, and GitHub integration guides
-- **[Testing/](Testing/)** - Testing guides, test coverage reports, and test deliverables
-- **[Implementation Plans/](Implementation%20Plans/)** - Feature planning and implementation plan documents
-- **[Guides/](Guides/)** - How-to guides, quick starts, and setup instructions
-- **[Analysis/](Analysis/)** - Research, investigation, and analysis documents
+### Current System Documentation (Implemented Features)
+- **[architecture/](architecture/)** - System architecture, technical design, cleanup, and performance optimization
+- **[features/](features/)** - **Implemented** feature-specific documentation
+- **[implementation/](implementation/)** - **Completed** implementation guides and strategies
+- **[testing/](testing/)** - Testing guides, test coverage reports, and test deliverables
+
+### Planned & Future Features (Not Yet Implemented)
+- **[planned_features/](planned_features/)** - **Planned features awaiting approval/implementation**
+  - `codebase-refactoring/` - Systematic refactoring plan (15-20 days)
+  - `pattern-learning/` - Out-loop coding and pattern detection
+  - `auto-tool-routing/` - Automated workflow optimization
+
+### Historical & Reference
 - **[Archive/](Archive/)** - Historical documentation and session notes
 - **[Archived Issues/](Archived%20Issues/)** - Completed issue documentation with specs and summaries
-- **[features/](features/)** - Feature-specific implementation documentation
 
 ## Core Documentation
 

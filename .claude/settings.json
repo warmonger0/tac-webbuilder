@@ -17,7 +17,11 @@
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
-      "Bash(rm -rf:*)"
+      "Bash(rm -rf:*)",
+      "Bash(pwd && ls:*)",
+      "Bash(pwd && ./scripts/:*)",
+      "Bash(ls -la package.json:*)",
+      "Bash(ls package.json:*)"
     ]
   },
   "hooks": {
