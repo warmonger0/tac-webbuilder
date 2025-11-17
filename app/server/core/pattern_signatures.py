@@ -34,8 +34,12 @@ def extract_operation_signature(workflow: Dict) -> Optional[str]:
     Returns:
         Pattern signature string, or None if no clear pattern
     """
-    nl_input = (workflow.get("nl_input") or "").lower()
-    template = (workflow.get("workflow_template") or "").lower()
+    # Safely extract and normalize inputs
+    nl_input_raw = workflow.get("nl_input")
+    template_raw = workflow.get("workflow_template")
+
+    nl_input = (nl_input_raw if nl_input_raw is not None else "").lower()
+    template = (template_raw if template_raw is not None else "").lower()
 
     # Category 1: Testing operations
     if any(kw in nl_input for kw in ["test", "pytest", "vitest", "jest", "run tests"]):
@@ -207,7 +211,7 @@ def validate_signature(signature: str) -> bool:
     category, subcategory, target = parts
 
     # Validate category
-    valid_categories = {"test", "build", "format", "git", "deps", "docs"}
+    valid_categories = {"test", "build", "format", "git", "deps", "docs", "sdlc", "patch", "deploy", "review"}
     if category not in valid_categories:
         return False
 
