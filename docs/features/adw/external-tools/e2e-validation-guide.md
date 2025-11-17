@@ -426,7 +426,7 @@ uv run adw_sdlc_iso.py <issue-number> --use-external
 - adws/README.md - External Tools section
 - docs/EXTERNAL_TOOLS_USAGE_EXAMPLES.md - Practical examples
 - docs/EXTERNAL_TOOLS_MIGRATION_GUIDE.md - Migration guide
-- docs/ADW_CHAINING_ARCHITECTURE.md - Architecture patterns
+- docs/features/adw/chaining-architecture.md - Architecture patterns
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF

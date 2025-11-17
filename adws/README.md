@@ -648,7 +648,7 @@ External tools share state via `agents/{adw_id}/adw_state.json`:
 ### Documentation
 
 For detailed information, see:
-- `docs/ADW_CHAINING_ARCHITECTURE.md` - ADW chaining model explanation
+- `docs/features/adw/chaining-architecture.md` - ADW chaining model explanation
 - `docs/EXTERNAL_TEST_TOOLS_ARCHITECTURE.md` - Complete system design
 - `docs/EXTERNAL_TOOL_SCHEMAS.md` - Detailed API specifications
 - `docs/EXTERNAL_TOOLS_INTEGRATION_GUIDE.md` - Integration strategy

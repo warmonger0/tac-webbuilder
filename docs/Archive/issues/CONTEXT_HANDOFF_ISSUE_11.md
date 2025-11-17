@@ -242,7 +242,7 @@ uv run adw_plan_build_test_iso.py <issue_number>
 - Then `.claude/references/<topic>.md` if needed
 
 **Need architecture context?**
-- `docs/ADW_TECHNICAL_OVERVIEW.md` - ADW system design
+- `docs/features/adw/technical-overview.md` - ADW system design
 - `docs/REALTIME_WEBSOCKET_IMPLEMENTATION.md` - WebSocket patterns
 - `.claude/references/decision_tree.md` - Routing guide
 

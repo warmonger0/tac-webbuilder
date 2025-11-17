@@ -242,7 +242,7 @@ print(f"Cost: ${analysis.estimated_cost_range[0]:.2f} - ${analysis.estimated_cos
 
 - `docs/PROGRESSIVE_COST_ESTIMATION.md` - Future ML-based cost prediction
 - `docs/AUTO_ROUTING_COST_ANALYSIS.md` - Workflow routing optimization
-- `docs/ADW_OPTIMIZATION_ANALYSIS.md` - Cost reduction strategies
+- `docs/features/adw/optimization.md` - Cost reduction strategies
 - `adws/adw_modules/complexity_analyzer.py` - Complexity analysis logic
 
 ---

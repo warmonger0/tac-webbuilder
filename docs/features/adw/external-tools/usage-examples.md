@@ -694,7 +694,7 @@ uv run adw_test_external.py 123 abc12345
 ## Next Steps
 
 - **Migration Guide**: See `docs/EXTERNAL_TOOLS_MIGRATION_GUIDE.md` for migrating existing workflows
-- **Architecture**: See `docs/ADW_CHAINING_ARCHITECTURE.md` for design details
+- **Architecture**: See `docs/features/adw/chaining-architecture.md` for design details
 - **Integration**: See `docs/EXTERNAL_TOOLS_INTEGRATION_GUIDE.md` for integration strategies
 - **API Reference**: See `docs/EXTERNAL_TOOL_SCHEMAS.md` for complete API specifications
 

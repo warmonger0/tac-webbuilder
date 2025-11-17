@@ -321,7 +321,7 @@ git revert 512d1a7
 - **User Guide**: `docs/PLAYWRIGHT_LAZY_LOADING.md`
 - **Implementation**: `adws/adw_modules/plan_executor.py`
 - **Test Example**: Issue #3 - API Routes Display Feature
-- **Architecture**: `docs/ADW_TECHNICAL_OVERVIEW.md`
+- **Architecture**: `docs/features/adw/technical-overview.md`
 
 ## Lessons Learned
 

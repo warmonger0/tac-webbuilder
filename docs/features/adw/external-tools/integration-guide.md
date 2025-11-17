@@ -24,7 +24,7 @@ We've successfully created an external testing infrastructure with proper ADW ch
 4. **Documentation**
    - `docs/EXTERNAL_TEST_TOOLS_ARCHITECTURE.md` - Full architecture design
    - `docs/EXTERNAL_TOOL_SCHEMAS.md` - Input/output specifications
-   - `docs/ADW_CHAINING_ARCHITECTURE.md` - Chaining model explanation
+   - `docs/features/adw/chaining-architecture.md` - Chaining model explanation
    - `docs/EXTERNAL_TOOLS_INTEGRATION_GUIDE.md` - This file
 
 ## How It Works (ADW Chaining Model)

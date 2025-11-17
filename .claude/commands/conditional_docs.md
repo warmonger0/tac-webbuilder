@@ -115,7 +115,7 @@
   - Implementing new CLI features
   - CLI workflow troubleshooting
 
-### docs/playwright-mcp.md
+### docs/testing/playwright-mcp.md
 - Conditions:
   - Playwright MCP configuration
   - E2E testing with browser automation

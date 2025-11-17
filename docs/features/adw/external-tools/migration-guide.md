@@ -126,7 +126,7 @@ Read these documents before proceeding:
 
 1. **ADW Chaining Architecture**
    ```bash
-   cat docs/ADW_CHAINING_ARCHITECTURE.md
+   cat docs/features/adw/chaining-architecture.md
    ```
    - Understand why chaining over direct invocation
    - Learn state management patterns
@@ -757,7 +757,7 @@ After completing migration:
 
 ## Support
 
-- **Architecture**: See `docs/ADW_CHAINING_ARCHITECTURE.md`
+- **Architecture**: See `docs/features/adw/chaining-architecture.md`
 - **Usage Examples**: See `docs/EXTERNAL_TOOLS_USAGE_EXAMPLES.md`
 - **Tool Schemas**: See `docs/EXTERNAL_TOOL_SCHEMAS.md`
 - **Integration Guide**: See `docs/EXTERNAL_TOOLS_INTEGRATION_GUIDE.md`
