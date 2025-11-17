@@ -19,3 +19,28 @@ NESTED_DELIMITER = "__"
 
 # Delimiter for list/array indices
 LIST_INDEX_DELIMITER = "_"
+
+# Pattern Signature Constants
+# Used by the pattern signature generation system to classify workflow operations
+
+# Valid categories for pattern signatures
+# Each category represents a high-level operation type
+VALID_CATEGORIES = ["test", "build", "format", "git", "deps", "docs"]
+
+# Valid subcategories mapped to each category
+# Subcategories identify the specific tool or operation within a category
+VALID_SUBCATEGORIES = {
+    "test": ["pytest", "vitest", "jest", "unittest", "mocha", "cypress", "generic"],
+    "build": ["typecheck", "compile", "webpack", "vite", "npm", "pip", "cargo", "generic"],
+    "format": ["prettier", "eslint", "black", "ruff", "rustfmt", "generic"],
+    "git": ["diff", "commit", "status", "add", "push", "pull", "log", "generic"],
+    "deps": ["npm", "pip", "cargo", "yarn", "pnpm", "update", "install", "generic"],
+    "docs": ["readme", "api", "guide", "changelog", "docstring", "generic"],
+}
+
+# Valid targets for pattern signatures
+# Target indicates what part of the codebase the operation applies to
+VALID_TARGETS = ["backend", "frontend", "both", "all"]
+
+# Regex pattern for validating signature format: category:subcategory:target
+SIGNATURE_FORMAT_REGEX = r"^[a-z]+:[a-z]+:[a-z]+$"
