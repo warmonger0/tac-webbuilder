@@ -101,32 +101,62 @@ check_json_endpoint() {
 
 # Function to check workflow history data
 check_workflow_history() {
-    local url="http://localhost:$SERVER_PORT/api/workflow-history?limit=5"
+    local backend_url="http://localhost:$SERVER_PORT/api/workflow-history?limit=5"
+    local frontend_url="http://localhost:$CLIENT_PORT/api/workflow-history?limit=5"
 
-    response=$(curl -s -f -m 5 "$url" 2>&1)
-    curl_exit=$?
+    # Check backend directly (without -f flag to avoid 404 issues)
+    response=$(curl -s -m 5 "$backend_url" 2>&1)
+    http_code=$(curl -s -w "%{http_code}" -o /dev/null -m 5 "$backend_url" 2>&1)
 
-    if [ $curl_exit -eq 0 ]; then
+    if [ "$http_code" = "200" ]; then
         # Check if response has workflows and analytics
         total_count=$(echo "$response" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('total_count', 0))" 2>/dev/null)
 
         if [ $? -eq 0 ]; then
-            echo -e "${GREEN}✅ Workflow History API is functional (${total_count} workflows in database)${NC}"
+            echo -e "${GREEN}✅ Backend Workflow History API: ${total_count} workflows${NC}"
 
             if [ "$total_count" -eq 0 ]; then
-                echo -e "${YELLOW}   ⚠️  No workflow history data found (this is normal for fresh installs)${NC}"
+                echo -e "${YELLOW}   ⚠️  No workflow history data (normal for fresh installs)${NC}"
             fi
-            return 0
         else
-            echo -e "${RED}❌ Workflow History API returned malformed data${NC}"
+            echo -e "${RED}❌ Backend Workflow History API returned malformed data${NC}"
             OVERALL_HEALTH=1
             return 1
         fi
     else
-        echo -e "${RED}❌ Workflow History API is not responding${NC}"
+        echo -e "${RED}❌ Backend Workflow History API returned HTTP $http_code${NC}"
         OVERALL_HEALTH=1
         return 1
     fi
+
+    # Check frontend proxy
+    response=$(curl -s -m 5 "$frontend_url" 2>&1)
+    http_code=$(curl -s -w "%{http_code}" -o /dev/null -m 5 "$frontend_url" 2>&1)
+
+    if [ "$http_code" = "200" ]; then
+        total_count=$(echo "$response" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('total_count', 0))" 2>/dev/null)
+
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ Frontend Proxy Workflow History: ${total_count} workflows${NC}"
+
+            if [ "$total_count" -eq 0 ]; then
+                echo -e "${YELLOW}   ⚠️  Frontend proxy working but no data${NC}"
+                OVERALL_HEALTH=1
+            fi
+        else
+            echo -e "${RED}❌ Frontend proxy returned malformed data${NC}"
+            OVERALL_HEALTH=1
+            return 1
+        fi
+    else
+        echo -e "${RED}❌ Frontend proxy returned HTTP $http_code${NC}"
+        echo -e "${YELLOW}   This means the React app won't receive data${NC}"
+        echo -e "${YELLOW}   Try restarting the frontend server${NC}"
+        OVERALL_HEALTH=1
+        return 1
+    fi
+
+    return 0
 }
 
 # Function to check database accessibility
