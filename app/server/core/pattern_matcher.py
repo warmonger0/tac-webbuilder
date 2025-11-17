@@ -238,7 +238,7 @@ def format_test_results(data: Dict) -> str:
     summary = data.get("summary", {})
     failures = data.get("failures", [])
 
-    md = f"## Test Results\n\n"
+    md = "## Test Results\n\n"
     md += f"- Passed: {summary.get('passed', 0)} ✅\n"
     md += f"- Failed: {summary.get('failed', 0)} ❌\n\n"
 

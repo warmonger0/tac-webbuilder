@@ -16,7 +16,7 @@ SOLUTION:
 """
 
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from dataclasses import dataclass
 
 

@@ -6,7 +6,6 @@ subcategory detection, target detection, validation, normalization,
 and edge cases.
 """
 
-import pytest
 from core.pattern_signatures import (
     generate_signature,
     detect_category,

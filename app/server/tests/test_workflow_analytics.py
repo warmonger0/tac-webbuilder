@@ -8,7 +8,6 @@ Tests cover:
 - Integration with sync process
 """
 
-import pytest
 from core.workflow_analytics import (
     extract_hour,
     extract_day_of_week,
