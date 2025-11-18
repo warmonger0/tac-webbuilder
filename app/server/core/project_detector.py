@@ -5,7 +5,7 @@ Analyzes project structure to determine framework, tools, and complexity.
 
 import json
 from pathlib import Path
-from typing import Optional, List
+
 from core.data_models import ProjectContext
 
 
@@ -108,7 +108,7 @@ def is_directory_empty(path: Path) -> bool:
     return len(non_hidden) == 0
 
 
-def detect_framework(path: Path) -> Optional[str]:
+def detect_framework(path: Path) -> str | None:
     """
     Detect frontend/application framework.
 
@@ -162,7 +162,7 @@ def detect_framework(path: Path) -> Optional[str]:
     return None
 
 
-def detect_backend(path: Path) -> Optional[str]:
+def detect_backend(path: Path) -> str | None:
     """
     Detect backend framework.
 
@@ -222,7 +222,7 @@ def detect_backend(path: Path) -> Optional[str]:
     return None
 
 
-def detect_build_tools(path: Path) -> List[str]:
+def detect_build_tools(path: Path) -> list[str]:
     """
     Detect build tools in the project.
 
@@ -259,7 +259,7 @@ def detect_build_tools(path: Path) -> List[str]:
     return tools
 
 
-def detect_package_manager(path: Path) -> Optional[str]:
+def detect_package_manager(path: Path) -> str | None:
     """
     Detect package manager used in the project.
 
@@ -315,9 +315,9 @@ def check_git_initialized(path: Path) -> bool:
 
 def calculate_complexity_from_structure(
     path: Path,
-    framework: Optional[str],
-    backend: Optional[str],
-    build_tools: List[str]
+    framework: str | None,
+    backend: str | None,
+    build_tools: list[str]
 ) -> str:
     """
     Calculate project complexity based on structure.
@@ -425,9 +425,7 @@ def suggest_workflow(context: ProjectContext) -> str:
     Returns:
         Recommended workflow name
     """
-    if context.complexity == "high":
-        return "adw_plan_build_test_iso"
-    elif context.complexity == "medium":
+    if context.complexity == "high" or context.complexity == "medium":
         return "adw_plan_build_test_iso"
     else:
         return "adw_sdlc_iso"

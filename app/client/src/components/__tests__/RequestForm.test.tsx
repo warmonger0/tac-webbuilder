@@ -4,7 +4,7 @@
  * Tests for project path persistence, health checks, and form submission
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RequestForm } from '../RequestForm';

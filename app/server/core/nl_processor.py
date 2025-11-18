@@ -1,10 +1,11 @@
-import os
 import json
+import os
 import re
-from typing import Tuple, List, Optional
+
 from anthropic import Anthropic
+
 from core.data_models import GitHubIssue, ProjectContext
-from core.template_router import route_by_template, detect_characteristics
+from core.template_router import detect_characteristics, route_by_template
 
 
 async def analyze_intent(nl_input: str) -> dict:
@@ -76,7 +77,7 @@ Return ONLY the JSON object, no explanations."""
         raise Exception(f"Error analyzing intent with Anthropic: {str(e)}")
 
 
-def extract_requirements(nl_input: str, intent: dict) -> List[str]:
+def extract_requirements(nl_input: str, intent: dict) -> list[str]:
     """
     Extract technical requirements from the natural language request.
 
@@ -155,7 +156,7 @@ def classify_issue_type(intent: dict) -> str:
     return intent.get("intent_type", "feature")
 
 
-def extract_explicit_workflow(text: str) -> Optional[Tuple[str, str]]:
+def extract_explicit_workflow(text: str) -> tuple[str, str] | None:
     """
     Extract explicit workflow specification from text if present.
 
@@ -223,7 +224,7 @@ def extract_explicit_workflow(text: str) -> Optional[Tuple[str, str]]:
     return None
 
 
-def suggest_adw_workflow(issue_type: str, complexity: str, characteristics: dict = None) -> Tuple[str, str]:
+def suggest_adw_workflow(issue_type: str, complexity: str, characteristics: dict = None) -> tuple[str, str]:
     """
     Recommend ADW workflow and model set based on issue type, complexity, and characteristics.
 

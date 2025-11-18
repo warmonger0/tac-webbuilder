@@ -7,12 +7,11 @@ Handles all database interactions for pattern detection and tracking.
 import json
 import logging
 import sqlite3
-from typing import Dict, List, Optional, Tuple
 
 from .pattern_detector import (
-    process_workflow_for_patterns,
     calculate_confidence_score,
     extract_pattern_characteristics,
+    process_workflow_for_patterns,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 def record_pattern_occurrence(
     pattern_signature: str,
-    workflow: Dict,
+    workflow: dict,
     db_connection: sqlite3.Connection
-) -> Tuple[Optional[int], bool]:
+) -> tuple[int | None, bool]:
     """
     Record that we observed a pattern in a workflow.
 
@@ -159,7 +158,7 @@ def record_pattern_occurrence(
 
 def update_pattern_statistics(
     pattern_id: int,
-    workflow: Dict,
+    workflow: dict,
     db_connection: sqlite3.Connection
 ):
     """
@@ -331,9 +330,9 @@ def _calculate_confidence_from_db(
 # ============================================================================
 
 def process_and_persist_workflow(
-    workflow: Dict,
+    workflow: dict,
     db_connection: sqlite3.Connection
-) -> Dict:
+) -> dict:
     """
     Process a workflow for patterns and persist to database.
 
@@ -389,9 +388,9 @@ def process_and_persist_workflow(
 
 
 def batch_process_workflows(
-    workflows: List[Dict],
+    workflows: list[dict],
     db_connection: sqlite3.Connection
-) -> Dict:
+) -> dict:
     """
     Process multiple workflows for patterns in batch.
 

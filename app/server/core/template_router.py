@@ -8,7 +8,6 @@ Cost: $0 (template matching)
 Latency: <100ms
 """
 
-from typing import Optional, Dict
 from dataclasses import dataclass
 
 
@@ -16,11 +15,11 @@ from dataclasses import dataclass
 class TemplateMatch:
     """Result of template matching."""
     matched: bool
-    workflow: Optional[str] = None
-    model_set: Optional[str] = None
-    classification: Optional[str] = None
+    workflow: str | None = None
+    model_set: str | None = None
+    classification: str | None = None
     confidence: float = 0.0
-    pattern_name: Optional[str] = None
+    pattern_name: str | None = None
 
 
 # Lightweight patterns ($0.20-0.50)
@@ -118,7 +117,7 @@ def normalize_text(text: str) -> str:
     return text.lower().strip()
 
 
-def matches_pattern(text: str, pattern: Dict) -> bool:
+def matches_pattern(text: str, pattern: dict) -> bool:
     """
     Check if text matches a pattern.
 
@@ -150,7 +149,7 @@ def matches_pattern(text: str, pattern: Dict) -> bool:
     return True
 
 
-def match_lightweight(text: str) -> Optional[TemplateMatch]:
+def match_lightweight(text: str) -> TemplateMatch | None:
     """
     Check if request matches lightweight workflow patterns.
 
@@ -170,7 +169,7 @@ def match_lightweight(text: str) -> Optional[TemplateMatch]:
     return None
 
 
-def match_standard(text: str) -> Optional[TemplateMatch]:
+def match_standard(text: str) -> TemplateMatch | None:
     """
     Check if request matches standard SDLC patterns.
 
@@ -190,7 +189,7 @@ def match_standard(text: str) -> Optional[TemplateMatch]:
     return None
 
 
-def match_bug(text: str) -> Optional[TemplateMatch]:
+def match_bug(text: str) -> TemplateMatch | None:
     """
     Check if request matches bug fix patterns.
 
@@ -248,7 +247,7 @@ def route_by_template(nl_input: str) -> TemplateMatch:
     return TemplateMatch(matched=False)
 
 
-def detect_characteristics(nl_input: str) -> Dict[str, any]:
+def detect_characteristics(nl_input: str) -> dict[str, any]:
     """
     Detect request characteristics for workflow routing.
 

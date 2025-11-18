@@ -8,14 +8,14 @@ Tests cover:
 - Database operations and persistence
 """
 
-import pytest
 import sqlite3
-import json
+
+import pytest
 from core.pattern_persistence import (
+    batch_process_workflows,
+    process_and_persist_workflow,
     record_pattern_occurrence,
     update_pattern_statistics,
-    process_and_persist_workflow,
-    batch_process_workflows,
 )
 
 

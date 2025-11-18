@@ -8,17 +8,16 @@ Tests cover:
 - Integration with sync process
 """
 
-import pytest
 from core.workflow_analytics import (
-    extract_hour,
-    extract_day_of_week,
-    detect_complexity,
-    calculate_nl_input_clarity_score,
     calculate_cost_efficiency_score,
+    calculate_nl_input_clarity_score,
     calculate_performance_score,
     calculate_quality_score,
-    find_similar_workflows,
     detect_anomalies,
+    detect_complexity,
+    extract_day_of_week,
+    extract_hour,
+    find_similar_workflows,
     generate_optimization_recommendations,
 )
 

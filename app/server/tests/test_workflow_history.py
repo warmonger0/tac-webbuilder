@@ -4,30 +4,32 @@ Unit tests for workflow history module.
 Tests database operations, data parsing, and query functions.
 """
 
-import pytest
-import tempfile
 import json
 import sqlite3
-from pathlib import Path
-from datetime import datetime
-from unittest.mock import patch
-from fastapi.testclient import TestClient
 
 # Import the module to test
 import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+from fastapi.testclient import TestClient
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.workflow_history import (
-    init_db,
-    insert_workflow_history,
-    update_workflow_history,
+    get_history_analytics,
     get_workflow_by_adw_id,
     get_workflow_history,
-    get_history_analytics,
+    init_db,
+    insert_workflow_history,
+    resync_all_completed_workflows,
+    resync_workflow_cost,
     scan_agents_directory,
     sync_workflow_history,
-    resync_workflow_cost,
-    resync_all_completed_workflows,
+    update_workflow_history,
 )
 
 
@@ -632,6 +634,7 @@ def test_cost_sync_failed_workflow_updates_final_cost(temp_db):
 def test_cost_sync_logging(temp_db, caplog):
     """Test that cost sync logging works correctly"""
     import logging
+
     from core.data_models import CostData, PhaseCost, TokenBreakdown
 
     with patch('core.workflow_history.DB_PATH', Path(temp_db)):

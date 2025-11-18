@@ -5,21 +5,20 @@ Tests anomaly detection, recommendation generation, and complexity detection
 for Phase 3D: Insights & Recommendations.
 """
 
+
 import pytest
-from typing import Dict, List
 from core.workflow_analytics import (
     detect_anomalies,
+    detect_complexity,
     generate_optimization_recommendations,
-    detect_complexity
 )
-
 
 # ============================================================================
 # Test Fixtures
 # ============================================================================
 
 @pytest.fixture
-def sample_workflow() -> Dict:
+def sample_workflow() -> dict:
     """Normal workflow with typical metrics."""
     return {
         "adw_id": "test123",
@@ -42,7 +41,7 @@ def sample_workflow() -> Dict:
 
 
 @pytest.fixture
-def historical_workflows() -> List[Dict]:
+def historical_workflows() -> list[dict]:
     """Historical workflows for comparison."""
     return [
         {
@@ -70,7 +69,7 @@ def historical_workflows() -> List[Dict]:
 
 
 @pytest.fixture
-def simple_workflow() -> Dict:
+def simple_workflow() -> dict:
     """Simple workflow for complexity detection."""
     return {
         "nl_input": "Add a button",
@@ -80,7 +79,7 @@ def simple_workflow() -> Dict:
 
 
 @pytest.fixture
-def complex_workflow() -> Dict:
+def complex_workflow() -> dict:
     """Complex workflow for complexity detection."""
     return {
         "nl_input": " ".join(["word"] * 250),  # 250 words
@@ -90,7 +89,7 @@ def complex_workflow() -> Dict:
 
 
 @pytest.fixture
-def medium_workflow() -> Dict:
+def medium_workflow() -> dict:
     """Medium complexity workflow."""
     return {
         "nl_input": " ".join(["word"] * 100),  # 100 words

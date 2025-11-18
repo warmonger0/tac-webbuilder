@@ -2,9 +2,9 @@
 Issue formatting module for GitHub issue generation.
 """
 
-from typing import Dict, Any
-from core.data_models import GitHubIssue
+from typing import Any
 
+from core.data_models import GitHubIssue
 
 # Issue templates for different types
 ISSUE_TEMPLATES = {
@@ -53,7 +53,7 @@ ISSUE_TEMPLATES = {
 }
 
 
-def format_issue(issue: GitHubIssue, template_data: Dict[str, Any]) -> str:
+def format_issue(issue: GitHubIssue, template_data: dict[str, Any]) -> str:
     """
     Format a GitHub issue using the appropriate template.
 

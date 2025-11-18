@@ -7,9 +7,8 @@ and calculates cost metrics including total cost, cache efficiency, and per-phas
 
 import json
 import logging
-from pathlib import Path
-from typing import Dict, List, Optional
 from collections import defaultdict
+from pathlib import Path
 
 from core.data_models import (
     CostData,
@@ -48,7 +47,7 @@ def calculate_api_call_cost(
     return input_cost + cache_write_cost + cache_read_cost + output_cost
 
 
-def parse_jsonl_file(file_path: Path) -> Optional[Dict]:
+def parse_jsonl_file(file_path: Path) -> dict | None:
     """
     Parse a raw_output.jsonl file and extract API call statistics.
 
@@ -56,7 +55,7 @@ def parse_jsonl_file(file_path: Path) -> Optional[Dict]:
     cache_read_tokens, output_tokens, or None if parsing fails.
     """
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path) as f:
             lines = f.readlines()
 
         # Find the result message (last message with type="result")
@@ -156,7 +155,7 @@ def read_cost_history(adw_id: str) -> CostData:
         raise ValueError(f"No raw_output.jsonl files found for ADW ID: {adw_id}")
 
     # Aggregate costs by phase
-    phase_data: Dict[str, Dict] = defaultdict(lambda: {
+    phase_data: dict[str, dict] = defaultdict(lambda: {
         "input_tokens": 0,
         "cache_creation_tokens": 0,
         "cache_read_tokens": 0,
@@ -220,7 +219,7 @@ def read_cost_history(adw_id: str) -> CostData:
     cache_savings_amount = (total_cache_read / 1_000_000) * (3 - 0.30)
 
     # Build phase costs list
-    phases: List[PhaseCost] = []
+    phases: list[PhaseCost] = []
     for phase_name, data in sorted(phase_data.items()):
         phases.append(
             PhaseCost(

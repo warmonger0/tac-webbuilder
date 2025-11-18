@@ -6,6 +6,9 @@ import logging
 import os
 import subprocess
 import re
+import sys
+import urllib.request
+import urllib.error
 from datetime import datetime
 from typing import Tuple, Optional, Dict, Any, List
 from adw_modules.data_types import (
@@ -19,6 +22,90 @@ from adw_modules.agent import execute_template
 from adw_modules.github import get_repo_url, extract_repo_path, ADW_BOT_IDENTIFIER
 from adw_modules.state import ADWState
 from adw_modules.utils import parse_json
+
+
+def validate_issue_number(issue_number: str) -> int:
+    """Validate and convert issue_number to integer.
+
+    Args:
+        issue_number: The issue number as a string
+
+    Returns:
+        The validated issue number as an integer
+
+    Raises:
+        ValueError: If issue_number is not a valid positive integer
+    """
+    try:
+        issue_num = int(issue_number)
+        if issue_num <= 0:
+            raise ValueError(f"Issue number must be a positive integer, got: {issue_number}")
+        return issue_num
+    except (ValueError, TypeError) as e:
+        if isinstance(e, ValueError) and "positive integer" in str(e):
+            raise
+        raise ValueError(
+            f"Invalid issue number '{issue_number}'. Expected a positive integer (e.g., 39), "
+            f"not '{issue_number}'. If you need help, use --help flag."
+        )
+
+
+def trigger_cost_sync(adw_id: str, logger: Optional[logging.Logger] = None) -> bool:
+    """
+    Trigger cost synchronization for a completed workflow.
+
+    Calls the backend API to resync cost data from raw_output.jsonl files.
+
+    Args:
+        adw_id: The ADW workflow identifier
+        logger: Optional logger instance
+
+    Returns:
+        True if sync was successful, False otherwise
+    """
+    backend_port = os.environ.get("BACKEND_PORT", "8000")
+    api_url = f"http://localhost:{backend_port}/api/workflow-history/resync"
+
+    try:
+        # Create request payload
+        payload = json.dumps({"adw_id": adw_id, "force": False}).encode('utf-8')
+
+        # Make POST request
+        req = urllib.request.Request(
+            api_url,
+            data=payload,
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.loads(response.read().decode('utf-8'))
+
+            if result.get("success"):
+                if logger:
+                    logger.info(f"✅ Cost sync successful for {adw_id}")
+                else:
+                    print(f"✅ Cost sync successful for {adw_id}")
+                return True
+            else:
+                if logger:
+                    logger.warning(f"⚠️ Cost sync returned success=False for {adw_id}")
+                else:
+                    print(f"⚠️ Cost sync returned success=False for {adw_id}")
+                return False
+
+    except urllib.error.URLError as e:
+        if logger:
+            logger.debug(f"Cost sync API not available: {e}")
+        else:
+            print(f"Note: Cost sync skipped (API not available): {e}")
+        return False
+    except Exception as e:
+        if logger:
+            logger.debug(f"Cost sync failed: {e}")
+        else:
+            print(f"Note: Cost sync failed: {e}")
+        return False
 
 
 # Agent name constants
@@ -584,7 +671,21 @@ def ensure_adw_id(
 
     Returns:
         The ADW ID (existing or newly created)
+
+    Raises:
+        ValueError: If issue_number is not a valid positive integer
     """
+    # Validate issue_number first
+    try:
+        validated_issue_number = validate_issue_number(issue_number)
+        issue_number_str = str(validated_issue_number)
+    except ValueError as e:
+        if logger:
+            logger.error(str(e))
+        else:
+            print(f"❌ Error: {e}", file=sys.stderr)
+        raise
+
     # If ADW ID provided, check if state exists
     if adw_id:
         state = ADWState.load(adw_id, logger)
@@ -596,7 +697,7 @@ def ensure_adw_id(
             return adw_id
         # ADW ID provided but no state exists, create state
         state = ADWState(adw_id)
-        state.update(adw_id=adw_id, issue_number=issue_number)
+        state.update(adw_id=adw_id, issue_number=issue_number_str)
         state.save("ensure_adw_id")
         if logger:
             logger.info(f"Created new ADW state for provided ID: {adw_id}")
@@ -609,7 +710,7 @@ def ensure_adw_id(
 
     new_adw_id = make_adw_id()
     state = ADWState(new_adw_id)
-    state.update(adw_id=new_adw_id, issue_number=issue_number)
+    state.update(adw_id=new_adw_id, issue_number=issue_number_str)
     state.save("ensure_adw_id")
     if logger:
         logger.info(f"Created new ADW ID and state: {new_adw_id}")

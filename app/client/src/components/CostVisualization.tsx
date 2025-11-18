@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchWorkflowCosts } from '../api/client';
 import type { CostData, PhaseCost } from '../types';
 import { CacheEfficiencyBadge } from './CacheEfficiencyBadge';

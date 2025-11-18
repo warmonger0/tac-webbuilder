@@ -8,10 +8,9 @@ GOAL: Reduce LLM costs by offloading deterministic work to Python scripts.
 """
 
 import json
+import logging
 import subprocess
 from pathlib import Path
-from typing import Optional, Dict, List
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +31,10 @@ class PatternMatcher:
         self.registry_path = registry_path
         self.patterns = self._load_registry()
 
-    def _load_registry(self) -> Dict:
+    def _load_registry(self) -> dict:
         """Load pattern registry from JSON file."""
         try:
-            with open(self.registry_path, 'r') as f:
+            with open(self.registry_path) as f:
                 data = json.load(f)
                 return data.get("patterns", {})
         except FileNotFoundError:
@@ -45,7 +44,7 @@ class PatternMatcher:
             logger.error(f"Failed to parse pattern registry: {e}")
             return {}
 
-    def match_pattern(self, nl_input: str, task_context: Dict = None) -> Optional[Dict]:
+    def match_pattern(self, nl_input: str, task_context: dict = None) -> dict | None:
         """
         Match input against known patterns.
 
@@ -74,7 +73,7 @@ class PatternMatcher:
 
         return None
 
-    def _is_safe_to_offload(self, context: Dict, pattern: Dict) -> bool:
+    def _is_safe_to_offload(self, context: dict, pattern: dict) -> bool:
         """
         Verify it's safe to offload this task to a script.
 
@@ -106,10 +105,10 @@ class PatternMatcher:
 
     def execute_pattern(
         self,
-        pattern: Dict,
-        args: List[str] = None,
+        pattern: dict,
+        args: list[str] = None,
         timeout: int = 300
-    ) -> Dict:
+    ) -> dict:
         """
         Execute matched pattern script.
 
@@ -167,7 +166,7 @@ class PatternMatcher:
                 "error": str(e)
             }
 
-    def get_cost_savings(self, pattern_name: str) -> Dict:
+    def get_cost_savings(self, pattern_name: str) -> dict:
         """
         Get cost savings data for a pattern.
 
@@ -206,7 +205,7 @@ class PatternMatcher:
         # This could update the registry.json or a separate stats database
 
 
-def format_script_result_for_llm(result: Dict) -> str:
+def format_script_result_for_llm(result: dict) -> str:
     """
     Format script execution result for LLM consumption.
 
@@ -233,12 +232,12 @@ def format_script_result_for_llm(result: Dict) -> str:
         return json.dumps(data, indent=2)
 
 
-def format_test_results(data: Dict) -> str:
+def format_test_results(data: dict) -> str:
     """Format test results in compact markdown."""
     summary = data.get("summary", {})
     failures = data.get("failures", [])
 
-    md = f"## Test Results\n\n"
+    md = "## Test Results\n\n"
     md += f"- Passed: {summary.get('passed', 0)} ✅\n"
     md += f"- Failed: {summary.get('failed', 0)} ❌\n\n"
 
@@ -255,7 +254,7 @@ def format_test_results(data: Dict) -> str:
     return md
 
 
-def format_build_results(data: Dict) -> str:
+def format_build_results(data: dict) -> str:
     """Format build results in compact markdown."""
     if data.get("success"):
         return "✅ Build successful - no errors"

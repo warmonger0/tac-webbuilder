@@ -5,8 +5,8 @@ Unit tests for pattern signature generation.
 import pytest
 from core.pattern_signatures import (
     extract_operation_signature,
-    validate_signature,
     normalize_signature,
+    validate_signature,
 )
 
 
