@@ -179,6 +179,12 @@
 - `app_docs/feature-09115cf1-zte-hopper-queue-system.md` - ZTE Hopper queue system, batch processing, zte_hopper.sh
 - `app_docs/feature-d2ac5466-workflows-documentation-tab.md` - ADW workflow documentation display, workflow categorization, workflows section UI
 - `app_docs/feature-a5b80595-workflow-history-ui-enhancements.md` - Workflow history UI enhancements, classification badges, workflow journey display, structured input visualization, WorkflowHistoryCard component
+- `app_docs/feature-4c973d9a-websocket-manager-integration.md` - WebSocket connection management, ConnectionManager class, services/websocket_manager.py module, WebSocket lifecycle and broadcasting
+  - Conditions:
+    - Working with WebSocket endpoints or real-time communication
+    - Implementing new WebSocket features or troubleshooting connections
+    - Modifying server.py WebSocket routes or background watchers
+    - Understanding ConnectionManager usage patterns and state tracking
 
 ### Analytics & Insights Features
 - `app_docs/feature-a7c948e2-insights-recommendations.md` - Phase 3D anomaly detection, optimization recommendations, workflow analytics insights, complexity detection, statistical thresholds
