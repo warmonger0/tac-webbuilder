@@ -936,28 +936,32 @@ def sync_workflow_history() -> int:
             logger.warning(f"[SYNC] Failed to calculate quality score for {adw_id}: {e}")
             workflow_data["quality_score"] = 0.0
 
-        # Phase 3D: Generate insights and recommendations
-        try:
-            # Get all workflows for comparison (unpack tuple: workflows list and total count)
-            all_workflows, _ = get_workflow_history()
+        # Anomaly Detection & Optimization Recommendations
+        # Only generate insights for NEW workflows - skip for existing ones to prevent redundant updates
+        should_generate_insights = not existing  # Only for new workflows
 
-            # Detect anomalies
-            from core.workflow_analytics import detect_anomalies, generate_optimization_recommendations
-            anomalies = detect_anomalies(workflow_data, all_workflows)
+        if should_generate_insights:
+            try:
+                # Get all workflows for comparison (unpack tuple: workflows list and total count)
+                all_workflows, _ = get_workflow_history()
 
-            # Generate recommendations
-            recommendations = generate_optimization_recommendations(workflow_data, anomalies)
+                # Detect anomalies
+                from core.workflow_analytics import detect_anomalies, generate_optimization_recommendations
+                anomalies = detect_anomalies(workflow_data, all_workflows)
 
-            # Serialize to JSON for database storage
-            import json
-            workflow_data["anomaly_flags"] = json.dumps([a["message"] for a in anomalies])  # Simplified for UI
-            workflow_data["optimization_recommendations"] = json.dumps(recommendations)
+                # Generate recommendations
+                recommendations = generate_optimization_recommendations(workflow_data, anomalies)
 
-            logger.debug(f"[SYNC] Generated {len(anomalies)} anomalies and {len(recommendations)} recommendations for {adw_id}")
-        except Exception as e:
-            logger.warning(f"[SYNC] Failed to generate insights for {adw_id}: {e}")
-            workflow_data["anomaly_flags"] = "[]"
-            workflow_data["optimization_recommendations"] = "[]"
+                # Serialize to JSON for database storage
+                import json
+                workflow_data["anomaly_flags"] = json.dumps([a["message"] for a in anomalies])  # Simplified for UI
+                workflow_data["optimization_recommendations"] = json.dumps(recommendations)
+
+                logger.debug(f"[SYNC] Generated {len(anomalies)} anomalies and {len(recommendations)} recommendations for {adw_id}")
+            except Exception as e:
+                logger.warning(f"[SYNC] Failed to generate insights for {adw_id}: {e}")
+                workflow_data["anomaly_flags"] = "[]"
+                workflow_data["optimization_recommendations"] = "[]"
 
         if existing:
             # Update existing record if status or other fields changed
@@ -973,7 +977,7 @@ def sync_workflow_history() -> int:
                 updates["duration_seconds"] = duration_seconds
 
             # Update cost data with status-aware logic to prevent staleness
-            # - Always update completed/failed workflows (final cost is authoritative)
+            # - Only update if cost has ACTUALLY CHANGED (prevent redundant writes)
             # - For running workflows, only update if cost increased (progressive tracking)
             # - Never allow cost decreases (prevents data corruption from out-of-order syncs)
             if workflow_data.get("cost_breakdown"):
@@ -984,17 +988,17 @@ def sync_workflow_history() -> int:
                 should_update = False
                 update_reason = ""
 
-                # Always update completed/failed workflows with final cost
-                if status in ["completed", "failed"]:
+                # For completed/failed workflows, only update if cost actually changed
+                if status in ["completed", "failed"] and new_cost != old_cost:
                     should_update = True
-                    update_reason = f"final cost for {status} workflow"
+                    update_reason = f"final cost changed for {status} workflow: ${old_cost:.4f} → ${new_cost:.4f}"
                 # For running workflows, only update if cost increased
                 elif status == "running" and new_cost > old_cost:
                     should_update = True
                     update_reason = f"progressive increase from ${old_cost:.4f} to ${new_cost:.4f}"
-                # Skip if running and cost didn't increase or decreased
-                elif status == "running":
-                    update_reason = f"no increase (${old_cost:.4f} → ${new_cost:.4f})"
+                # Skip if no change or decrease
+                else:
+                    update_reason = f"no change (${old_cost:.4f} = ${new_cost:.4f})" if new_cost == old_cost else f"no update needed"
 
                 if should_update:
                     updates["cost_breakdown"] = workflow_data["cost_breakdown"]
@@ -1024,11 +1028,28 @@ def sync_workflow_history() -> int:
             if workflow_data.get("complexity_actual") and not existing.get("complexity_actual"):
                 updates["complexity_actual"] = workflow_data["complexity_actual"]
 
-            # Phase 3D: Always update insights when they change
-            if workflow_data.get("anomaly_flags") != existing.get("anomaly_flags"):
-                updates["anomaly_flags"] = workflow_data["anomaly_flags"]
-            if workflow_data.get("optimization_recommendations") != existing.get("optimization_recommendations"):
-                updates["optimization_recommendations"] = workflow_data["optimization_recommendations"]
+            # Anomaly Detection & Recommendations - Only update if we generated new insights
+            # (We only generate insights for new workflows, so this block rarely runs)
+            if should_generate_insights and "anomaly_flags" in workflow_data:
+                try:
+                    # workflow_data has JSON strings, existing has parsed Python objects
+                    new_anomaly_flags = json.loads(workflow_data.get("anomaly_flags", "[]"))
+                    old_anomaly_flags = existing.get("anomaly_flags", [])
+                    if new_anomaly_flags != old_anomaly_flags:
+                        updates["anomaly_flags"] = workflow_data["anomaly_flags"]
+                except Exception:
+                    # If comparison fails, skip update (don't cause unnecessary writes)
+                    pass
+
+            if should_generate_insights and "optimization_recommendations" in workflow_data:
+                try:
+                    new_recommendations = json.loads(workflow_data.get("optimization_recommendations", "[]"))
+                    old_recommendations = existing.get("optimization_recommendations", [])
+                    if new_recommendations != old_recommendations:
+                        updates["optimization_recommendations"] = workflow_data["optimization_recommendations"]
+                except Exception:
+                    # If comparison fails, skip update (don't cause unnecessary writes)
+                    pass
 
             if updates:
                 update_workflow_history(adw_id, **updates)
@@ -1046,95 +1067,25 @@ def sync_workflow_history() -> int:
             insert_workflow_history(**insert_data)
             synced_count += 1
 
-    # Phase 3E: Second pass - Calculate similar_workflow_ids for all workflows
-    logger.debug("[SYNC] Phase 3E: Calculating similar workflows...")
-    try:
-        from .workflow_analytics import find_similar_workflows
-        import json
+    # Workflow Similarity Analysis - Skip to avoid redundant processing on every sync
+    # Similarity detection is expensive and should only run:
+    # 1. During initial backfill (one-time)
+    # 2. When explicitly requested via API
+    # 3. NOT on every routine sync
+    # This phase is intentionally disabled for performance - re-enable only if needed
+    logger.debug("[SYNC] Skipping similarity analysis (performance optimization)")
 
-        # Fetch all workflows from database for comparison
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM workflow_history")
-            all_workflows = [dict(row) for row in cursor.fetchall()]
+    # Pattern Learning - Skip to avoid redundant processing on every sync
+    # Pattern detection is expensive and should only run:
+    # 1. During initial backfill (one-time)
+    # 2. When explicitly requested via API
+    # 3. NOT on every routine sync
+    # This phase is intentionally disabled for performance - re-enable only if needed
+    logger.debug("[SYNC] Skipping pattern learning (performance optimization)")
 
-        # Ensure workflow_id field exists for pattern learning (maps to id field)
-        for workflow in all_workflows:
-            if 'id' in workflow and 'workflow_id' not in workflow:
-                workflow['workflow_id'] = workflow['id']
-            elif 'id' not in workflow:
-                logger.warning(f"[SYNC] Workflow {workflow.get('adw_id', 'unknown')} missing 'id' field. Keys: {list(workflow.keys())[:5]}")
-
-        logger.debug(f"[SYNC] Found {len(all_workflows)} workflows for similarity analysis")
-
-        # Calculate similar workflows for each workflow
-        similarity_updates = 0
-        for workflow in all_workflows:
-            try:
-                # Find similar workflows (returns list of ADW IDs)
-                similar_ids = find_similar_workflows(workflow, all_workflows)
-
-                if similar_ids:
-                    # Serialize to JSON for storage
-                    similar_ids_json = json.dumps(similar_ids)
-
-                    # Update database
-                    with get_db_connection() as conn:
-                        cursor = conn.cursor()
-                        cursor.execute(
-                            "UPDATE workflow_history SET similar_workflow_ids = ? WHERE adw_id = ?",
-                            (similar_ids_json, workflow['adw_id'])
-                        )
-                        conn.commit()
-
-                    logger.debug(f"[SYNC] Updated similar workflows for {workflow['adw_id']}: {len(similar_ids)} matches")
-                    similarity_updates += 1
-
-            except Exception as e:
-                logger.warning(f"[SYNC] Failed to calculate similar workflows for {workflow['adw_id']}: {e}")
-
-        logger.debug(f"[SYNC] Updated similar workflows for {similarity_updates} workflows")
-
-    except Exception as e:
-        logger.error(f"[SYNC] Failed to calculate similar workflows (Phase 3E): {e}")
-        # Don't fail the entire sync if similarity detection fails
-
-    # Phase 1.3: Pattern Learning Pass
-    logger.debug("[SYNC] Phase: Pattern Learning")
-    try:
-        from .pattern_persistence import process_and_persist_workflow
-
-        patterns_detected = 0
-        new_patterns = 0
-
-        with get_db_connection() as conn:
-            for workflow in all_workflows:
-                try:
-                    result = process_and_persist_workflow(workflow, conn)
-                    patterns_detected += result['patterns_detected']
-                    new_patterns += result['new_patterns']
-
-                    if result['patterns_detected'] > 0:
-                        logger.debug(
-                            f"[SYNC] Workflow {workflow['adw_id']}: "
-                            f"detected {result['patterns_detected']} pattern(s)"
-                        )
-
-                except Exception as e:
-                    logger.warning(
-                        f"[SYNC] Failed to process patterns for {workflow['adw_id']}: {e}"
-                    )
-
-        logger.debug(
-            f"[SYNC] Pattern learning complete: "
-            f"{patterns_detected} patterns detected, {new_patterns} new"
-        )
-
-    except Exception as e:
-        logger.error(f"[SYNC] Pattern learning failed: {e}")
-        # Don't fail entire sync if pattern learning fails
-
-    logger.info(f"[SYNC] Synchronized {synced_count} workflows")
+    # Only log if we actually synced something
+    if synced_count > 0:
+        logger.info(f"[SYNC] Synchronized {synced_count} workflows")
     return synced_count
 
 

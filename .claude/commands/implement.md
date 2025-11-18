@@ -17,6 +17,14 @@ plan_file: $1 (absolute path to the plan file to implement)
 - Use the context file information to understand what's already been done if needed
 - DO NOT run git commands for file discovery - use Read tool to examine files directly
 
+**Code Quality Standards:**
+- Follow `.claude/references/code_quality_standards.md` - File/function length limits, naming conventions
+- Follow `.claude/references/typescript_standards.md` - TypeScript type organization
+- Keep files under 500 lines (soft limit), never exceed 800 lines (hard limit)
+- Keep functions under 100 lines (soft limit), never exceed 300 lines (hard limit)
+- Extract reusable logic to modules proactively
+- Run linting after implementation: `ruff check` (Python), `bun run lint` (TypeScript)
+
 ## Plan
 
 Read the plan from the file path: {plan_file}

@@ -1,0 +1,90 @@
+# Ruff Configuration
+# Code Quality Standards enforcement for Python code
+# See: .claude/references/code_quality_standards.md
+
+# Global Settings
+line-length = 100
+target-version = "py312"
+
+[lint]
+# Rule Selection
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "C90", # mccabe complexity
+    "I",   # isort (import sorting)
+    "N",   # pep8-naming
+    "UP",  # pyupgrade (modern Python idioms)
+    "B",   # flake8-bugbear (likely bugs)
+    "A",   # flake8-builtins (shadowing built-ins)
+    "C4",  # flake8-comprehensions
+    "PT",  # flake8-pytest-style
+    "SIM", # flake8-simplify
+]
+
+# Ignored Rules
+ignore = [
+    "E501",   # Line too long (handled by formatter)
+    "B008",   # Do not perform function calls in argument defaults (FastAPI dependency injection)
+    "UP007",  # Use X | Y for type annotations (allow Optional[] for clarity)
+]
+
+# Code Complexity Limits
+[lint.mccabe]
+# Maximum cyclomatic complexity for a function
+# Aligns with ~100 line soft limit
+max-complexity = 15
+
+[lint.pylint]
+# Maximum number of arguments for a function
+max-args = 8
+
+# Maximum number of branches (if/elif/else, match cases)
+max-branches = 15
+
+# Maximum number of return statements
+max-returns = 8
+
+# Maximum number of statements in a function body
+# ~75 statements ≈ 100 lines at typical code density
+# This is our soft limit enforcement
+max-statements = 75
+
+[lint.isort]
+# Import sorting configuration
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+
+known-first-party = ["app", "adws"]
+
+# Per-file ignores
+[lint.per-file-ignores]
+# Test files can be longer and more complex
+"tests/**/*.py" = ["C90", "PLR0913", "PLR0915"]
+"**/test_*.py" = ["C90", "PLR0913", "PLR0915"]
+
+# Migration files or generated code
+"**/migrations/**" = ["ALL"]
+
+# __init__.py files can have unused imports (re-exports)
+"__init__.py" = ["F401"]
+
+# Format Settings
+[format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Indent with spaces
+indent-style = "space"
+
+# Unix line endings
+line-ending = "lf"
+
+# Skip magic trailing comma behavior
+skip-magic-trailing-comma = false

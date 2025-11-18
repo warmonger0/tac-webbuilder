@@ -158,6 +158,12 @@ def main():
     # Load the state that was created/found by ensure_adw_id
     state = ADWState.load(adw_id, temp_logger)
 
+    # If state doesn't exist, create a new one
+    if state is None:
+        state = ADWState(adw_id)
+        if temp_logger:
+            temp_logger.info(f"Created new state for ADW ID: {adw_id}")
+
     # Ensure state has the adw_id field
     if not state.get("adw_id"):
         state.update(adw_id=adw_id)
@@ -210,12 +216,13 @@ def main():
             from adw_modules.workflow_ops import classify_issue
 
             issue_command, error = classify_issue(issue, adw_id, logger)
-            if error:
-                logger.error(f"Failed to classify issue: {error}")
+            if error or issue_command is None:
+                error_msg = error or "Issue classification returned None"
+                logger.error(f"Failed to classify issue: {error_msg}")
                 make_issue_comment(
                     issue_number,
                     format_issue_message(
-                        adw_id, "ops", f"❌ Failed to classify issue: {error}"
+                        adw_id, "ops", f"❌ Failed to classify issue: {error_msg}"
                     ),
                 )
                 sys.exit(1)
@@ -228,12 +235,13 @@ def main():
             branch_name, error = generate_branch_name(
                 issue, issue_command, adw_id, logger
             )
-            if error:
-                logger.error(f"Error generating branch name: {error}")
+            if error or branch_name is None:
+                error_msg = error or "Branch name generation returned None"
+                logger.error(f"Error generating branch name: {error_msg}")
                 make_issue_comment(
                     issue_number,
                     format_issue_message(
-                        adw_id, "ops", f"❌ Error generating branch name: {error}"
+                        adw_id, "ops", f"❌ Error generating branch name: {error_msg}"
                     ),
                 )
                 sys.exit(1)
@@ -372,14 +380,15 @@ def main():
         AGENT_PATCH_IMPLEMENTOR, issue, issue_command, adw_id, logger, worktree_path
     )
 
-    if error:
-        logger.error(f"Error creating commit message: {error}")
+    if error or commit_msg is None:
+        error_msg = error or "Commit message generation returned None"
+        logger.error(f"Error creating commit message: {error_msg}")
         make_issue_comment(
             issue_number,
             format_issue_message(
                 adw_id,
                 AGENT_PATCH_IMPLEMENTOR,
-                f"❌ Error creating commit message: {error}",
+                f"❌ Error creating commit message: {error_msg}",
             ),
         )
         sys.exit(1)

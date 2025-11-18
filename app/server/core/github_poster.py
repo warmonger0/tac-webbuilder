@@ -78,6 +78,10 @@ class GitHubPoster:
                 self.console.print("[yellow]Issue posting cancelled.[/yellow]")
                 raise RuntimeError("User cancelled issue posting")
 
+        # Ensure labels exist before creating issue
+        if issue.labels:
+            self._ensure_labels_exist(issue.labels)
+
         # Prepare gh command
         cmd = ["gh", "issue", "create"]
 
@@ -109,6 +113,61 @@ class GitHubPoster:
 
         except Exception as e:
             raise RuntimeError(f"Failed to post issue to GitHub: {str(e)}")
+
+    def _ensure_labels_exist(self, labels: list):
+        """
+        Ensure all labels exist in the repository, create them if they don't.
+
+        Args:
+            labels: List of label names to ensure exist
+        """
+        # Get existing labels
+        try:
+            cmd = ["gh", "label", "list", "--json", "name"]
+            if self.repo_url:
+                cmd.extend(["--repo", self.repo_url])
+
+            result = self._execute_gh_command(cmd)
+            import json
+            existing_labels = {label["name"] for label in json.loads(result)}
+
+            # Create missing labels
+            for label in labels:
+                if label not in existing_labels:
+                    self._create_label(label)
+
+        except Exception as e:
+            # If we can't check labels, log warning but don't fail
+            # The issue creation will proceed and fail gracefully if labels don't exist
+            self.console.print(f"[yellow]Warning: Could not verify labels: {str(e)}[/yellow]")
+
+    def _create_label(self, label: str):
+        """
+        Create a label in the repository.
+
+        Args:
+            label: Label name to create
+        """
+        # Define colors for common label types
+        label_colors = {
+            "feature": "0e8a16",  # Green
+            "bug": "d73a4a",      # Red
+            "chore": "fbca04",    # Yellow
+        }
+
+        color = label_colors.get(label, "ededed")  # Default gray
+
+        try:
+            cmd = ["gh", "label", "create", label, "--color", color]
+            if self.repo_url:
+                cmd.extend(["--repo", self.repo_url])
+
+            self._execute_gh_command(cmd)
+            self.console.print(f"[green]✓ Created label: {label}[/green]")
+
+        except Exception as e:
+            # If label creation fails, warn but don't fail the whole operation
+            self.console.print(f"[yellow]Warning: Could not create label '{label}': {str(e)}[/yellow]")
 
     def _show_preview(self, issue: GitHubIssue):
         """

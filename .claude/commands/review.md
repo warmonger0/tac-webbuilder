@@ -49,6 +49,11 @@ adw_id: $1
   - IMPORTANT: Do not include any additional text, explanations, or markdown formatting
   - We'll immediately run JSON.parse() on the output, so make sure it's valid JSON
 - Ultra think as you work through the review process. Focus on the critical functionality paths and the user experience. Don't report issues if they are not critical to the feature.
+- **Code Quality Review:**
+  - Check that files don't exceed 800 lines (hard limit) - this is a BLOCKER
+  - Check that functions don't exceed 300 lines (hard limit) - this is a BLOCKER
+  - Verify code follows naming conventions from `.claude/references/code_quality_standards.md`
+  - Note if files exceed 500 lines or functions exceed 100 lines (soft limits) as TECH_DEBT
 
 ## Application Setup
 

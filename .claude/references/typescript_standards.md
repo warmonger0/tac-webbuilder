@@ -1,5 +1,7 @@
 # TypeScript Standards & Type Organization
 
+**Related:** See `.claude/references/code_quality_standards.md` for file length limits, function length limits, naming conventions, and general code organization standards that apply to all code (Python and TypeScript).
+
 ## Type System Architecture
 
 ### Directory Structure
@@ -175,6 +177,10 @@ Before committing code that modifies types:
 - [ ] Central `index.ts` exports all new types
 - [ ] No unused type imports
 - [ ] Type names clearly describe their purpose
+- [ ] Code quality standards followed (see `.claude/references/code_quality_standards.md`):
+  - [ ] No files exceed 800 lines (hard limit)
+  - [ ] No functions exceed 300 lines (hard limit)
+  - [ ] ESLint passes (`bun run lint`)
 
 ## Migration Guide
 

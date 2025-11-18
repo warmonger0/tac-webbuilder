@@ -42,6 +42,10 @@ Focus on the following files:
 - `scripts/**` - Contains the scripts to start and stop the server + client.
 - `adws/**` - Contains the AI Developer Workflow (ADW) scripts.
 
+**Code Quality Standards:**
+- Read `.claude/references/code_quality_standards.md` - File/function length limits, naming conventions, refactoring guidelines
+- Read `.claude/references/typescript_standards.md` - TypeScript-specific type organization and patterns
+
 - Read `.claude/commands/conditional_docs.md` to check if your task requires additional documentation
 - If your task matches any of the conditions listed, include those documentation files in the `Plan Format: Relevant Files` section of your plan
 
@@ -112,8 +116,15 @@ Execute every command to validate the feature works correctly with zero regressi
 
 <If you created an E2E test, include the following validation step: `Read .claude/commands/test_e2e.md`, then read and execute your new E2E `.claude/commands/e2e/test_<descriptive_name>.md` test file to validate this functionality works.>
 
+### Code Quality Validation
+- `cd app/server && uv run ruff check` - Validate Python code quality standards
+- `cd app/client && bun run lint` - Validate TypeScript code quality standards
+- Verify no files exceed 800 lines (hard limit)
+- Verify no functions exceed 300 lines (hard limit)
+
+### Functional Validation
 - `cd app/server && uv run pytest` - Run server tests to validate the feature works with zero regressions
-- `cd app/client && bun tsc --noEmit` - Run frontend tests to validate the feature works with zero regressions
+- `cd app/client && bun tsc --noEmit` - Run frontend type checking to validate the feature works with zero regressions
 - `cd app/client && bun run build` - Run frontend build to validate the feature works with zero regressions
 
 ## Notes
