@@ -181,27 +181,9 @@ def get_workflows_data() -> List[Workflow]:
                 logger.debug(f"[WORKFLOW] Skipping workflow {adw_id} with invalid issue_number: {issue_num_raw}")
                 continue
 
-            # Check GitHub issue status - only include OPEN issues
-            try:
-                import subprocess
-                result = subprocess.run(
-                    ["gh", "issue", "view", str(issue_number), "--json", "state"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                if result.returncode == 0:
-                    issue_data = json.loads(result.stdout)
-                    if issue_data.get("state") != "OPEN":
-                        # Skip closed workflows
-                        continue
-                else:
-                    # If gh command fails, skip this workflow (issue may not exist or be accessible)
-                    logger.debug(f"[WORKFLOW] Could not check status for issue #{issue_number}")
-                    continue
-            except Exception as e:
-                logger.debug(f"[WORKFLOW] Failed to check GitHub status for issue #{issue_number}: {e}")
-                continue
+            # Note: We no longer check GitHub issue status in the watch loop
+            # This was causing blocking subprocess calls every 2 seconds (24 workflows × 5s = 120s!)
+            # Workflow status comes from adw_state.json instead
 
             # Determine current phase by checking which phase directories exist
             phase_order = ["plan", "build", "test", "review", "document", "ship"]
