@@ -2,7 +2,8 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSock
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from datetime import datetime
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Literal
+from contextlib import asynccontextmanager
 import os
 import sqlite3
 import traceback
@@ -98,10 +99,29 @@ logging.basicConfig(
 # Create logger for this module
 logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # Startup: Initialize workflow history database
+    init_workflow_history_db()
+    logger.info("[STARTUP] Workflow history database initialized")
+
+    # Start background watchers
+    asyncio.create_task(watch_workflows())
+    asyncio.create_task(watch_routes())
+    asyncio.create_task(watch_workflow_history())
+    logger.info("[STARTUP] Workflow, routes, and history watchers started")
+
+    yield
+
+    # Shutdown (if needed in the future)
+    logger.info("[SHUTDOWN] Application shutting down")
+
 app = FastAPI(
     title="Natural Language SQL Interface",
     description="Convert natural language to SQL queries",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS configuration for frontend
@@ -247,7 +267,7 @@ def get_routes_data() -> List[Route]:
 
     return route_list
 
-async def watch_workflows():
+async def watch_workflows() -> None:
     """Background task to watch for workflow changes and broadcast updates"""
     while True:
         try:
@@ -271,7 +291,7 @@ async def watch_workflows():
             logger.error(f"[WS] Error in workflow watcher: {e}")
             await asyncio.sleep(5)  # Back off on error
 
-async def watch_routes():
+async def watch_routes() -> None:
     """Background task to watch for route changes and broadcast updates"""
     while True:
         try:
@@ -343,7 +363,7 @@ def get_workflow_history_data(filters: Optional[WorkflowHistoryFilters] = None) 
             analytics=WorkflowHistoryAnalytics()
         )
 
-async def watch_workflow_history():
+async def watch_workflow_history() -> None:
     """Background task to watch for workflow history changes and broadcast updates"""
     while True:
         try:
@@ -814,7 +834,7 @@ async def get_system_status() -> SystemStatusResponse:
     )
 
 @app.post("/api/services/webhook/start")
-async def start_webhook_service():
+async def start_webhook_service() -> dict:
     """Start the webhook service on port 8001"""
     try:
         # Check if already running
@@ -870,7 +890,7 @@ async def start_webhook_service():
         }
 
 @app.post("/api/services/cloudflare/restart")
-async def restart_cloudflare_tunnel():
+async def restart_cloudflare_tunnel() -> dict:
     """Restart the Cloudflare tunnel"""
     try:
         # Check if CLOUDFLARED_TUNNEL_TOKEN is set
@@ -925,7 +945,7 @@ async def restart_cloudflare_tunnel():
         }
 
 @app.get("/api/services/github-webhook/health")
-async def get_github_webhook_health():
+async def get_github_webhook_health() -> dict:
     """Check GitHub webhook health by testing recent deliveries"""
     try:
         # Get GitHub PAT
@@ -1011,7 +1031,7 @@ async def get_github_webhook_health():
         }
 
 @app.post("/api/services/github-webhook/redeliver")
-async def redeliver_github_webhook():
+async def redeliver_github_webhook() -> dict:
     """
     Redeliver the most recent failed GitHub webhook with intelligent diagnostics.
 
@@ -1179,21 +1199,8 @@ async def get_workflow_costs(adw_id: str) -> CostResponse:
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         return CostResponse(error=f"Failed to retrieve cost data: {str(e)}")
 
-@app.on_event("startup")
-async def startup_event():
-    """Start background tasks on server startup"""
-    # Initialize workflow history database
-    init_workflow_history_db()
-    logger.info("[STARTUP] Workflow history database initialized")
-
-    # Start background watchers
-    asyncio.create_task(watch_workflows())
-    asyncio.create_task(watch_routes())
-    asyncio.create_task(watch_workflow_history())
-    logger.info("[STARTUP] Workflow, routes, and history watchers started")
-
 @app.websocket("/ws/workflows")
-async def websocket_workflows(websocket: WebSocket):
+async def websocket_workflows(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time workflow updates"""
     await manager.connect(websocket)
 
@@ -1218,7 +1225,7 @@ async def websocket_workflows(websocket: WebSocket):
         manager.disconnect(websocket)
 
 @app.websocket("/ws/routes")
-async def websocket_routes(websocket: WebSocket):
+async def websocket_routes(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time route updates"""
     await manager.connect(websocket)
 
@@ -1243,7 +1250,7 @@ async def websocket_routes(websocket: WebSocket):
         manager.disconnect(websocket)
 
 @app.websocket("/ws/workflow-history")
-async def websocket_workflow_history(websocket: WebSocket):
+async def websocket_workflow_history(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time workflow history updates"""
     await manager.connect(websocket)
 
@@ -1282,7 +1289,7 @@ async def get_workflow_history_endpoint(
     end_date: Optional[str] = None,
     search: Optional[str] = None,
     sort_by: str = "created_at",
-    sort_order: str = "DESC"
+    sort_order: Literal["ASC", "DESC"] = "DESC"
 ) -> WorkflowHistoryResponse:
     """Get workflow history with filtering, sorting, and pagination (REST endpoint for fallback)"""
     try:
@@ -1296,7 +1303,7 @@ async def get_workflow_history_endpoint(
             end_date=end_date,
             search=search,
             sort_by=sort_by,
-            sort_order=sort_order  # type: ignore
+            sort_order=sort_order
         )
         history_data = get_workflow_history_data(filters)
         logger.info(f"[SUCCESS] Retrieved {len(history_data.workflows)} workflow history items (total: {history_data.total_count})")
@@ -1765,7 +1772,7 @@ async def get_workflow_catalog() -> WorkflowCatalogResponse:
         return WorkflowCatalogResponse(workflows=[], total=0)
 
 @app.delete("/api/table/{table_name}")
-async def delete_table(table_name: str):
+async def delete_table(table_name: str) -> dict:
     """Delete a table from the database"""
     try:
         # Validate table name using security module
