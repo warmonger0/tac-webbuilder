@@ -54,10 +54,10 @@ def record_pattern_occurrence(
         ...     print(f"New pattern discovered: {pattern_id}")
     """
     cursor = db_connection.cursor()
-    workflow_id = workflow.get("workflow_id")
+    workflow_id = workflow.get("workflow_id") or workflow.get("id")
 
     if not workflow_id:
-        logger.warning("[Pattern] Workflow missing workflow_id, cannot record pattern")
+        logger.debug(f"[Pattern] Workflow {workflow.get('adw_id', 'unknown')} missing workflow_id and id, cannot record pattern")
         return None, False
 
     # Get characteristics from workflow (used for both new and existing patterns)

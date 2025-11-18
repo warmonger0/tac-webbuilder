@@ -111,16 +111,24 @@ async def lifespan(app: FastAPI):
     init_workflow_history_db()
     logger.info("[STARTUP] Workflow history database initialized")
 
-    # Start background watchers
-    asyncio.create_task(watch_workflows())
-    asyncio.create_task(watch_routes())
-    asyncio.create_task(watch_workflow_history())
+    # Start background watchers and store references for cleanup
+    watcher_tasks = [
+        asyncio.create_task(watch_workflows()),
+        asyncio.create_task(watch_routes()),
+        asyncio.create_task(watch_workflow_history())
+    ]
     logger.info("[STARTUP] Workflow, routes, and history watchers started")
 
     yield
 
-    # Shutdown (if needed in the future)
-    logger.info("[SHUTDOWN] Application shutting down")
+    # Shutdown: Cancel background tasks
+    logger.info("[SHUTDOWN] Application shutting down, cancelling background tasks...")
+    for task in watcher_tasks:
+        task.cancel()
+
+    # Wait for all tasks to be cancelled
+    await asyncio.gather(*watcher_tasks, return_exceptions=True)
+    logger.info("[SHUTDOWN] All background tasks cancelled")
 
 app = FastAPI(
     title="Natural Language SQL Interface",
@@ -256,51 +264,57 @@ def get_routes_data() -> List[Route]:
 
 async def watch_workflows() -> None:
     """Background task to watch for workflow changes and broadcast updates"""
-    while True:
-        try:
-            if len(manager.active_connections) > 0:
-                workflows = get_workflows_data()
+    try:
+        while True:
+            try:
+                if len(manager.active_connections) > 0:
+                    workflows = get_workflows_data()
 
-                # Convert to dict for comparison
-                current_state = json.dumps([w.model_dump() for w in workflows], sort_keys=True)
+                    # Convert to dict for comparison
+                    current_state = json.dumps([w.model_dump() for w in workflows], sort_keys=True)
 
-                # Only broadcast if state changed
-                if current_state != manager.last_workflow_state:
-                    manager.last_workflow_state = current_state
-                    await manager.broadcast({
-                        "type": "workflows_update",
-                        "data": [w.model_dump() for w in workflows]
-                    })
-                    logger.info(f"[WS] Broadcasted workflow update to {len(manager.active_connections)} clients")
+                    # Only broadcast if state changed
+                    if current_state != manager.last_workflow_state:
+                        manager.last_workflow_state = current_state
+                        await manager.broadcast({
+                            "type": "workflows_update",
+                            "data": [w.model_dump() for w in workflows]
+                        })
+                        logger.info(f"[WS] Broadcasted workflow update to {len(manager.active_connections)} clients")
 
-            await asyncio.sleep(2)  # Check every 2 seconds
-        except Exception as e:
-            logger.error(f"[WS] Error in workflow watcher: {e}")
-            await asyncio.sleep(5)  # Back off on error
+                await asyncio.sleep(2)  # Check every 2 seconds
+            except Exception as e:
+                logger.error(f"[WS] Error in workflow watcher: {e}")
+                await asyncio.sleep(5)  # Back off on error
+    except asyncio.CancelledError:
+        logger.info("[WS] Workflow watcher cancelled")
 
 async def watch_routes() -> None:
     """Background task to watch for route changes and broadcast updates"""
-    while True:
-        try:
-            if len(manager.active_connections) > 0:
-                routes = get_routes_data()
+    try:
+        while True:
+            try:
+                if len(manager.active_connections) > 0:
+                    routes = get_routes_data()
 
-                # Convert to dict for comparison
-                current_state = json.dumps([r.model_dump() for r in routes], sort_keys=True)
+                    # Convert to dict for comparison
+                    current_state = json.dumps([r.model_dump() for r in routes], sort_keys=True)
 
-                # Only broadcast if state changed
-                if current_state != manager.last_routes_state:
-                    manager.last_routes_state = current_state
-                    await manager.broadcast({
-                        "type": "routes_update",
-                        "data": [r.model_dump() for r in routes]
-                    })
-                    logger.info(f"[WS] Broadcasted routes update to {len(manager.active_connections)} clients")
+                    # Only broadcast if state changed
+                    if current_state != manager.last_routes_state:
+                        manager.last_routes_state = current_state
+                        await manager.broadcast({
+                            "type": "routes_update",
+                            "data": [r.model_dump() for r in routes]
+                        })
+                        logger.info(f"[WS] Broadcasted routes update to {len(manager.active_connections)} clients")
 
-            await asyncio.sleep(2)  # Check every 2 seconds
-        except Exception as e:
-            logger.error(f"[WS] Error in routes watcher: {e}")
-            await asyncio.sleep(5)  # Back off on error
+                await asyncio.sleep(2)  # Check every 2 seconds
+            except Exception as e:
+                logger.error(f"[WS] Error in routes watcher: {e}")
+                await asyncio.sleep(5)  # Back off on error
+    except asyncio.CancelledError:
+        logger.info("[WS] Routes watcher cancelled")
 
 def get_workflow_history_data(filters: Optional[WorkflowHistoryFilters] = None) -> WorkflowHistoryResponse:
     """Helper function to get workflow history data"""
@@ -360,38 +374,41 @@ def get_workflow_history_data(filters: Optional[WorkflowHistoryFilters] = None) 
 
 async def watch_workflow_history() -> None:
     """Background task to watch for workflow history changes and broadcast updates"""
-    while True:
-        try:
-            if len(manager.active_connections) > 0:
-                # Get latest workflow history (limited to recent items for WebSocket)
-                history_data = get_workflow_history_data(WorkflowHistoryFilters(limit=50, offset=0))
+    try:
+        while True:
+            try:
+                if len(manager.active_connections) > 0:
+                    # Get latest workflow history (limited to recent items for WebSocket)
+                    history_data = get_workflow_history_data(WorkflowHistoryFilters(limit=50, offset=0))
 
-                # Convert to dict for comparison
-                current_state = json.dumps(
-                    {
-                        "workflows": [w.model_dump() for w in history_data.workflows],
-                        "analytics": history_data.analytics.model_dump()
-                    },
-                    sort_keys=True
-                )
-
-                # Only broadcast if state changed
-                if current_state != manager.last_history_state:
-                    manager.last_history_state = current_state
-                    await manager.broadcast({
-                        "type": "workflow_history_update",
-                        "data": {
+                    # Convert to dict for comparison
+                    current_state = json.dumps(
+                        {
                             "workflows": [w.model_dump() for w in history_data.workflows],
-                            "total_count": history_data.total_count,
                             "analytics": history_data.analytics.model_dump()
-                        }
-                    })
-                    logger.info(f"[WS] Broadcasted workflow history update to {len(manager.active_connections)} clients")
+                        },
+                        sort_keys=True
+                    )
 
-            await asyncio.sleep(2)  # Check every 2 seconds
-        except Exception as e:
-            logger.error(f"[WS] Error in workflow history watcher: {e}")
-            await asyncio.sleep(5)  # Back off on error
+                    # Only broadcast if state changed
+                    if current_state != manager.last_history_state:
+                        manager.last_history_state = current_state
+                        await manager.broadcast({
+                            "type": "workflow_history_update",
+                            "data": {
+                                "workflows": [w.model_dump() for w in history_data.workflows],
+                                "total_count": history_data.total_count,
+                                "analytics": history_data.analytics.model_dump()
+                            }
+                        })
+                        logger.info(f"[WS] Broadcasted workflow history update to {len(manager.active_connections)} clients")
+
+                await asyncio.sleep(2)  # Check every 2 seconds
+            except Exception as e:
+                logger.error(f"[WS] Error in workflow history watcher: {e}")
+                await asyncio.sleep(5)  # Back off on error
+    except asyncio.CancelledError:
+        logger.info("[WS] Workflow history watcher cancelled")
 
 @app.post("/api/upload", response_model=FileUploadResponse)
 async def upload_file(file: UploadFile = File(...)) -> FileUploadResponse:
