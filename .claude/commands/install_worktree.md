@@ -1,5 +1,8 @@
 # Install Worktree
 
+> **Note:** ADW workflows now use `adw_modules/worktree_setup.py` for deterministic setup without AI calls.
+> This command is available for manual worktree setup or debugging purposes.
+
 This command sets up an isolated worktree environment with custom port configuration.
 
 ## Parameters

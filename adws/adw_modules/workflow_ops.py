@@ -29,22 +29,32 @@ AGENT_PR_CREATOR = "pr_creator"
 
 # Available ADW workflows for runtime validation
 AVAILABLE_ADW_WORKFLOWS = [
-    # Isolated workflows (all workflows are now iso-based)
+    # Single-phase workflows
     "adw_plan_iso",
+    "adw_plan_iso_optimized",
     "adw_patch_iso",
     "adw_build_iso",
     "adw_test_iso",
     "adw_review_iso",
     "adw_document_iso",
     "adw_ship_iso",
+    "adw_cleanup_iso",
+    "adw_lint_iso",
+
+    # Multi-phase workflows
     "adw_lightweight_iso",  # Optimized for simple changes ($0.20-0.50)
-    "adw_sdlc_ZTE_iso",  # Zero Touch Execution workflow
     "adw_plan_build_iso",
     "adw_plan_build_test_iso",
     "adw_plan_build_test_review_iso",
     "adw_plan_build_document_iso",
     "adw_plan_build_review_iso",
+    "adw_stepwise_iso",
+
+    # Full SDLC workflows
     "adw_sdlc_iso",
+    "adw_sdlc_complete_iso",
+    "adw_sdlc_ZTE_iso",  # Zero Touch Execution workflow
+    "adw_sdlc_complete_zte_iso",  # Complete Zero Touch Execution with optimized plan
 ]
 
 
@@ -330,34 +340,21 @@ def create_commit(
     logger: logging.Logger,
     working_dir: str,
 ) -> Tuple[Optional[str], Optional[str]]:
-    """Create a git commit with a properly formatted message.
-    Returns (commit_message, error_message) tuple."""
+    """Create a git commit with a properly formatted message using deterministic Python.
+
+    DEPRECATED AI CALL: This function now uses commit_generator.py instead of /commit command.
+    Returns (commit_message, error_message) tuple.
+    """
+    # Import here to avoid circular imports
+    from adw_modules.commit_generator import generate_commit_message
+
     # Remove the leading slash from issue_class
     issue_type = issue_class.replace("/", "")
 
-    # Create unique committer agent name by suffixing '_committer'
-    unique_agent_name = f"{agent_name}_committer"
+    # Generate commit message using Python template
+    commit_message = generate_commit_message(agent_name, issue_type, issue)
 
-    # Use minimal payload like classify_issue does
-    minimal_issue_json = issue.model_dump_json(
-        by_alias=True, include={"number", "title", "body"}
-    )
-
-    request = AgentTemplateRequest(
-        agent_name=unique_agent_name,
-        slash_command="/commit",
-        args=[agent_name, issue_type, minimal_issue_json],
-        adw_id=adw_id,
-        working_dir=working_dir,
-    )
-
-    response = execute_template(request)
-
-    if not response.success:
-        return None, response.output
-
-    commit_message = response.output.strip()
-    logger.info(f"Created commit message: {commit_message}")
+    logger.info(f"Generated commit message (Python): {commit_message}")
     return commit_message, None
 
 

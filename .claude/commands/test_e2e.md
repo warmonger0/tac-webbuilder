@@ -32,9 +32,12 @@ application_url: $ARGUMENT if provided, otherwise determine from port configurat
 - If you encounter an error, mark the test as failed immediately and explain exactly what went wrong and on what step it occurred. For example: '(Step 1 ❌) Failed to find element with selector "query-input" on page "http://localhost:5173"'
 - Use `pwd` or equivalent to get the absolute path to the codebase for writing and displaying the correct paths to the screenshots
 
-## Setup
+## Application Setup
 
-Read and Execute `.claude/commands/prepare_app.md` now to prepare the application for the test.
+> **ADW Workflows:** The application is prepared automatically by `adw_modules/app_lifecycle.py` before testing starts.
+> **Manual Use:** Execute `/prepare_app` or read `.claude/commands/prepare_app.md` to prepare the application.
+
+Application URL will be auto-detected from `.ports.env` or defaulted to http://localhost:5173.
 
 ## Screenshot Directory
 

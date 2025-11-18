@@ -56,6 +56,7 @@ from adw_modules.data_types import (
 from adw_modules.agent import execute_template
 from adw_modules.r2_uploader import R2Uploader
 from adw_modules.worktree_ops import validate_worktree
+from adw_modules.app_lifecycle import prepare_application_for_review
 
 # Agent name constants
 AGENT_REVIEWER = "reviewer"
@@ -408,7 +409,32 @@ def main():
         issue_number,
         format_issue_message(adw_id, "ops", f"📋 Found spec file: {spec_file}")
     )
-    
+
+    # Prepare application for review using deterministic Python function
+    logger.info("Preparing application for review (using Python, no AI)")
+    make_issue_comment(
+        issue_number,
+        format_issue_message(adw_id, "ops", "🚀 Preparing application for review (deterministic Python)...")
+    )
+
+    app_success, app_info = prepare_application_for_review(worktree_path, logger)
+    if not app_success:
+        error_msg = f"Failed to prepare application: {app_info.get('error', 'Unknown error')}"
+        logger.error(error_msg)
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"❌ {error_msg}")
+        )
+        sys.exit(1)
+
+    logger.info(f"✅ Application ready - Backend: {app_info['backend_url']}, Frontend: {app_info['frontend_url']}")
+    make_issue_comment(
+        issue_number,
+        format_issue_message(adw_id, "ops", f"✅ Application ready for review\n"
+                           f"   Backend:  {app_info['backend_url']}\n"
+                           f"   Frontend: {app_info['frontend_url']}")
+    )
+
     # Run review with retry logic
     review_attempt = 0
     review_result = None

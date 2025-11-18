@@ -46,11 +46,14 @@ review_image_dir: `<absolute path to codebase>/agents/<adw_id>/<agent_name>/revi
   - We'll immediately run JSON.parse() on the output, so make sure it's valid JSON
 - Ultra think as you work through the review process. Focus on the critical functionality paths and the user experience. Don't report issues if they are not critical to the feature.
 
-## Setup
+## Application Setup
 
-IMPORTANT: Read and **Execute** `.claude/commands/prepare_app.md` now to prepare the application for the review.
-- Note: prepare_app.md will automatically detect and use ports from `.ports.env` if running in a worktree environment
-- The application URL will be http://localhost:PORT where PORT is from `.ports.env` (FRONTEND_PORT) or default 5173
+> **ADW Workflows:** The application is prepared automatically by `adw_modules/app_lifecycle.py` before review starts.
+> **Manual Use:** Execute `/prepare_app` or read `.claude/commands/prepare_app.md` to prepare the application.
+
+The application will be running at:
+- Frontend URL: Auto-detected from `.ports.env` or default to http://localhost:5173
+- Backend URL: Auto-detected from `.ports.env` or default to http://localhost:8000
 
 ## Report
 

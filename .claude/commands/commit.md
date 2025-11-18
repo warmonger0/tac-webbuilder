@@ -1,5 +1,8 @@
 # Generate Git Commit
 
+> **Note:** ADW workflows now use `adw_modules/commit_generator.py` for deterministic commit generation without AI calls.
+> This command is available for manual commit message generation or debugging purposes.
+
 Based on the `Instructions` below, take the `Variables` follow the `Run` section to create a git commit with a properly formatted message. Then follow the `Report` section to report the results of your work.
 
 ## Variables

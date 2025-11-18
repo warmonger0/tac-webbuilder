@@ -57,8 +57,8 @@ from adw_modules.worktree_ops import (
     get_ports_for_adw,
     is_port_available,
     find_next_available_ports,
-    setup_worktree_environment,
 )
+from adw_modules.worktree_setup import setup_worktree_complete
 
 
 
@@ -192,30 +192,19 @@ def main():
         state.update(worktree_path=worktree_path)
         state.save("adw_plan_iso")
         logger.info(f"Created worktree at {worktree_path}")
-        
-        # Setup worktree environment (create .ports.env)
-        setup_worktree_environment(worktree_path, backend_port, frontend_port, logger)
-        
-        # Run install_worktree command to set up the isolated environment
-        logger.info("Setting up isolated environment with custom ports")
-        install_request = AgentTemplateRequest(
-            agent_name="ops",
-            slash_command="/install_worktree",
-            args=[worktree_path, str(backend_port), str(frontend_port)],
-            adw_id=adw_id,
-            working_dir=worktree_path,  # Execute in worktree
-        )
-        
-        install_response = execute_template(install_request)
-        if not install_response.success:
-            logger.error(f"Error setting up worktree: {install_response.output}")
+
+        # Setup worktree environment using deterministic Python function
+        logger.info("Setting up isolated environment with custom ports (using Python, no AI)")
+        success, error = setup_worktree_complete(worktree_path, backend_port, frontend_port, logger)
+        if not success:
+            logger.error(f"Error setting up worktree: {error}")
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "ops", f"❌ Error setting up worktree: {install_response.output}"),
+                format_issue_message(adw_id, "ops", f"❌ Error setting up worktree: {error}"),
             )
             sys.exit(1)
-        
-        logger.info("Worktree environment setup complete")
+
+        logger.info("✅ Worktree environment setup complete (deterministic Python)")
 
     make_issue_comment(
         issue_number,

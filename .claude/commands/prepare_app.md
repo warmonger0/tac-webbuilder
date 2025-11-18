@@ -1,5 +1,8 @@
 # Prepare Application
 
+> **Note:** ADW workflows now use `adw_modules/app_lifecycle.py` for deterministic app preparation without AI calls.
+> This command is available for manual app setup or debugging purposes.
+
 Setup the application for the review or test.
 
 ## Variables
