@@ -7,7 +7,16 @@ AI Developer Workflow - Automated development via isolated git worktrees + Claud
 - **Isolation:** Each workflow runs in `trees/{adw_id}/` (complete repo copy)
 - **Ports:** Backend 9100-9114, Frontend 9200-9214 (supports 15 concurrent)
 - **State:** `agents/{adw_id}/adw_state.json` tracks progress
-- **Phases:** Plan → Build → Test → Review → Document → Ship → Cleanup
+- **Phases (Complete):** Plan → Build → Lint → Test → Review → Doc → Ship → Cleanup (ALL 8)
+- **Phases (Legacy):** Plan → Build → Test → Review → Document (5 only - missing lint, ship, cleanup)
+
+## New Features in Complete Workflows
+- **Lint Phase:** TypeScript/ESLint validation prevents deploying broken code
+- **Ship Phase:** Automatic PR approval and merge (in ZTE workflows)
+- **Cleanup Phase:** Automatic worktree removal and artifact organization
+- **External Tools:** Enabled by default for 70-95% token reduction
+- **Optimized Plan:** Optional flag for faster planning workflow
+- **Flag Support:** --skip-e2e, --skip-resolution, --no-external, --use-optimized-plan
 
 ## Cost Optimization
 - **Lightweight:** $0.20-0.50 for simple changes (CSS, text, single-file)
@@ -17,6 +26,20 @@ AI Developer Workflow - Automated development via isolated git worktrees + Claud
 Auto-routing via `adw_modules/complexity_analyzer.py`
 
 ## Quick Workflow Selection
+
+### Recommended Workflows (Production-Ready)
+```bash
+cd adws/
+
+# Stepwise refinement - analyzes issue complexity (ATOMIC vs DECOMPOSE)
+uv run adw_stepwise_iso.py <issue-number>
+
+# Complete SDLC with ALL 8 phases (Plan → Build → Lint → Test → Review → Doc → Ship → Cleanup)
+uv run adw_sdlc_complete_iso.py <issue-number> [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
+
+# Zero Touch Execution with ALL 8 phases + auto-merge (⚠️ auto-merges to main!)
+uv run adw_sdlc_complete_zte_iso.py <issue-number> [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
+```
 
 ### Entry Points (Create Worktrees)
 ```bash
@@ -34,14 +57,17 @@ uv run adw_lightweight_iso.py <issue-number>
 
 ### Complete Workflows
 ```bash
-# Full SDLC
-uv run adw_sdlc_iso.py <issue-number>
-
-# Zero Touch (auto-merge ⚠️)
-uv run adw_sdlc_zte_iso.py <issue-number>
-
 # Plan + Build only
 uv run adw_plan_build_iso.py <issue-number>
+```
+
+### Deprecated Workflows (Use Complete Versions)
+```bash
+# DEPRECATED: Missing lint phase - use adw_sdlc_complete_iso.py instead
+# uv run adw_sdlc_iso.py <issue-number>
+
+# DEPRECATED: Missing lint phase - use adw_sdlc_complete_zte_iso.py instead
+# uv run adw_sdlc_zte_iso.py <issue-number>
 ```
 
 ### Dependent Phases (Need Existing Worktree)

@@ -120,11 +120,38 @@ This refactoring will improve the foundation for:
 
 ## Getting Started
 
-Once approved, begin with:
-1. Create feature branch: `git checkout -b refactor/phase-1-server-services`
-2. Read [REFACTORING_PLAN.md](./REFACTORING_PLAN.md) Phase 1
-3. Start with Step 1.1: Create services directory structure
-4. Follow plan step-by-step with testing after each change
+### Quick Start (3 Steps)
+
+1. **Read the strategy:**
+   - [REFACTORING_ANALYSIS.md](./REFACTORING_ANALYSIS.md) - What needs to be fixed
+   - [REFACTORING_PLAN.md](./REFACTORING_PLAN.md) - Overall approach
+
+2. **Choose your phase:**
+   - [IMPLEMENTATION_ORCHESTRATION.md](./IMPLEMENTATION_ORCHESTRATION.md) - Master execution guide
+   - [phases/README.md](./phases/README.md) - Phase overview and progress tracking
+
+3. **Start executing:**
+   - Open the detailed phase plan (e.g., [phases/PHASE_1_DETAILED.md](./phases/PHASE_1_DETAILED.md))
+   - Create feature branch: `git checkout -b refactor/phase1-websocket-manager`
+   - Execute first workflow (e.g., Workflow 1.1.1)
+   - Follow tasks sequentially, run tests, commit
+
+### Detailed Implementation Plans (NEW!)
+
+Each phase has been broken down into **67 atomic workflow units** (1-3 hours each, completable in one ADW workflow):
+
+- **[Phase 1: Extract Server Services](./phases/PHASE_1_DETAILED.md)** - 25 workflows, 4-5 days
+  - WebSocket Manager, Workflow Service, Background Tasks, Health Service, Service Controller, Integration
+- **[Phase 2: Create Helper Utilities](./phases/PHASE_2_DETAILED.md)** - 12 workflows, 2-3 days
+  - DatabaseManager, LLMClient, ProcessRunner, Frontend Formatters
+- **[Phase 3: Split Large Core Modules](./phases/PHASE_3_DETAILED.md)** - 15 workflows, 4-5 days
+  - workflow_history.py split (8 workflows), workflow_analytics.py split (7 workflows)
+- **[Phase 4: Frontend Component Refactoring](./phases/PHASE_4_DETAILED.md)** - 16 workflows, 3-4 days
+  - WorkflowHistoryCard split (12 workflows), WebSocket hooks (4 workflows)
+- **[Phase 5: Fix Import Structure](./phases/PHASE_5_DETAILED.md)** - 5 workflows, 1-2 days
+  - Create shared package, update imports, eliminate path manipulation
+
+**Each workflow includes:** Estimated time, complexity, dependencies, input/output files, detailed tasks (6-10 steps), code examples, acceptance criteria, and verification commands.
 
 ---
 

@@ -4,6 +4,9 @@
 # ///
 
 """
+WARNING: DEPRECATED - This workflow is missing the Lint phase.
+Please use adw_sdlc_complete_zte_iso.py instead for the complete ZTE workflow.
+
 ADW SDLC ZTE Iso - Zero Touch Execution: Complete SDLC with automatic shipping
 
 Usage: uv run adw_sdlc_zte_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution]
@@ -39,6 +42,16 @@ from adw_modules.utils import setup_logger
 
 def main():
     """Main entry point."""
+    # Print deprecation warning
+    print("=" * 70)
+    print("WARNING: DEPRECATION NOTICE")
+    print("=" * 70)
+    print("This workflow is incomplete (missing Lint phase)")
+    print("Please use: adw_sdlc_complete_zte_iso.py")
+    print("Continuing execution...")
+    print("=" * 70)
+    print()
+
     # Check for flags
     skip_e2e = "--skip-e2e" in sys.argv
     skip_resolution = "--skip-resolution" in sys.argv

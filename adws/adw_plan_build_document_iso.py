@@ -4,6 +4,9 @@
 # ///
 
 """
+WARNING: DEPRECATED - This is a partial workflow chain.
+Please use adw_sdlc_complete_iso.py instead for the complete SDLC workflow.
+
 ADW Plan Build Document Iso - Compositional workflow for isolated planning, building, and documentation
 
 Usage: uv run adw_plan_build_document_iso.py <issue-number> [adw-id]
@@ -27,6 +30,16 @@ from adw_modules.workflow_ops import ensure_adw_id
 
 def main():
     """Main entry point."""
+    # Print deprecation warning
+    print("=" * 70)
+    print("WARNING: DEPRECATION NOTICE")
+    print("=" * 70)
+    print("This is a partial workflow (only Plan, Build, Document phases)")
+    print("Please use: adw_sdlc_complete_iso.py")
+    print("Continuing execution...")
+    print("=" * 70)
+    print()
+
     if len(sys.argv) < 2:
         print("Usage: uv run adw_plan_build_document_iso.py <issue-number> [adw-id]")
         print("\nThis runs the isolated plan, build, and document workflow:")

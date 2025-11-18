@@ -4,6 +4,9 @@
 # ///
 
 """
+WARNING: DEPRECATED - This is a partial workflow chain.
+Please use adw_sdlc_complete_iso.py instead for the complete SDLC workflow.
+
 ADW Plan Build Test Review Iso - Compositional workflow for isolated planning, building, testing, and reviewing
 
 Usage: uv run adw_plan_build_test_review_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution]
@@ -28,16 +31,26 @@ from adw_modules.workflow_ops import ensure_adw_id
 
 def main():
     """Main entry point."""
+    # Print deprecation warning
+    print("=" * 70)
+    print("WARNING: DEPRECATION NOTICE")
+    print("=" * 70)
+    print("This is a partial workflow (only Plan, Build, Test, Review phases)")
+    print("Please use: adw_sdlc_complete_iso.py")
+    print("Continuing execution...")
+    print("=" * 70)
+    print()
+
     # Check for flags
     skip_e2e = "--skip-e2e" in sys.argv
     skip_resolution = "--skip-resolution" in sys.argv
-    
+
     # Remove flags from argv
     if skip_e2e:
         sys.argv.remove("--skip-e2e")
     if skip_resolution:
         sys.argv.remove("--skip-resolution")
-    
+
     if len(sys.argv) < 2:
         print("Usage: uv run adw_plan_build_test_review_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution]")
         print("\nThis runs the isolated plan, build, test, and review workflow:")

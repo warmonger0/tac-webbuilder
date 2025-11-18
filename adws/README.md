@@ -84,11 +84,20 @@ uv run adw_plan_build_review_iso.py 123
 # Process with documentation (plan + build + document)
 uv run adw_plan_build_document_iso.py 123
 
-# Complete SDLC workflow in isolation
-uv run adw_sdlc_iso.py 123
+# Stepwise refinement analysis - decides ATOMIC vs DECOMPOSE
+uv run adw_stepwise_iso.py 123
 
-# Zero Touch Execution - Complete SDLC with auto-ship (⚠️ merges to main!)
-uv run adw_sdlc_zte_iso.py 123
+# Complete SDLC workflow with ALL 8 phases (Plan → Build → Lint → Test → Review → Doc → Ship → Cleanup)
+uv run adw_sdlc_complete_iso.py 123 [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
+
+# Zero Touch Execution - Complete SDLC with ALL 8 phases + auto-ship (⚠️ merges to main!)
+uv run adw_sdlc_complete_zte_iso.py 123 [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
+
+# DEPRECATED: Use adw_sdlc_complete_iso.py instead (missing lint phase)
+# uv run adw_sdlc_iso.py 123
+
+# DEPRECATED: Use adw_sdlc_complete_zte_iso.py instead (missing lint phase)
+# uv run adw_sdlc_zte_iso.py 123
 
 # Run individual isolated phases
 uv run adw_plan_iso.py 123              # Planning phase (creates worktree)
@@ -222,6 +231,31 @@ uv run adw_document_iso.py <issue-number> <adw-id>
 
 ### Orchestrator Scripts
 
+#### adw_stepwise_iso.py - Stepwise Refinement Analysis
+Analyzes GitHub issues to determine whether they should be processed atomically or decomposed into sub-tasks.
+
+**Usage:**
+```bash
+uv run adw_stepwise_iso.py <issue-number> [adw-id]
+```
+
+**What it does:**
+1. Fetches and analyzes issue complexity
+2. Uses `/stepwise_analysis` command to evaluate scope
+3. Decides between:
+   - **ATOMIC**: Single workflow execution (simple tasks)
+   - **DECOMPOSE**: Break into smaller sub-issues (complex tasks)
+4. For DECOMPOSE: Creates numbered sub-issues with clear dependencies
+5. Posts analysis results as GitHub comment
+6. Routes to appropriate workflow based on decision
+
+**Decision Criteria:**
+- File count and complexity
+- Cross-cutting concerns
+- Testing requirements
+- Integration complexity
+- Risk assessment
+
 #### adw_plan_build_iso.py - Isolated Plan + Build
 Runs planning and building in isolation.
 
@@ -262,7 +296,48 @@ Documentation pipeline in isolation.
 uv run adw_plan_build_document_iso.py <issue-number> [adw-id]
 ```
 
-#### adw_sdlc_iso.py - Complete Isolated SDLC
+#### adw_sdlc_complete_iso.py - Complete Isolated SDLC (ALL 8 Phases)
+Full Software Development Life Cycle with ALL 8 phases including lint validation.
+
+**Usage:**
+```bash
+uv run adw_sdlc_complete_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
+```
+
+**Phases (ALL 8):**
+1. **Plan**: Creates worktree and implementation spec
+2. **Build**: Implements solution in isolation
+3. **Lint**: Validates code quality (TypeScript, ESLint, formatting) - **NEW**
+4. **Test**: Runs tests with dedicated ports
+5. **Review**: Validates and captures screenshots
+6. **Document**: Generates comprehensive docs
+7. **Ship**: Approves and merges PR
+8. **Cleanup**: Removes worktree and organizes artifacts
+
+**Flags:**
+- `--skip-e2e`: Skip E2E tests during test phase
+- `--skip-resolution`: Skip auto-resolution of review blockers
+- `--no-external`: Don't use external test/build tools (default: uses external for 70-95% token reduction)
+- `--use-optimized-plan`: Use optimized planning workflow
+
+**Output:**
+- Isolated worktree at `trees/<adw_id>/`
+- Feature implementation on dedicated branch
+- Lint validation results
+- Test results with port isolation
+- Review screenshots from isolated instance
+- Complete documentation in `app_docs/`
+- Clean state after shipping
+
+**Key Improvements over adw_sdlc_iso.py:**
+- Added lint phase (was missing before)
+- Added cleanup phase (automatic resource management)
+- Added ship phase (complete automation)
+- External test tools enabled by default (70-95% token reduction)
+
+#### adw_sdlc_iso.py - Complete Isolated SDLC (DEPRECATED)
+**⚠️ DEPRECATED:** Use `adw_sdlc_complete_iso.py` instead. This version is missing the lint phase.
+
 Full Software Development Life Cycle in isolation.
 
 **Usage:**
@@ -270,12 +345,17 @@ Full Software Development Life Cycle in isolation.
 uv run adw_sdlc_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution]
 ```
 
-**Phases:**
+**Phases (5 only - incomplete):**
 1. **Plan**: Creates worktree and implementation spec
 2. **Build**: Implements solution in isolation
 3. **Test**: Runs tests with dedicated ports
 4. **Review**: Validates and captures screenshots
 5. **Document**: Generates comprehensive docs
+
+**Missing Phases:**
+- No lint validation (can deploy broken code)
+- No ship phase (manual PR merge required)
+- No cleanup phase (worktrees accumulate)
 
 **Output:**
 - Isolated worktree at `trees/<adw_id>/`
@@ -313,7 +393,49 @@ uv run adw_ship_iso.py <issue-number> <adw-id>
 - `worktree_path` exists
 - `backend_port` and `frontend_port` allocated
 
-#### adw_sdlc_zte_iso.py - Zero Touch Execution
+#### adw_sdlc_complete_zte_iso.py - Zero Touch Execution (ALL 8 Phases)
+Complete SDLC with ALL 8 phases including lint and automatic shipping - no human intervention required.
+
+**Usage:**
+```bash
+uv run adw_sdlc_complete_zte_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
+```
+
+**Phases (ALL 8):**
+1. **Plan**: Creates worktree and implementation spec
+2. **Build**: Implements solution in isolation
+3. **Lint**: Validates code quality (TypeScript, ESLint, formatting) - **NEW**
+4. **Test**: Runs tests (stops on failure)
+5. **Review**: Validates implementation (stops on failure)
+6. **Document**: Generates comprehensive docs
+7. **Ship**: Automatically approves and merges PR
+8. **Cleanup**: Removes worktree and organizes artifacts - **NEW**
+
+**Flags:**
+- `--skip-e2e`: Skip E2E tests during test phase
+- `--skip-resolution`: Skip auto-resolution of review blockers
+- `--no-external`: Don't use external test/build tools (default: uses external for 70-95% token reduction)
+- `--use-optimized-plan`: Use optimized planning workflow
+
+**⚠️ WARNING:** This workflow will automatically merge code to main if all phases pass!
+
+**Output:**
+- Complete feature implementation
+- Lint validation passed
+- Automatic PR approval
+- Code merged to main branch
+- Production deployment
+- Clean state (worktree removed)
+
+**Key Improvements over adw_sdlc_zte_iso.py:**
+- Added lint phase (prevents deploying broken code)
+- Added cleanup phase (automatic resource cleanup)
+- External test tools enabled by default (70-95% token reduction)
+- Optimized planning option
+
+#### adw_sdlc_zte_iso.py - Zero Touch Execution (DEPRECATED)
+**⚠️ DEPRECATED:** Use `adw_sdlc_complete_zte_iso.py` instead. This version is missing the lint and cleanup phases.
+
 Complete SDLC with automatic shipping - no human intervention required.
 
 **Usage:**
@@ -321,13 +443,17 @@ Complete SDLC with automatic shipping - no human intervention required.
 uv run adw_sdlc_zte_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution]
 ```
 
-**Phases:**
+**Phases (6 only - incomplete):**
 1. **Plan**: Creates worktree and implementation spec
 2. **Build**: Implements solution in isolation
 3. **Test**: Runs tests (stops on failure)
 4. **Review**: Validates implementation (stops on failure)
 5. **Document**: Generates comprehensive docs
 6. **Ship**: Automatically approves and merges PR
+
+**Missing Phases:**
+- No lint validation (can auto-merge broken code)
+- No cleanup phase (worktrees accumulate)
 
 **⚠️ WARNING:** This workflow will automatically merge code to main if all phases pass!
 
@@ -657,6 +783,15 @@ For detailed information, see:
 
 ## Common Usage Scenarios
 
+### Analyze issue complexity with stepwise refinement
+```bash
+# Analyze if issue should be atomic or decomposed
+uv run adw_stepwise_iso.py 789
+# Evaluates complexity and decides: ATOMIC or DECOMPOSE
+# For DECOMPOSE: Creates sub-issues automatically
+# For ATOMIC: Routes to appropriate workflow
+```
+
 ### Process a bug report in isolation
 ```bash
 # User reports bug in issue #789
@@ -673,19 +808,41 @@ uv run adw_plan_build_iso.py 103 &
 # Each gets its own worktree and ports
 ```
 
-### Run complete SDLC in isolation
+### Run complete SDLC with ALL 8 phases (RECOMMENDED)
 ```bash
-# Full SDLC with review and documentation
+# Full SDLC with ALL phases: Plan → Build → Lint → Test → Review → Doc → Ship → Cleanup
+uv run adw_sdlc_complete_iso.py 789
+# Creates worktree at trees/abc12345/
+# Runs on ports 9107 (backend) and 9207 (frontend)
+# Validates with lint before testing
+# Generates complete documentation with screenshots
+# Ships and cleans up automatically
+```
+
+### Run complete SDLC in isolation (DEPRECATED - missing lint)
+```bash
+# Full SDLC with review and documentation (missing lint phase)
 uv run adw_sdlc_iso.py 789
+# ⚠️ DEPRECATED: Use adw_sdlc_complete_iso.py instead
 # Creates worktree at trees/abc12345/
 # Runs on ports 9107 (backend) and 9207 (frontend)
 # Generates complete documentation with screenshots
 ```
 
-### Zero Touch Execution (Auto-ship)
+### Zero Touch Execution with ALL 8 phases (RECOMMENDED for auto-ship)
 ```bash
-# Complete SDLC with automatic PR merge
+# Complete SDLC with ALL phases + automatic PR merge
+uv run adw_sdlc_complete_zte_iso.py 789
+# ⚠️ WARNING: Automatically merges to main if all phases pass!
+# Creates worktree, implements, lints, tests, reviews, documents, ships, and cleans up
+# Uses external tools by default for 70-95% token reduction
+```
+
+### Zero Touch Execution (DEPRECATED - missing lint)
+```bash
+# Complete SDLC with automatic PR merge (missing lint phase)
 uv run adw_sdlc_zte_iso.py 789
+# ⚠️ DEPRECATED: Use adw_sdlc_complete_zte_iso.py instead
 # ⚠️ WARNING: Automatically merges to main if all phases pass!
 # Creates worktree, implements, tests, reviews, documents, and ships
 ```
@@ -734,19 +891,34 @@ uv run adw_triggers/trigger_webhook.py
 
 Include the workflow name in your issue body to trigger a specific isolated workflow:
 
+**Recommended Workflows:**
+- `adw_stepwise_iso` - Stepwise refinement analysis (decides ATOMIC vs DECOMPOSE)
+- `adw_sdlc_complete_iso` - Complete SDLC with ALL 8 phases (Plan → Build → Lint → Test → Review → Doc → Ship → Cleanup)
+- `adw_sdlc_complete_zte_iso` - Complete ZTE with ALL 8 phases + auto-merge
+
 **Available Workflows:**
 - `adw_plan_iso` - Isolated planning only
 - `adw_patch_iso` - Quick patch in isolation
 - `adw_plan_build_iso` - Plan and build in isolation
 - `adw_plan_build_test_iso` - Plan, build, and test in isolation
 - `adw_plan_build_test_review_iso` - Plan, build, test, and review in isolation
-- `adw_sdlc_iso` - Complete SDLC in isolation
+
+**Deprecated Workflows (use complete versions instead):**
+- `adw_sdlc_iso` - Complete SDLC (missing lint phase) - Use `adw_sdlc_complete_iso` instead
+- `adw_sdlc_zte_iso` - Zero Touch Execution (missing lint phase) - Use `adw_sdlc_complete_zte_iso` instead
 
 **Example Issue:**
 ```
 Title: Add export functionality
 Body: Please add the ability to export data to CSV.
-Include workflow: adw_plan_build_iso
+Include workflow: adw_sdlc_complete_iso
+```
+
+**Example with Flags:**
+```
+Title: Add export functionality
+Body: Please add the ability to export data to CSV.
+Include workflow: adw_sdlc_complete_iso --skip-e2e --use-optimized-plan
 ```
 
 **Note:** Dependent workflows (`adw_build_iso`, `adw_test_iso`, `adw_review_iso`, `adw_document_iso`) require an existing worktree and cannot be triggered directly via webhook.
@@ -1026,12 +1198,16 @@ app_docs/                         # Generated documentation
 - `adw_document_iso.py` - Isolated documentation workflow
 
 #### Orchestrators
+- `adw_stepwise_iso.py` - Stepwise refinement analysis (ATOMIC vs DECOMPOSE)
 - `adw_plan_build_iso.py` - Plan & build in isolation
 - `adw_plan_build_test_iso.py` - Plan & build & test in isolation
 - `adw_plan_build_test_review_iso.py` - Plan & build & test & review in isolation
 - `adw_plan_build_review_iso.py` - Plan & build & review in isolation
 - `adw_plan_build_document_iso.py` - Plan & build & document in isolation
-- `adw_sdlc_iso.py` - Complete SDLC in isolation
+- `adw_sdlc_complete_iso.py` - Complete SDLC with ALL 8 phases (RECOMMENDED)
+- `adw_sdlc_complete_zte_iso.py` - Complete ZTE with ALL 8 phases + auto-merge (RECOMMENDED)
+- `adw_sdlc_iso.py` - Complete SDLC (DEPRECATED - missing lint phase)
+- `adw_sdlc_zte_iso.py` - Zero Touch Execution (DEPRECATED - missing lint phase)
 
 ### Branch Naming
 ```

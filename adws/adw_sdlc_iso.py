@@ -4,6 +4,9 @@
 # ///
 
 """
+WARNING: DEPRECATED - This workflow is missing Ship and Cleanup phases.
+Please use adw_sdlc_complete_iso.py instead for the complete SDLC workflow.
+
 ADW SDLC Iso - Complete Software Development Life Cycle workflow with isolation
 
 Usage: uv run adw_sdlc_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution]
@@ -31,6 +34,16 @@ from adw_modules.workflow_ops import ensure_adw_id
 
 def main():
     """Main entry point."""
+    # Print deprecation warning
+    print("=" * 70)
+    print("WARNING: DEPRECATION NOTICE")
+    print("=" * 70)
+    print("This workflow is incomplete (missing Ship, Cleanup phases)")
+    print("Please use: adw_sdlc_complete_iso.py")
+    print("Continuing execution...")
+    print("=" * 70)
+    print()
+
     # Check for flags
     skip_e2e = "--skip-e2e" in sys.argv
     skip_resolution = "--skip-resolution" in sys.argv
