@@ -1,9 +1,60 @@
 {
   "adw_id": "4c973d9a",
   "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/4c973d9a",
-  "created_at": "2025-11-18T14:28:07.690994",
+  "created_at": "2025-11-18T14:30:57.677535",
+  "branch_name": "chore-issue-40-adw-4c973d9a-integrate-websocket-manager",
   "changed_files": [
+    ".adw-context.json",
     ".mcp.json",
+    "app/server/services/websocket_manager.py",
     "playwright-mcp-config.json"
-  ]
-}
+  ],
+  "commits": [
+    {
+      "sha": "93b34f5",
+      "message": "sdlc_implementor: chore: update ### workflow 1.3: integrate websocket"
+    },
+    {
+      "sha": "3ad8536",
+      "message": "sdlc_planner: chore: update ### workflow 1.3: integrate websocket"
+    }
+  ],
+  "plan_file": "specs/issue-40-adw-4c973d9a-sdlc_planner-workflow-1-3-integrate-websocket-manager-into-serv.md",
+  "issue": {
+    "number": 40,
+    "title": "### Workflow 1.3: Integrate WebSocket Manager into server.py\n**Estimated Time:** 30 minutes\n**Comple",
+    "body": "## Description\n### Workflow 1.3: Integrate WebSocket Manager into server.py\n**Estimated Time:** 30 minutes\n**Complexity:** Low\n**Dependencies:** Workflow 1.1, 1.2\n\n**Input Files:**\n- `app/server/server.py`\n- `app/server/services/websocket_manager.py`\n\n**Output Files:**\n- `app/server/server.py` (modified - remove lines 124-154)\n\n**Tasks:**\n1. Add import statement for ConnectionManager\n2. Remove ConnectionManager class definition\n3. Verify all WebSocket routes still work\n4. Update any type hints if needed\n\n**Code Changes:**\n```python\n# Add at top of server.py\nfrom services.websocket_manager import ConnectionManager\n\n# Remove lines 124-154 (ConnectionManager class)\n\n# Existing usage remains unchanged:\nmanager = ConnectionManager()\n```\n\n**Acceptance Criteria:**\n- [ ] server.py imports ConnectionManager successfully\n- [ ] WebSocket endpoints work correctly\n- [ ] All existing tests still pass\n- [ ] Integration tests pass\n\n**Verification Commands:**\n```bash\n# Start server and test WebSocket connection\ncd app/server && python server.py &\nsleep 2\ncurl -i -N -H \"Connection: Upgrade\" -H \"Upgrade: websocket\" http://localhost:8000/ws/workflows\n```\n**Execution:**\n```bash\ncd adws/\nuv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan\n```\n---\n\n\n## Classification\nExplicit workflow: `adw_sdlc_complete_zte_iso` (user specified)\n\n## Workflow\nadw_sdlc_complete_zte_iso with base model",
+    "state": "OPEN",
+    "author": {
+      "id": "MDQ6VXNlcjExNTk1NTE3",
+      "login": "warmonger0",
+      "name": "",
+      "is_bot": false
+    },
+    "assignees": [],
+    "labels": [
+      {
+        "id": "LA_kwDOQT8ln88AAAACQH6zig",
+        "name": "feature",
+        "color": "0e8a16",
+        "description": ""
+      },
+      {
+        "id": "LA_kwDOQT8ln88AAAACQH6zoQ",
+        "name": "explicit-workflow",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "milestone": null,
+    "comments": [
+      {
+        "id": "IC_kwDOQT8ln87Tk-Xn",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] \ud83e\udd16 ADW Webhook: Detected `adw_sdlc_complete_zte_iso` workflow request\n\nStarting workflow with ID: `4c973d9a`\nWorkflow: `adw_sdlc_complete_zte_iso` \ud83c\udfd7\ufe0f\nModel Set: `base` \u2699\ufe0f\nReason: New issue with adw_sdlc_complete_zte_iso workflow\n\nLogs will be available at: `agents/4c973d9a/adw_sdlc_complete_zte_iso/`",
+        "createdAt": 
