@@ -429,7 +429,7 @@ def update_workflow_history(
         cursor.execute(query, values)
 
         if cursor.rowcount > 0:
-            logger.info(f"[DB] Updated workflow history for ADW {adw_id}")
+            logger.debug(f"[DB] Updated workflow history for ADW {adw_id}")
             return True
         else:
             logger.warning(f"[DB] No workflow found with ADW ID {adw_id}")
@@ -604,7 +604,7 @@ def get_workflow_history(
 
             results.append(result)
 
-        logger.info(
+        logger.debug(
             f"[DB] Retrieved {len(results)} workflows (total: {total_count}, "
             f"offset: {offset}, limit: {limit})"
         )
@@ -724,7 +724,7 @@ def get_history_analytics() -> Dict:
             "avg_cache_efficiency": avg_cache_efficiency,
         }
 
-        logger.info(f"[DB] Generated analytics: {analytics}")
+        logger.debug(f"[DB] Generated analytics: {analytics}")
         return analytics
 
 
@@ -801,7 +801,7 @@ def scan_agents_directory() -> List[Dict]:
             logger.error(f"[SCAN] Error parsing {state_file}: {e}")
             continue
 
-    logger.info(f"[SCAN] Scanned agents directory, found {len(workflows)} workflows")
+    logger.debug(f"[SCAN] Scanned agents directory, found {len(workflows)} workflows")
     return workflows
 
 
@@ -1006,7 +1006,7 @@ def sync_workflow_history() -> int:
                     updates["output_tokens"] = workflow_data.get("output_tokens", 0)
                     updates["total_tokens"] = workflow_data.get("total_tokens", 0)
                     updates["cache_efficiency_percent"] = workflow_data.get("cache_efficiency_percent", 0.0)
-                    logger.info(f"[SYNC] Cost update for {adw_id} ({status}): ${old_cost:.4f} → ${new_cost:.4f} ({update_reason})")
+                    logger.debug(f"[SYNC] Cost update for {adw_id} ({status}): ${old_cost:.4f} → ${new_cost:.4f} ({update_reason})")
                 else:
                     logger.debug(f"[SYNC] Cost update skipped for {adw_id} ({status}): {update_reason}")
 
@@ -1047,7 +1047,7 @@ def sync_workflow_history() -> int:
             synced_count += 1
 
     # Phase 3E: Second pass - Calculate similar_workflow_ids for all workflows
-    logger.info("[SYNC] Phase 3E: Calculating similar workflows...")
+    logger.debug("[SYNC] Phase 3E: Calculating similar workflows...")
     try:
         from .workflow_analytics import find_similar_workflows
         import json
@@ -1058,7 +1058,14 @@ def sync_workflow_history() -> int:
             cursor.execute("SELECT * FROM workflow_history")
             all_workflows = [dict(row) for row in cursor.fetchall()]
 
-        logger.info(f"[SYNC] Found {len(all_workflows)} workflows for similarity analysis")
+        # Ensure workflow_id field exists for pattern learning (maps to id field)
+        for workflow in all_workflows:
+            if 'id' in workflow and 'workflow_id' not in workflow:
+                workflow['workflow_id'] = workflow['id']
+            elif 'id' not in workflow:
+                logger.warning(f"[SYNC] Workflow {workflow.get('adw_id', 'unknown')} missing 'id' field. Keys: {list(workflow.keys())[:5]}")
+
+        logger.debug(f"[SYNC] Found {len(all_workflows)} workflows for similarity analysis")
 
         # Calculate similar workflows for each workflow
         similarity_updates = 0
@@ -1086,14 +1093,14 @@ def sync_workflow_history() -> int:
             except Exception as e:
                 logger.warning(f"[SYNC] Failed to calculate similar workflows for {workflow['adw_id']}: {e}")
 
-        logger.info(f"[SYNC] Updated similar workflows for {similarity_updates} workflows")
+        logger.debug(f"[SYNC] Updated similar workflows for {similarity_updates} workflows")
 
     except Exception as e:
         logger.error(f"[SYNC] Failed to calculate similar workflows (Phase 3E): {e}")
         # Don't fail the entire sync if similarity detection fails
 
     # Phase 1.3: Pattern Learning Pass
-    logger.info("[SYNC] Phase: Pattern Learning")
+    logger.debug("[SYNC] Phase: Pattern Learning")
     try:
         from .pattern_persistence import process_and_persist_workflow
 
@@ -1118,7 +1125,7 @@ def sync_workflow_history() -> int:
                         f"[SYNC] Failed to process patterns for {workflow['adw_id']}: {e}"
                     )
 
-        logger.info(
+        logger.debug(
             f"[SYNC] Pattern learning complete: "
             f"{patterns_detected} patterns detected, {new_patterns} new"
         )

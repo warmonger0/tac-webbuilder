@@ -14,6 +14,7 @@ import asyncio
 import json
 import subprocess
 import urllib.request
+import time
 
 from core.data_models import (
     FileUploadResponse,
@@ -99,6 +100,10 @@ logging.basicConfig(
 # Create logger for this module
 logger = logging.getLogger(__name__)
 
+# Cache for workflow history sync to prevent redundant operations
+_last_sync_time = 0
+_sync_cache_seconds = 10  # Only sync once every 10 seconds
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
@@ -172,8 +177,8 @@ def get_workflows_data() -> List[Workflow]:
             try:
                 issue_number = int(issue_num_raw)
             except (ValueError, TypeError):
-                # Skip workflows with invalid issue numbers
-                logger.warning(f"[WARNING] Skipping workflow {adw_id} with invalid issue_number: {issue_num_raw}")
+                # Skip workflows with invalid issue numbers (debug workflows, tests, etc.)
+                logger.debug(f"[WORKFLOW] Skipping workflow {adw_id} with invalid issue_number: {issue_num_raw}")
                 continue
 
             # Check GitHub issue status - only include OPEN issues
@@ -191,11 +196,11 @@ def get_workflows_data() -> List[Workflow]:
                         # Skip closed workflows
                         continue
                 else:
-                    # If gh command fails, skip this workflow
-                    logger.warning(f"[WARNING] Could not check status for issue #{issue_number}")
+                    # If gh command fails, skip this workflow (issue may not exist or be accessible)
+                    logger.debug(f"[WORKFLOW] Could not check status for issue #{issue_number}")
                     continue
             except Exception as e:
-                logger.warning(f"[WARNING] Failed to check GitHub status for issue #{issue_number}: {e}")
+                logger.debug(f"[WORKFLOW] Failed to check GitHub status for issue #{issue_number}: {e}")
                 continue
 
             # Determine current phase by checking which phase directories exist
@@ -317,9 +322,17 @@ async def watch_routes() -> None:
 
 def get_workflow_history_data(filters: Optional[WorkflowHistoryFilters] = None) -> WorkflowHistoryResponse:
     """Helper function to get workflow history data"""
+    global _last_sync_time
+
     try:
-        # Sync workflow history from agents directory first
-        sync_workflow_history()
+        # Only sync if cache has expired (prevents redundant syncs on rapid requests)
+        current_time = time.time()
+        if current_time - _last_sync_time >= _sync_cache_seconds:
+            logger.debug(f"[SYNC] Cache expired, syncing workflow history (last sync {current_time - _last_sync_time:.1f}s ago)")
+            sync_workflow_history()
+            _last_sync_time = current_time
+        else:
+            logger.debug(f"[SYNC] Using cached data (last sync {current_time - _last_sync_time:.1f}s ago)")
 
         # Apply filters if provided
         filter_params = {}

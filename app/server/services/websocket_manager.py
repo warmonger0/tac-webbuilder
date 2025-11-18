@@ -74,7 +74,7 @@ class ConnectionManager:
         """
         await websocket.accept()
         self.active_connections.add(websocket)
-        logger.info(f"[WS] Client connected. Total connections: {len(self.active_connections)}")
+        logger.debug(f"[WS] Client connected. Total connections: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket) -> None:
         """
@@ -92,7 +92,7 @@ class ConnectionManager:
             [WS] Client disconnected. Total connections: 0
         """
         self.active_connections.discard(websocket)
-        logger.info(f"[WS] Client disconnected. Total connections: {len(self.active_connections)}")
+        logger.debug(f"[WS] Client disconnected. Total connections: {len(self.active_connections)}")
 
     async def broadcast(self, message: dict) -> None:
         """
@@ -120,7 +120,7 @@ class ConnectionManager:
         if not self.active_connections:
             return
 
-        logger.info(f"[WS] Broadcasting message to {len(self.active_connections)} clients")
+        logger.debug(f"[WS] Broadcasting message to {len(self.active_connections)} clients")
         disconnected = set()
 
         for connection in self.active_connections:
@@ -135,4 +135,4 @@ class ConnectionManager:
             self.disconnect(connection)
 
         if not disconnected:
-            logger.info(f"[WS] Broadcast successful to {len(self.active_connections)} clients")
+            logger.debug(f"[WS] Broadcast successful to {len(self.active_connections)} clients")

@@ -71,7 +71,7 @@ def parse_jsonl_file(file_path: Path) -> Optional[Dict]:
                 continue
 
         if not result_msg:
-            logger.warning(f"No result message found in {file_path}")
+            logger.debug(f"No result message found in {file_path}")
             return None
 
         # Extract usage statistics
