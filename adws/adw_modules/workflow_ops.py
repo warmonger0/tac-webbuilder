@@ -6,7 +6,8 @@ import logging
 import os
 import subprocess
 import re
-from typing import Tuple, Optional
+from datetime import datetime
+from typing import Tuple, Optional, Dict, Any, List
 from adw_modules.data_types import (
     AgentTemplateRequest,
     GitHubIssue,
@@ -66,6 +67,64 @@ def format_issue_message(
     if session_id:
         return f"{ADW_BOT_IDENTIFIER} {adw_id}_{agent_name}_{session_id}: {message}"
     return f"{ADW_BOT_IDENTIFIER} {adw_id}_{agent_name}: {message}"
+
+
+def create_context_file(
+    worktree_path: str,
+    adw_id: str,
+    context_data: Dict[str, Any],
+    logger: Optional[logging.Logger] = None
+) -> str:
+    """Create a .adw-context.json file in the worktree root with runtime context.
+
+    This file provides pre-computed paths and context to agents, eliminating the need
+    for agents to run git commands or discover files themselves.
+
+    Args:
+        worktree_path: Absolute path to the worktree root
+        adw_id: ADW workflow ID
+        context_data: Dictionary of context to write (will be merged with defaults)
+        logger: Optional logger instance
+
+    Returns:
+        Absolute path to the created context file
+
+    Example:
+        create_context_file(
+            "/path/to/trees/adw-12345678",
+            "adw-12345678",
+            {
+                "spec_file": "/abs/path/to/spec.md",
+                "changed_files": ["file1.py", "file2.tsx"],
+                "patch_file_path": "specs/patch/patch-adw-12345678.md"
+            }
+        )
+    """
+    # Ensure worktree_path is absolute
+    if not os.path.isabs(worktree_path):
+        worktree_path = os.path.abspath(worktree_path)
+
+    # Build context with defaults
+    context = {
+        "adw_id": adw_id,
+        "worktree_path": worktree_path,
+        "created_at": datetime.now().isoformat(),
+    }
+
+    # Merge with provided context
+    context.update(context_data)
+
+    # Write to worktree root as hidden file
+    context_file = os.path.join(worktree_path, ".adw-context.json")
+
+    with open(context_file, "w") as f:
+        json.dump(context, f, indent=2)
+
+    if logger:
+        logger.info(f"Created context file: {context_file}")
+        logger.debug(f"Context data: {json.dumps(context, indent=2)}")
+
+    return context_file
 
 
 def extract_adw_info_simple(text: str) -> ADWExtractionResult:
@@ -234,12 +293,27 @@ def build_plan(
     logger: logging.Logger,
     working_dir: Optional[str] = None,
     plan_file_path: Optional[str] = None,
+    state: Optional[ADWState] = None,
 ) -> AgentPromptResponse:
     """Build implementation plan for the issue using the specified command."""
     # Use minimal payload like classify_issue does
     minimal_issue_json = issue.model_dump_json(
         by_alias=True, include={"number", "title", "body"}
     )
+
+    # Optionally create context file for planning (minimal - just worktree info)
+    worktree_path = working_dir or os.getcwd()
+    context_data = {}
+
+    if state:
+        if state.get("backend_port"):
+            context_data["backend_port"] = state.get("backend_port")
+        if state.get("frontend_port"):
+            context_data["frontend_port"] = state.get("frontend_port")
+
+    # Only create context file if we have useful data
+    if context_data:
+        create_context_file(worktree_path, adw_id, context_data, logger)
 
     # Build args list - include plan_file_path if provided
     args = [str(issue.number), adw_id, minimal_issue_json]
@@ -273,10 +347,42 @@ def implement_plan(
     logger: logging.Logger,
     agent_name: Optional[str] = None,
     working_dir: Optional[str] = None,
+    state: Optional[ADWState] = None,
 ) -> AgentPromptResponse:
     """Implement the plan using the /implement command."""
     # Use provided agent_name or default to AGENT_IMPLEMENTOR
     implementor_name = agent_name or AGENT_IMPLEMENTOR
+
+    # Create context file with available information
+    worktree_path = working_dir or os.getcwd()
+    context_data = {}
+
+    # Add state information if available
+    if state:
+        if state.get("spec_file"):
+            context_data["spec_file"] = state.get("spec_file")
+        if state.get("backend_port"):
+            context_data["backend_port"] = state.get("backend_port")
+        if state.get("frontend_port"):
+            context_data["frontend_port"] = state.get("frontend_port")
+
+    # Pre-compute changed files if in a git repository
+    try:
+        result = subprocess.run(
+            ["git", "diff", "origin/main", "--name-only"],
+            capture_output=True,
+            text=True,
+            cwd=worktree_path,
+            timeout=5
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            context_data["changed_files"] = result.stdout.strip().split('\n')
+    except Exception as e:
+        logger.debug(f"Could not get changed files: {e}")
+
+    # Only create context file if we have data
+    if context_data:
+        create_context_file(worktree_path, adw_id, context_data, logger)
 
     implement_template_request = AgentTemplateRequest(
         agent_name=implementor_name,
@@ -372,33 +478,59 @@ def create_pull_request(
     plan_file = state.get("plan_file") or "No plan file (test run)"
     adw_id = state.get("adw_id")
 
-    # If we don't have issue data, try to construct minimal data
+    # PRE-COMPUTE PR context (deterministic Python, no AI needed)
+    # Get changed files
+    result = subprocess.run(
+        ["git", "diff", "origin/main...HEAD", "--name-only"],
+        capture_output=True,
+        text=True,
+        cwd=working_dir,
+        timeout=5
+    )
+    changed_files = result.stdout.strip().split('\n') if result.returncode == 0 and result.stdout.strip() else []
+
+    # Get commits
+    result = subprocess.run(
+        ["git", "log", "origin/main..HEAD", "--oneline"],
+        capture_output=True,
+        text=True,
+        cwd=working_dir,
+        timeout=5
+    )
+    commits = []
+    if result.returncode == 0 and result.stdout.strip():
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                parts = line.split(' ', 1)
+                sha = parts[0]
+                message = parts[1] if len(parts) > 1 else ""
+                commits.append({"sha": sha, "message": message})
+
+    # Create context file with PR data
+    context_data = {
+        "branch_name": branch_name,
+        "changed_files": changed_files,
+        "commits": commits,
+        "plan_file": plan_file,
+    }
+
+    # Add issue data to context
     if not issue:
         issue_data = state.get("issue", {})
-        issue_json = json.dumps(issue_data) if issue_data else "{}"
+        context_data["issue"] = issue_data if issue_data else {}
     elif isinstance(issue, dict):
-        # Try to reconstruct as GitHubIssue model which handles datetime serialization
-        from adw_modules.data_types import GitHubIssue
-
-        try:
-            issue_model = GitHubIssue(**issue)
-            # Use minimal payload like classify_issue does
-            issue_json = issue_model.model_dump_json(
-                by_alias=True, include={"number", "title", "body"}
-            )
-        except Exception:
-            # Fallback: use json.dumps with default str converter for datetime
-            issue_json = json.dumps(issue, default=str)
+        context_data["issue"] = issue
     else:
-        # Use minimal payload like classify_issue does
-        issue_json = issue.model_dump_json(
-            by_alias=True, include={"number", "title", "body"}
-        )
+        context_data["issue"] = issue.model_dump(by_alias=True)
 
+    # Create context file
+    create_context_file(working_dir, adw_id, context_data, logger)
+
+    # Simplified request - agent reads everything from context
     request = AgentTemplateRequest(
         agent_name=AGENT_PR_CREATOR,
         slash_command="/pull_request",
-        args=[branch_name, issue_json, plan_file, adw_id],
+        args=[adw_id],  # Just need ADW ID!
         adw_id=adw_id,
         working_dir=working_dir,
     )
@@ -515,41 +647,6 @@ def find_existing_branch_for_issue(
     return None
 
 
-def find_plan_for_issue(
-    issue_number: str, adw_id: Optional[str] = None
-) -> Optional[str]:
-    """Find plan file for the given issue number and optional adw_id.
-    Returns path to plan file if found, None otherwise."""
-    import os
-
-    # Get project root
-    project_root = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    )
-    agents_dir = os.path.join(project_root, "agents")
-
-    if not os.path.exists(agents_dir):
-        return None
-
-    # If adw_id is provided, check specific directory first
-    if adw_id:
-        plan_path = os.path.join(agents_dir, adw_id, AGENT_PLANNER, "plan.md")
-        if os.path.exists(plan_path):
-            return plan_path
-
-    # Otherwise, search all agent directories
-    for agent_id in os.listdir(agents_dir):
-        agent_path = os.path.join(agents_dir, agent_id)
-        if os.path.isdir(agent_path):
-            plan_path = os.path.join(agent_path, AGENT_PLANNER, "plan.md")
-            if os.path.exists(plan_path):
-                # Check if this plan is for our issue by reading branch info or checking commits
-                # For now, return the first plan found (can be improved)
-                return plan_path
-
-    return None
-
-
 def create_or_find_branch(
     issue_number: str,
     issue: GitHubIssue,
@@ -638,73 +735,25 @@ def create_or_find_branch(
 
 
 def find_spec_file(state: ADWState, logger: logging.Logger) -> Optional[str]:
-    """Find the spec file from state or by examining git diff.
+    """Find the spec file from state - fail fast if not present.
 
     For isolated workflows, automatically uses worktree_path from state.
     """
-    # Get worktree path if in isolated workflow
     worktree_path = state.get("worktree_path")
-
-    # Check if spec file is already in state (from plan phase)
     spec_file = state.get("plan_file")
-    if spec_file:
-        # If worktree_path exists and spec_file is relative, make it absolute
-        if worktree_path and not os.path.isabs(spec_file):
-            spec_file = os.path.join(worktree_path, spec_file)
 
-        if os.path.exists(spec_file):
-            logger.info(f"Using spec file from state: {spec_file}")
-            return spec_file
+    if not spec_file:
+        raise ValueError("No plan_file in state - run planning phase first")
 
-    # Otherwise, try to find it from git diff
-    logger.info("Looking for spec file in git diff")
-    result = subprocess.run(
-        ["git", "diff", "origin/main", "--name-only"],
-        capture_output=True,
-        text=True,
-        cwd=worktree_path,
-    )
+    # Make absolute if needed
+    if worktree_path and not os.path.isabs(spec_file):
+        spec_file = os.path.join(worktree_path, spec_file)
 
-    if result.returncode == 0:
-        files = result.stdout.strip().split("\n")
-        spec_files = [f for f in files if f.startswith("specs/") and f.endswith(".md")]
+    if not os.path.exists(spec_file):
+        raise ValueError(f"Spec file not found: {spec_file}")
 
-        if spec_files:
-            # Use the first spec file found
-            spec_file = spec_files[0]
-            if worktree_path:
-                spec_file = os.path.join(worktree_path, spec_file)
-            logger.info(f"Found spec file: {spec_file}")
-            return spec_file
-
-    # If still not found, try to derive from branch name
-    branch_name = state.get("branch_name")
-    if branch_name:
-        # Extract issue number from branch name
-        import re
-
-        match = re.search(r"issue-(\d+)", branch_name)
-        if match:
-            issue_num = match.group(1)
-            adw_id = state.get("adw_id")
-
-            # Look for spec files matching the pattern
-            import glob
-
-            # Use worktree_path if provided, otherwise current directory
-            search_dir = worktree_path if worktree_path else os.getcwd()
-            pattern = os.path.join(
-                search_dir, f"specs/issue-{issue_num}-adw-{adw_id}*.md"
-            )
-            spec_files = glob.glob(pattern)
-
-            if spec_files:
-                spec_file = spec_files[0]
-                logger.info(f"Found spec file by pattern: {spec_file}")
-                return spec_file
-
-    logger.warning("No spec file found")
-    return None
+    logger.info(f"Using spec file from state: {spec_file}")
+    return spec_file
 
 
 def create_and_implement_patch(
@@ -715,24 +764,38 @@ def create_and_implement_patch(
     agent_name_implementor: str,
     spec_path: Optional[str] = None,
     issue_screenshots: Optional[str] = None,
+    target_files: Optional[list] = None,
     working_dir: Optional[str] = None,
 ) -> Tuple[Optional[str], AgentPromptResponse]:
     """Create a patch plan and implement it.
     Returns (patch_file_path, implement_response) tuple."""
 
-    # Create patch plan using /patch command
-    args = [adw_id, review_change_request]
+    # PRE-COMPUTE patch file path (deterministic, no parsing needed)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    issue_slug = re.sub(r'[^a-z0-9]+', '-', review_change_request[:30].lower()).strip('-')
+    expected_patch_file = f"specs/patch/patch-adw-{adw_id}-{timestamp}-{issue_slug}.md"
 
-    # Add optional arguments in the correct order
+    logger.info(f"Pre-computed patch file path: {expected_patch_file}")
+
+    # Create context file with pre-computed paths
+    worktree_path = working_dir or os.getcwd()
+    context_data = {
+        "patch_file_path": expected_patch_file,
+    }
+
     if spec_path:
-        args.append(spec_path)
-    else:
-        args.append("")  # Empty string for optional spec_path
-
-    args.append(agent_name_planner)
+        context_data["spec_file"] = spec_path
 
     if issue_screenshots:
-        args.append(issue_screenshots)
+        context_data["issue_screenshots"] = issue_screenshots.split(',') if isinstance(issue_screenshots, str) else issue_screenshots
+
+    if target_files:
+        context_data["target_files"] = target_files
+
+    create_context_file(worktree_path, adw_id, context_data, logger)
+
+    # Create patch plan using /patch command (simplified args)
+    args = [adw_id, review_change_request]
 
     request = AgentTemplateRequest(
         agent_name=agent_name_planner,
@@ -754,102 +817,13 @@ def create_and_implement_patch(
 
     if not response.success:
         logger.error(f"Error creating patch plan: {response.output}")
-        # Return None and a failed response
         return None, AgentPromptResponse(
             output=f"Failed to create patch plan: {response.output}", success=False
         )
 
-    # Extract the patch plan file path from the response
-    patch_file_path_raw = response.output.strip()
-
-    # Extract just the file path if agent added extra text
-    # Look for lines that look like file paths (contain "specs/patch/" and end with ".md")
-    for line in patch_file_path_raw.split('\n'):
-        line = line.strip()
-        if 'specs/patch/' in line and line.endswith('.md'):
-            # Remove any leading/trailing quotes or backticks
-            line = line.strip('`').strip('"').strip("'")
-            # If line starts with specs/ or /, use it
-            if line.startswith('specs/') or line.startswith('/'):
-                patch_file_path_raw = line
-                break
-
-    logger.info(f"Agent reported patch file: {patch_file_path_raw}")
-
-    # Handle both absolute and relative paths with fallback recovery
-    import shutil
-    patch_file_path = None
-
-    if os.path.isabs(patch_file_path_raw):
-        # Agent returned absolute path
-        if os.path.exists(patch_file_path_raw):
-            if working_dir and working_dir in patch_file_path_raw:
-                # File is correctly in worktree
-                logger.info(f"Patch file found at absolute path in worktree: {patch_file_path_raw}")
-                patch_file_path = os.path.relpath(patch_file_path_raw, working_dir)
-            elif working_dir:
-                # File is in parent repo - move it to worktree
-                logger.warning(f"Patch file created in parent repo, moving to worktree")
-                # Extract relative path from absolute path
-                if "specs/patch/" in patch_file_path_raw:
-                    relative_path = "specs/patch/" + os.path.basename(patch_file_path_raw)
-                else:
-                    relative_path = "specs/patch/" + os.path.basename(patch_file_path_raw)
-                worktree_patch_path = os.path.join(working_dir, relative_path)
-                os.makedirs(os.path.dirname(worktree_patch_path), exist_ok=True)
-                shutil.move(patch_file_path_raw, worktree_patch_path)
-                patch_file_path = relative_path
-                logger.warning(f"Moved patch file from parent to worktree: {relative_path}")
-            else:
-                # No worktree context, use absolute path
-                patch_file_path = patch_file_path_raw
-        else:
-            logger.error(f"Patch file does not exist at reported absolute path: {patch_file_path_raw}")
-            return None, AgentPromptResponse(
-                output=f"Patch file not found: {patch_file_path_raw}", success=False
-            )
-    else:
-        # Agent returned relative path
-        if working_dir:
-            # Check worktree first
-            worktree_patch_path = os.path.join(working_dir, patch_file_path_raw)
-            if os.path.exists(worktree_patch_path):
-                # File correctly in worktree
-                logger.info(f"Patch file found in worktree: {patch_file_path_raw}")
-                patch_file_path = patch_file_path_raw
-            else:
-                # Check parent repo as fallback
-                parent_repo_path = os.path.dirname(working_dir)
-                parent_patch_path = os.path.join(parent_repo_path, patch_file_path_raw)
-                if os.path.exists(parent_patch_path):
-                    logger.warning(f"Patch file created in parent repo, moving to worktree")
-                    os.makedirs(os.path.dirname(worktree_patch_path), exist_ok=True)
-                    shutil.move(parent_patch_path, worktree_patch_path)
-                    patch_file_path = patch_file_path_raw
-                    logger.warning(f"Moved patch file from parent to worktree: {patch_file_path_raw}")
-                else:
-                    logger.error(f"Patch file does not exist in worktree or parent: {patch_file_path_raw}")
-                    return None, AgentPromptResponse(
-                        output=f"Patch file not found: {patch_file_path_raw}", success=False
-                    )
-        else:
-            # No worktree, just validate it exists
-            if os.path.exists(patch_file_path_raw):
-                patch_file_path = patch_file_path_raw
-            else:
-                logger.error(f"Patch file does not exist: {patch_file_path_raw}")
-                return None, AgentPromptResponse(
-                    output=f"Patch file not found: {patch_file_path_raw}", success=False
-                )
-
-    # Validate that it looks like a file path
-    if "specs/patch/" not in patch_file_path or not patch_file_path.endswith(".md"):
-        logger.error(f"Invalid patch plan path format: {patch_file_path}")
-        return None, AgentPromptResponse(
-            output=f"Invalid patch plan path: {patch_file_path}", success=False
-        )
-
-    logger.info(f"Patch plan validated: {patch_file_path}")
+    # Use pre-computed path - no parsing needed!
+    patch_file_path = expected_patch_file
+    logger.info(f"Using pre-computed patch file: {patch_file_path}")
 
     # Now implement the patch plan using the provided implementor agent name
     implement_response = implement_plan(

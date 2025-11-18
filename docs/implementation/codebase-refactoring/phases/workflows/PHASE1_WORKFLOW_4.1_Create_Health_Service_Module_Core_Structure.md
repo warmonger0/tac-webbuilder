@@ -70,5 +70,9 @@ class HealthService:
 ```bash
 python -c "from app.server.services.health_service import HealthService; hs = HealthService(); print('Module created successfully')"
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

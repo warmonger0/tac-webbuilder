@@ -38,5 +38,9 @@
 # Use Apache Bench or similar tool
 ab -n 1000 -c 10 http://localhost:8000/api/workflows
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

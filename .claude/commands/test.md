@@ -16,6 +16,11 @@ TEST_COMMAND_TIMEOUT: 5 minutes
 
 ## Instructions
 
+- **OPTIONAL: Read `.adw-context.json` from worktree root** if available for:
+  - `test_targets` - specific test files to run (if provided)
+  - `changed_files` - files that were modified (for context)
+  - `backend_port`, `frontend_port` - application URLs
+- If `test_targets` are provided in context, prioritize running those tests first
 - Execute each test in the sequence provided below
 - Capture the result (passed/failed) and any error messages
 - IMPORTANT: Return ONLY the JSON array with test results

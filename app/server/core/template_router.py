@@ -220,6 +220,9 @@ def route_by_template(nl_input: str) -> TemplateMatch:
     3. Standard SDLC (fallback for known patterns)
     4. No match (return unmatched)
 
+    Note: This function is only called when no explicit workflow is found.
+    Explicit workflow checking happens in nl_processor.py before this.
+
     Args:
         nl_input: Natural language request
 

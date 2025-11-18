@@ -110,5 +110,9 @@ python -c "import shared.models; print('shared.models package OK')"
 python -c "import shared.services; print('shared.services package OK')"
 python -c "import shared.utils; print('shared.utils package OK')"
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

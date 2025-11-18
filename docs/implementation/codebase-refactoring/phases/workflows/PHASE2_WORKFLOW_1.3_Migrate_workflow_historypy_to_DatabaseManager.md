@@ -61,5 +61,9 @@ def get_workflow_by_id(workflow_id: str):
 ```bash
 cd app/server && pytest tests/core/test_workflow_history.py -v
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

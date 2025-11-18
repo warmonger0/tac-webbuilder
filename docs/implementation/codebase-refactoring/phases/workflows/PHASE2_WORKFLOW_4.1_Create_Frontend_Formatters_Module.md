@@ -185,5 +185,9 @@ export function formatTokenCount(tokens: number): string {
 ```bash
 cd app/client && npm run typecheck
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

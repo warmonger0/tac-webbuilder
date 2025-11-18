@@ -10,10 +10,14 @@ plan_file_path: $4
 
 ## Instructions
 
+- **OPTIONAL: Read `.adw-context.json` from the worktree root** if available for additional context:
+  - `worktree_path` - worktree location (if in isolated worktree)
+  - `backend_port`, `frontend_port` - application URLs
+  - Context file may not exist for planning phase - that's OK
 - IMPORTANT: You're writing a plan to implement a net new feature based on the `Feature` that will add value to the application.
 - IMPORTANT: The `Feature` describes the feature that will be implemented but remember we're not implementing a new feature, we're creating the plan that will be used to implement the feature based on the `Plan Format` below.
 - Create the plan file at: `{plan_file_path}` (this path is pre-computed for you - use it exactly as provided)
-- Use the `Plan Format` below to create the plan. 
+- Use the `Plan Format` below to create the plan.
 - Research the codebase to understand existing patterns, architecture, and conventions before planning the feature.
 - IMPORTANT: Replace every <placeholder> in the `Plan Format` with the requested value. Add as much detail as needed to implement the feature successfully.
 - Use your reasoning model: THINK HARD about the feature requirements, design, and implementation approach.

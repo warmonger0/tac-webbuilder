@@ -72,5 +72,9 @@ grep -r "OpenAI(" app/server/core/ --exclude=llm_client.py
 # Run all tests
 cd app/server && pytest tests/core/ -v
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

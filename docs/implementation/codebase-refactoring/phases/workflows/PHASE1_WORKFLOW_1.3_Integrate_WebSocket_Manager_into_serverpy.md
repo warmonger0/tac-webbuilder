@@ -40,5 +40,9 @@ cd app/server && python server.py &
 sleep 2
 curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" http://localhost:8000/ws/workflows
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

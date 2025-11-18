@@ -4,17 +4,21 @@ Follow the `Instructions` below to **review work done against a specification fi
 
 ## Variables
 
-adw_id: $ARGUMENT
-spec_file: $ARGUMENT
-agent_name: $ARGUMENT if provided, otherwise use 'review_agent'
-review_image_dir: `<absolute path to codebase>/agents/<adw_id>/<agent_name>/review_img/`
+adw_id: $1
 
 ## Instructions
 
-- Check current git branch using `git branch` to understand context
-- Run `git diff origin/main` to see all changes made in current branch. Continue even if there are no changes related to the spec file.
-- Find the spec file by looking for specs/*.md files in the diff that match the current branch name
-- Read the identified spec file to understand requirements
+- **IMPORTANT: Read `.adw-context.json` from the worktree root** to get pre-computed paths and context:
+  - `spec_file` - specification file to review against (absolute path)
+  - `worktree_path` - worktree location (if different from current working directory)
+  - `changed_files` - files changed since main branch (newline-separated list)
+  - `review_image_dir` - where to save review screenshots
+  - `backend_port`, `frontend_port` - application URLs for UI validation
+- Read the spec file from the context to understand requirements
+- Use the `changed_files` list from context to understand what was modified
+- DO NOT run git commands (git branch, git diff, etc.) - all file information is pre-computed in the context file
+- Use the Read tool to examine files that need review
+- Use the Grep tool if you need to search for specific patterns across the codebase
 - IMPORTANT: If the work can be validated by UI validation then (if not skip the section):
   - Use the playwright mcp server commands to validate the work.
   - Look for corresponding e2e test files in ./claude/commands/e2e/test_*.md that mirror the feature name

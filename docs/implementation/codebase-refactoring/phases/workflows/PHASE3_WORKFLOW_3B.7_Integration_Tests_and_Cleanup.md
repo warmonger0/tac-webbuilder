@@ -48,5 +48,9 @@ cd app/server && pytest tests/test_workflow_analytics_integration.py -v
 ```
 
 **Status:** Not Started
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

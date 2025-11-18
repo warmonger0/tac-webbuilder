@@ -83,5 +83,9 @@ grep -r "subprocess.run" app/server/ adws/ --exclude-dir=tests --exclude=process
 cd app/server && pytest tests/ -v
 cd adws && pytest tests/ -v
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

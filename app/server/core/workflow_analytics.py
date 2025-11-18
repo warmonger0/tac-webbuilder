@@ -79,43 +79,6 @@ def extract_day_of_week(timestamp: str) -> int:
         return -1
 
 
-def detect_complexity(workflow: Dict) -> str:
-    """
-    Detect workflow complexity for model appropriateness scoring.
-
-    Criteria:
-    - Simple: word_count < 50 AND duration < 300s AND errors < 3
-    - Complex: word_count > 200 OR duration > 1800s OR errors > 5
-    - Medium: everything else
-
-    Args:
-        workflow: Workflow data dictionary containing nl_input, duration_seconds, error_count
-
-    Returns:
-        Complexity level: "simple", "medium", or "complex"
-    """
-    try:
-        # Extract metrics with safe defaults
-        nl_input = workflow.get("nl_input", "")
-        word_count = len(nl_input.split()) if nl_input else 0
-        duration = workflow.get("duration_seconds", 0) or 0
-        error_count = workflow.get("error_count", 0) or 0
-
-        # Check for complex criteria (any condition triggers complex)
-        if word_count > 200 or duration > 1800 or error_count > 5:
-            return "complex"
-
-        # Check for simple criteria (all conditions must be true)
-        if word_count < 50 and duration < 300 and error_count < 3:
-            return "simple"
-
-        # Everything else is medium
-        return "medium"
-    except Exception as e:
-        logger.warning(f"Failed to detect complexity for workflow: {e}")
-        return "medium"  # Default to medium on error
-
-
 # ============================================================================
 # Core Scoring Functions
 # ============================================================================

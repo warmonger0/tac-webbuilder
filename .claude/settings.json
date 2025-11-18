@@ -21,7 +21,9 @@
       "Bash(pwd && ls:*)",
       "Bash(pwd && ./scripts/:*)",
       "Bash(ls -la package.json:*)",
-      "Bash(ls package.json:*)"
+      "Bash(ls package.json:*)",
+      "Bash(nvm:*)",
+      "Bash(nvm use:*)"
     ]
   },
   "hooks": {

@@ -5,25 +5,28 @@ Generate concise markdown documentation for implemented features by analyzing co
 ## Variables
 
 adw_id: $1
-spec_path: $2 if provided, otherwise leave it blank
-documentation_screenshots_dir: $3 if provided, otherwise leave it blank
 
 ## Instructions
 
 ### 1. Analyze Changes
-- Run `git diff origin/main --stat` to see files changed and lines modified
-- Run `git diff origin/main --name-only` to get the list of changed files
-- For significant changes (>50 lines), run `git diff origin/main <file>` on specific files to understand the implementation details
+- **IMPORTANT: Read `.adw-context.json` from the worktree root** to get pre-computed data:
+  - `changed_files` - list of files modified since main branch
+  - `changed_files_stats` - additions/deletions per file (if available)
+  - `spec_file` - original specification file path
+  - `documentation_screenshots_dir` - screenshot directory location
+- DO NOT run git commands - all change information is pre-computed in the context file
+- Use Read tool to examine significant changes in files directly
 
-### 2. Read Specification (if provided)
-- If `spec_path` is provided, read the specification file to understand:
+### 2. Read Specification
+- Read `spec_file` from context to understand:
   - Original requirements and goals
   - Expected functionality
   - Success criteria
 - Use this to frame the documentation around what was requested vs what was built
 
-### 3. Analyze and Copy Screenshots (if provided)
-- If `documentation_screenshots_dir` is provided, list and examine screenshots
+### 3. Analyze and Copy Screenshots
+- Get `documentation_screenshots_dir` from context
+- If screenshots directory exists, list and examine screenshots
 - Create `app_docs/assets/` directory if it doesn't exist
 - Copy all screenshot files (*.png) from `documentation_screenshots_dir` to `app_docs/assets/`
   - Preserve original filenames

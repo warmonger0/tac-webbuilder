@@ -49,5 +49,9 @@ class ServiceController:
 ```bash
 python -c "from app.server.services.service_controller import ServiceController; sc = ServiceController(); print('Module created')"
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

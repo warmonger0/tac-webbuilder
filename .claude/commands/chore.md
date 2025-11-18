@@ -10,11 +10,15 @@ plan_file_path: $4
 
 ## Instructions
 
+- **OPTIONAL: Read `.adw-context.json` from the worktree root** if available for additional context:
+  - `worktree_path` - worktree location (if in isolated worktree)
+  - `backend_port`, `frontend_port` - application URLs
+  - Context file may not exist for planning phase - that's OK
 - IMPORTANT: You're writing a plan to resolve a chore based on the `Chore` that will add value to the application.
 - IMPORTANT: The `Chore` describes the chore that will be resolved but remember we're not resolving the chore, we're creating the plan that will be used to resolve the chore based on the `Plan Format` below.
 - You're writing a plan to resolve a chore, it should be simple but we need to be thorough and precise so we don't miss anything or waste time with any second round of changes.
 - Create the plan file at: `{plan_file_path}` (this path is pre-computed for you - use it exactly as provided)
-- Use the plan format below to create the plan. 
+- Use the plan format below to create the plan.
 - Research the codebase and put together a plan to accomplish the chore.
 - IMPORTANT: Replace every <placeholder> in the `Plan Format` with the requested value. Add as much detail as needed to accomplish the chore.
 - Use your reasoning model: THINK HARD about the plan and the steps to accomplish the chore.

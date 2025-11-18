@@ -47,5 +47,9 @@ class WorkflowService:
 ```bash
 python -c "from app.server.services.workflow_service import WorkflowService; ws = WorkflowService(); print(len(ws.get_workflows()))"
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

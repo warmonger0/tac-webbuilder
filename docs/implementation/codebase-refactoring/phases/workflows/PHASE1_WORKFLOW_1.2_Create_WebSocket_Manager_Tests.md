@@ -34,5 +34,9 @@
 ```bash
 cd app/server && pytest tests/services/test_websocket_manager.py -v --cov=services.websocket_manager --cov-report=term-missing
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

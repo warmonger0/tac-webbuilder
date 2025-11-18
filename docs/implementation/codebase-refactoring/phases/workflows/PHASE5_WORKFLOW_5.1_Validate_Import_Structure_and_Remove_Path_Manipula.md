@@ -151,3 +151,9 @@ Create/update documentation explaining the new structure:
 
 ```markdown
 # Import Structure Documentation
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
+---

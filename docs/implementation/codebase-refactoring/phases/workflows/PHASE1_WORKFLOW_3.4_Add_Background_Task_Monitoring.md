@@ -49,5 +49,9 @@ async def get_background_tasks_status():
 ```bash
 curl http://localhost:8000/api/background-tasks/status | jq
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

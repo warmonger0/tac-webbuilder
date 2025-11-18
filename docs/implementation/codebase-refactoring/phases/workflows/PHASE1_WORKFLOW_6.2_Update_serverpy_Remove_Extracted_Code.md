@@ -67,5 +67,9 @@ async def websocket_workflows(websocket: WebSocket): ...
 wc -l app/server/server.py
 # Should be <300 lines
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

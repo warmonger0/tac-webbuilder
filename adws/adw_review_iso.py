@@ -30,6 +30,7 @@ import os
 import logging
 import json
 from typing import Optional, List
+import subprocess
 from dotenv import load_dotenv
 
 from adw_modules.state import ADWState
@@ -74,12 +75,53 @@ def run_review(
     adw_id: str,
     logger: logging.Logger,
     working_dir: Optional[str] = None,
+    state: Optional['ADWState'] = None,
 ) -> ReviewResult:
     """Run the review using the /review command."""
+    from adw_modules.workflow_ops import create_context_file
+
+    # PRE-COMPUTE changed files (deterministic Python, no AI needed)
+    worktree_path = working_dir or os.getcwd()
+    changed_files = []
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "origin/main", "--name-only"],
+            capture_output=True,
+            text=True,
+            cwd=worktree_path,
+            timeout=5
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            changed_files = result.stdout.strip().split('\n')
+            logger.info(f"Pre-computed {len(changed_files)} changed files")
+    except Exception as e:
+        logger.warning(f"Could not get changed files: {e}")
+
+    # Create context file with all pre-computed review context
+    review_image_dir = os.path.join(worktree_path, "agents", adw_id, AGENT_REVIEWER, "review_img")
+
+    context_data = {
+        "spec_file": spec_file,
+        "worktree_path": worktree_path,
+        "changed_files": changed_files,
+        "review_image_dir": review_image_dir,
+    }
+
+    # Add state information if available
+    if state:
+        if state.get("backend_port"):
+            context_data["backend_port"] = state.get("backend_port")
+        if state.get("frontend_port"):
+            context_data["frontend_port"] = state.get("frontend_port")
+
+    create_context_file(worktree_path, adw_id, context_data, logger)
+
+    # Simplified request - agent reads context from file
     request = AgentTemplateRequest(
         agent_name=AGENT_REVIEWER,
         slash_command="/review",
-        args=[adw_id, spec_file, AGENT_REVIEWER],
+        args=[adw_id],  # Only need adw_id now!
         adw_id=adw_id,
         working_dir=working_dir,
     )
@@ -453,7 +495,7 @@ def main():
             )
         )
         
-        review_result = run_review(spec_file, adw_id, logger, working_dir=worktree_path)
+        review_result = run_review(spec_file, adw_id, logger, working_dir=worktree_path, state=state)
         
         # Check if we have blocker issues
         blocker_issues = [

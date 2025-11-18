@@ -94,5 +94,9 @@ cd app/server && python server.py &
 sleep 2
 curl -X POST http://localhost:8000/api/github-webhook -H "Content-Type: application/json" -d '{"action": "opened", "issue": {"number": 1, "title": "Test", "body": "", "state": "open", "user": {"login": "test"}, "labels": [], "created_at": "2025-01-01", "updated_at": "2025-01-01", "html_url": "https://github.com/test/test/issues/1"}}'
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

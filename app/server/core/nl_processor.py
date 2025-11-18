@@ -1,6 +1,7 @@
 import os
 import json
-from typing import Tuple, List
+import re
+from typing import Tuple, List, Optional
 from anthropic import Anthropic
 from core.data_models import GitHubIssue, ProjectContext
 from core.template_router import route_by_template, detect_characteristics
@@ -154,6 +155,74 @@ def classify_issue_type(intent: dict) -> str:
     return intent.get("intent_type", "feature")
 
 
+def extract_explicit_workflow(text: str) -> Optional[Tuple[str, str]]:
+    """
+    Extract explicit workflow specification from text if present.
+
+    This function checks if the user has explicitly specified a workflow in their text,
+    allowing them to override automatic pattern-based classification.
+
+    Looks for patterns like:
+    - "Workflow: adw_sdlc_iso"
+    - "Execution: uv run adw_sdlc_complete_zte_iso.py"
+    - "adw_plan_build_test_iso with base model"
+    - "Use adw_lightweight_iso"
+
+    Args:
+        text: Input text that may contain workflow specification
+
+    Returns:
+        Tuple of (workflow, model_set) if found, None otherwise
+    """
+    text_lower = text.lower()
+
+    # List of all valid workflows (synchronized with adws/adw_modules/workflow_ops.py)
+    valid_workflows = [
+        # Single-phase workflows
+        "adw_plan_iso",
+        "adw_plan_iso_optimized",
+        "adw_patch_iso",
+        "adw_build_iso",
+        "adw_test_iso",
+        "adw_review_iso",
+        "adw_document_iso",
+        "adw_ship_iso",
+        "adw_cleanup_iso",
+        "adw_lint_iso",
+        # Multi-phase workflows
+        "adw_lightweight_iso",
+        "adw_plan_build_iso",
+        "adw_plan_build_test_iso",
+        "adw_plan_build_test_review_iso",
+        "adw_plan_build_document_iso",
+        "adw_plan_build_review_iso",
+        "adw_stepwise_iso",
+        # Full SDLC workflows
+        "adw_sdlc_iso",
+        "adw_sdlc_complete_iso",
+        "adw_sdlc_zte_iso",
+        "adw_sdlc_complete_zte_iso",
+    ]
+
+    for workflow in valid_workflows:
+        workflow_lower = workflow.lower()
+
+        # Pattern: workflow name with optional .py extension, optional --flags, and optional model specification
+        # Examples:
+        # - "adw_sdlc_complete_zte_iso.py --use-optimized-plan"
+        # - "adw_plan_build_test_iso with base model"
+        # - "Workflow: adw_sdlc_iso"
+        pattern = rf'{re.escape(workflow_lower)}(?:\.py)?(?:\s+--[\w-]+)*(?:\s+with\s+(\w+)\s+model)?'
+        match = re.search(pattern, text_lower)
+
+        if match:
+            # Extract model_set if specified, default to "base"
+            model_set = match.group(1) if match.group(1) else "base"
+            return (workflow, model_set)
+
+    return None
+
+
 def suggest_adw_workflow(issue_type: str, complexity: str, characteristics: dict = None) -> Tuple[str, str]:
     """
     Recommend ADW workflow and model set based on issue type, complexity, and characteristics.
@@ -276,85 +345,119 @@ async def process_request(nl_input: str, project_context: ProjectContext) -> Git
                   extraction, or issue generation)
     """
     try:
-        # Step 0: Try template matching first (cost optimization)
-        template_match = route_by_template(nl_input)
+        # Step 0: Check for explicit workflow specification FIRST (user override)
+        explicit_workflow = extract_explicit_workflow(nl_input)
 
-        if template_match.matched:
-            # Template matched! Skip Claude API calls
-            classification = template_match.classification
-            workflow = template_match.workflow
-            model_set = template_match.model_set
+        if explicit_workflow:
+            # User explicitly specified a workflow - honor their choice
+            workflow, model_set = explicit_workflow
 
-            # Generate simplified issue for template matches
-            # (we don't have detailed intent/requirements, but that's ok for simple requests)
-            title = nl_input[:100]  # Use truncated input as title
-            requirements = [nl_input]  # Use full input as single requirement
+            # Infer classification from workflow name (simple heuristic)
+            if "lightweight" in workflow or "patch" in workflow:
+                classification = "chore"
+            elif "test" in workflow or "fix" in nl_input.lower():
+                classification = "bug"
+            else:
+                classification = "feature"
+
+            # Generate simplified issue for explicit workflow specs
+            title = nl_input[:100]
+            requirements = [nl_input]
 
             body_parts = [
                 "## Description",
                 f"{nl_input}",
                 "",
                 "## Classification",
-                f"Pattern matched: `{template_match.pattern_name}` (confidence: {template_match.confidence:.0%})",
+                f"Explicit workflow: `{workflow}` (user specified)",
                 "",
                 "## Workflow",
                 f"{workflow} with {model_set} model"
             ]
 
             body = "\n".join(body_parts)
-            labels = [classification, "auto-routed"]
+            labels = [classification, "explicit-workflow"]
 
         else:
-            # No template match - use structured prompts (Claude API)
-            # Step 1: Analyze intent
-            intent = await analyze_intent(nl_input)
+            # No explicit workflow - try template matching (cost optimization)
+            template_match = route_by_template(nl_input)
 
-            # Step 2: Extract requirements
-            requirements = extract_requirements(nl_input, intent)
+            if template_match.matched:
+                # Template matched! Skip Claude API calls
+                classification = template_match.classification
+                workflow = template_match.workflow
+                model_set = template_match.model_set
 
-            # Step 3: Classify issue type
-            classification = classify_issue_type(intent)
+                # Generate simplified issue for template matches
+                # (we don't have detailed intent/requirements, but that's ok for simple requests)
+                title = nl_input[:100]  # Use truncated input as title
+                requirements = [nl_input]  # Use full input as single requirement
 
-            # Step 4: Detect characteristics for routing
-            characteristics = detect_characteristics(nl_input)
+                body_parts = [
+                    "## Description",
+                    f"{nl_input}",
+                    "",
+                    "## Classification",
+                    f"Pattern matched: `{template_match.pattern_name}` (confidence: {template_match.confidence:.0%})",
+                    "",
+                    "## Workflow",
+                    f"{workflow} with {model_set} model"
+                ]
 
-            # Step 5: Suggest workflow based on complexity and characteristics
-            workflow, model_set = suggest_adw_workflow(
-                classification,
-                project_context.complexity,
-                characteristics
-            )
+                body = "\n".join(body_parts)
+                labels = [classification, "auto-routed"]
 
-            # Step 6: Generate title
-            title = intent.get("summary", nl_input[:100])
+            else:
+                # No template match - use structured prompts (Claude API)
+                # Step 1: Analyze intent
+                intent = await analyze_intent(nl_input)
 
-            # Step 7: Generate issue body (will be formatted by issue_formatter)
-            # For now, create a basic structure
-            body_parts = [
-                "## Description",
-                f"{intent.get('summary', nl_input)}",
-                "",
-                "## Requirements",
-            ]
+                # Step 2: Extract requirements
+                requirements = extract_requirements(nl_input, intent)
 
-            for req in requirements:
-                body_parts.append(f"- {req}")
+                # Step 3: Classify issue type
+                classification = classify_issue_type(intent)
 
-            body_parts.extend([
-                "",
-                "## Technical Area",
-                f"{intent.get('technical_area', 'General')}",
-                "",
-                "## Workflow",
-                f"{workflow} with {model_set} model"
-            ])
+                # Step 4: Detect characteristics for routing
+                characteristics = detect_characteristics(nl_input)
 
-            body = "\n".join(body_parts)
+                # Step 5: Suggest workflow based on complexity and characteristics
+                workflow, model_set = suggest_adw_workflow(
+                    classification,
+                    project_context.complexity,
+                    characteristics
+                )
 
-            # Step 8: Generate labels
-            labels = [classification, intent.get('technical_area', 'general').lower()]
-            if project_context.framework:
-                labels.append(project_context.framework)
+                # Step 6: Generate title
+                title = intent.get("summary", nl_input[:100])
+
+                # Step 7: Generate issue body (will be formatted by issue_formatter)
+                # For now, create a basic structure
+                body_parts = [
+                    "## Description",
+                    f"{intent.get('summary', nl_input)}",
+                    "",
+                    "## Requirements",
+                ]
+
+                for req in requirements:
+                    body_parts.append(f"- {req}")
+
+                body_parts.extend([
+                    "",
+                    "## Technical Area",
+                    f"{intent.get('technical_area', 'General')}",
+                    "",
+                    "## Workflow",
+                    f"{workflow} with {model_set} model"
+                ])
+
+                body = "\n".join(body_parts)
+
+                # Step 8: Generate labels
+                labels = [classification, intent.get('technical_area', 'general').lower()]
+                if project_context.framework:
+                    labels.append(project_context.framework)
 
         # Step 9: Create GitHubIssue object
         return GitHubIssue(

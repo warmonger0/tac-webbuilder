@@ -1,6 +1,6 @@
 # Individual Workflow Files
 
-This directory contains 73 individual workflow files extracted from the 5 phase detailed plans.
+This directory contains 72 individual workflow files extracted from the 5 phase detailed plans (1 completed).
 
 ## Overview
 
@@ -20,11 +20,11 @@ Where:
 
 ## Workflow Distribution by Phase
 
-### Phase 1: Extract Server Services (25 workflows)
-**Duration:** 4-5 days | **Status:** Not Started
+### Phase 1: Extract Server Services (24 workflows remaining, 1 completed)
+**Duration:** 4-5 days | **Status:** 4% Complete (1/25)
 
 **Components:**
-1. WebSocket Manager Service (3 workflows: 1.1-1.3)
+1. WebSocket Manager Service (2 workflows: 1.2-1.3) - ✅ 1.1 completed
 2. Workflow Service (4 workflows: 2.1-2.4)
 3. Background Tasks Service (4 workflows: 3.1-3.4)
 4. Health Service (6 workflows: 4.1-4.6)
@@ -66,15 +66,21 @@ Where:
 
 ## Total Project Statistics
 
-- **Total Workflows:** 73 atomic units
+- **Total Workflows:** 73 atomic units (72 remaining, 1 completed)
+- **Overall Progress:** 1.4% (1/73)
 - **Total Duration:** 17-21 days
 - **Total Phases:** 5
 - **Priority Levels:** CRITICAL (2), HIGH (2), MEDIUM (1)
 
+## Completed Workflows
+
+Completed workflows are moved to the `completed/` subdirectory for reference:
+- ✅ [1.1 - Create WebSocket Manager Module](completed/PHASE1_WORKFLOW_1.1_Create_WebSocket_Manager_Module.md) - Issue #37, PR #38
+
 ## Quick Navigation
 
 ### Phase 1 Workflows
-- [1.1 - Create WebSocket Manager Module](PHASE1_WORKFLOW_1.1_Create_WebSocket_Manager_Module.md)
+- ~~1.1 - Create WebSocket Manager Module~~ ✅ Completed
 - [1.2 - Create WebSocket Manager Tests](PHASE1_WORKFLOW_1.2_Create_WebSocket_Manager_Tests.md)
 - [1.3 - Integrate WebSocket Manager](PHASE1_WORKFLOW_1.3_Integrate_WebSocket_Manager_into_serverpy.md)
 - ... (see directory for complete list)
@@ -122,32 +128,20 @@ Each workflow file contains:
    - Acceptance Criteria (checkboxes)
    - Verification Commands
 
-## Usage
+## Execution
 
-### Viewing a Workflow
-
-Simply open any workflow file to see its complete details:
+Each workflow is executed via ZTE (Zero Touch Execution):
 
 ```bash
-# Example: View the first workflow
-cat PHASE1_WORKFLOW_1.1_Create_WebSocket_Manager_Module.md
+# 1. Create GitHub issue from workflow file
+gh issue create --title "PHASE{N} {X.Y}: {Title}" --body "{workflow-content}"
+
+# 2. Run ZTE pipeline
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
 ```
 
-### Executing a Workflow
-
-Follow the tasks sequentially as listed in each workflow file. Use the verification commands to ensure correct implementation.
-
-### Tracking Progress
-
-Use the acceptance criteria checkboxes in each file to track completion:
-
-```markdown
-**Acceptance Criteria:**
-- [x] ConnectionManager class exists in websocket_manager.py
-- [x] All methods have type hints
-- [ ] All methods have docstrings
-- [ ] Module can be imported without errors
-```
+ZTE runs all 8 phases automatically: Plan → Build → Lint → Test → Review → Document → Ship → Cleanup
 
 ## Generation
 

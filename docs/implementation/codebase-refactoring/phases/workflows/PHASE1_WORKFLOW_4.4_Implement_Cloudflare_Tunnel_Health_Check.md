@@ -83,5 +83,9 @@ hs = HealthService(cloudflare_tunnel_name='test-tunnel')
 print(hs.check_cloudflare_tunnel())
 "
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

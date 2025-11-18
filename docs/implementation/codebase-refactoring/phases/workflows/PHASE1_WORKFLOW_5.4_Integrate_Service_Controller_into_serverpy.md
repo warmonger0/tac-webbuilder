@@ -60,5 +60,9 @@ sleep 2
 # Stop webhook service
 curl -X POST http://localhost:8000/api/services/webhook/stop | jq
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

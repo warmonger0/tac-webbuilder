@@ -38,5 +38,9 @@
 ```bash
 cd app/server && pytest tests/core/test_process_utils.py -v --cov=core.process_utils --cov-report=term-missing
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

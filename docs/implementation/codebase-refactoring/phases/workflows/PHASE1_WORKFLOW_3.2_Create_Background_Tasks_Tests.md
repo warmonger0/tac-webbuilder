@@ -37,5 +37,9 @@
 ```bash
 cd app/server && pytest tests/services/test_background_tasks.py -v --cov=services.background_tasks --cov-report=term-missing
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

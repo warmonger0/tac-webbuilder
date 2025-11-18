@@ -205,5 +205,9 @@ python -c "from shared.services.complexity_analyzer import analyze_issue_complex
 # Verify no circular dependencies
 python -c "import shared.models.github_issue; import shared.models.complexity; import shared.services.complexity_analyzer; print('No circular dependencies')"
 ```
-
+**Execution:**
+```bash
+cd adws/
+uv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan
+```
 ---

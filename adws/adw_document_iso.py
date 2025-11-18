@@ -102,6 +102,7 @@ def generate_documentation(
     logger: logging.Logger,
     spec_file: str,
     working_dir: Optional[str] = None,
+    state: Optional[ADWState] = None,
 ) -> Optional[DocumentationResult]:
     """Generate documentation using the /document command.
 
@@ -111,14 +112,71 @@ def generate_documentation(
         logger: Logger instance
         spec_file: Path to the spec file
         working_dir: Working directory for the agent
+        state: ADW state object
 
     Returns:
         DocumentationResult if successful, None if failed
     """
+    from adw_modules.workflow_ops import create_context_file
+
+    # PRE-COMPUTE changed files (deterministic Python, no AI needed)
+    worktree_path = working_dir or os.getcwd()
+    changed_files = []
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "origin/main", "--name-only"],
+            capture_output=True,
+            text=True,
+            cwd=worktree_path,
+            timeout=5
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            changed_files = result.stdout.strip().split('\n')
+            logger.info(f"Pre-computed {len(changed_files)} changed files for documentation")
+    except Exception as e:
+        logger.warning(f"Could not get changed files: {e}")
+
+    # Get file stats (additions/deletions per file)
+    changed_files_stats = {}
+    for file in changed_files:
+        try:
+            stat_result = subprocess.run(
+                ["git", "diff", "origin/main", "--numstat", "--", file],
+                capture_output=True,
+                text=True,
+                cwd=worktree_path,
+                timeout=5
+            )
+            if stat_result.returncode == 0 and stat_result.stdout:
+                parts = stat_result.stdout.split()
+                if len(parts) >= 2:
+                    additions = int(parts[0]) if parts[0].isdigit() else 0
+                    deletions = int(parts[1]) if parts[1].isdigit() else 0
+                    changed_files_stats[file] = {
+                        "additions": additions,
+                        "deletions": deletions
+                    }
+        except Exception as e:
+            logger.debug(f"Could not get stats for {file}: {e}")
+
+    # Create context file with documentation context
+    review_image_dir = os.path.join(worktree_path, "agents", adw_id, "reviewer", "review_img")
+
+    context_data = {
+        "spec_file": spec_file,
+        "changed_files": changed_files,
+        "changed_files_stats": changed_files_stats,
+        "documentation_screenshots_dir": review_image_dir,
+    }
+
+    create_context_file(worktree_path, adw_id, context_data, logger)
+
+    # Simplified request - agent reads from context
     request = AgentTemplateRequest(
         agent_name=AGENT_DOCUMENTER,
         slash_command="/document",
-        args=[spec_file],
+        args=[adw_id],  # Just need ADW ID!
         adw_id=adw_id,
         working_dir=working_dir,
     )
@@ -412,7 +470,7 @@ def main():
     )
 
     doc_result = generate_documentation(
-        issue_number, adw_id, logger, spec_file, working_dir=worktree_path
+        issue_number, adw_id, logger, spec_file, working_dir=worktree_path, state=state
     )
 
     if not doc_result:
