@@ -1,9 +1,12 @@
 {
-  "adw_id": "a8d15f3e",
-  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/a8d15f3e",
-  "created_at": "2025-11-18T13:27:58.631578",
+  "adw_id": "9513a3c4",
+  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/9513a3c4",
+  "created_at": "2025-11-18T14:52:20.224748",
   "changed_files": [
+    ".adw-context.json",
+    ".claude/commands/conditional_docs.md",
     ".mcp.json",
-    "playwright-mcp-config.json"
+    "app/server/services/websocket_manager.py",
+    "app_docs/feature-4c973d9a-websocket-manager-integration.md"
   ]
 }
