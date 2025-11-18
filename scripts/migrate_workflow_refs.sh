@@ -33,11 +33,11 @@ migrate_file() {
     # Create backup
     create_backup "$file"
 
-    # Migrate adw_sdlc_iso.py → adw_sdlc_complete_iso.py
+    # Migrate adw_sdlc_complete_iso.py → adw_sdlc_complete_iso.py
     if grep -q "adw_sdlc_iso\.py" "$file"; then
         sed -i '' 's/adw_sdlc_iso\.py/adw_sdlc_complete_iso.py/g' "$file"
         ((changes++))
-        echo -e "  ${GREEN}✓${NC} adw_sdlc_iso.py → adw_sdlc_complete_iso.py"
+        echo -e "  ${GREEN}✓${NC} adw_sdlc_complete_iso.py → adw_sdlc_complete_iso.py"
     fi
 
     # Migrate adw_sdlc_zte_iso.py → adw_sdlc_complete_zte_iso.py

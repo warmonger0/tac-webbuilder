@@ -65,7 +65,7 @@ These workflows were deprecated in favor of complete workflow chains that includ
 ### Incomplete SDLC Workflows
 
 **adw_sdlc_iso.py**
-- Missing: Ship, Cleanup phases
+- Missing: Lint, Ship, Cleanup phases
 - Replacement: `adw_sdlc_complete_iso.py`
 - Reason: Incomplete workflow, manual PR merge required
 
