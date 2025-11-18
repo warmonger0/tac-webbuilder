@@ -333,6 +333,11 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
         mcp_config_path = os.path.join(request.working_dir, ".mcp.json")
         if os.path.exists(mcp_config_path):
             cmd.extend(["--mcp-config", mcp_config_path])
+            logging.debug(f"MCP config found: {mcp_config_path}")
+        else:
+            # Warn if expected but not found (worktree detection)
+            if "trees/" in request.working_dir:
+                logging.warning(f"Worktree detected but no MCP config at {mcp_config_path}")
 
     # Add dangerous skip permissions flag if enabled
     if request.dangerously_skip_permissions:
