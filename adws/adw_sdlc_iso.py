@@ -11,9 +11,10 @@ Usage: uv run adw_sdlc_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resol
 This script runs the complete ADW SDLC pipeline in isolation:
 1. adw_plan_iso.py - Planning phase (isolated)
 2. adw_build_iso.py - Implementation phase (isolated)
-3. adw_test_iso.py - Testing phase (isolated)
-4. adw_review_iso.py - Review phase (isolated)
-5. adw_document_iso.py - Documentation phase (isolated)
+3. adw_lint_iso.py - Linting phase (isolated)
+4. adw_test_iso.py - Testing phase (isolated)
+5. adw_review_iso.py - Review phase (isolated)
+6. adw_document_iso.py - Documentation phase (isolated)
 
 The scripts are chained together via persistent state (adw_state.json).
 Each phase runs in its own git worktree with dedicated ports.
@@ -51,9 +52,10 @@ def main():
         print("\nThis runs the complete isolated Software Development Life Cycle:")
         print("  1. Plan (isolated)")
         print("  2. Build (isolated)")
-        print("  3. Test (isolated)")
-        print("  4. Review (isolated)")
-        print("  5. Document (isolated)")
+        print("  3. Lint (isolated)")
+        print("  4. Test (isolated)")
+        print("  5. Review (isolated)")
+        print("  6. Document (isolated)")
         print("\nFlags:")
         print("  --skip-e2e: Skip E2E tests")
         print("  --skip-resolution: Skip automatic resolution of review failures")
@@ -94,8 +96,8 @@ def main():
         issue_number,
         adw_id,
     ]
-    if use_external:
-        build_cmd.append("--use-external")
+    if not use_external:
+        build_cmd.append("--no-external")
 
     print(f"\n=== ISOLATED BUILD PHASE ===")
     if use_external:
@@ -106,6 +108,27 @@ def main():
         print("Isolated build phase failed")
         sys.exit(1)
 
+    # Run isolated lint with the ADW ID
+    lint_cmd = [
+        "uv",
+        "run",
+        os.path.join(script_dir, "adw_lint_iso.py"),
+        issue_number,
+        adw_id,
+        "--fix-mode",  # Enable auto-fix by default
+    ]
+    if not use_external:
+        lint_cmd.append("--no-external")
+
+    print(f"\n=== ISOLATED LINT PHASE ===")
+    if use_external:
+        print("🔧 Using external lint tools for context optimization")
+    print(f"Running: {' '.join(lint_cmd)}")
+    lint = subprocess.run(lint_cmd)
+    # Note: Lint phase always exits 0 (advisory only)
+    if lint.returncode != 0:
+        print("WARNING: Lint phase encountered issues but continuing")
+
     # Run isolated test with the ADW ID
     test_cmd = [
         "uv",
@@ -115,8 +138,8 @@ def main():
         adw_id,
         "--skip-e2e",  # Always skip E2E tests in SDLC workflows
     ]
-    if use_external:
-        test_cmd.append("--use-external")
+    if not use_external:
+        test_cmd.append("--no-external")
 
     print(f"\n=== ISOLATED TEST PHASE ===")
     if use_external:

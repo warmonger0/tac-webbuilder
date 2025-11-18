@@ -7,7 +7,7 @@
 ADW Test Iso - AI Developer Workflow for agentic testing in isolated worktrees
 
 Usage:
-  uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e] [--use-external]
+  uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e] [--no-external]
 
 Workflow:
 1. Load state and validate worktree exists
@@ -18,7 +18,7 @@ Workflow:
 
 Options:
   --skip-e2e: Skip E2E tests
-  --use-external: Use external test tools (minimizes context consumption)
+  --no-external: Disable external test tools (uses inline execution, higher token usage)
 
 This workflow REQUIRES that adw_plan_iso.py or adw_patch_iso.py has been run first
 to create the worktree. It cannot create worktrees itself.
@@ -701,18 +701,21 @@ def main():
 
     # Check for flags in args
     skip_e2e = "--skip-e2e" in sys.argv
-    use_external = "--use-external" in sys.argv
+    # External tools are DEFAULT (opt-out with --no-external)
+    use_external = "--no-external" not in sys.argv
 
     # Remove flags from args if present
     if skip_e2e:
         sys.argv.remove("--skip-e2e")
     if use_external:
-        sys.argv.remove("--use-external")
+        pass  # Keep for backwards compatibility
+    if "--no-external" in sys.argv:
+        sys.argv.remove("--no-external")
 
     # Parse command line args
     # INTENTIONAL: adw-id is REQUIRED - we need it to find the worktree
     if len(sys.argv) < 3:
-        print("Usage: uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e] [--use-external]")
+        print("Usage: uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e] [--no-external]")
         print("\nError: adw-id is required to locate the worktree")
         print("Run adw_plan_iso.py or adw_patch_iso.py first to create the worktree")
         sys.exit(1)

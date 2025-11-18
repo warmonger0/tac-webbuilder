@@ -1092,6 +1092,41 @@ def sync_workflow_history() -> int:
         logger.error(f"[SYNC] Failed to calculate similar workflows (Phase 3E): {e}")
         # Don't fail the entire sync if similarity detection fails
 
+    # Phase 1.3: Pattern Learning Pass
+    logger.info("[SYNC] Phase: Pattern Learning")
+    try:
+        from .pattern_persistence import process_and_persist_workflow
+
+        patterns_detected = 0
+        new_patterns = 0
+
+        with get_db_connection() as conn:
+            for workflow in all_workflows:
+                try:
+                    result = process_and_persist_workflow(workflow, conn)
+                    patterns_detected += result['patterns_detected']
+                    new_patterns += result['new_patterns']
+
+                    if result['patterns_detected'] > 0:
+                        logger.debug(
+                            f"[SYNC] Workflow {workflow['adw_id']}: "
+                            f"detected {result['patterns_detected']} pattern(s)"
+                        )
+
+                except Exception as e:
+                    logger.warning(
+                        f"[SYNC] Failed to process patterns for {workflow['adw_id']}: {e}"
+                    )
+
+        logger.info(
+            f"[SYNC] Pattern learning complete: "
+            f"{patterns_detected} patterns detected, {new_patterns} new"
+        )
+
+    except Exception as e:
+        logger.error(f"[SYNC] Pattern learning failed: {e}")
+        # Don't fail entire sync if pattern learning fails
+
     logger.info(f"[SYNC] Synchronized {synced_count} workflows")
     return synced_count
 

@@ -7,7 +7,7 @@
 ADW Build Iso - AI Developer Workflow for agentic building in isolated worktrees
 
 Usage:
-  uv run adw_build_iso.py <issue-number> <adw-id> [--use-external]
+  uv run adw_build_iso.py <issue-number> <adw-id> [--no-external]
 
 Workflow:
 1. Load state and validate worktree exists
@@ -17,7 +17,7 @@ Workflow:
 5. Push and update PR
 
 Options:
-  --use-external: Use external build tools for type checking (minimizes context consumption)
+  --no-external: Disable external build tools (uses inline execution, higher token usage)
 
 This workflow REQUIRES that adw_plan_iso.py or adw_patch_iso.py has been run first
 to create the worktree. It cannot create worktrees itself.
@@ -95,15 +95,15 @@ def main():
     # Load environment variables
     load_dotenv()
 
-    # Check for --use-external flag
-    use_external = "--use-external" in sys.argv
-    if use_external:
-        sys.argv.remove("--use-external")
+    # External tools are DEFAULT (opt-out with --no-external)
+    use_external = "--no-external" not in sys.argv
+    if "--no-external" in sys.argv:
+        sys.argv.remove("--no-external")
 
     # Parse command line args
     # INTENTIONAL: adw-id is REQUIRED - we need it to find the worktree
     if len(sys.argv) < 3:
-        print("Usage: uv run adw_build_iso.py <issue-number> <adw-id> [--use-external]")
+        print("Usage: uv run adw_build_iso.py <issue-number> <adw-id> [--no-external]")
         print("\nError: adw-id is required to locate the worktree and plan file")
         print("Run adw_plan_iso.py or adw_patch_iso.py first to create the worktree")
         sys.exit(1)
