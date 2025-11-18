@@ -282,7 +282,7 @@ async def watch_workflows() -> None:
                         })
                         logger.info(f"[WS] Broadcasted workflow update to {len(manager.active_connections)} clients")
 
-                await asyncio.sleep(2)  # Check every 2 seconds
+                await asyncio.sleep(10)  # Check every 10 seconds
             except Exception as e:
                 logger.error(f"[WS] Error in workflow watcher: {e}")
                 await asyncio.sleep(5)  # Back off on error
@@ -309,7 +309,7 @@ async def watch_routes() -> None:
                         })
                         logger.info(f"[WS] Broadcasted routes update to {len(manager.active_connections)} clients")
 
-                await asyncio.sleep(2)  # Check every 2 seconds
+                await asyncio.sleep(10)  # Check every 10 seconds
             except Exception as e:
                 logger.error(f"[WS] Error in routes watcher: {e}")
                 await asyncio.sleep(5)  # Back off on error
@@ -1181,7 +1181,7 @@ async def get_routes() -> RoutesResponse:
     try:
         route_list = get_routes_data()
         response = RoutesResponse(routes=route_list, total=len(route_list))
-        logger.info(f"[SUCCESS] Retrieved {len(route_list)} routes")
+        logger.debug(f"[SUCCESS] Retrieved {len(route_list)} routes")
         return response
     except Exception as e:
         logger.error(f"[ERROR] Failed to retrieve routes: {str(e)}")
@@ -1320,7 +1320,7 @@ async def get_workflow_history_endpoint(
             sort_order=sort_order
         )
         history_data, _ = get_workflow_history_data(filters)
-        logger.info(f"[SUCCESS] Retrieved {len(history_data.workflows)} workflow history items (total: {history_data.total_count})")
+        logger.debug(f"[SUCCESS] Retrieved {len(history_data.workflows)} workflow history items (total: {history_data.total_count})")
         return history_data
     except Exception as e:
         logger.error(f"[ERROR] Failed to retrieve workflow history: {str(e)}")
@@ -1708,7 +1708,7 @@ async def get_workflows() -> List[Workflow]:
     """Get all active ADW workflows (REST endpoint for fallback)"""
     try:
         workflows = get_workflows_data()
-        logger.info(f"[SUCCESS] Retrieved {len(workflows)} active workflows")
+        logger.debug(f"[SUCCESS] Retrieved {len(workflows)} active workflows")
         return workflows
     except Exception as e:
         logger.error(f"[ERROR] Failed to retrieve workflows: {str(e)}")

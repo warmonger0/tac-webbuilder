@@ -208,7 +208,7 @@ echo ""
 
 # 4. Check API Connectivity
 echo -e "${BLUE}[4/6] API Connectivity${NC}"
-check_json_endpoint "http://localhost:$SERVER_PORT/api/workflows" "Workflows API" "workflows" 10
+check_json_endpoint "http://localhost:$SERVER_PORT/api/workflows" "Workflows API" "" 10
 check_json_endpoint "http://localhost:$CLIENT_PORT/api/routes" "Frontend Proxy to Backend" "routes"
 echo ""
 
