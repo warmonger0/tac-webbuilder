@@ -38,19 +38,21 @@ from adw_modules.workflow_ops import ensure_adw_id
 from adw_modules.github import make_issue_comment, format_issue_message
 from adw_modules.cleanup_operations import cleanup_shipped_issue
 from adw_modules.utils import setup_logger
+from adw_modules.migration_helper import check_and_forward, print_deprecation_notice
 
 
 def main():
     """Main entry point."""
+    # Check for auto-forwarding
+    if check_and_forward("adw_sdlc_zte_iso.py"):
+        return  # Never reached, but for clarity
+
     # Print deprecation warning
-    print("=" * 70)
-    print("WARNING: DEPRECATION NOTICE")
-    print("=" * 70)
-    print("This workflow is incomplete (missing Lint phase)")
-    print("Please use: adw_sdlc_complete_zte_iso.py")
-    print("Continuing execution...")
-    print("=" * 70)
-    print()
+    print_deprecation_notice(
+        workflow_name="adw_sdlc_zte_iso.py",
+        missing_phases=["Lint"],
+        replacement="adw_sdlc_complete_zte_iso.py"
+    )
 
     # Check for flags
     skip_e2e = "--skip-e2e" in sys.argv
