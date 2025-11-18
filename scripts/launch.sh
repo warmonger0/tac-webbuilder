@@ -33,6 +33,33 @@ kill_port() {
     fi
 }
 
+# Function to wait for endpoint to be ready
+wait_for_endpoint() {
+    local url=$1
+    local service_name=$2
+    local max_attempts=${3:-30}  # Default 30 attempts
+    local sleep_time=${4:-1}     # Default 1 second between attempts
+
+    local attempt=1
+    echo -n "⏳ Waiting for ${service_name} to be ready"
+
+    while [ $attempt -le $max_attempts ]; do
+        if curl -s -f -m 2 "$url" > /dev/null 2>&1; then
+            echo ""
+            echo -e "${GREEN}✅ ${service_name} is ready!${NC}"
+            return 0
+        fi
+
+        echo -n "."
+        sleep $sleep_time
+        attempt=$((attempt + 1))
+    done
+
+    echo ""
+    echo -e "${RED}❌ ${service_name} did not become ready after ${max_attempts} attempts${NC}"
+    return 1
+}
+
 # Kill any existing processes on our ports
 kill_port $SERVER_PORT "backend server"
 kill_port $CLIENT_PORT "frontend server"
@@ -75,13 +102,12 @@ cd "$PROJECT_ROOT/app/server"
 uv run python server.py &
 BACKEND_PID=$!
 
-# Wait for backend to start
-echo "⏳ Waiting for backend to initialize..."
-sleep 3
-
-# Check if backend is running
-if ! kill -0 $BACKEND_PID 2>/dev/null; then
-    echo -e "${RED}❌ Backend failed to start!${NC}"
+# Wait for backend API to be ready (not just process started)
+if ! wait_for_endpoint "http://localhost:$SERVER_PORT/api/system-status" "Backend API" 30 1; then
+    echo -e "${RED}❌ Backend API did not become ready!${NC}"
+    if ! kill -0 $BACKEND_PID 2>/dev/null; then
+        echo -e "${RED}   Backend process crashed during startup${NC}"
+    fi
     exit 1
 fi
 
@@ -91,13 +117,12 @@ cd "$PROJECT_ROOT/adws/adw_triggers"
 uv run trigger_webhook.py &
 WEBHOOK_PID=$!
 
-# Wait for webhook to start
-echo "⏳ Waiting for webhook service to initialize..."
-sleep 2
-
-# Check if webhook is running
-if ! kill -0 $WEBHOOK_PID 2>/dev/null; then
-    echo -e "${RED}❌ Webhook service failed to start!${NC}"
+# Wait for webhook endpoint to be ready
+if ! wait_for_endpoint "http://localhost:$WEBHOOK_PORT/ping" "Webhook Service" 30 1; then
+    echo -e "${RED}❌ Webhook service did not become ready!${NC}"
+    if ! kill -0 $WEBHOOK_PID 2>/dev/null; then
+        echo -e "${RED}   Webhook process crashed during startup${NC}"
+    fi
     exit 1
 fi
 
@@ -107,12 +132,12 @@ cd "$PROJECT_ROOT/app/client"
 bun run dev &
 FRONTEND_PID=$!
 
-# Wait for frontend to start
-sleep 3
-
-# Check if frontend is running
-if ! kill -0 $FRONTEND_PID 2>/dev/null; then
-    echo -e "${RED}❌ Frontend failed to start!${NC}"
+# Wait for frontend to be ready
+if ! wait_for_endpoint "http://localhost:$CLIENT_PORT" "Frontend" 30 1; then
+    echo -e "${RED}❌ Frontend did not become ready!${NC}"
+    if ! kill -0 $FRONTEND_PID 2>/dev/null; then
+        echo -e "${RED}   Frontend process crashed during startup${NC}"
+    fi
     exit 1
 fi
 
