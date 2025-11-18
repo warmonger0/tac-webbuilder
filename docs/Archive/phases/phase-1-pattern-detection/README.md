@@ -21,34 +21,31 @@ This folder contains the completed documentation for Phase 1 of the Pattern Dete
 
 ## Documentation Index
 
+### Planning & Specifications (Archived)
+
+1. **phase-1-detection.md** - Phase 1 overview specification
+2. **phase-1.1-core-signatures.md** - Core signature specification
+3. **phase-1.2-detection.md** - Detection logic specification
+4. **phase-1.3-database.md** - Database schema specification
+5. **phase-1.4-backfill.md** - Backfill specification
+
 ### Implementation Completion Reports
 
-1. **PHASE_1_COMPLETE.md** - Comprehensive Phase 1 overview (all sub-phases)
-2. **PHASE_1.3_IMPLEMENTATION_COMPLETE.md** - Database & persistence completion
-3. **PHASE_1.4_IMPLEMENTATION_COMPLETE.md** - Backfill & validation completion
+6. **PHASE_1_COMPLETE.md** - Comprehensive Phase 1 overview (all sub-phases)
+7. **PHASE_1.3_IMPLEMENTATION_COMPLETE.md** - Database & persistence completion
+8. **PHASE_1.4_IMPLEMENTATION_COMPLETE.md** - Backfill & validation completion
 
 ### Supporting Documentation
 
-4. **PHASE_1_3_COMPLETE.md** - Phase 1.3 summary
-5. **PHASE_1_3_DELIVERY.md** - Phase 1.3 deliverables checklist
-6. **PHASE_1_3_INDEX.md** - Phase 1.3 file index
-7. **IMPLEMENTATION_VERIFICATION.md** - Verification checklist
-8. **PATTERN_PERSISTENCE_IMPLEMENTATION.md** - Persistence details
-9. **QUICK_REFERENCE.md** - Quick command reference
+9. **PHASE_1_3_COMPLETE.md** - Phase 1.3 summary
+10. **PHASE_1_3_DELIVERY.md** - Phase 1.3 deliverables checklist
+11. **PHASE_1_3_INDEX.md** - Phase 1.3 file index
+12. **IMPLEMENTATION_VERIFICATION.md** - Verification checklist
+13. **PATTERN_PERSISTENCE_IMPLEMENTATION.md** - Persistence details
+14. **QUICK_REFERENCE.md** - Quick command reference
+15. **README.md** - This file (archive index)
 
-## Active Specifications (Still in Implementation Folder)
-
-The following planning documents remain in `docs/implementation/pattern-signatures/` as they define future work:
-
-- `phase-1-detection.md` - Phase 1 overview specification
-- `phase-1.1-core-signatures.md` - Core signature specification
-- `phase-1.2-detection.md` - Detection logic specification
-- `phase-1.3-database.md` - Database schema specification
-- `phase-1.4-backfill.md` - Backfill specification
-- `phase-2-*.md` - Phase 2 specifications (future work)
-- `phase-3-*.md` - Phase 3 specifications (future work)
-- `phase-4-*.md` - Phase 4 specifications (future work)
-- `phase-5-*.md` - Phase 5 specifications (future work)
+**Total:** 15 documents archived
 
 ## Production Code Location
 
