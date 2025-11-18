@@ -55,8 +55,18 @@ def run_external_build_check(
         Build results dictionary
     """
     # Load state
-    state = ADWState(adw_id)
-    state.load()
+    state = ADWState.load(adw_id)
+    if not state:
+        return {
+            "success": False,
+            "error": {
+                "type": "StateError",
+                "message": "No state file found. Run adw_plan_iso.py first."
+            },
+            "summary": {"total_errors": 0, "type_errors": 0, "build_errors": 0},
+            "errors": [],
+            "next_steps": ["Create worktree with adw_plan_iso.py"]
+        }
 
     # Get worktree path
     worktree_path = state.get("worktree_path")
@@ -179,8 +189,10 @@ def main():
     )
 
     # Load state to save results
-    state = ADWState(adw_id)
-    state.load()
+    state = ADWState.load(adw_id)
+    if not state:
+        logger.error("Failed to load state for saving results")
+        sys.exit(1)
 
     # Store results in state
     state.data["external_build_results"] = results
