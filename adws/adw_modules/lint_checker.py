@@ -64,17 +64,71 @@ class LintChecker:
         """
         self.project_root = Path(project_root)
 
-    def check_frontend_lint(self, fix_mode: bool = False) -> LintResult:
+    def get_changed_files(self, base_branch: str = "main") -> Dict[str, List[str]]:
+        """
+        Get list of changed files compared to base branch.
+
+        Args:
+            base_branch: Branch to compare against (default: "main")
+
+        Returns:
+            Dict with "frontend" and "backend" lists of changed files
+        """
+        try:
+            # Get list of changed files
+            result = subprocess.run(
+                ["git", "diff", f"{base_branch}...HEAD", "--name-only"],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            all_changed = result.stdout.strip().split("\n")
+
+            # Filter by frontend/backend
+            frontend_files = []
+            backend_files = []
+
+            for file in all_changed:
+                if file.startswith("app/client/") and (file.endswith(".ts") or file.endswith(".tsx") or file.endswith(".js") or file.endswith(".jsx")):
+                    frontend_files.append(file)
+                elif file.startswith("app/server/") and file.endswith(".py"):
+                    backend_files.append(file)
+
+            return {
+                "frontend": frontend_files,
+                "backend": backend_files
+            }
+        except Exception:
+            return {"frontend": [], "backend": []}
+
+    def check_frontend_lint(self, fix_mode: bool = False, changed_files_only: bool = False) -> LintResult:
         """
         Run ESLint on frontend code.
 
         Args:
             fix_mode: If True, auto-fix issues where possible
+            changed_files_only: If True, only lint changed files vs main branch
 
         Returns:
             LintResult with lint errors only
         """
         frontend_path = self.project_root / "app" / "client"
+
+        # Get changed files if requested
+        files_to_lint = []
+        if changed_files_only:
+            changed = self.get_changed_files()
+            files_to_lint = changed.get("frontend", [])
+            if not files_to_lint:
+                # No changed frontend files, return success
+                return LintResult(
+                    success=True,
+                    summary=LintSummary(total_errors=0, style_errors=0, quality_errors=0, warnings=0),
+                    errors=[],
+                    next_steps=["No changed frontend files to lint"]
+                )
 
         # Run ESLint
         cmd = ["npm", "run", "lint", "--"]
@@ -83,6 +137,10 @@ class LintChecker:
 
         # Always use JSON output for parsing
         cmd.extend(["--format", "json"])
+
+        # Add specific files if changed_files_only
+        if changed_files_only and files_to_lint:
+            cmd.extend(files_to_lint)
 
         import time
         start_time = time.time()
@@ -198,17 +256,32 @@ class LintChecker:
 
         return errors
 
-    def check_backend_lint(self, fix_mode: bool = False) -> LintResult:
+    def check_backend_lint(self, fix_mode: bool = False, changed_files_only: bool = False) -> LintResult:
         """
         Run Ruff linting on backend code.
 
         Args:
             fix_mode: If True, auto-fix issues where possible
+            changed_files_only: If True, only lint changed files vs main branch
 
         Returns:
             LintResult with lint errors
         """
         backend_path = self.project_root / "app" / "server"
+
+        # Get changed files if requested
+        files_to_lint = []
+        if changed_files_only:
+            changed = self.get_changed_files()
+            files_to_lint = changed.get("backend", [])
+            if not files_to_lint:
+                # No changed backend files, return success
+                return LintResult(
+                    success=True,
+                    summary=LintSummary(total_errors=0, style_errors=0, quality_errors=0, warnings=0),
+                    errors=[],
+                    next_steps=["No changed backend files to lint"]
+                )
 
         # Build ruff command
         cmd = ["uv", "run", "ruff", "check"]
@@ -216,7 +289,14 @@ class LintChecker:
             cmd.append("--fix")
 
         # Use JSON output for parsing
-        cmd.extend(["--output-format", "json", "."])
+        cmd.append("--output-format")
+        cmd.append("json")
+
+        # Add specific files or all files
+        if changed_files_only and files_to_lint:
+            cmd.extend(files_to_lint)
+        else:
+            cmd.append(".")
 
         import time
         start_time = time.time()
@@ -334,7 +414,8 @@ class LintChecker:
     def check_all(
         self,
         target: str = "both",
-        fix_mode: bool = False
+        fix_mode: bool = False,
+        changed_files_only: bool = False
     ) -> Dict[str, LintResult]:
         """
         Run all lint checks.
@@ -342,6 +423,7 @@ class LintChecker:
         Args:
             target: "frontend", "backend", or "both"
             fix_mode: Enable auto-fix mode
+            changed_files_only: Only lint changed files vs main branch
 
         Returns:
             Dict with check results
@@ -349,10 +431,10 @@ class LintChecker:
         results = {}
 
         if target in ["frontend", "both"]:
-            results["frontend_lint"] = self.check_frontend_lint(fix_mode)
+            results["frontend_lint"] = self.check_frontend_lint(fix_mode, changed_files_only)
 
         if target in ["backend", "both"]:
-            results["backend_lint"] = self.check_backend_lint(fix_mode)
+            results["backend_lint"] = self.check_backend_lint(fix_mode, changed_files_only)
 
         return results
 
