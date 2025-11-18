@@ -316,17 +316,23 @@ async def watch_routes() -> None:
     except asyncio.CancelledError:
         logger.info("[WS] Routes watcher cancelled")
 
-def get_workflow_history_data(filters: Optional[WorkflowHistoryFilters] = None) -> WorkflowHistoryResponse:
-    """Helper function to get workflow history data"""
+def get_workflow_history_data(filters: Optional[WorkflowHistoryFilters] = None) -> tuple[WorkflowHistoryResponse, bool]:
+    """Helper function to get workflow history data
+
+    Returns:
+        tuple: (WorkflowHistoryResponse, did_sync: bool) - did_sync indicates if sync found changes
+    """
     global _last_sync_time
 
+    did_sync = False
     try:
         # Only sync if cache has expired (prevents redundant syncs on rapid requests)
         current_time = time.time()
         if current_time - _last_sync_time >= _sync_cache_seconds:
             logger.debug(f"[SYNC] Cache expired, syncing workflow history (last sync {current_time - _last_sync_time:.1f}s ago)")
-            sync_workflow_history()
+            synced_count = sync_workflow_history()
             _last_sync_time = current_time
+            did_sync = synced_count > 0  # Only True if actual changes were found
         else:
             logger.debug(f"[SYNC] Using cached data (last sync {current_time - _last_sync_time:.1f}s ago)")
 
@@ -358,18 +364,24 @@ def get_workflow_history_data(filters: Optional[WorkflowHistoryFilters] = None) 
         workflow_items = [WorkflowHistoryItem(**workflow) for workflow in workflows]
         analytics_model = WorkflowHistoryAnalytics(**analytics)
 
-        return WorkflowHistoryResponse(
-            workflows=workflow_items,
-            total_count=total_count,
-            analytics=analytics_model
+        return (
+            WorkflowHistoryResponse(
+                workflows=workflow_items,
+                total_count=total_count,
+                analytics=analytics_model
+            ),
+            did_sync
         )
     except Exception as e:
         logger.error(f"[ERROR] Failed to get workflow history data: {str(e)}")
         # Return empty response on error
-        return WorkflowHistoryResponse(
-            workflows=[],
-            total_count=0,
-            analytics=WorkflowHistoryAnalytics()
+        return (
+            WorkflowHistoryResponse(
+                workflows=[],
+                total_count=0,
+                analytics=WorkflowHistoryAnalytics()
+            ),
+            False
         )
 
 async def watch_workflow_history() -> None:
@@ -378,21 +390,11 @@ async def watch_workflow_history() -> None:
         while True:
             try:
                 if len(manager.active_connections) > 0:
-                    # Get latest workflow history (limited to recent items for WebSocket)
-                    history_data = get_workflow_history_data(WorkflowHistoryFilters(limit=50, offset=0))
+                    # Get latest workflow history - did_sync tells us if anything changed
+                    history_data, did_sync = get_workflow_history_data(WorkflowHistoryFilters(limit=50, offset=0))
 
-                    # Convert to dict for comparison
-                    current_state = json.dumps(
-                        {
-                            "workflows": [w.model_dump() for w in history_data.workflows],
-                            "analytics": history_data.analytics.model_dump()
-                        },
-                        sort_keys=True
-                    )
-
-                    # Only broadcast if state changed
-                    if current_state != manager.last_history_state:
-                        manager.last_history_state = current_state
+                    # Only broadcast if sync found actual changes
+                    if did_sync:
                         await manager.broadcast({
                             "type": "workflow_history_update",
                             "data": {
@@ -403,7 +405,7 @@ async def watch_workflow_history() -> None:
                         })
                         logger.info(f"[WS] Broadcasted workflow history update to {len(manager.active_connections)} clients")
 
-                await asyncio.sleep(2)  # Check every 2 seconds
+                await asyncio.sleep(10)  # Check every 10 seconds (increased from 2s)
             except Exception as e:
                 logger.error(f"[WS] Error in workflow history watcher: {e}")
                 await asyncio.sleep(5)  # Back off on error
@@ -1267,8 +1269,8 @@ async def websocket_workflow_history(websocket: WebSocket) -> None:
     await manager.connect(websocket)
 
     try:
-        # Send initial data
-        history_data = get_workflow_history_data(WorkflowHistoryFilters(limit=50, offset=0))
+        # Send initial data (ignore did_sync flag for initial connection)
+        history_data, _ = get_workflow_history_data(WorkflowHistoryFilters(limit=50, offset=0))
         await websocket.send_json({
             "type": "workflow_history_update",
             "data": {
@@ -1317,7 +1319,7 @@ async def get_workflow_history_endpoint(
             sort_by=sort_by,
             sort_order=sort_order
         )
-        history_data = get_workflow_history_data(filters)
+        history_data, _ = get_workflow_history_data(filters)
         logger.info(f"[SUCCESS] Retrieved {len(history_data.workflows)} workflow history items (total: {history_data.total_count})")
         return history_data
     except Exception as e:
