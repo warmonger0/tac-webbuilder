@@ -37,8 +37,8 @@ import os
 
 # Add the parent directory to Python path to import modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from adw_modules.workflow_ops import ensure_adw_id
-from adw_modules.github import make_issue_comment, format_issue_message
+from adw_modules.workflow_ops import ensure_adw_id, format_issue_message
+from adw_modules.github import make_issue_comment
 from adw_modules.cleanup_operations import cleanup_shipped_issue
 from adw_modules.utils import setup_logger
 
