@@ -6,7 +6,7 @@
         "@playwright/mcp@latest",
         "--isolated",
         "--config",
-        "/Users/Warmonger0/tac/tac-webbuilder/trees/4c973d9a/playwright-mcp-config.json"
+        "/Users/Warmonger0/tac/tac-webbuilder/trees/641fb538/playwright-mcp-config.json"
       ]
     }
   }
