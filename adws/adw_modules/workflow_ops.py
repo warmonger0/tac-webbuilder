@@ -520,7 +520,21 @@ def generate_branch_name(
     if not response.success:
         return None, response.output
 
-    branch_name = response.output.strip()
+    # Extract just the branch name from the response
+    # AI sometimes includes explanation text, so we need to extract the actual branch name
+    output = response.output.strip()
+
+    # Look for branch name pattern: <type>-issue-<number>-adw-<id>-<description>
+    import re
+    branch_pattern = r'((?:patch|bug|feature|chore)-issue-\d+-adw-[a-f0-9]+-[\w-]+)'
+    match = re.search(branch_pattern, output)
+
+    if match:
+        branch_name = match.group(1)
+    else:
+        # Fallback: use last line if no pattern match (in case format changes)
+        branch_name = output.split('\n')[-1].strip()
+
     logger.info(f"Generated branch name: {branch_name}")
     return branch_name, None
 
