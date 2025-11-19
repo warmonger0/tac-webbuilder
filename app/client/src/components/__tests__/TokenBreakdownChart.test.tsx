@@ -4,7 +4,7 @@
  * Tests for rendering, formatting, and handling edge cases
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TokenBreakdownChart } from '../TokenBreakdownChart';
 

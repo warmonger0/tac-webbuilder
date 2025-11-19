@@ -16,7 +16,6 @@ SOLUTION:
 """
 
 import re
-from typing import Dict, List, Tuple
 from dataclasses import dataclass
 
 
@@ -25,7 +24,7 @@ class SplitRecommendation:
     """Recommendation for splitting an issue."""
     should_split: bool
     reason: str
-    suggested_splits: List[Dict[str, str]]
+    suggested_splits: list[dict[str, str]]
     estimated_savings: float
     confidence_score: float
 
@@ -50,7 +49,7 @@ CONCERN_KEYWORDS = {
 }
 
 
-def analyze_input(nl_input: str, metadata: Dict = None) -> SplitRecommendation:
+def analyze_input(nl_input: str, metadata: dict = None) -> SplitRecommendation:
     """
     Analyze if an issue should be split into multiple smaller issues.
 
@@ -135,7 +134,7 @@ def analyze_input(nl_input: str, metadata: Dict = None) -> SplitRecommendation:
     )
 
 
-def detect_concerns(nl_input: str) -> List[str]:
+def detect_concerns(nl_input: str) -> list[str]:
     """
     Detect technical concerns mentioned in input.
 
@@ -209,9 +208,9 @@ def estimate_complexity(nl_input: str, num_concerns: int, bullet_points: int) ->
 
 def generate_split_suggestions(
     nl_input: str,
-    concerns: List[str],
+    concerns: list[str],
     bullet_points: int
-) -> List[Dict[str, str]]:
+) -> list[dict[str, str]]:
     """
     Generate suggested issue splits based on concerns.
 
@@ -238,7 +237,7 @@ def generate_split_suggestions(
     return splits[:4]  # Max 4 splits to avoid over-fragmentation
 
 
-def generate_split_suggestions_from_bullets(nl_input: str) -> List[Dict[str, str]]:
+def generate_split_suggestions_from_bullets(nl_input: str) -> list[dict[str, str]]:
     """Generate splits based on bullet points/tasks in the input."""
     splits = []
     lines = nl_input.split('\n')
@@ -316,9 +315,7 @@ def calculate_split_savings(complexity: str, num_splits: int) -> float:
 
     # Calculate split cost
     # When splitting complex → multiple simpler tasks
-    if complexity == "complex":
-        split_complexity = "simple"
-    elif complexity == "medium":
+    if complexity == "complex" or complexity == "medium":
         split_complexity = "simple"
     else:
         # Already simple, splitting adds overhead

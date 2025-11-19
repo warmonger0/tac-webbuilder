@@ -75,8 +75,11 @@ def run_external_build(
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     # Reload state to get external build results
-    state.load()
-    build_results = state.get("external_build_results", {})
+    reloaded_state = ADWState.load(adw_id)
+    if not reloaded_state:
+        logger.error("Failed to reload state after external build")
+        return False, {"error": "Failed to reload state"}
+    build_results = reloaded_state.get("external_build_results", {})
 
     if not build_results:
         logger.warning("No external_build_results found in state after execution")

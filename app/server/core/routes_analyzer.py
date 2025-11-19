@@ -9,9 +9,9 @@ Scans FastAPI route definitions and extracts route metadata including:
 """
 
 import ast
-from pathlib import Path
-from typing import List, Dict, Any, Optional
 import logging
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class RoutesAnalyzer:
         else:
             self.server_file_path = server_file_path
 
-    def analyze_routes(self) -> List[Dict[str, Any]]:
+    def analyze_routes(self) -> list[dict[str, Any]]:
         """
         Analyze the server file and extract all route definitions.
 
@@ -62,7 +62,7 @@ class RoutesAnalyzer:
             logger.error(f"Error analyzing routes: {e}")
             return []
 
-    def _analyze_file(self, file_path: str) -> List[Dict[str, Any]]:
+    def _analyze_file(self, file_path: str) -> list[dict[str, Any]]:
         """
         Analyze a single Python file for FastAPI route decorators.
 
@@ -75,7 +75,7 @@ class RoutesAnalyzer:
         routes = []
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 file_content = f.read()
 
             # Parse the file into an AST
@@ -96,7 +96,7 @@ class RoutesAnalyzer:
 
         return routes
 
-    def _extract_route_from_decorators(self, func_node) -> Optional[Dict[str, Any]]:
+    def _extract_route_from_decorators(self, func_node) -> dict[str, Any] | None:
         """
         Extract route information from function decorators.
 
@@ -128,7 +128,7 @@ class RoutesAnalyzer:
 
         return None
 
-    def _extract_string_value(self, node: ast.AST) -> Optional[str]:
+    def _extract_string_value(self, node: ast.AST) -> str | None:
         """
         Extract string value from an AST node.
 

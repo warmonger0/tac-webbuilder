@@ -1,22 +1,20 @@
 import sqlite3
-from typing import List, Optional
-from core.data_models import ColumnInsight
-from .sql_security import (
-    execute_query_safely,
-    validate_identifier,
-    SQLSecurityError
-)
 
-def generate_insights(table_name: str, column_names: Optional[List[str]] = None) -> List[ColumnInsight]:
+from core.data_models import ColumnInsight
+
+from .sql_security import SQLSecurityError, execute_query_safely, validate_identifier
+
+
+def generate_insights(table_name: str, column_names: list[str] | None = None) -> list[ColumnInsight]:
     """
     Generate statistical insights for table columns
     """
     try:
         # Validate table name
         validate_identifier(table_name, "table")
-        
+
         conn = sqlite3.connect("db/database.db")
-        
+
         # Get table schema using safe query execution
         cursor_info = execute_query_safely(
             conn,
@@ -24,7 +22,7 @@ def generate_insights(table_name: str, column_names: Optional[List[str]] = None)
             identifier_params={'table': table_name}
         )
         columns_info = cursor_info.fetchall()
-        
+
         # If no specific columns requested, analyze all
         if not column_names:
             column_names = [col[1] for col in columns_info]
@@ -35,23 +33,23 @@ def generate_insights(table_name: str, column_names: Optional[List[str]] = None)
                     validate_identifier(col, "column")
                 except SQLSecurityError:
                     raise Exception(f"Invalid column name: {col}")
-        
+
         insights = []
-        
+
         for col_info in columns_info:
             col_name = col_info[1]
             col_type = col_info[2]
-            
+
             if col_name not in column_names:
                 continue
-            
+
             # Validate column name
             try:
                 validate_identifier(col_name, "column")
             except SQLSecurityError:
                 # Skip columns with invalid names
                 continue
-            
+
             # Basic statistics using safe query execution
             cursor_distinct = execute_query_safely(
                 conn,
@@ -59,21 +57,21 @@ def generate_insights(table_name: str, column_names: Optional[List[str]] = None)
                 identifier_params={'column': col_name, 'table': table_name}
             )
             unique_values = cursor_distinct.fetchone()[0]
-            
+
             cursor_null = execute_query_safely(
                 conn,
                 "SELECT COUNT(*) FROM {table} WHERE {column} IS NULL",
                 identifier_params={'table': table_name, 'column': col_name}
             )
             null_count = cursor_null.fetchone()[0]
-            
+
             insight = ColumnInsight(
                 column_name=col_name,
                 data_type=col_type,
                 unique_values=unique_values,
                 null_count=null_count
             )
-            
+
             # Type-specific insights
             if col_type in ['INTEGER', 'REAL', 'NUMERIC']:
                 # Numeric insights using safe query execution
@@ -94,7 +92,7 @@ def generate_insights(table_name: str, column_names: Optional[List[str]] = None)
                     insight.min_value = result[0]
                     insight.max_value = result[1]
                     insight.avg_value = result[2]
-            
+
             # Most common values (for all types) using safe query execution
             cursor_common = execute_query_safely(
                 conn,
@@ -111,14 +109,14 @@ def generate_insights(table_name: str, column_names: Optional[List[str]] = None)
             most_common = cursor_common.fetchall()
             if most_common:
                 insight.most_common = [
-                    {"value": val, "count": count} 
+                    {"value": val, "count": count}
                     for val, count in most_common
                 ]
-            
+
             insights.append(insight)
-        
+
         conn.close()
         return insights
-        
+
     except Exception as e:
         raise Exception(f"Error generating insights: {str(e)}")

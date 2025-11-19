@@ -5,11 +5,11 @@ Monitors Claude API usage and provides quota checking functionality
 to prevent ADW workflows from starting when quota is exhausted.
 """
 
-import os
 import logging
-from typing import Optional, Tuple
+import os
 from datetime import datetime
-from anthropic import Anthropic, RateLimitError, APIError
+
+from anthropic import Anthropic, APIError, RateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ except Exception as e:
     ANTHROPIC_AVAILABLE = False
 
 
-def check_anthropic_quota() -> Tuple[bool, Optional[str]]:
+def check_anthropic_quota() -> tuple[bool, str | None]:
     """
     Check if Anthropic API quota is available by making a minimal test call.
 
@@ -63,7 +63,7 @@ def check_anthropic_quota() -> Tuple[bool, Optional[str]]:
         return False, f"Unexpected error: {str(e)}"
 
 
-def can_start_adw() -> Tuple[bool, Optional[str]]:
+def can_start_adw() -> tuple[bool, str | None]:
     """
     Determine if an ADW workflow can be started based on API quota availability.
 
@@ -102,7 +102,7 @@ def get_quota_status() -> dict:
     }
 
 
-def should_skip_e2e_tests() -> Tuple[bool, Optional[str]]:
+def should_skip_e2e_tests() -> tuple[bool, str | None]:
     """
     Determine if E2E tests should be skipped due to quota constraints.
 

@@ -15,9 +15,9 @@ Additionally provides:
 - Optimization recommendations
 """
 
-from typing import Dict, List, Union
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Union
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ def extract_day_of_week(timestamp: str) -> int:
 # Core Scoring Functions
 # ============================================================================
 
-def calculate_nl_input_clarity_score(workflow: Dict) -> float:
+def calculate_nl_input_clarity_score(workflow: dict) -> float:
     """
     Calculate natural language input clarity score (0-100).
 
@@ -152,7 +152,7 @@ def calculate_nl_input_clarity_score(workflow: Dict) -> float:
         return 0.0
 
 
-def calculate_cost_efficiency_score(workflow: Dict) -> float:
+def calculate_cost_efficiency_score(workflow: dict) -> float:
     """
     Calculate cost efficiency score (0-100).
 
@@ -219,9 +219,7 @@ def calculate_cost_efficiency_score(workflow: Dict) -> float:
         model = workflow.get("model_used", "").lower()
 
         model_score = 0
-        if complexity == "simple" and "haiku" in model:
-            model_score = 10  # Perfect match
-        elif complexity == "complex" and "sonnet" in model:
+        if complexity == "simple" and "haiku" in model or complexity == "complex" and "sonnet" in model:
             model_score = 10  # Perfect match
         elif complexity == "medium":
             model_score = 8   # Either model is fine
@@ -248,7 +246,7 @@ def calculate_cost_efficiency_score(workflow: Dict) -> float:
         return 0.0
 
 
-def calculate_performance_score(workflow: Dict) -> float:
+def calculate_performance_score(workflow: dict) -> float:
     """
     Calculate performance score (0-100).
 
@@ -323,7 +321,7 @@ def calculate_performance_score(workflow: Dict) -> float:
         return 0.0
 
 
-def calculate_quality_score(workflow: Dict) -> float:
+def calculate_quality_score(workflow: dict) -> float:
     """
     Calculate quality score (0-100).
 
@@ -437,7 +435,7 @@ def calculate_text_similarity(text1: str, text2: str) -> float:
     return intersection / union if union > 0 else 0.0
 
 
-def detect_complexity(workflow: Dict) -> str:
+def detect_complexity(workflow: dict) -> str:
     """
     Detect workflow complexity level based on multiple factors.
 
@@ -494,7 +492,7 @@ def detect_complexity(workflow: Dict) -> str:
         return "medium"  # Default to medium on error
 
 
-def find_similar_workflows(workflow: Dict, all_workflows: List[Dict]) -> Union[List[str], List[Dict]]:
+def find_similar_workflows(workflow: dict, all_workflows: list[dict]) -> Union[list[str], list[dict]]:
     """
     Find similar workflows using multi-factor similarity scoring.
 
@@ -616,7 +614,7 @@ def find_similar_workflows(workflow: Dict, all_workflows: List[Dict]) -> Union[L
         return []
 
 
-def detect_anomalies(workflow: Dict, historical_data: List[Dict]) -> List[Dict]:
+def detect_anomalies(workflow: dict, historical_data: list[dict]) -> list[dict]:
     """
     Detect anomalies in workflow execution.
 
@@ -730,7 +728,7 @@ def detect_anomalies(workflow: Dict, historical_data: List[Dict]) -> List[Dict]:
         return []
 
 
-def generate_optimization_recommendations(workflow: Dict, anomalies: List[Dict]) -> List[str]:
+def generate_optimization_recommendations(workflow: dict, anomalies: list[dict]) -> list[str]:
     """
     Generate actionable optimization recommendations with emoji prefixes.
 

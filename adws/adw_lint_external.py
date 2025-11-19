@@ -10,7 +10,7 @@ This ADW workflow executes linting externally and returns
 compact results (errors only) to minimize context consumption.
 
 Usage:
-  uv run adw_lint_external.py <issue-number> <adw-id> [--target=both] [--fix-mode]
+  uv run adw_lint_external.py <issue-number> <adw-id> [--target=both] [--fix-mode] [--changed-files-only]
 
 Workflow:
 1. Load state from agents/{adw_id}/adw_state.json
@@ -39,7 +39,8 @@ from adw_modules.utils import setup_logger
 def run_external_lint_check(
     adw_id: str,
     target: str = "both",
-    fix_mode: bool = False
+    fix_mode: bool = False,
+    changed_files_only: bool = False
 ) -> Dict[str, Any]:
     """
     Run linting using external lint workflow.
@@ -48,13 +49,30 @@ def run_external_lint_check(
         adw_id: ADW ID for state management
         target: "frontend", "backend", or "both"
         fix_mode: Enable auto-fix mode
+        changed_files_only: Only lint changed files vs main branch
 
     Returns:
         Lint results dictionary
     """
     # Load state
-    state = ADWState(adw_id)
-    state.load()
+    state = ADWState.load(adw_id)
+    if not state:
+        return {
+            "success": False,
+            "error": {
+                "type": "StateError",
+                "message": "No state file found. Run adw_plan_iso.py first."
+            },
+            "summary": {
+                "total_errors": 0,
+                "style_errors": 0,
+                "quality_errors": 0,
+                "warnings": 0,
+                "fixable_count": 0
+            },
+            "errors": [],
+            "next_steps": ["Create worktree with adw_plan_iso.py"]
+        }
 
     # Get worktree path
     worktree_path = state.get("worktree_path")
@@ -87,7 +105,8 @@ def run_external_lint_check(
         str(lint_workflow_script),
         "--json-input", json.dumps({
             "target": target,
-            "fix_mode": fix_mode
+            "fix_mode": fix_mode,
+            "changed_files_only": changed_files_only
         })
     ]
 
@@ -165,7 +184,7 @@ def run_external_lint_check(
 def main():
     """Main entry point."""
     if len(sys.argv) < 3:
-        print("Usage: uv run adw_lint_external.py <issue-number> <adw-id> [--target=both] [--fix-mode]")
+        print("Usage: uv run adw_lint_external.py <issue-number> <adw-id> [--target=both] [--fix-mode] [--changed-files-only]")
         print("\nThis ADW workflow runs linting externally and stores compact results in state.")
         print("It is designed to be chained from adw_lint_iso.py via subprocess.")
         sys.exit(1)
@@ -176,28 +195,35 @@ def main():
     # Parse optional flags
     target = "both"
     fix_mode = False
+    changed_files_only = False
 
     for arg in sys.argv[3:]:
         if arg.startswith("--target="):
             target = arg.split("=")[1]
         elif arg == "--fix-mode":
             fix_mode = True
+        elif arg == "--changed-files-only":
+            changed_files_only = True
 
     # Setup logging
     logger = setup_logger(f"adw_lint_external_{adw_id}")
     logger.info(f"Starting external lint workflow for issue #{issue_number}, ADW {adw_id}")
 
     # Run lint checks
-    logger.info(f"Running lint checks on {target}{' with auto-fix' if fix_mode else ''}")
+    scope_msg = " (changed files only)" if changed_files_only else ""
+    logger.info(f"Running lint checks on {target}{' with auto-fix' if fix_mode else ''}{scope_msg}")
     results = run_external_lint_check(
         adw_id,
         target=target,
-        fix_mode=fix_mode
+        fix_mode=fix_mode,
+        changed_files_only=changed_files_only
     )
 
     # Load state to save results
-    state = ADWState(adw_id)
-    state.load()
+    state = ADWState.load(adw_id)
+    if not state:
+        logger.error("Failed to load state for saving results")
+        sys.exit(1)
 
     # Store results in state
     state.data["external_lint_results"] = results

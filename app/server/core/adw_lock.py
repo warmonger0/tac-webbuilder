@@ -6,11 +6,10 @@ This module provides mutex-like locking functionality to ensure only one ADW ins
 processes a given issue at any time.
 """
 
-import sqlite3
 import logging
-from pathlib import Path
-from typing import Optional
+import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +62,7 @@ def init_adw_locks_table() -> None:
         logger.info("[ADW Lock] Lock table initialized")
 
 
-def acquire_lock(issue_number: int, adw_id: str, github_url: Optional[str] = None) -> bool:
+def acquire_lock(issue_number: int, adw_id: str, github_url: str | None = None) -> bool:
     """
     Attempt to acquire a lock for a GitHub issue.
 

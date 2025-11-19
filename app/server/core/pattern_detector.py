@@ -6,7 +6,6 @@ Analyzes complete workflows to identify patterns and extract characteristics.
 
 import logging
 import re
-from typing import Dict, List, Optional
 
 from .pattern_signatures import extract_operation_signature
 
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 # PATTERN DETECTION FROM WORKFLOWS
 # ============================================================================
 
-def detect_patterns_in_workflow(workflow: Dict) -> List[str]:
+def detect_patterns_in_workflow(workflow: dict) -> list[str]:
     """
     Analyze a workflow and extract all operation patterns.
 
@@ -67,7 +66,7 @@ def detect_patterns_in_workflow(workflow: Dict) -> List[str]:
     return patterns
 
 
-def _extract_patterns_from_errors(error_message: str) -> List[str]:
+def _extract_patterns_from_errors(error_message: str) -> list[str]:
     """
     Extract operation patterns from error messages.
 
@@ -110,7 +109,7 @@ def _extract_patterns_from_errors(error_message: str) -> List[str]:
     return patterns
 
 
-def _extract_pattern_from_template(template: Optional[str]) -> Optional[str]:
+def _extract_pattern_from_template(template: str | None) -> str | None:
     """
     Extract pattern from workflow template name.
 
@@ -163,7 +162,7 @@ def _extract_pattern_from_template(template: Optional[str]) -> Optional[str]:
 # PATTERN CHARACTERISTICS EXTRACTION
 # ============================================================================
 
-def extract_pattern_characteristics(workflow: Dict) -> Dict:
+def extract_pattern_characteristics(workflow: dict) -> dict:
     """
     Extract characteristics that help identify and classify patterns.
 
@@ -243,7 +242,7 @@ def extract_pattern_characteristics(workflow: Dict) -> Dict:
     }
 
 
-def _extract_keywords(text: str) -> List[str]:
+def _extract_keywords(text: str) -> list[str]:
     """
     Extract significant keywords from text.
 
@@ -284,7 +283,7 @@ def _extract_keywords(text: str) -> List[str]:
     return found
 
 
-def _extract_file_paths(text: str) -> List[str]:
+def _extract_file_paths(text: str) -> list[str]:
     """
     Extract file paths or glob patterns from text.
 
@@ -327,7 +326,7 @@ def _extract_file_paths(text: str) -> List[str]:
 # CONFIDENCE SCORE CALCULATION
 # ============================================================================
 
-def calculate_confidence_score(pattern_data: Dict, workflows: List[Dict]) -> float:
+def calculate_confidence_score(pattern_data: dict, workflows: list[dict]) -> float:
     """
     Calculate confidence score for a pattern based on occurrence data.
 
@@ -413,7 +412,7 @@ def calculate_confidence_score(pattern_data: Dict, workflows: List[Dict]) -> flo
 # BATCH PROCESSING
 # ============================================================================
 
-def process_workflow_for_patterns(workflow: Dict) -> Dict:
+def process_workflow_for_patterns(workflow: dict) -> dict:
     """
     Main entry point for pattern detection on a single workflow.
 

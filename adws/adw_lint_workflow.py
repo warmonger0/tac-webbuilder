@@ -24,7 +24,8 @@ Usage:
 Input Schema:
     {
         "target": "frontend" | "backend" | "both",
-        "fix_mode": bool (default: False)
+        "fix_mode": bool (default: False),
+        "changed_files_only": bool (default: False)
     }
 
 Output Schema:
@@ -82,6 +83,12 @@ def parse_args():
         help="Enable auto-fix mode"
     )
     parser.add_argument(
+        "--changed-files-only",
+        action="store_true",
+        default=False,
+        help="Only lint changed files vs main branch"
+    )
+    parser.add_argument(
         "--json-input",
         type=str,
         default=None,
@@ -104,6 +111,7 @@ def run_workflow(params: Dict[str, Any]) -> Dict[str, Any]:
     # Extract parameters
     target = params.get("target", "both")
     fix_mode = params.get("fix_mode", False)
+    changed_files_only = params.get("changed_files_only", False)
 
     # Get project root (2 levels up from this file)
     project_root = Path(__file__).parent.parent
@@ -114,7 +122,8 @@ def run_workflow(params: Dict[str, Any]) -> Dict[str, Any]:
     # Execute checks
     results = checker.check_all(
         target=target,
-        fix_mode=fix_mode
+        fix_mode=fix_mode,
+        changed_files_only=changed_files_only
     )
 
     # Combine results
@@ -206,7 +215,8 @@ def main():
     else:
         params = {
             "target": args.target,
-            "fix_mode": args.fix_mode
+            "fix_mode": args.fix_mode,
+            "changed_files_only": args.changed_files_only
         }
 
     # Execute workflow

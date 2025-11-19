@@ -233,6 +233,10 @@ class ADWStateData(BaseModel):
     model_set: Optional[ModelSet] = "base"  # Default to "base" model set
     all_adws: List[str] = Field(default_factory=list)
 
+    # Cost tracking fields
+    estimated_cost_total: Optional[float] = None
+    estimated_cost_breakdown: Optional[dict] = None  # Per-phase estimates
+
 
 class ReviewIssue(BaseModel):
     """Individual review issue found during spec verification."""

@@ -4,15 +4,16 @@ Unit tests for template router and workflow routing.
 Tests both backward compatibility and new template routing functionality.
 """
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from core.template_router import (
-    route_by_template,
-    detect_characteristics,
-)
 from core.nl_processor import suggest_adw_workflow
+from core.template_router import (
+    detect_characteristics,
+    route_by_template,
+)
 
 
 def test_template_routing_lightweight():

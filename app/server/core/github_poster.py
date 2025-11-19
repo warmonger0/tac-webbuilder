@@ -3,10 +3,11 @@ GitHub CLI integration for posting issues.
 """
 
 import subprocess
-from typing import Optional
+
 from rich.console import Console
-from rich.panel import Panel
 from rich.markdown import Markdown
+from rich.panel import Panel
+
 from core.data_models import GitHubIssue
 
 
@@ -15,7 +16,7 @@ class GitHubPoster:
     GitHub CLI wrapper for posting issues with preview and confirmation.
     """
 
-    def __init__(self, repo_url: Optional[str] = None):
+    def __init__(self, repo_url: str | None = None):
         """
         Initialize GitHub poster.
 

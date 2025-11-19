@@ -34,7 +34,7 @@ import logging
 
 # Add the parent directory to Python path to import modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from adw_modules.workflow_ops import ensure_adw_id
+from adw_modules.workflow_ops import ensure_adw_id, trigger_cost_sync
 from adw_modules.github import make_issue_comment
 
 
@@ -149,6 +149,11 @@ def main():
     print(f"\n=== ⚡ LIGHTWEIGHT WORKFLOW COMPLETED ===")
     print(f"ADW ID: {adw_id}")
     print(f"✅ Code has been shipped!")
+
+    # Trigger cost synchronization
+    print(f"\n📊 Syncing workflow costs...")
+    trigger_cost_sync(adw_id)
+
     print(f"\nWorktree location: trees/{adw_id}/")
     print(f"To clean up: ./scripts/purge_tree.sh {adw_id}")
 

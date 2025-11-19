@@ -6,7 +6,7 @@ and proper escaping mechanisms.
 
 import re
 import sqlite3
-from typing import Any, List, Tuple, Optional, Union
+from typing import Any, Union
 
 
 class SQLSecurityError(Exception):
@@ -94,8 +94,8 @@ def escape_identifier(identifier: str) -> str:
 def execute_query_safely(
     conn: sqlite3.Connection,
     query: str,
-    params: Optional[Union[Tuple, List]] = None,
-    identifier_params: Optional[dict] = None,
+    params: Union[tuple, list] | None = None,
+    identifier_params: dict | None = None,
     allow_ddl: bool = False,
 ) -> sqlite3.Cursor:
     """
@@ -226,7 +226,7 @@ def sanitize_value_for_like(value: str) -> str:
     return value
 
 
-def build_safe_in_clause(column: str, values: List[Any]) -> Tuple[str, List[Any]]:
+def build_safe_in_clause(column: str, values: list[Any]) -> tuple[str, list[Any]]:
     """
     Build a safe IN clause with proper parameterization.
 
@@ -253,7 +253,7 @@ def build_safe_in_clause(column: str, values: List[Any]) -> Tuple[str, List[Any]
     return clause, values
 
 
-def get_safe_table_list(conn: sqlite3.Connection) -> List[str]:
+def get_safe_table_list(conn: sqlite3.Connection) -> list[str]:
     """
     Get a list of all tables in the database safely.
 

@@ -1,4 +1,4 @@
-import type { GitHubIssue, CostEstimate } from '../types';
+import type { CostEstimate, GitHubIssue } from '../types';
 import { IssuePreview } from './IssuePreview';
 import { CostEstimateCard } from './CostEstimateCard';
 

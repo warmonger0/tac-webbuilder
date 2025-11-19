@@ -1,7 +1,7 @@
 import './style.css'
 import { api } from './api/client'
-import { getAllWorkflows, categoryNames, categoryDescriptions } from './workflows'
-import type { QueryResponse, TableSchema, FileUploadResponse, WorkflowTemplate } from './types'
+import { categoryDescriptions, categoryNames, getAllWorkflows } from './workflows'
+import type { FileUploadResponse, QueryResponse, TableSchema, WorkflowTemplate } from './types'
 
 // Global state
 

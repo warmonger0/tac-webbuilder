@@ -21,9 +21,9 @@ Usage:
     await manager.broadcast({"type": "workflow_update", "data": {...}})
 """
 
-from fastapi import WebSocket
-from typing import Set, Optional
 import logging
+
+from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +52,10 @@ class ConnectionManager:
 
     def __init__(self):
         """Initialize the ConnectionManager with empty connection set and state tracking."""
-        self.active_connections: Set[WebSocket] = set()
-        self.last_workflow_state: Optional[dict] = None
-        self.last_routes_state: Optional[dict] = None
-        self.last_history_state: Optional[dict] = None
+        self.active_connections: set[WebSocket] = set()
+        self.last_workflow_state: dict | None = None
+        self.last_routes_state: dict | None = None
+        self.last_history_state: dict | None = None
 
     async def connect(self, websocket: WebSocket) -> None:
         """

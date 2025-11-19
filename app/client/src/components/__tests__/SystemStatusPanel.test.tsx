@@ -4,8 +4,8 @@
  * Tests for the comprehensive system health monitoring panel
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SystemStatusPanel } from '../SystemStatusPanel';
 import * as client from '../../api/client';

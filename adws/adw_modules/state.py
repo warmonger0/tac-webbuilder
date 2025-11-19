@@ -77,7 +77,7 @@ class ADWState:
         state_path = self.get_state_path()
         os.makedirs(os.path.dirname(state_path), exist_ok=True)
 
-        # Create ADWStateData for validation
+        # Create ADWStateData for validation of core fields
         state_data = ADWStateData(
             adw_id=self.data.get("adw_id"),
             issue_number=self.data.get("issue_number"),
@@ -91,9 +91,18 @@ class ADWState:
             all_adws=self.data.get("all_adws", []),
         )
 
+        # Start with validated core fields
+        save_data = state_data.model_dump()
+
+        # Add extra fields (like external_build_results, external_test_results, etc.)
+        core_field_names = set(state_data.model_fields.keys())
+        for key, value in self.data.items():
+            if key not in core_field_names:
+                save_data[key] = value
+
         # Save as JSON
         with open(state_path, "w") as f:
-            json.dump(state_data.model_dump(), f, indent=2)
+            json.dump(save_data, f, indent=2)
 
         self.logger.info(f"Saved state to {state_path}")
         if workflow_step:
@@ -116,16 +125,18 @@ class ADWState:
             with open(state_path, "r") as f:
                 data = json.load(f)
 
-            # Validate with ADWStateData
-            state_data = ADWStateData(**data)
+            # Validate core fields with ADWStateData
+            # This will raise an error if core fields are invalid
+            state_data = ADWStateData(**{k: v for k, v in data.items() if k in ADWStateData.model_fields})
 
             # Create ADWState instance
             state = cls(state_data.adw_id)
-            state.data = state_data.model_dump()
+            # Use full data to preserve extra fields (like external_build_results)
+            state.data = data
 
             if logger:
                 logger.info(f"🔍 Found existing state from {state_path}")
-                logger.info(f"State: {json.dumps(state_data.model_dump(), indent=2)}")
+                logger.info(f"State: {json.dumps(data, indent=2)}")
 
             return state
         except Exception as e:

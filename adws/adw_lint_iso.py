@@ -75,8 +75,11 @@ def run_external_lint(
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     # Reload state to get external lint results
-    state.load()
-    lint_results = state.get("external_lint_results", {})
+    reloaded_state = ADWState.load(adw_id)
+    if not reloaded_state:
+        logger.error("Failed to reload state after external lint")
+        return False, {"error": "Failed to reload state"}
+    lint_results = reloaded_state.get("external_lint_results", {})
 
     if not lint_results:
         logger.warning("No external_lint_results found in state after execution")

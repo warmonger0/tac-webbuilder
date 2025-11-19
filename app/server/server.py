@@ -1,89 +1,96 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
-from datetime import datetime
-from typing import List, Set, Optional, Literal
-from contextlib import asynccontextmanager
-import os
-import sqlite3
-import traceback
-from dotenv import load_dotenv
-import logging
-import sys
 import asyncio
 import json
+import logging
+import os
+import sqlite3
 import subprocess
-import urllib.request
+import sys
 import time
+import traceback
+import urllib.request
+import uuid
+from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Literal
 
+import httpx
+from core.cost_tracker import read_cost_history
 from core.data_models import (
-    FileUploadResponse,
-    QueryRequest,
-    QueryResponse,
-    DatabaseSchemaResponse,
-    InsightsRequest,
-    InsightsResponse,
-    HealthCheckResponse,
-    ServiceHealth,
-    SystemStatusResponse,
-    TableSchema,
     ColumnInfo,
-    RandomQueryResponse,
-    ExportRequest,
-    QueryExportRequest,
-    Route,
-    RoutesResponse,
-    Workflow,
-    WorkflowTemplate,
-    WorkflowCatalogResponse,
-    CostResponse,
-    WorkflowHistoryItem,
-    WorkflowHistoryResponse,
-    WorkflowHistoryAnalytics,
-    WorkflowHistoryFilters,
-    SubmitRequestData,
-    SubmitRequestResponse,
     ConfirmResponse,
     CostEstimate,
-    GitHubIssue,
-    ProjectContext,
-    ResyncResponse,
-    WorkflowAnalyticsDetail,
-    WorkflowTrends,
     CostPrediction,
+    CostResponse,
+    DatabaseSchemaResponse,
+    ExportRequest,
+    FileUploadResponse,
+    GitHubIssue,
+    HealthCheckResponse,
+    InsightsRequest,
+    InsightsResponse,
+    ProjectContext,
+    QueryExportRequest,
+    QueryRequest,
+    QueryResponse,
+    RandomQueryResponse,
+    ResyncResponse,
+    Route,
+    RoutesResponse,
+    ServiceHealth,
+    SubmitRequestData,
+    SubmitRequestResponse,
+    SystemStatusResponse,
+    TableSchema,
     TrendDataPoint,
-)
-from core.file_processor import convert_csv_to_sqlite, convert_json_to_sqlite, convert_jsonl_to_sqlite
-from core.llm_processor import generate_sql, generate_random_query
-from core.sql_processor import execute_sql_safely, get_database_schema
-from core.insights import generate_insights
-from core.sql_security import (
-    execute_query_safely,
-    validate_identifier,
-    check_table_exists,
-    SQLSecurityError
+    Workflow,
+    WorkflowAnalyticsDetail,
+    WorkflowCatalogResponse,
+    WorkflowHistoryAnalytics,
+    WorkflowHistoryFilters,
+    WorkflowHistoryItem,
+    WorkflowHistoryResponse,
+    WorkflowTemplate,
+    WorkflowTrends,
 )
 from core.export_utils import generate_csv_from_data, generate_csv_from_table
-from core.cost_tracker import read_cost_history
+from core.file_processor import (
+    convert_csv_to_sqlite,
+    convert_json_to_sqlite,
+    convert_jsonl_to_sqlite,
+)
+from core.github_poster import GitHubPoster
+from core.insights import generate_insights
+from core.llm_processor import generate_random_query, generate_sql
+from core.nl_processor import process_request
+from core.project_detector import detect_project_context
+from core.sql_processor import execute_sql_safely, get_database_schema
+from core.sql_security import (
+    SQLSecurityError,
+    check_table_exists,
+    execute_query_safely,
+    validate_identifier,
+)
+from core.workflow_history import (
+    get_history_analytics,
+    get_workflow_history,
+    resync_all_completed_workflows,
+    resync_workflow_cost,
+    sync_workflow_history,
+)
 from core.workflow_history import (
     init_db as init_workflow_history_db,
-    get_workflow_history,
-    get_history_analytics,
-    sync_workflow_history,
-    resync_workflow_cost,
-    resync_all_completed_workflows,
 )
-from core.nl_processor import process_request
-from core.github_poster import GitHubPoster
-from core.project_detector import detect_project_context
+from dotenv import load_dotenv
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from services.websocket_manager import ConnectionManager
-import uuid
-import httpx
 
 # Import ADW complexity analyzer for cost estimation
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'adws'))
 from adw_modules.complexity_analyzer import analyze_issue_complexity
 from adw_modules.data_types import GitHubIssue as ADWGitHubIssue
+from core.cost_estimate_storage import get_cost_estimate, save_cost_estimate
 
 # Load .env file from server directory
 load_dotenv()
@@ -157,7 +164,7 @@ os.makedirs("db", exist_ok=True)
 # WebSocket connection manager
 manager = ConnectionManager()
 
-def get_workflows_data() -> List[Workflow]:
+def get_workflows_data() -> list[Workflow]:
     """Helper function to get workflow data - only returns OPEN workflows"""
     workflows = []
     agents_dir = os.path.join(os.path.dirname(__file__), "..", "..", "agents")
@@ -177,7 +184,7 @@ def get_workflows_data() -> List[Workflow]:
 
         # Read state file
         try:
-            with open(state_file, 'r') as f:
+            with open(state_file) as f:
                 state = json.load(f)
 
             # Validate issue_number - must be convertible to int
@@ -222,7 +229,7 @@ def get_workflows_data() -> List[Workflow]:
 
     return workflows
 
-def get_routes_data() -> List[Route]:
+def get_routes_data() -> list[Route]:
     """Helper function to get API routes data"""
     route_list = []
 
@@ -316,7 +323,7 @@ async def watch_routes() -> None:
     except asyncio.CancelledError:
         logger.info("[WS] Routes watcher cancelled")
 
-def get_workflow_history_data(filters: Optional[WorkflowHistoryFilters] = None) -> tuple[WorkflowHistoryResponse, bool]:
+def get_workflow_history_data(filters: WorkflowHistoryFilters | None = None) -> tuple[WorkflowHistoryResponse, bool]:
     """Helper function to get workflow history data
 
     Returns:
@@ -419,13 +426,13 @@ async def upload_file(file: UploadFile = File(...)) -> FileUploadResponse:
         # Validate file type
         if not file.filename.endswith(('.csv', '.json', '.jsonl')):
             raise HTTPException(400, "Only .csv, .json, and .jsonl files are supported")
-        
+
         # Generate table name from filename
         table_name = file.filename.rsplit('.', 1)[0].lower().replace(' ', '_')
-        
+
         # Read file content
         content = await file.read()
-        
+
         # Convert to SQLite based on file type
         if file.filename.endswith('.csv'):
             result = convert_csv_to_sqlite(content, table_name)
@@ -433,7 +440,7 @@ async def upload_file(file: UploadFile = File(...)) -> FileUploadResponse:
             result = convert_jsonl_to_sqlite(content, table_name)
         else:
             result = convert_json_to_sqlite(content, table_name)
-        
+
         response = FileUploadResponse(
             table_name=result['table_name'],
             table_schema=result['schema'],
@@ -459,18 +466,18 @@ async def process_natural_language_query(request: QueryRequest) -> QueryResponse
     try:
         # Get database schema
         schema_info = get_database_schema()
-        
+
         # Generate SQL using routing logic
         sql = generate_sql(request, schema_info)
-        
+
         # Execute SQL query
         start_time = datetime.now()
         result = execute_sql_safely(sql)
         execution_time = (datetime.now() - start_time).total_seconds() * 1000
-        
+
         if result['error']:
             raise Exception(result['error'])
-        
+
         response = QueryResponse(
             sql=sql,
             results=result['results'],
@@ -498,7 +505,7 @@ async def get_database_schema_endpoint() -> DatabaseSchemaResponse:
     try:
         schema = get_database_schema()
         tables = []
-        
+
         for table_name, table_info in schema['tables'].items():
             columns = []
             for col_name, col_type in table_info['columns'].items():
@@ -508,14 +515,14 @@ async def get_database_schema_endpoint() -> DatabaseSchemaResponse:
                     nullable=True,
                     primary_key=False
                 ))
-            
+
             tables.append(TableSchema(
                 name=table_name,
                 columns=columns,
                 row_count=table_info.get('row_count', 0),
                 created_at=datetime.now()  # Simplified for v1
             ))
-        
+
         response = DatabaseSchemaResponse(
             tables=tables,
             total_tables=len(tables)
@@ -559,17 +566,17 @@ async def generate_random_query_endpoint() -> RandomQueryResponse:
     try:
         # Get database schema
         schema_info = get_database_schema()
-        
+
         # Check if there are any tables
         if not schema_info.get('tables'):
             return RandomQueryResponse(
                 query="Please upload some data first to generate queries.",
                 error="No tables found in database"
             )
-        
+
         # Generate random query using LLM
         random_query = generate_random_query(schema_info)
-        
+
         response = RandomQueryResponse(query=random_query)
         logger.info(f"[SUCCESS] Random query generated: {random_query}")
         return response
@@ -616,9 +623,9 @@ async def health_check() -> HealthCheckResponse:
 async def get_system_status() -> SystemStatusResponse:
     """Comprehensive system health check for all critical services"""
     import subprocess
-    from datetime import timedelta
-    import urllib.request
     import urllib.error
+    import urllib.request
+    from datetime import timedelta
 
     services = {}
 
@@ -1056,8 +1063,8 @@ async def redeliver_github_webhook() -> dict:
     4. Provide detailed diagnostics about any issues
     """
     import subprocess
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     try:
         diagnostics = []
@@ -1296,12 +1303,12 @@ async def websocket_workflow_history(websocket: WebSocket) -> None:
 async def get_workflow_history_endpoint(
     limit: int = 20,
     offset: int = 0,
-    status: Optional[str] = None,
-    model: Optional[str] = None,
-    template: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    search: Optional[str] = None,
+    status: str | None = None,
+    model: str | None = None,
+    template: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    search: str | None = None,
     sort_by: str = "created_at",
     sort_order: Literal["ASC", "DESC"] = "DESC"
 ) -> WorkflowHistoryResponse:
@@ -1334,7 +1341,7 @@ async def get_workflow_history_endpoint(
 
 @app.post("/api/workflow-history/resync", response_model=ResyncResponse)
 async def resync_workflow_history(
-    adw_id: Optional[str] = None,
+    adw_id: str | None = None,
     force: bool = False
 ) -> ResyncResponse:
     """
@@ -1403,8 +1410,8 @@ async def resync_workflow_history(
 
 # Phase 3: Advanced Analytics Endpoints
 
-@app.post("/api/workflows/batch", response_model=List[WorkflowHistoryItem])
-async def get_workflows_batch(workflow_ids: List[str]) -> List[WorkflowHistoryItem]:
+@app.post("/api/workflows/batch", response_model=list[WorkflowHistoryItem])
+async def get_workflows_batch(workflow_ids: list[str]) -> list[WorkflowHistoryItem]:
     """
     Fetch multiple workflows by ADW IDs in a single request.
 
@@ -1469,8 +1476,9 @@ async def get_workflows_batch(workflow_ids: List[str]) -> List[WorkflowHistoryIt
 async def get_workflow_analytics(adw_id: str) -> WorkflowAnalyticsDetail:
     """Get advanced analytics for a specific workflow"""
     try:
-        from core.workflow_history import get_workflow_by_adw_id
         import json
+
+        from core.workflow_history import get_workflow_by_adw_id
 
         workflow = get_workflow_by_adw_id(adw_id)
         if not workflow:
@@ -1526,9 +1534,10 @@ async def get_workflow_trends(
 ) -> WorkflowTrends:
     """Get trend data over time"""
     try:
-        from core.workflow_history import get_workflow_history
-        from datetime import datetime, timedelta
         from collections import defaultdict
+        from datetime import datetime, timedelta
+
+        from core.workflow_history import get_workflow_history
 
         # Calculate date range
         end_date = datetime.now()
@@ -1703,8 +1712,8 @@ async def predict_workflow_cost(
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to predict cost: {str(e)}")
 
-@app.get("/api/workflows", response_model=List[Workflow])
-async def get_workflows() -> List[Workflow]:
+@app.get("/api/workflows", response_model=list[Workflow])
+async def get_workflows() -> list[Workflow]:
     """Get all active ADW workflows (REST endpoint for fallback)"""
     try:
         workflows = get_workflows_data()
@@ -1794,14 +1803,14 @@ async def delete_table(table_name: str) -> dict:
             validate_identifier(table_name, "table")
         except SQLSecurityError as e:
             raise HTTPException(400, str(e))
-        
+
         conn = sqlite3.connect("db/database.db")
-        
+
         # Check if table exists using secure method
         if not check_table_exists(conn, table_name):
             conn.close()
             raise HTTPException(404, f"Table '{table_name}' not found")
-        
+
         # Drop the table using safe query execution with DDL permission
         execute_query_safely(
             conn,
@@ -1811,7 +1820,7 @@ async def delete_table(table_name: str) -> dict:
         )
         conn.commit()
         conn.close()
-        
+
         response = {"message": f"Table '{table_name}' deleted successfully"}
         logger.info(f"[SUCCESS] Table deleted: {table_name}")
         return response
@@ -1828,19 +1837,19 @@ async def export_table(request: ExportRequest) -> Response:
     try:
         # Validate table name
         validate_identifier(request.table_name, "table")
-        
+
         # Connect to database
         conn = sqlite3.connect("db/database.db")
-        
+
         # Check if table exists
         if not check_table_exists(conn, request.table_name):
             conn.close()
             raise HTTPException(404, f"Table '{request.table_name}' not found")
-        
+
         # Generate CSV
         csv_data = generate_csv_from_table(conn, request.table_name)
         conn.close()
-        
+
         # Return CSV response
         return Response(
             content=csv_data,
@@ -1862,7 +1871,7 @@ async def export_query_results(request: QueryExportRequest) -> Response:
     try:
         # Generate CSV from query results
         csv_data = generate_csv_from_data(request.data, request.columns)
-        
+
         # Return CSV response
         return Response(
             content=csv_data,
@@ -1934,6 +1943,8 @@ async def submit_nl_request(request: SubmitRequestData) -> SubmitRequestResponse
                 'level': cost_analysis.level,
                 'min_cost': cost_analysis.estimated_cost_range[0],
                 'max_cost': cost_analysis.estimated_cost_range[1],
+                'total': cost_analysis.estimated_cost_total,
+                'breakdown': cost_analysis.cost_breakdown_estimate,
                 'confidence': cost_analysis.confidence,
                 'reasoning': cost_analysis.reasoning,
                 'recommended_workflow': cost_analysis.recommended_workflow
@@ -2055,12 +2066,26 @@ async def confirm_and_post_issue(request_id: str) -> ConfirmResponse:
         if request_id not in pending_requests:
             raise HTTPException(404, f"Request ID '{request_id}' not found")
 
-        # Get the issue from pending requests
+        # Get the issue and cost estimate from pending requests
         issue = pending_requests[request_id]['issue']
+        cost_estimate = pending_requests[request_id].get('cost_estimate', {})
 
         # Post to GitHub
         github_poster = GitHubPoster()
         issue_number = github_poster.post_issue(issue, confirm=False)
+
+        # Save cost estimate for later retrieval during workflow sync
+        if cost_estimate:
+            save_cost_estimate(
+                issue_number=issue_number,
+                estimated_cost_total=cost_estimate.get('total', (cost_estimate['min_cost'] + cost_estimate['max_cost']) / 2.0),
+                estimated_cost_breakdown=cost_estimate.get('breakdown', {}),
+                level=cost_estimate['level'],
+                confidence=cost_estimate['confidence'],
+                reasoning=cost_estimate['reasoning'],
+                recommended_workflow=cost_estimate['recommended_workflow']
+            )
+            logger.info(f"[SUCCESS] Saved cost estimate for issue #{issue_number}: ${cost_estimate.get('total', 0):.2f}")
 
         # Get GitHub repo from environment
         github_repo = os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder")

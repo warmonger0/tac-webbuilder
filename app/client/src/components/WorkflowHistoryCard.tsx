@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { WorkflowHistoryItem, PhaseCost, CostBreakdown } from '../types';
+import type { CostBreakdown, PhaseCost, WorkflowHistoryItem } from '../types';
 import { StatusBadge } from './StatusBadge';
 import { CostBreakdownChart } from './CostBreakdownChart';
 import { CumulativeCostChart } from './CumulativeCostChart';

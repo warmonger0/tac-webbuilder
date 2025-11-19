@@ -6,11 +6,10 @@ Tests cover:
 - Complexity detection
 - Multi-factor workflow similarity scoring
 """
-import pytest
 from core.workflow_analytics import (
     calculate_text_similarity,
     detect_complexity,
-    find_similar_workflows
+    find_similar_workflows,
 )
 
 

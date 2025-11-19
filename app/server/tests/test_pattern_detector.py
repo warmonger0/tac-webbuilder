@@ -3,9 +3,9 @@ Unit tests for pattern detection engine.
 """
 
 from core.pattern_detector import (
+    calculate_confidence_score,
     detect_patterns_in_workflow,
     extract_pattern_characteristics,
-    calculate_confidence_score,
     process_workflow_for_patterns,
 )
 

@@ -122,8 +122,11 @@ def run_external_tests(
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     # Reload state to get external test results
-    state.load()
-    test_results = state.get("external_test_results", {})
+    reloaded_state = ADWState.load(adw_id)
+    if not reloaded_state:
+        logger.error("Failed to reload state after external tests")
+        return False, {"error": "Failed to reload state"}
+    test_results = reloaded_state.get("external_test_results", {})
 
     if not test_results:
         logger.warning("No external_test_results found in state after execution")

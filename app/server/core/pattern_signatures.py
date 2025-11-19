@@ -5,7 +5,6 @@ Generates unique signatures for workflow operations to enable pattern detection.
 """
 
 import logging
-from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 # SIGNATURE GENERATION
 # ============================================================================
 
-def extract_operation_signature(workflow: Dict) -> Optional[str]:
+def extract_operation_signature(workflow: dict) -> str | None:
     """
     Generate unique signature for a workflow's primary operation.
 
@@ -150,7 +149,7 @@ def _detect_package_manager(nl_input: str) -> str:
 # TARGET DETECTION
 # ============================================================================
 
-def _detect_target(nl_input: str, workflow: Dict) -> str:
+def _detect_target(nl_input: str, workflow: dict) -> str:
     """
     Detect target of operation (backend, frontend, both).
 
