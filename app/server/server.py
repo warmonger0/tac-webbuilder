@@ -85,7 +85,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from services.websocket_manager import ConnectionManager
 
-from app.server.utils.db_connection import get_connection
+from utils.db_connection import get_connection
 
 # Import ADW complexity analyzer for cost estimation
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'adws'))
