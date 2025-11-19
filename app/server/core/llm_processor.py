@@ -166,7 +166,7 @@ def generate_random_query_with_openai(schema_info: dict[str, Any]) -> str:
 
 {schema_description}
 
-Generate an interesting natural language query that someone might ask about this data. 
+Generate an interesting natural language query that someone might ask about this data.
 The query should be:
 - Contextually relevant to the table structures and columns
 - Natural and conversational
@@ -219,7 +219,7 @@ def generate_random_query_with_anthropic(schema_info: dict[str, Any]) -> str:
 
 {schema_description}
 
-Generate an interesting natural language query that someone might ask about this data. 
+Generate an interesting natural language query that someone might ask about this data.
 The query should be:
 - Contextually relevant to the table structures and columns
 - Natural and conversational

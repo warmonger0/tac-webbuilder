@@ -78,7 +78,7 @@ def generate_insights(table_name: str, column_names: list[str] | None = None) ->
                 cursor_stats = execute_query_safely(
                     conn,
                     """
-                    SELECT 
+                    SELECT
                         MIN({column}) as min_val,
                         MAX({column}) as max_val,
                         AVG({column}) as avg_val

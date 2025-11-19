@@ -176,11 +176,11 @@ def convert_json_to_sqlite(json_content: bytes, table_name: str, db_path: str = 
 def flatten_json_object(obj: Any, prefix: str = "") -> dict[str, Any]:
     """
     Flatten a nested JSON object using delimiter constants.
-    
+
     Args:
         obj: The object to flatten (can be dict, list, or primitive)
         prefix: The current prefix for nested keys
-        
+
     Returns:
         Dict with flattened key-value pairs
     """
@@ -203,10 +203,10 @@ def flatten_json_object(obj: Any, prefix: str = "") -> dict[str, Any]:
 def discover_jsonl_fields(jsonl_content: bytes) -> set[str]:
     """
     Discover all possible field names by scanning the entire JSONL file.
-    
+
     Args:
         jsonl_content: The raw JSONL file content
-        
+
     Returns:
         Set of all flattened field names found in the file
     """
@@ -235,11 +235,11 @@ def discover_jsonl_fields(jsonl_content: bytes) -> set[str]:
 def convert_jsonl_to_sqlite(jsonl_content: bytes, table_name: str, db_path: str = "db/database.db") -> dict[str, Any]:
     """
     Convert JSONL file content to SQLite table with flattened structure.
-    
+
     Args:
         jsonl_content: The raw JSONL file content
         table_name: Name for the SQLite table
-        
+
     Returns:
         Dict containing table info, schema, row count, and sample data
     """

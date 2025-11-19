@@ -169,7 +169,7 @@ class TestExportUtils:
         ''')
 
         cursor.executemany('''
-            INSERT INTO test_table (name, value, created_date) 
+            INSERT INTO test_table (name, value, created_date)
             VALUES (?, ?, ?)
         ''', [
             ('Item 1', 100.5, '2024-01-01'),

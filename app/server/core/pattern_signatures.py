@@ -38,7 +38,7 @@ def extract_operation_signature(workflow: dict) -> str | None:
     template_raw = workflow.get("workflow_template")
 
     nl_input = (nl_input_raw if nl_input_raw is not None else "").lower()
-    template = (template_raw if template_raw is not None else "").lower()
+    (template_raw if template_raw is not None else "").lower()
 
     # Category 1: Testing operations
     if any(kw in nl_input for kw in ["test", "pytest", "vitest", "jest", "run tests"]):
@@ -215,10 +215,7 @@ def validate_signature(signature: str) -> bool:
         return False
 
     # Validate non-empty subcategory and target
-    if not subcategory or not target:
-        return False
-
-    return True
+    return not (not subcategory or not target)
 
 
 def normalize_signature(signature: str) -> str:

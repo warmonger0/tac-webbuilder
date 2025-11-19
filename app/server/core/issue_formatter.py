@@ -91,11 +91,7 @@ def validate_issue_body(body: str) -> bool:
     # Required sections for any issue
     required_sections = ["##", "Workflow"]
 
-    for section in required_sections:
-        if section not in body:
-            return False
-
-    return True
+    return all(section in body for section in required_sections)
 
 
 def format_requirements_list(requirements: list) -> str:

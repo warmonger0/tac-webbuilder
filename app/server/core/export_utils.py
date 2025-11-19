@@ -7,11 +7,11 @@ import pandas as pd
 def generate_csv_from_data(data: list[dict], columns: list[str]) -> bytes:
     """
     Generate CSV file from data and columns.
-    
+
     Args:
         data: List of dictionaries containing the data
         columns: List of column names
-        
+
     Returns:
         bytes: CSV file content as bytes
     """
@@ -34,21 +34,21 @@ def generate_csv_from_data(data: list[dict], columns: list[str]) -> bytes:
 def generate_csv_from_table(conn: sqlite3.Connection, table_name: str) -> bytes:
     """
     Generate CSV file from a database table.
-    
+
     Args:
         conn: SQLite database connection
         table_name: Name of the table to export
-        
+
     Returns:
         bytes: CSV file content as bytes
-        
+
     Raises:
         ValueError: If table doesn't exist
     """
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT name FROM sqlite_master 
+        SELECT name FROM sqlite_master
         WHERE type='table' AND name=?
     """, (table_name,))
 

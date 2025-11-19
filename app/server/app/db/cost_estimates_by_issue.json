@@ -1,0 +1,17 @@
+{
+  "40": {
+    "estimated_cost_total": 4.0,
+    "estimated_cost_breakdown": {
+      "plan": 0.8,
+      "build": 1.4,
+      "test": 1.0,
+      "review": 0.4,
+      "document": 0.4
+    },
+    "level": "complex",
+    "confidence": 1.0,
+    "reasoning": "Database changes required | Complex testing required | Workflow/automation changes | Explicitly marked as complex",
+    "recommended_workflow": "adw_sdlc_zte_iso",
+    "timestamp": "2025-11-18T14:25:41.219536"
+  }
+}

@@ -83,7 +83,7 @@ class RoutesAnalyzer:
 
             # Visit all nodes in the module
             for node in tree.body:
-                if isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     # Check for route decorators
                     route_info = self._extract_route_from_decorators(node)
                     if route_info:

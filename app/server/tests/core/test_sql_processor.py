@@ -176,7 +176,7 @@ class TestSQLProcessor:
         ]
 
         # Test that each operation is properly blocked
-        for keyword, query in dangerous_operations:
+        for _keyword, query in dangerous_operations:
             result = execute_sql_safely(query)
             assert result['error'] is not None
             # Query should be blocked

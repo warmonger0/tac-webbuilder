@@ -9,7 +9,7 @@ import time
 import traceback
 import urllib.request
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 from typing import Literal
 
@@ -1487,24 +1487,18 @@ async def get_workflow_analytics(adw_id: str) -> WorkflowAnalyticsDetail:
         # Parse JSON fields
         similar_workflow_ids = []
         if workflow.get("similar_workflow_ids"):
-            try:
+            with suppress(json.JSONDecodeError):
                 similar_workflow_ids = json.loads(workflow["similar_workflow_ids"])
-            except json.JSONDecodeError:
-                pass
 
         anomaly_flags = []
         if workflow.get("anomaly_flags"):
-            try:
+            with suppress(json.JSONDecodeError):
                 anomaly_flags = json.loads(workflow["anomaly_flags"])
-            except json.JSONDecodeError:
-                pass
 
         optimization_recommendations = []
         if workflow.get("optimization_recommendations"):
-            try:
+            with suppress(json.JSONDecodeError):
                 optimization_recommendations = json.loads(workflow["optimization_recommendations"])
-            except json.JSONDecodeError:
-                pass
 
         analytics = WorkflowAnalyticsDetail(
             adw_id=adw_id,
