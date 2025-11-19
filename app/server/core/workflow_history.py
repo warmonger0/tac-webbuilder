@@ -933,20 +933,25 @@ def sync_workflow_history() -> int:
                 if cost_estimate:
                     workflow_data["estimated_cost_total"] = cost_estimate.get("estimated_cost_total", 0.0)
 
-                    # Add estimated breakdown to cost_breakdown if we're populating it
-                    if "cost_breakdown" not in workflow_data and cost_estimate.get("estimated_cost_breakdown"):
+                    # Add estimated breakdown to cost_breakdown
+                    estimated_by_phase = cost_estimate.get("estimated_cost_breakdown", {})
+
+                    if "cost_breakdown" not in workflow_data:
+                        # Create new cost_breakdown with estimates
                         workflow_data["cost_breakdown"] = {
                             "estimated_total": cost_estimate.get("estimated_cost_total", 0.0),
                             "actual_total": workflow_data.get("actual_cost_total", 0.0),
-                            "by_phase": {}
+                            "by_phase": {},  # Will be populated with actual costs from raw_output.jsonl
+                            "estimated_by_phase": estimated_by_phase  # Per-phase estimates
                         }
                     elif "cost_breakdown" in workflow_data:
-                        # Update existing cost_breakdown with estimate
+                        # Update existing cost_breakdown with estimates
                         breakdown = json.loads(workflow_data["cost_breakdown"]) if isinstance(workflow_data["cost_breakdown"], str) else workflow_data["cost_breakdown"]
                         breakdown["estimated_total"] = cost_estimate.get("estimated_cost_total", 0.0)
+                        breakdown["estimated_by_phase"] = estimated_by_phase  # Add per-phase estimates
                         workflow_data["cost_breakdown"] = breakdown
 
-                    logger.info(f"[SYNC] Loaded cost estimate for {adw_id}: ${cost_estimate.get('estimated_cost_total', 0):.2f}")
+                    logger.info(f"[SYNC] Loaded cost estimate for {adw_id}: ${cost_estimate.get('estimated_cost_total', 0):.2f} (with {len(estimated_by_phase)} phase estimates)")
             except Exception as e:
                 logger.debug(f"[SYNC] Could not load cost estimate for {adw_id}: {e}")
 

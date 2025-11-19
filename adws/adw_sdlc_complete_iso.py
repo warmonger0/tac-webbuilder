@@ -37,7 +37,7 @@ import os
 
 # Add the parent directory to Python path to import modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from adw_modules.workflow_ops import ensure_adw_id, format_issue_message
+from adw_modules.workflow_ops import ensure_adw_id, format_issue_message, trigger_cost_sync
 from adw_modules.github import make_issue_comment
 from adw_modules.cleanup_operations import cleanup_shipped_issue
 from adw_modules.utils import setup_logger
@@ -381,6 +381,11 @@ def main():
     print(f"ADW ID: {adw_id}")
     print(f"All 8 phases completed successfully!")
     print(f"✅ Code has been shipped to production!")
+
+    # Trigger cost synchronization
+    print(f"\n📊 Syncing workflow costs...")
+    trigger_cost_sync(adw_id)
+
     print(f"\nWorktree location: trees/{adw_id}/")
     print(f"To manually clean up: ./scripts/purge_tree.sh {adw_id}")
 

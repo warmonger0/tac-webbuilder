@@ -209,8 +209,6 @@ def generate_documentation(
     # Check if the agent actually created documentation
     if doc_file_path and doc_file_path != "No documentation needed":
         # Agent created documentation - validate the path exists
-        import os
-
         full_path = os.path.join(working_dir or ".", doc_file_path)
         if os.path.exists(full_path):
             logger.info(f"Documentation created at: {doc_file_path}")
