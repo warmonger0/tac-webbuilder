@@ -75,7 +75,7 @@ describe('ScoreCard', () => {
     const container = screen.getByText('Quality').closest('div');
     expect(container?.className).toContain('bg-orange-50');
     expect(container?.className).toContain('border-orange-200');
-    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('N/A')).toBeInTheDocument();
   });
 
   it('renders with green color for score 90 (boundary: lower bound of green range)', () => {

@@ -7,6 +7,9 @@ interface ScoreCardProps {
 type ColorKey = 'green' | 'blue' | 'yellow' | 'orange';
 
 export function ScoreCard({ title, score, description }: ScoreCardProps) {
+  // Show N/A for zero scores (no data available)
+  const isNoData = score === 0;
+
   // Determine color based on score
   const getScoreColor = (score: number): ColorKey => {
     if (score >= 90) return 'green';
@@ -15,7 +18,7 @@ export function ScoreCard({ title, score, description }: ScoreCardProps) {
     return 'orange';
   };
 
-  const color = getScoreColor(score);
+  const color = isNoData ? 'orange' : getScoreColor(score);
 
   // Color classes for different states
   const colorClasses = {
@@ -97,7 +100,7 @@ export function ScoreCard({ title, score, description }: ScoreCardProps) {
         {/* Score text in center */}
         <div className="absolute inset-0 flex items-center justify-center">
           <span className={`text-2xl font-bold ${classes.progress}`}>
-            {Math.round(score)}
+            {isNoData ? 'N/A' : Math.round(score)}
           </span>
         </div>
       </div>

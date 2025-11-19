@@ -106,7 +106,17 @@ export function WorkflowHistoryCard({ workflow }: WorkflowHistoryCardProps) {
   const formatDate = (timestamp?: string) => {
     if (!timestamp) return 'N/A';
     try {
-      return new Date(timestamp).toLocaleString();
+      // Handle timestamps that may or may not have timezone info
+      // If no timezone marker (Z or +/-), assume UTC
+      let dateStr = timestamp;
+      if (!timestamp.includes('Z') && !timestamp.includes('+') && !timestamp.includes('T')) {
+        // Old format: "2025-11-19 07:08:51" -> assume UTC
+        dateStr = timestamp.replace(' ', 'T') + 'Z';
+      } else if (timestamp.includes('T') && !timestamp.includes('Z') && !timestamp.includes('+')) {
+        // ISO format without timezone: "2025-11-19T07:08:51" -> assume UTC
+        dateStr = timestamp + 'Z';
+      }
+      return new Date(dateStr).toLocaleString();
     } catch {
       return 'Invalid date';
     }
@@ -119,7 +129,10 @@ export function WorkflowHistoryCard({ workflow }: WorkflowHistoryCardProps) {
     return `${mins}m ${secs}s`;
   };
 
-  const formatCost = (cost: number) => {
+  const formatCost = (cost: number | undefined) => {
+    if (cost === undefined || cost === 0) {
+      return 'N/A';
+    }
     return `$${cost.toFixed(4)}`;
   };
 
