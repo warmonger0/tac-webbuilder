@@ -1,32 +1,32 @@
 {
-  "adw_id": "9513a3c4",
-  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/9513a3c4",
-  "created_at": "2025-11-18T14:58:18.725325",
-  "branch_name": "feature-issue-41-adw-9513a3c4-create-health-service-module",
+  "adw_id": "d87f2a65",
+  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/d87f2a65",
+  "created_at": "2025-11-18T23:16:37.996273",
+  "branch_name": "chore-issue-47-adw-d87f2a65-extract-db-connection-utility",
   "changed_files": [
     ".adw-context.json",
     ".mcp.json",
-    "app/server/services/__init__.py",
-    "app/server/services/health_service.py",
-    "app/server/tests/services/__init__.py",
-    "app/server/tests/services/test_health_service.py",
-    "playwright-mcp-config.json"
+    "app/server/.coverage",
+    "app/server/tests/utils/__init__.py",
+    "app/server/tests/utils/test_db_connection.py",
+    "app/server/utils/__init__.py",
+    "app/server/utils/db_connection.py"
   ],
   "commits": [
     {
-      "sha": "9919e25",
-      "message": "sdlc_implementor: feature: add ### workflow 4.1: create health service"
+      "sha": "7752b87",
+      "message": "sdlc_implementor: chore: update # phase 1: utility extraction (dry"
     },
     {
-      "sha": "5306ae5",
-      "message": "sdlc_planner: feature: add ### workflow 4.1: create health service"
+      "sha": "35aaf89",
+      "message": "sdlc_planner: chore: update # phase 1: utility extraction (dry"
     }
   ],
-  "plan_file": "specs/issue-41-adw-9513a3c4-sdlc_planner-workflow-4-1-create-health-service-module-core-str.md",
+  "plan_file": "specs/issue-47-adw-d87f2a65-sdlc_planner-phase-1-utility-extraction-dry-principles-request-.md",
   "issue": {
-    "number": 41,
-    "title": "### Workflow 4.1: Create Health Service Module - Core Structure\n**Estimated Time:** 1-2 hours\n**Complexity:** Low",
-    "body": "## Description\n### Workflow 4.1: Create Health Service Module - Core Structure\n**Estimated Time:** 1-2 hours\n**Complexity:** Low\n**Dependencies:** None\n\n**Input Files:**\n- `app/server/server.py` (lines 610-843)\n\n**Output Files:**\n- `app/server/services/health_service.py` (new)\n\n**Tasks:**\n1. Create ServiceStatus enum\n2. Create ServiceHealth dataclass\n3. Create HealthService class skeleton\n4. Add configuration for health check targets\n5. Add `check_all()` method structure\n\n**Code Structure:**\n\\`\\`\\`python\nfrom enum import Enum\nfrom dataclasses import dataclass\nfrom typing import Dict, Optional\n\nclass ServiceStatus(str, Enum):\n    HEALTHY = \"healthy\"\n    DEGRADED = \"degraded\"\n    UNHEALTHY = \"unhealthy\"\n    UNKNOWN = \"unknown\"\n\n@dataclass\nclass ServiceHealth:\n    name: str\n    status: ServiceStatus\n    message: str\n    details: Optional[Dict] = None\n\nclass HealthService:\n    def __init__(\n        self,\n        db_path: str = \"db/database.db\",\n        webhook_url: str = \"http://localhost:8001/health\",\n        cloudflare_tunnel_name: Optional[str] = None,\n        frontend_url: str = \"http://localhost:5173\"\n    ):\n        self.db_path = db_path\n        self.webhook_url = webhook_url\n        self.cloudflare_tunnel_name = cloudflare_tunnel_name\n        self.frontend_url = frontend_url\n\n    async def check_all(self) -> Dict[str, ServiceHealth]:\n        \"\"\"Check health of all services\"\"\"\n        return {\n            \"backend\": self.check_backend(),\n            \"database\": self.check_database(),\n            \"webhook\": await self.check_webhook(),\n            \"cloudflare\": self.check_cloudflare_tunnel(),\n            \"github_webhook\": await self.check_github_webhook(),\n            \"frontend\": await self.check_frontend()\n        }\n\\`\\`\\`\n\n**Acceptance Criteria:**\n- [ ] Module imports without errors\n- [ ] Enums and dataclasses defined\n- [ ] HealthService class instantiable\n- [ ] check_all() method defined (stub implementations OK)\n\n**Verification Command:**\n\\`\\`\\`bash\npython -c \"from app.server.services.health_service import HealthService; hs = HealthService(); print('Module created successfully')\"\n\\`\\`\\`\n**Execution:**\n\\`\\`\\`bash\ncd adws/\nuv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan\n\\`\\`\\`\n---\n\n## Classification\nExplicit workflow: \\`adw_sdlc_complete_zte_iso\\` (user specified)\n\n## Workflow\nadw_sdlc_complete_zte_iso with base model",
+    "number": 47,
+    "title": "# Phase 1: Utility Extraction (DRY Principles)\n\n## \u2705 Request 1.1: Extract Database Connection Utilit",
+    "body": "## Description\n# Phase 1: Utility Extraction (DRY Principles)\n\n## \u2705 Request 1.1: Extract Database Connection Utility\n\n```\nCreate a centralized database connection utility at app/server/utils/db_connection.py to eliminate duplicated sqlite3.connect() patterns across the codebase.\n\nCONTEXT:\nCurrently, 7 files manually create database connections with duplicated error handling:\n- server.py (4 instances: lines 596, 664, 1801, 1836)\n- insights.py (1 instance: line 16)\n- sql_processor.py (2 instances: lines 16, 64)\n\nA good pattern already exists in workflow_history.py lines 182-193 using a context manager.\n\nTASK:\nCreate app/server/utils/db_connection.py with a context manager that:\n- Uses sqlite3.connect() with configurable db_path (default: \"db/database.db\")\n- Sets row_factory to sqlite3.Row for dict-like access\n- Automatically commits on success, rollbacks on error\n- Properly closes connections in finally block\n- Includes basic retry logic for SQLITE_BUSY errors (max 3 retries, 100ms delay)\n\nBase implementation on the existing pattern from workflow_history.py:182-193.\n\nACCEPTANCE CRITERIA:\n- Create app/server/utils/db_connection.py (~80-100 lines)\n- Include get_connection() context manager\n- Add docstrings explaining usage\n- Create app/server/tests/utils/test_db_connection.py with tests for:\n  - Successful connection and commit\n  - Automatic rollback on error\n  - Connection cleanup\n  - Row factory configuration\n- All tests pass\n- No migration of existing code yet (that's a separate task)\n\nFILES TO CREATE:\n- app/server/utils/db_connection.py\n- app/server/tests/utils/test_db_connection.py\n\nESTIMATED EFFORT: 2 hours\nCOMPLEXITY: Low\nDRY BENEFIT: Eliminates 7 duplicate patterns (105-140 lines)\n```\n\n---\n\n## Classification\nPattern matched: `error_fix` (confidence: 95%)\n\n## Workflow\nadw_plan_build_test_iso with base model",
     "state": "OPEN",
     "author": {
       "id": "MDQ6VXNlcjExNTk1NTE3",
@@ -37,27 +37,27 @@
     "assignees": [],
     "labels": [
       {
-        "id": "LA_kwDOQT8ln88AAAACQH6zig",
-        "name": "feature",
-        "color": "0e8a16",
-        "description": ""
+        "id": "LA_kwDOQT8ln88AAAACPfn9_g",
+        "name": "bug",
+        "color": "d73a4a",
+        "description": "Something isn't working"
       },
       {
-        "id": "LA_kwDOQT8ln88AAAACQH6zoQ",
-        "name": "explicit-workflow",
-        "color": "ededed",
-        "description": ""
+        "id": "LA_kwDOQT8ln88AAAACPyVzZA",
+        "name": "auto-routed",
+        "color": "0E8A16",
+        "description": "Issue automatically routed to ADW workflow"
       }
     ],
     "milestone": null,
     "comments": [
       {
-        "id": "IC_kwDOQT8ln87TlOio",
+        "id": "IC_kwDOQT8ln87Tqc92",
         "author": {
           "id": null,
           "login": "warmonger0",
           "name": null,
           "is_bot": false
         },
-        "body": "[ADW-AGENTS] \ud83e\udd16 ADW Webhook: Detected `adw_sdlc_complete_zte_iso` workflow request\n\nStarting workflow with ID: `47d96e68`\nWorkflow: `adw_sdlc_complete_zte_iso` \ud83c\udfd7\ufe0f\nModel Set: `base` \u2699\ufe0f\nReason: New issue with adw_sdlc_complete_zte_iso workflow\n\nLogs will be available at: `agents/47d96e68/adw_sdlc_complete_zte_iso/`",
+        "body": "[ADW-AGENTS] \ud83e\udd16 ADW Webhook: Detected `adw_plan_build_test_iso` workflow request\n\nStarting workflow with ID: `d87f2a65`\nWorkflow: `adw_plan_build_test_iso` \ud83c\udfd7\ufe0f\nModel Set: `base` \u2699\ufe0f\nReason: New issue with adw_plan_build_test_iso workflow\n\nLogs will be available at: `agents/d87f2a65/adw_plan_build_test_iso/`",
         "createdAt": 
