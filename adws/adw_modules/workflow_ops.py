@@ -398,14 +398,25 @@ def build_plan(
         if state.get("frontend_port"):
             context_data["frontend_port"] = state.get("frontend_port")
 
-    # Only create context file if we have useful data
+    # Build args list based on command type
+    args = [str(issue.number), adw_id, minimal_issue_json]
+
+    # Handle plan_file_path differently for /patch vs other commands
+    if command == "/patch":
+        # For /patch, add patch_file_path to context file (not as arg)
+        # The /patch command only takes 2 args: adw_id and review_change_request (issue body)
+        args = [adw_id, minimal_issue_json]
+        if plan_file_path:
+            context_data["patch_file_path"] = plan_file_path
+            logger.info(f"Adding patch_file_path to context: {plan_file_path}")
+    else:
+        # For /feature, /bug, /chore, pass plan_file_path as 4th argument
+        if plan_file_path:
+            args.append(plan_file_path)
+
+    # Create context file if we have useful data
     if context_data:
         create_context_file(worktree_path, adw_id, context_data, logger)
-
-    # Build args list - include plan_file_path if provided
-    args = [str(issue.number), adw_id, minimal_issue_json]
-    if plan_file_path:
-        args.append(plan_file_path)
 
     issue_plan_template_request = AgentTemplateRequest(
         agent_name=AGENT_PLANNER,

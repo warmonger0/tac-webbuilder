@@ -212,14 +212,21 @@ def main():
                            f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}"),
     )
 
-    # PRE-COMPUTE the plan file path (don't rely on agent to tell us where it saved it!)
-    # Generate a descriptive name from issue title (simplified version of what the template would generate)
+    # PRE-COMPUTE the plan file path deterministically
+    # Generate a descriptive name from issue title
     import re
     import shutil
     title_slug = re.sub(r'[^a-z0-9]+', '-', issue.title.lower()).strip('-')[:50]
-    expected_plan_file = f"specs/issue-{issue_number}-adw-{adw_id}-sdlc_planner-{title_slug}.md"
 
-    logger.info(f"Plan file expected at: {expected_plan_file}")
+    # Different naming conventions for different issue types
+    if issue_command == "/patch":
+        # Patch issues go into specs/patch/ subdirectory with patch- prefix
+        expected_plan_file = f"specs/patch/patch-adw-{adw_id}-{title_slug}.md"
+    else:
+        # Feature/bug/chore issues use the standard naming
+        expected_plan_file = f"specs/issue-{issue_number}-adw-{adw_id}-sdlc_planner-{title_slug}.md"
+
+    logger.info(f"Plan file path (deterministic): {expected_plan_file}")
 
     # Build the implementation plan (now executing in worktree)
     logger.info("Building implementation plan in worktree")
@@ -251,75 +258,50 @@ def main():
         format_issue_message(adw_id, AGENT_PLANNER, "✅ Implementation plan created"),
     )
 
-    # Use our pre-computed path instead of parsing agent output
-    plan_file_path_raw = expected_plan_file
-    logger.info(f"Using expected plan file path: {plan_file_path_raw}")
+    # Verify the deterministic plan file was created at the expected path
+    worktree_plan_path = os.path.join(worktree_path, expected_plan_file)
 
-    # Handle both absolute and relative paths with fallback recovery
-    # (Keep existing validation logic to handle edge cases)
-    plan_file_path = None
-    worktree_plan_path = None
+    if os.path.exists(worktree_plan_path):
+        plan_file_path = expected_plan_file
+        logger.info(f"✅ Plan file created at expected path: {plan_file_path}")
+    else:
+        # Check if file was mistakenly created in parent repo
+        parent_repo_root = os.path.dirname(os.path.dirname(worktree_path))
+        parent_plan_path = os.path.join(parent_repo_root, expected_plan_file)
 
-    if os.path.isabs(plan_file_path_raw):
-        # Agent returned absolute path
-        if os.path.exists(plan_file_path_raw):
-            if worktree_path in plan_file_path_raw:
-                # File is correctly in worktree
-                logger.info(f"Plan file found at absolute path in worktree: {plan_file_path_raw}")
-                worktree_plan_path = plan_file_path_raw
-                plan_file_path = os.path.relpath(plan_file_path_raw, worktree_path)
-            else:
-                # File is in parent repo - move it to worktree
-                logger.warning(f"Plan file created in parent repo, moving to worktree")
-                relative_path = os.path.basename(os.path.dirname(plan_file_path_raw)) + "/" + os.path.basename(plan_file_path_raw)
-                if relative_path.startswith("specs/"):
-                    relative_path = relative_path
-                else:
-                    relative_path = "specs/" + os.path.basename(plan_file_path_raw)
-                worktree_plan_path = os.path.join(worktree_path, relative_path)
-                os.makedirs(os.path.dirname(worktree_plan_path), exist_ok=True)
-                shutil.move(plan_file_path_raw, worktree_plan_path)
-                plan_file_path = relative_path
-                make_issue_comment(
-                    issue_number,
-                    format_issue_message(adw_id, "ops", f"⚠️ Plan file was in parent repo, moved to worktree: {relative_path}"),
-                )
+        if os.path.exists(parent_plan_path):
+            logger.warning(f"Plan file created in parent repo, moving to worktree")
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(worktree_plan_path), exist_ok=True)
+            # Move file to worktree
+            shutil.move(parent_plan_path, worktree_plan_path)
+            plan_file_path = expected_plan_file
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", f"⚠️ Plan file was in parent repo, moved to worktree: {plan_file_path}"),
+            )
         else:
-            error = f"Plan file does not exist at reported absolute path: {plan_file_path_raw}"
+            # File doesn't exist at expected location - fail with diagnostic info
+            error = f"Plan file not found at expected path: {expected_plan_file}"
             logger.error(error)
+
+            # Provide diagnostic info
+            specs_dir = os.path.join(worktree_path, "specs")
+            if os.path.exists(specs_dir):
+                import glob
+                pattern = f"*{adw_id}*.md"
+                found_files = glob.glob(os.path.join(specs_dir, "**", pattern), recursive=True)
+                if found_files:
+                    relative_files = [os.path.relpath(f, worktree_path) for f in found_files]
+                    logger.error(f"Files found with ADW ID in specs/: {relative_files}")
+                else:
+                    logger.error(f"No files with ADW ID found in specs/")
+
             make_issue_comment(
                 issue_number,
                 format_issue_message(adw_id, "ops", f"❌ {error}"),
             )
             sys.exit(1)
-    else:
-        # Agent returned relative path - check worktree first
-        worktree_plan_path = os.path.join(worktree_path, plan_file_path_raw)
-        if os.path.exists(worktree_plan_path):
-            # File correctly in worktree
-            logger.info(f"Plan file found in worktree: {plan_file_path_raw}")
-            plan_file_path = plan_file_path_raw
-        else:
-            # Check parent repo as fallback
-            parent_repo_path = os.path.dirname(worktree_path)
-            parent_plan_path = os.path.join(parent_repo_path, plan_file_path_raw)
-            if os.path.exists(parent_plan_path):
-                logger.warning(f"Plan file created in parent repo, moving to worktree")
-                os.makedirs(os.path.dirname(worktree_plan_path), exist_ok=True)
-                shutil.move(parent_plan_path, worktree_plan_path)
-                plan_file_path = plan_file_path_raw
-                make_issue_comment(
-                    issue_number,
-                    format_issue_message(adw_id, "ops", f"⚠️ Plan file was in parent repo, moved to worktree: {plan_file_path_raw}"),
-                )
-            else:
-                error = f"Plan file does not exist in worktree or parent: {plan_file_path_raw}"
-                logger.error(error)
-                make_issue_comment(
-                    issue_number,
-                    format_issue_message(adw_id, "ops", f"❌ {error}"),
-                )
-                sys.exit(1)
 
     state.update(plan_file=plan_file_path)
     state.save("adw_plan_iso")
