@@ -426,7 +426,7 @@ def suggest_workflow(context: ProjectContext) -> str:
         Recommended workflow name
     """
     if context.complexity == "high" or context.complexity == "medium":
-        return "adw_plan_build_test_iso"
+        return "adw_sdlc_complete_iso"
     else:
         return "adw_sdlc_iso"
 

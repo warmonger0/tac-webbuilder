@@ -70,8 +70,8 @@ def test_template_routing_bugs():
     print("\n=== Test 3: Bug Pattern Matching ===")
 
     test_cases = [
-        ("Fix the login error that's causing crashes", "adw_plan_build_test_iso"),
-        ("Resolve bug in payment processing", "adw_plan_build_test_iso"),
+        ("Fix the login error that's causing crashes", "adw_sdlc_complete_iso"),
+        ("Resolve bug in payment processing", "adw_sdlc_complete_iso"),
     ]
 
     for nl_input, expected_workflow in test_cases:
@@ -167,13 +167,13 @@ def test_suggest_workflow_backward_compatibility():
     workflow, model_set = suggest_adw_workflow("bug", "low")
     print("\nOld usage: suggest_adw_workflow('bug', 'low')")
     print(f"  Result: {workflow}, {model_set}")
-    assert workflow == "adw_plan_build_test_iso", "Bug should use plan-build-test"
+    assert workflow == "adw_sdlc_complete_iso", "Bug should use complete SDLC"
     assert model_set == "base", "Bug should use base model"
 
     workflow, model_set = suggest_adw_workflow("feature", "high")
     print("\nOld usage: suggest_adw_workflow('feature', 'high')")
     print(f"  Result: {workflow}, {model_set}")
-    assert workflow == "adw_plan_build_test_iso", "High complexity feature should use plan-build-test"
+    assert workflow == "adw_sdlc_complete_iso", "High complexity feature should use complete SDLC"
     assert model_set == "heavy", "High complexity should use heavy model"
 
     print("\n✅ Backward compatibility tests passed!")

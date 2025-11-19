@@ -200,7 +200,7 @@ def match_bug(text: str) -> TemplateMatch | None:
         if matches_pattern(text, pattern):
             return TemplateMatch(
                 matched=True,
-                workflow="adw_plan_build_test_iso",
+                workflow="adw_sdlc_complete_iso",
                 model_set="base",
                 classification="bug",
                 confidence=pattern["confidence"],

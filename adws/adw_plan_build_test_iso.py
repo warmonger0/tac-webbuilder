@@ -30,90 +30,35 @@ from adw_modules.workflow_ops import ensure_adw_id
 
 def main():
     """Main entry point."""
-    # Print deprecation warning
+    # Print deprecation warning and auto-forward
     print("=" * 70)
-    print("WARNING: DEPRECATION NOTICE")
+    print("⚠️  DEPRECATED WORKFLOW - AUTO-FORWARDING")
     print("=" * 70)
-    print("This is a partial workflow (only Plan, Build, Test phases)")
-    print("Please use: adw_sdlc_complete_iso.py")
-    print("Continuing execution...")
+    print("This workflow is incomplete (only Plan, Build, Test phases)")
+    print("Auto-forwarding to: adw_sdlc_complete_iso.py")
+    print("This ensures your work gets shipped with PR creation & merge")
     print("=" * 70)
     print()
 
-    # Check for --skip-e2e flag
-    skip_e2e = "--skip-e2e" in sys.argv
-    if skip_e2e:
-        sys.argv.remove("--skip-e2e")
-
+    # Parse arguments
     if len(sys.argv) < 2:
         print("Usage: uv run adw_plan_build_test_iso.py <issue-number> [adw-id] [--skip-e2e]")
-        print("\nThis runs the isolated plan, build, and test workflow:")
-        print("  1. Plan (isolated)")
-        print("  2. Build (isolated)")
-        print("  3. Test (isolated)")
+        print("\nThis workflow is DEPRECATED. Use adw_sdlc_complete_iso.py instead.")
         sys.exit(1)
-
-    issue_number = sys.argv[1]
-    adw_id = sys.argv[2] if len(sys.argv) > 2 else None
-
-    # Ensure ADW ID exists with initialized state
-    adw_id = ensure_adw_id(issue_number, adw_id)
-    print(f"Using ADW ID: {adw_id}")
 
     # Get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Run isolated plan with the ADW ID
-    plan_cmd = [
+    # Forward all arguments to the complete workflow
+    forward_cmd = [
         "uv",
         "run",
-        os.path.join(script_dir, "adw_plan_iso.py"),
-        issue_number,
-        adw_id,
-    ]
-    print(f"\n=== ISOLATED PLAN PHASE ===")
-    print(f"Running: {' '.join(plan_cmd)}")
-    plan = subprocess.run(plan_cmd)
-    if plan.returncode != 0:
-        print("Isolated plan phase failed")
-        sys.exit(1)
+        os.path.join(script_dir, "adw_sdlc_complete_iso.py"),
+    ] + sys.argv[1:]  # Pass all arguments
 
-    # Run isolated build with the ADW ID
-    build_cmd = [
-        "uv",
-        "run",
-        os.path.join(script_dir, "adw_build_iso.py"),
-        issue_number,
-        adw_id,
-    ]
-    print(f"\n=== ISOLATED BUILD PHASE ===")
-    print(f"Running: {' '.join(build_cmd)}")
-    build = subprocess.run(build_cmd)
-    if build.returncode != 0:
-        print("Isolated build phase failed")
-        sys.exit(1)
-
-    # Run isolated test with the ADW ID
-    test_cmd = [
-        "uv",
-        "run",
-        os.path.join(script_dir, "adw_test_iso.py"),
-        issue_number,
-        adw_id,
-    ]
-    if skip_e2e:
-        test_cmd.append("--skip-e2e")
-    
-    print(f"\n=== ISOLATED TEST PHASE ===")
-    print(f"Running: {' '.join(test_cmd)}")
-    test = subprocess.run(test_cmd)
-    if test.returncode != 0:
-        print("Isolated test phase failed")
-        sys.exit(1)
-
-    print(f"\n=== ISOLATED WORKFLOW COMPLETED ===")
-    print(f"ADW ID: {adw_id}")
-    print(f"All phases completed successfully!")
+    print(f"Executing: {' '.join(forward_cmd)}\n")
+    result = subprocess.run(forward_cmd)
+    sys.exit(result.returncode)
 
 
 if __name__ == "__main__":

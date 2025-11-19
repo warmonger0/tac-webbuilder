@@ -287,20 +287,20 @@ def suggest_adw_workflow(issue_type: str, complexity: str, characteristics: dict
     if issue_type == "chore" and complexity == "low" and not needs_testing:
         return ("adw_lightweight_iso", "base")
 
-    # Bugs always need testing
+    # Bugs always need testing - use complete SDLC workflow
     if issue_type == "bug":
-        return ("adw_plan_build_test_iso", "base")
+        return ("adw_sdlc_complete_iso", "base")
 
     # Chores without special characteristics
     elif issue_type == "chore":
         return ("adw_sdlc_iso", "base")
 
-    # Features tiered by complexity
+    # Features tiered by complexity - use complete SDLC workflow
     else:  # feature
         if complexity == "high":
-            return ("adw_plan_build_test_iso", "heavy")
+            return ("adw_sdlc_complete_iso", "heavy")
         elif complexity == "medium":
-            return ("adw_plan_build_test_iso", "base")
+            return ("adw_sdlc_complete_iso", "base")
         else:  # low
             # Low complexity features still use SDLC unless they match lightweight criteria
             return ("adw_sdlc_iso", "base")
