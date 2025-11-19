@@ -1,63 +1,8 @@
 {
-  "adw_id": "d87f2a65",
-  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/d87f2a65",
-  "created_at": "2025-11-18T23:16:37.996273",
-  "branch_name": "chore-issue-47-adw-d87f2a65-extract-db-connection-utility",
+  "adw_id": "7dc3d593",
+  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/7dc3d593",
+  "created_at": "2025-11-19T04:58:13.741751",
   "changed_files": [
-    ".adw-context.json",
-    ".mcp.json",
-    "app/server/.coverage",
-    "app/server/tests/utils/__init__.py",
-    "app/server/tests/utils/test_db_connection.py",
-    "app/server/utils/__init__.py",
-    "app/server/utils/db_connection.py"
-  ],
-  "commits": [
-    {
-      "sha": "7752b87",
-      "message": "sdlc_implementor: chore: update # phase 1: utility extraction (dry"
-    },
-    {
-      "sha": "35aaf89",
-      "message": "sdlc_planner: chore: update # phase 1: utility extraction (dry"
-    }
-  ],
-  "plan_file": "specs/issue-47-adw-d87f2a65-sdlc_planner-phase-1-utility-extraction-dry-principles-request-.md",
-  "issue": {
-    "number": 47,
-    "title": "# Phase 1: Utility Extraction (DRY Principles)\n\n## \u2705 Request 1.1: Extract Database Connection Utilit",
-    "body": "## Description\n# Phase 1: Utility Extraction (DRY Principles)\n\n## \u2705 Request 1.1: Extract Database Connection Utility\n\n```\nCreate a centralized database connection utility at app/server/utils/db_connection.py to eliminate duplicated sqlite3.connect() patterns across the codebase.\n\nCONTEXT:\nCurrently, 7 files manually create database connections with duplicated error handling:\n- server.py (4 instances: lines 596, 664, 1801, 1836)\n- insights.py (1 instance: line 16)\n- sql_processor.py (2 instances: lines 16, 64)\n\nA good pattern already exists in workflow_history.py lines 182-193 using a context manager.\n\nTASK:\nCreate app/server/utils/db_connection.py with a context manager that:\n- Uses sqlite3.connect() with configurable db_path (default: \"db/database.db\")\n- Sets row_factory to sqlite3.Row for dict-like access\n- Automatically commits on success, rollbacks on error\n- Properly closes connections in finally block\n- Includes basic retry logic for SQLITE_BUSY errors (max 3 retries, 100ms delay)\n\nBase implementation on the existing pattern from workflow_history.py:182-193.\n\nACCEPTANCE CRITERIA:\n- Create app/server/utils/db_connection.py (~80-100 lines)\n- Include get_connection() context manager\n- Add docstrings explaining usage\n- Create app/server/tests/utils/test_db_connection.py with tests for:\n  - Successful connection and commit\n  - Automatic rollback on error\n  - Connection cleanup\n  - Row factory configuration\n- All tests pass\n- No migration of existing code yet (that's a separate task)\n\nFILES TO CREATE:\n- app/server/utils/db_connection.py\n- app/server/tests/utils/test_db_connection.py\n\nESTIMATED EFFORT: 2 hours\nCOMPLEXITY: Low\nDRY BENEFIT: Eliminates 7 duplicate patterns (105-140 lines)\n```\n\n---\n\n## Classification\nPattern matched: `error_fix` (confidence: 95%)\n\n## Workflow\nadw_plan_build_test_iso with base model",
-    "state": "OPEN",
-    "author": {
-      "id": "MDQ6VXNlcjExNTk1NTE3",
-      "login": "warmonger0",
-      "name": "",
-      "is_bot": false
-    },
-    "assignees": [],
-    "labels": [
-      {
-        "id": "LA_kwDOQT8ln88AAAACPfn9_g",
-        "name": "bug",
-        "color": "d73a4a",
-        "description": "Something isn't working"
-      },
-      {
-        "id": "LA_kwDOQT8ln88AAAACPyVzZA",
-        "name": "auto-routed",
-        "color": "0E8A16",
-        "description": "Issue automatically routed to ADW workflow"
-      }
-    ],
-    "milestone": null,
-    "comments": [
-      {
-        "id": "IC_kwDOQT8ln87Tqc92",
-        "author": {
-          "id": null,
-          "login": "warmonger0",
-          "name": null,
-          "is_bot": false
-        },
-        "body": "[ADW-AGENTS] \ud83e\udd16 ADW Webhook: Detected `adw_plan_build_test_iso` workflow request\n\nStarting workflow with ID: `d87f2a65`\nWorkflow: `adw_plan_build_test_iso` \ud83c\udfd7\ufe0f\nModel Set: `base` \u2699\ufe0f\nReason: New issue with adw_plan_build_test_iso workflow\n\nLogs will be available at: `agents/d87f2a65/adw_plan_build_test_iso/`",
-        "createdAt": 
+    ".mcp.json"
+  ]
+}

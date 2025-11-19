@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import os
-import sqlite3
 import subprocess
 import sys
 import time
@@ -85,6 +84,8 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSock
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from services.websocket_manager import ConnectionManager
+
+from app.server.utils.db_connection import get_connection
 
 # Import ADW complexity analyzer for cost estimation
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'adws'))
@@ -593,11 +594,10 @@ async def health_check() -> HealthCheckResponse:
     """Health check endpoint with database status"""
     try:
         # Check database connection
-        conn = sqlite3.connect("db/database.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        tables = cursor.fetchall()
-        conn.close()
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = cursor.fetchall()
 
         uptime = (datetime.now() - app_start_time).total_seconds()
 
@@ -661,11 +661,10 @@ async def get_system_status() -> SystemStatusResponse:
 
     # 2. Database
     try:
-        conn = sqlite3.connect("db/database.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        tables = cursor.fetchall()
-        conn.close()
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = cursor.fetchall()
 
         services["database"] = ServiceHealth(
             name="Database",
@@ -1798,22 +1797,18 @@ async def delete_table(table_name: str) -> dict:
         except SQLSecurityError as e:
             raise HTTPException(400, str(e))
 
-        conn = sqlite3.connect("db/database.db")
+        with get_connection() as conn:
+            # Check if table exists using secure method
+            if not check_table_exists(conn, table_name):
+                raise HTTPException(404, f"Table '{table_name}' not found")
 
-        # Check if table exists using secure method
-        if not check_table_exists(conn, table_name):
-            conn.close()
-            raise HTTPException(404, f"Table '{table_name}' not found")
-
-        # Drop the table using safe query execution with DDL permission
-        execute_query_safely(
-            conn,
-            "DROP TABLE IF EXISTS {table}",
-            identifier_params={'table': table_name},
-            allow_ddl=True
-        )
-        conn.commit()
-        conn.close()
+            # Drop the table using safe query execution with DDL permission
+            execute_query_safely(
+                conn,
+                "DROP TABLE IF EXISTS {table}",
+                identifier_params={'table': table_name},
+                allow_ddl=True
+            )
 
         response = {"message": f"Table '{table_name}' deleted successfully"}
         logger.info(f"[SUCCESS] Table deleted: {table_name}")
@@ -1833,16 +1828,13 @@ async def export_table(request: ExportRequest) -> Response:
         validate_identifier(request.table_name, "table")
 
         # Connect to database
-        conn = sqlite3.connect("db/database.db")
+        with get_connection() as conn:
+            # Check if table exists
+            if not check_table_exists(conn, request.table_name):
+                raise HTTPException(404, f"Table '{request.table_name}' not found")
 
-        # Check if table exists
-        if not check_table_exists(conn, request.table_name):
-            conn.close()
-            raise HTTPException(404, f"Table '{request.table_name}' not found")
-
-        # Generate CSV
-        csv_data = generate_csv_from_table(conn, request.table_name)
-        conn.close()
+            # Generate CSV
+            csv_data = generate_csv_from_table(conn, request.table_name)
 
         # Return CSV response
         return Response(
