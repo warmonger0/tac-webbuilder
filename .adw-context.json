@@ -1,63 +1,9 @@
 {
-  "adw_id": "9513a3c4",
-  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/9513a3c4",
-  "created_at": "2025-11-18T14:58:18.725325",
-  "branch_name": "feature-issue-41-adw-9513a3c4-create-health-service-module",
+  "adw_id": "d87f2a65",
+  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/d87f2a65",
+  "created_at": "2025-11-18T23:11:30.692885",
   "changed_files": [
     ".adw-context.json",
-    ".mcp.json",
-    "app/server/services/__init__.py",
-    "app/server/services/health_service.py",
-    "app/server/tests/services/__init__.py",
-    "app/server/tests/services/test_health_service.py",
-    "playwright-mcp-config.json"
-  ],
-  "commits": [
-    {
-      "sha": "9919e25",
-      "message": "sdlc_implementor: feature: add ### workflow 4.1: create health service"
-    },
-    {
-      "sha": "5306ae5",
-      "message": "sdlc_planner: feature: add ### workflow 4.1: create health service"
-    }
-  ],
-  "plan_file": "specs/issue-41-adw-9513a3c4-sdlc_planner-workflow-4-1-create-health-service-module-core-str.md",
-  "issue": {
-    "number": 41,
-    "title": "### Workflow 4.1: Create Health Service Module - Core Structure\n**Estimated Time:** 1-2 hours\n**Complexity:** Low",
-    "body": "## Description\n### Workflow 4.1: Create Health Service Module - Core Structure\n**Estimated Time:** 1-2 hours\n**Complexity:** Low\n**Dependencies:** None\n\n**Input Files:**\n- `app/server/server.py` (lines 610-843)\n\n**Output Files:**\n- `app/server/services/health_service.py` (new)\n\n**Tasks:**\n1. Create ServiceStatus enum\n2. Create ServiceHealth dataclass\n3. Create HealthService class skeleton\n4. Add configuration for health check targets\n5. Add `check_all()` method structure\n\n**Code Structure:**\n\\`\\`\\`python\nfrom enum import Enum\nfrom dataclasses import dataclass\nfrom typing import Dict, Optional\n\nclass ServiceStatus(str, Enum):\n    HEALTHY = \"healthy\"\n    DEGRADED = \"degraded\"\n    UNHEALTHY = \"unhealthy\"\n    UNKNOWN = \"unknown\"\n\n@dataclass\nclass ServiceHealth:\n    name: str\n    status: ServiceStatus\n    message: str\n    details: Optional[Dict] = None\n\nclass HealthService:\n    def __init__(\n        self,\n        db_path: str = \"db/database.db\",\n        webhook_url: str = \"http://localhost:8001/health\",\n        cloudflare_tunnel_name: Optional[str] = None,\n        frontend_url: str = \"http://localhost:5173\"\n    ):\n        self.db_path = db_path\n        self.webhook_url = webhook_url\n        self.cloudflare_tunnel_name = cloudflare_tunnel_name\n        self.frontend_url = frontend_url\n\n    async def check_all(self) -> Dict[str, ServiceHealth]:\n        \"\"\"Check health of all services\"\"\"\n        return {\n            \"backend\": self.check_backend(),\n            \"database\": self.check_database(),\n            \"webhook\": await self.check_webhook(),\n            \"cloudflare\": self.check_cloudflare_tunnel(),\n            \"github_webhook\": await self.check_github_webhook(),\n            \"frontend\": await self.check_frontend()\n        }\n\\`\\`\\`\n\n**Acceptance Criteria:**\n- [ ] Module imports without errors\n- [ ] Enums and dataclasses defined\n- [ ] HealthService class instantiable\n- [ ] check_all() method defined (stub implementations OK)\n\n**Verification Command:**\n\\`\\`\\`bash\npython -c \"from app.server.services.health_service import HealthService; hs = HealthService(); print('Module created successfully')\"\n\\`\\`\\`\n**Execution:**\n\\`\\`\\`bash\ncd adws/\nuv run adw_sdlc_complete_zte_iso.py <issue-number> --use-optimized-plan\n\\`\\`\\`\n---\n\n## Classification\nExplicit workflow: \\`adw_sdlc_complete_zte_iso\\` (user specified)\n\n## Workflow\nadw_sdlc_complete_zte_iso with base model",
-    "state": "OPEN",
-    "author": {
-      "id": "MDQ6VXNlcjExNTk1NTE3",
-      "login": "warmonger0",
-      "name": "",
-      "is_bot": false
-    },
-    "assignees": [],
-    "labels": [
-      {
-        "id": "LA_kwDOQT8ln88AAAACQH6zig",
-        "name": "feature",
-        "color": "0e8a16",
-        "description": ""
-      },
-      {
-        "id": "LA_kwDOQT8ln88AAAACQH6zoQ",
-        "name": "explicit-workflow",
-        "color": "ededed",
-        "description": ""
-      }
-    ],
-    "milestone": null,
-    "comments": [
-      {
-        "id": "IC_kwDOQT8ln87TlOio",
-        "author": {
-          "id": null,
-          "login": "warmonger0",
-          "name": null,
-          "is_bot": false
-        },
-        "body": "[ADW-AGENTS] \ud83e\udd16 ADW Webhook: Detected `adw_sdlc_complete_zte_iso` workflow request\n\nStarting workflow with ID: `47d96e68`\nWorkflow: `adw_sdlc_complete_zte_iso` \ud83c\udfd7\ufe0f\nModel Set: `base` \u2699\ufe0f\nReason: New issue with adw_sdlc_complete_zte_iso workflow\n\nLogs will be available at: `agents/47d96e68/adw_sdlc_complete_zte_iso/`",
-        "createdAt": 
+    ".mcp.json"
+  ]
+}
