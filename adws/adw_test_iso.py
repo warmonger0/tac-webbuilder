@@ -294,16 +294,33 @@ def post_comprehensive_test_summary(
     logger.info(f"Posted comprehensive test results summary to issue #{issue_number}")
 
 
-def run_e2e_tests(adw_id: str, logger: logging.Logger, working_dir: Optional[str] = None) -> AgentPromptResponse:
+def run_e2e_tests(adw_id: str, logger: logging.Logger, working_dir: Optional[str] = None, e2e_test_file: Optional[str] = None) -> AgentPromptResponse:
     """Run the E2E test suite using the /test_e2e command.
-    
+
     Note: The test_e2e command will automatically detect and use ports from .ports.env
     in the working directory if it exists.
+
+    Args:
+        adw_id: ADW workflow ID
+        logger: Logger instance
+        working_dir: Working directory for the test
+        e2e_test_file: Path to E2E test specification file (optional, skips E2E if not provided)
+
+    Returns:
+        AgentPromptResponse with success=True and a skip message if no e2e_test_file provided
     """
+    # Skip E2E tests if no test file is provided
+    if not e2e_test_file:
+        logger.info("No E2E test file provided, skipping E2E tests")
+        return AgentPromptResponse(
+            output="E2E tests skipped (no test file provided)",
+            success=True
+        )
+
     test_template_request = AgentTemplateRequest(
         agent_name=AGENT_E2E_TESTER,
         slash_command="/test_e2e",
-        args=[],
+        args=[e2e_test_file] if e2e_test_file else [],
         adw_id=adw_id,
         working_dir=working_dir,
     )

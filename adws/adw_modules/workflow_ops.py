@@ -608,7 +608,8 @@ def create_pull_request(
     elif isinstance(issue, dict):
         context_data["issue"] = issue
     else:
-        context_data["issue"] = issue.model_dump(by_alias=True)
+        # Use mode='json' to properly serialize datetime fields to ISO strings
+        context_data["issue"] = issue.model_dump(by_alias=True, mode='json')
 
     # Create context file
     create_context_file(working_dir, adw_id, context_data, logger)
