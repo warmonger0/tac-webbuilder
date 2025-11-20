@@ -47,7 +47,7 @@ def init_db():
     # Ensure db directory exists
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         # Create workflow_history table with comprehensive fields
@@ -182,7 +182,7 @@ def insert_workflow_history(
     Raises:
         sqlite3.IntegrityError: If a workflow with this adw_id already exists
     """
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         # Build dynamic query based on provided kwargs
@@ -257,7 +257,7 @@ def update_workflow_history_by_issue(
         logger.warning(f"[DB] No fields provided to update for issue #{issue_number}")
         return 0
 
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         # Build UPDATE query
@@ -305,7 +305,7 @@ def update_workflow_history(
         logger.warning(f"[DB] No fields provided to update for ADW {adw_id}")
         return False
 
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         # Convert dicts and lists to JSON strings
@@ -348,7 +348,7 @@ def get_workflow_by_adw_id(adw_id: str) -> dict | None:
     Returns:
         Dict: Workflow history record as a dictionary, or None if not found
     """
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM workflow_history WHERE adw_id = ?", (adw_id,))
         row = cursor.fetchone()
@@ -406,7 +406,7 @@ def get_workflow_history(
     Returns:
         Tuple[List[Dict], int]: List of workflow records and total count (before pagination)
     """
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         # Build WHERE clauses
@@ -533,7 +533,7 @@ def get_history_analytics() -> dict:
             - avg_tokens: Average tokens per workflow
             - avg_cache_efficiency: Average cache efficiency percentage
     """
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         # Total workflows
@@ -1222,7 +1222,7 @@ def resync_all_completed_workflows(force: bool = False) -> tuple[int, list[dict]
     """
     try:
         # Get all completed workflows
-        with get_db_connection() as conn:
+        with get_db_connection(db_path=str(DB_PATH)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT adw_id, status FROM workflow_history WHERE status IN ('completed', 'failed')"
