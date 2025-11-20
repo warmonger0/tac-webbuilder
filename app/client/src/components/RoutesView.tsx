@@ -53,8 +53,9 @@ export function RoutesView() {
         const search = searchText.toLowerCase();
         return (
           route.path.toLowerCase().includes(search) ||
-          route.handler.toLowerCase().includes(search) ||
-          route.description.toLowerCase().includes(search)
+          (route.name?.toLowerCase().includes(search) ?? false) ||
+          (route.description?.toLowerCase().includes(search) ?? false) ||
+          (route.summary?.toLowerCase().includes(search) ?? false)
         );
       }
 
@@ -195,12 +196,12 @@ export function RoutesView() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 font-medium">
-                        {route.handler}
+                        {route.name || 'N/A'}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-600 max-w-md">
-                        {route.description}
+                        {route.description || route.summary || 'No description'}
                       </div>
                     </td>
                   </tr>

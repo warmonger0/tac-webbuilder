@@ -166,8 +166,10 @@ class CostEstimate(BaseModel):
 class Route(BaseModel):
     path: str = Field(..., description="Route path (e.g., /api/upload)")
     method: str = Field(..., description="HTTP method (GET, POST, PUT, DELETE, PATCH)")
-    handler: str = Field(..., description="Handler function name")
-    description: str = Field(..., description="Route description from docstring")
+    name: str | None = Field(None, description="Route name or handler identifier")
+    summary: str | None = Field(None, description="Route summary from docstring first line")
+    description: str | None = Field(None, description="Route description from docstring")
+    tags: list[str] = Field(default_factory=list, description="Route tags from FastAPI")
 
 class RoutesResponse(BaseModel):
     routes: list[Route] = Field(..., description="List of routes")
