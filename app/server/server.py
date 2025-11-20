@@ -84,6 +84,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSock
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from services.background_tasks import BackgroundTaskManager
+from services.health_service import HealthService
 from services.service_controller import ServiceController
 from services.websocket_manager import ConnectionManager
 from services.workflow_service import WorkflowService
@@ -163,6 +164,14 @@ service_controller = ServiceController(
     github_pat=os.environ.get("GITHUB_PAT"),
     github_repo="warmonger0/tac-webbuilder",
     github_webhook_id=os.environ.get("GITHUB_WEBHOOK_ID", "580534779")
+)
+health_service = HealthService(
+    db_path="db/database.db",
+    webhook_url="http://localhost:8001/webhook-status",
+    frontend_url=f"http://localhost:{os.environ.get('FRONTEND_PORT', '5173')}",
+    backend_port=os.environ.get("BACKEND_PORT", "8000"),
+    app_start_time=app_start_time,
+    github_repo="warmonger0/tac-webbuilder"
 )
 background_task_manager = BackgroundTaskManager(
     websocket_manager=manager,
@@ -408,237 +417,9 @@ async def health_check() -> HealthCheckResponse:
 
 @app.get("/api/system-status", response_model=SystemStatusResponse)
 async def get_system_status() -> SystemStatusResponse:
-    """Comprehensive system health check for all critical services"""
-    import subprocess
-    import urllib.error
-    import urllib.request
-    from datetime import timedelta
-
-    services = {}
-
-    # Helper function to format uptime
-    def format_uptime(seconds: float) -> str:
-        td = timedelta(seconds=int(seconds))
-        hours = td.seconds // 3600
-        minutes = (td.seconds % 3600) // 60
-        if td.days > 0:
-            return f"{td.days}d {hours}h {minutes}m"
-        elif hours > 0:
-            return f"{hours}h {minutes}m"
-        else:
-            return f"{minutes}m"
-
-    # 1. Backend API (this service)
-    try:
-        uptime = (datetime.now() - app_start_time).total_seconds()
-        services["backend_api"] = ServiceHealth(
-            name="Backend API",
-            status="healthy",
-            uptime_seconds=uptime,
-            uptime_human=format_uptime(uptime),
-            message=f"Running on port {os.environ.get('BACKEND_PORT', '8000')}",
-            details={"port": os.environ.get('BACKEND_PORT', '8000')}
-        )
-    except Exception as e:
-        services["backend_api"] = ServiceHealth(
-            name="Backend API",
-            status="error",
-            message=str(e)
-        )
-
-    # 2. Database
-    try:
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = cursor.fetchall()
-
-        services["database"] = ServiceHealth(
-            name="Database",
-            status="healthy",
-            message=f"{len(tables)} tables available",
-            details={"tables_count": len(tables), "path": "db/database.db"}
-        )
-    except Exception as e:
-        services["database"] = ServiceHealth(
-            name="Database",
-            status="error",
-            message=f"Connection failed: {str(e)}"
-        )
-
-    # 3. Webhook Service
-    try:
-        with urllib.request.urlopen("http://localhost:8001/webhook-status", timeout=2) as response:
-            if response.status == 200:
-                webhook_data = json.loads(response.read().decode())
-                stats = webhook_data.get('stats', {})
-                total_received = stats.get('total_received', 0)
-                successful = stats.get('successful', 0)
-
-                services["webhook"] = ServiceHealth(
-                    name="Webhook Service",
-                    status=webhook_data.get("status", "unknown"),
-                    uptime_seconds=webhook_data.get("uptime", {}).get("seconds"),
-                    uptime_human=webhook_data.get("uptime", {}).get("human"),
-                    message=f"Port 8001 • {successful}/{total_received} webhooks processed",
-                    details={
-                        "port": 8001,
-                        "webhooks_processed": f"{successful}/{total_received}",
-                        "failed": stats.get('failed', 0)
-                    }
-                )
-            else:
-                services["webhook"] = ServiceHealth(
-                    name="Webhook Service",
-                    status="error",
-                    message=f"HTTP {response.status} on port 8001"
-                )
-    except urllib.error.URLError:
-        services["webhook"] = ServiceHealth(
-            name="Webhook Service",
-            status="error",
-            message="Not running (port 8001)"
-        )
-    except Exception as e:
-        services["webhook"] = ServiceHealth(
-            name="Webhook Service",
-            status="error",
-            message=f"Error on port 8001: {str(e)}"
-        )
-
-    # 4. Cloudflare Tunnel
-    try:
-        result = subprocess.run(
-            ["ps", "aux"],
-            capture_output=True,
-            text=True,
-            timeout=2
-        )
-        if "cloudflared tunnel run" in result.stdout:
-            services["cloudflare_tunnel"] = ServiceHealth(
-                name="Cloudflare Tunnel",
-                status="healthy",
-                message="Tunnel is running"
-            )
-        else:
-            services["cloudflare_tunnel"] = ServiceHealth(
-                name="Cloudflare Tunnel",
-                status="error",
-                message="Tunnel process not found"
-            )
-    except Exception as e:
-        services["cloudflare_tunnel"] = ServiceHealth(
-            name="Cloudflare Tunnel",
-            status="unknown",
-            message=f"Check failed: {str(e)}"
-        )
-
-    # 5. GitHub Webhook
-    try:
-        webhook_id = os.environ.get("GITHUB_WEBHOOK_ID", "580534779")
-        repo = "warmonger0/tac-webbuilder"
-
-        # Check recent webhook deliveries
-        result = subprocess.run(
-            ["gh", "api", f"repos/{repo}/hooks/{webhook_id}/deliveries", "--jq", ".[0].status_code"],
-            capture_output=True,
-            text=True,
-            timeout=3
-        )
-
-        if result.returncode == 0 and result.stdout.strip():
-            status_code = int(result.stdout.strip())
-            if status_code == 200:
-                services["github_webhook"] = ServiceHealth(
-                    name="GitHub Webhook",
-                    status="healthy",
-                    message=f"Latest delivery successful (HTTP {status_code})",
-                    details={"webhook_url": "webhook.directmyagent.com"}
-                )
-            elif status_code >= 500:
-                services["github_webhook"] = ServiceHealth(
-                    name="GitHub Webhook",
-                    status="error",
-                    message=f"Latest delivery failed (HTTP {status_code})",
-                    details={"webhook_url": "webhook.directmyagent.com"}
-                )
-            else:
-                services["github_webhook"] = ServiceHealth(
-                    name="GitHub Webhook",
-                    status="degraded",
-                    message=f"Latest delivery status: HTTP {status_code}",
-                    details={"webhook_url": "webhook.directmyagent.com"}
-                )
-        else:
-            # Fallback: try to access webhook endpoint
-            try:
-                with urllib.request.urlopen("https://webhook.directmyagent.com/health", timeout=3) as response:
-                    services["github_webhook"] = ServiceHealth(
-                        name="GitHub Webhook",
-                        status="healthy",
-                        message="Webhook endpoint accessible",
-                        details={"webhook_url": "webhook.directmyagent.com"}
-                    )
-            except Exception:
-                services["github_webhook"] = ServiceHealth(
-                    name="GitHub Webhook",
-                    status="unknown",
-                    message="Cannot verify deliveries",
-                    details={"webhook_url": "webhook.directmyagent.com"}
-                )
-    except Exception as e:
-        services["github_webhook"] = ServiceHealth(
-            name="GitHub Webhook",
-            status="unknown",
-            message=f"Check failed: {str(e)[:50]}"
-        )
-
-    # 6. Frontend (if accessible)
-    try:
-        frontend_port = os.environ.get("FRONTEND_PORT", "5173")
-        with urllib.request.urlopen(f"http://localhost:{frontend_port}", timeout=2) as response:
-            services["frontend"] = ServiceHealth(
-                name="Frontend",
-                status="healthy" if response.status == 200 else "degraded",
-                message=f"Serving on port {frontend_port}",
-                details={"port": frontend_port}
-            )
-    except urllib.error.URLError:
-        services["frontend"] = ServiceHealth(
-            name="Frontend",
-            status="error",
-            message="Not responding"
-        )
-    except Exception as e:
-        services["frontend"] = ServiceHealth(
-            name="Frontend",
-            status="unknown",
-            message=str(e)
-        )
-
-    # Determine overall status
-    statuses = [s.status for s in services.values()]
-    if any(s == "error" for s in statuses):
-        overall_status = "error"
-    elif any(s == "degraded" for s in statuses):
-        overall_status = "degraded"
-    else:
-        overall_status = "healthy"
-
-    # Summary
-    healthy_count = sum(1 for s in statuses if s == "healthy")
-    total_count = len(services)
-
-    return SystemStatusResponse(
-        overall_status=overall_status,
-        timestamp=datetime.now().isoformat(),
-        services=services,
-        summary={
-            "healthy_services": healthy_count,
-            "total_services": total_count,
-            "health_percentage": round((healthy_count / total_count) * 100, 1) if total_count > 0 else 0
-        }
-    )
+    """Comprehensive system health check - delegates to HealthService"""
+    status_data = await health_service.get_system_status()
+    return SystemStatusResponse(**status_data)
 
 @app.post("/api/services/webhook/start")
 async def start_webhook_service() -> dict:
