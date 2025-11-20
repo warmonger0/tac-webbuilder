@@ -39,8 +39,8 @@ def integration_test_db() -> Generator[Path, None, None]:
 
     Usage:
         def test_workflow_lifecycle(integration_test_db):
-            from core.workflow_history import insert_workflow_history
-            with patch('core.workflow_history.DB_PATH', integration_test_db):
+            from core.workflow_history_utils.database import insert_workflow_history
+            with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
                 row_id = insert_workflow_history(adw_id="TEST-001", ...)
                 assert row_id > 0
     """
@@ -76,7 +76,7 @@ def integration_app(integration_test_db: Path):
             assert response.status_code == 200
     """
     # Patch database path before importing server
-    with patch('core.workflow_history.DB_PATH', integration_test_db):
+    with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
         from server import app
         yield app
 
@@ -115,8 +115,8 @@ def db_with_workflows(integration_test_db: Path) -> Generator[Path, None, None]:
 
     Usage:
         def test_workflow_analytics(db_with_workflows):
-            from core.workflow_history import get_workflow_history
-            with patch('core.workflow_history.DB_PATH', db_with_workflows):
+            from core.workflow_history_utils.database import get_workflow_history
+            with patch('core.workflow_history_utils.database.DB_PATH', db_with_workflows):
                 workflows = get_workflow_history(limit=10)
                 assert len(workflows) > 0
     """
@@ -385,7 +385,7 @@ def workflow_service(integration_test_db: Path):
     """
     from services.workflow_service import WorkflowService
 
-    with patch('core.workflow_history.DB_PATH', integration_test_db):
+    with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
         return WorkflowService()
 
 

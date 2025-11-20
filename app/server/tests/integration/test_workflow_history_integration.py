@@ -202,7 +202,7 @@ class TestWorkflowHistoryIntegration:
             )
 
             # Mock the read_cost_history function
-            with patch('core.workflow_history.read_cost_history', return_value=mock_cost_data):
+            with patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
                 # Perform resync
                 result = resync_workflow_cost(adw_id, force=False)
 
@@ -677,7 +677,7 @@ class TestWorkflowHistoryIntegration:
             )
 
             # Test 1: Single workflow resync
-            with patch('core.workflow_history.read_cost_history', return_value=mock_cost_data):
+            with patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
                 response = integration_client.post(f"/api/workflow-history/resync?adw_id={adw_id}")
                 assert response.status_code == 200
 
@@ -701,7 +701,7 @@ class TestWorkflowHistoryIntegration:
             assert len(data["errors"]) > 0
 
             # Test 3: Bulk resync with force
-            with patch('core.workflow_history.read_cost_history', return_value=mock_cost_data):
+            with patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
                 response = integration_client.post("/api/workflow-history/resync?force=true")
                 assert response.status_code == 200
 
