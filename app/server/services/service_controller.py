@@ -20,6 +20,8 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from utils.process_runner import ProcessRunner
+
 logger = logging.getLogger(__name__)
 
 
@@ -143,9 +145,8 @@ class ServiceController:
                 }
 
             # Kill existing cloudflared process
-            subprocess.run(
-                ["pkill", "-f", "cloudflared tunnel run"],
-                capture_output=True
+            ProcessRunner.run(
+                ["pkill", "-f", "cloudflared tunnel run"]
             )
 
             # Wait a moment
@@ -162,11 +163,7 @@ class ServiceController:
             time.sleep(2)
 
             # Verify it's running
-            result = subprocess.run(
-                ["ps", "aux"],
-                capture_output=True,
-                text=True
-            )
+            result = ProcessRunner.run(["ps", "aux"])
             if "cloudflared tunnel run" in result.stdout:
                 return {
                     "status": "restarted",
@@ -208,15 +205,13 @@ class ServiceController:
                 }
 
             # Check recent webhook deliveries using gh CLI
-            result = subprocess.run(
-                ["gh", "api", f"repos/{self.github_repo}/hooks/{self.github_webhook_id}/deliveries",
+            result = ProcessRunner.run_gh_command(
+                ["api", f"repos/{self.github_repo}/hooks/{self.github_webhook_id}/deliveries",
                  "--jq", ".[0:5] | .[] | {id: .id, status: .status_code, delivered_at: .delivered_at}"],
-                capture_output=True,
-                text=True,
                 timeout=5
             )
 
-            if result.returncode == 0:
+            if result.success:
                 deliveries_output = result.stdout.strip()
                 if deliveries_output:
                     # Parse the deliveries
@@ -314,10 +309,8 @@ class ServiceController:
                     server_dir = os.path.dirname(os.path.abspath(__file__))
                     project_root = os.path.dirname(os.path.dirname(server_dir))
                     adws_dir = os.path.join(project_root, "adws")
-                    restart_result = subprocess.run(
-                        ["bash", "-c", f"cd {adws_dir} && uv run {self.webhook_script_path} &"],
-                        capture_output=True,
-                        text=True,
+                    restart_result = ProcessRunner.run_shell(
+                        f"cd {adws_dir} && uv run {self.webhook_script_path} &",
                         timeout=3
                     )
                     diagnostics.append("⚙ Attempted to restart webhook service")
@@ -327,12 +320,7 @@ class ServiceController:
             # Step 2: Check Cloudflare tunnel health
             tunnel_healthy = False
             try:
-                result = subprocess.run(
-                    ["ps", "aux"],
-                    capture_output=True,
-                    text=True,
-                    timeout=2
-                )
+                result = ProcessRunner.run(["ps", "aux"], timeout=2)
                 tunnel_healthy = "cloudflared tunnel run" in result.stdout
                 if tunnel_healthy:
                     diagnostics.append("✓ Cloudflare tunnel is running")
@@ -352,15 +340,13 @@ class ServiceController:
 
             # Step 4: Get webhook info and attempt redelivery
             # Get most recent failed delivery
-            result = subprocess.run(
-                ["gh", "api", f"repos/{self.github_repo}/hooks/{self.github_webhook_id}/deliveries",
+            result = ProcessRunner.run_gh_command(
+                ["api", f"repos/{self.github_repo}/hooks/{self.github_webhook_id}/deliveries",
                  "--jq", '.[] | select(.status_code != 200) | .id'],
-                capture_output=True,
-                text=True,
                 timeout=5
             )
 
-            if result.returncode == 0 and result.stdout.strip():
+            if result.success and result.stdout.strip():
                 delivery_id = result.stdout.strip().split('\n')[0]
                 diagnostics.append(f"Found failed delivery: {delivery_id}")
 
@@ -377,15 +363,13 @@ class ServiceController:
                     }
 
                 # Redeliver
-                redeliver_result = subprocess.run(
-                    ["gh", "api", "-X", "POST",
+                redeliver_result = ProcessRunner.run_gh_command(
+                    ["api", "-X", "POST",
                      f"repos/{self.github_repo}/hooks/{self.github_webhook_id}/deliveries/{delivery_id}/attempts"],
-                    capture_output=True,
-                    text=True,
                     timeout=5
                 )
 
-                if redeliver_result.returncode == 0:
+                if redeliver_result.success:
                     return {
                         "status": "success",
                         "message": "Webhook redelivered successfully",
@@ -427,12 +411,8 @@ class ServiceController:
             bool: True if a process is listening on the port, False otherwise
         """
         try:
-            result = subprocess.run(
-                ["lsof", "-i", f":{port}"],
-                capture_output=True,
-                text=True
-            )
-            return result.returncode == 0
+            result = ProcessRunner.run(["lsof", "-i", f":{port}"])
+            return result.success
         except Exception as e:
             logger.warning(f"Failed to check if port {port} is in use: {e}")
             return False
@@ -446,14 +426,10 @@ class ServiceController:
         """
         try:
             # Get PID of process on port
-            result = subprocess.run(
-                ["lsof", "-ti", f":{port}"],
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0 and result.stdout.strip():
+            result = ProcessRunner.run(["lsof", "-ti", f":{port}"])
+            if result.success and result.stdout.strip():
                 pid = result.stdout.strip()
-                subprocess.run(["kill", "-9", pid], capture_output=True)
+                ProcessRunner.run(["kill", "-9", pid])
                 logger.info(f"Killed process {pid} on port {port}")
         except Exception as e:
             logger.warning(f"Failed to kill process on port {port}: {e}")

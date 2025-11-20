@@ -32,7 +32,6 @@ Usage:
 import json
 import logging
 import os
-import subprocess
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
@@ -40,6 +39,7 @@ from enum import Enum
 
 from core.data_models import ServiceHealth
 from utils.db_connection import get_connection
+from utils.process_runner import ProcessRunner
 
 logger = logging.getLogger(__name__)
 
@@ -292,10 +292,8 @@ class HealthService:
     def check_cloudflare_tunnel(self) -> ServiceHealth:
         """Check the health of the Cloudflare Tunnel"""
         try:
-            result = subprocess.run(
+            result = ProcessRunner.run(
                 ["ps", "aux"],
-                capture_output=True,
-                text=True,
                 timeout=2
             )
             if "cloudflared tunnel run" in result.stdout:
@@ -323,14 +321,12 @@ class HealthService:
             webhook_id = os.environ.get("GITHUB_WEBHOOK_ID", "580534779")
 
             # Check recent webhook deliveries
-            result = subprocess.run(
-                ["gh", "api", f"repos/{self.github_repo}/hooks/{webhook_id}/deliveries", "--jq", ".[0].status_code"],
-                capture_output=True,
-                text=True,
+            result = ProcessRunner.run_gh_command(
+                ["api", f"repos/{self.github_repo}/hooks/{webhook_id}/deliveries", "--jq", ".[0].status_code"],
                 timeout=3
             )
 
-            if result.returncode == 0 and result.stdout.strip():
+            if result.success and result.stdout.strip():
                 status_code = int(result.stdout.strip())
                 if status_code == 200:
                     return ServiceHealth(

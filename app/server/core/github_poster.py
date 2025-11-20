@@ -2,13 +2,12 @@
 GitHub CLI integration for posting issues.
 """
 
-import subprocess
-
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
 from core.data_models import GitHubIssue
+from utils.process_runner import ProcessRunner
 
 
 class GitHubPoster:
@@ -200,17 +199,16 @@ class GitHubPoster:
         Raises:
             RuntimeError: If command fails
         """
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            error_msg = e.stderr if e.stderr else str(e)
+        # Extract gh args (remove 'gh' prefix if present)
+        args = cmd[1:] if cmd[0] == "gh" else cmd
+
+        result = ProcessRunner.run_gh_command(args)
+
+        if not result.success:
+            error_msg = result.stderr if result.stderr else f"Command failed with code {result.returncode}"
             raise RuntimeError(f"GitHub CLI command failed: {error_msg}")
+
+        return result.stdout
 
     def _validate_gh_cli(self) -> bool:
         """
@@ -219,25 +217,14 @@ class GitHubPoster:
         Returns:
             True if gh CLI is ready, False otherwise
         """
-        try:
-            # Check if gh is installed
-            subprocess.run(
-                ["gh", "--version"],
-                capture_output=True,
-                check=True
-            )
-
-            # Check if authenticated
-            subprocess.run(
-                ["gh", "auth", "status"],
-                capture_output=True,
-                check=True
-            )
-
-            return True
-
-        except (subprocess.CalledProcessError, FileNotFoundError):
+        # Check if gh is installed
+        version_result = ProcessRunner.run_gh_command(["--version"])
+        if not version_result.success:
             return False
+
+        # Check if authenticated
+        auth_result = ProcessRunner.run_gh_command(["auth", "status"])
+        return auth_result.success
 
     def get_repo_info(self) -> dict:
         """

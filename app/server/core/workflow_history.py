@@ -9,11 +9,11 @@ and detailed status information.
 import json
 import logging
 import sqlite3
-import subprocess
 from datetime import datetime
 from pathlib import Path
 
 from utils.db_connection import get_connection as get_db_connection
+from utils.process_runner import ProcessRunner
 from core.cost_estimate_storage import get_cost_estimate
 from core.cost_tracker import read_cost_history
 from core.data_models import CostData
@@ -43,13 +43,11 @@ def fetch_github_issue_state(issue_number: int) -> str | None:
         'open', 'closed', or None if unable to fetch
     """
     try:
-        result = subprocess.run(
-            ["gh", "issue", "view", str(issue_number), "--json", "state", "--jq", ".state"],
-            capture_output=True,
-            text=True,
+        result = ProcessRunner.run_gh_command(
+            ["issue", "view", str(issue_number), "--json", "state", "--jq", ".state"],
             timeout=5
         )
-        if result.returncode == 0:
+        if result.success:
             state = result.stdout.strip().lower()
             return state if state in ['open', 'closed'] else None
         return None

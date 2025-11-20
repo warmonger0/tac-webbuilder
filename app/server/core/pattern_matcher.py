@@ -9,8 +9,9 @@ GOAL: Reduce LLM costs by offloading deterministic work to Python scripts.
 
 import json
 import logging
-import subprocess
 from pathlib import Path
+
+from utils.process_runner import ProcessRunner
 
 logger = logging.getLogger(__name__)
 
@@ -130,12 +131,10 @@ class PatternMatcher:
             logger.info(f"Executing: {' '.join(cmd)}")
 
             # Run script
-            result = subprocess.run(
+            result = ProcessRunner.run(
                 cmd,
-                capture_output=True,
-                text=True,
                 timeout=timeout,
-                cwd=Path(__file__).parent.parent.parent.parent  # Project root
+                cwd=str(Path(__file__).parent.parent.parent.parent)  # Project root
             )
 
             # Parse JSON output if available
@@ -146,19 +145,13 @@ class PatternMatcher:
                 data = {"output": result.stdout}
 
             return {
-                "success": result.returncode == 0,
+                "success": result.success,
                 "return_code": result.returncode,
                 "data": data,
                 "stderr": result.stderr if result.stderr else None,
                 "pattern_name": pattern["pattern_name"]
             }
 
-        except subprocess.TimeoutExpired:
-            logger.error(f"Script timed out after {timeout}s")
-            return {
-                "success": False,
-                "error": f"Script execution timed out after {timeout}s"
-            }
         except Exception as e:
             logger.error(f"Script execution failed: {e}")
             return {
