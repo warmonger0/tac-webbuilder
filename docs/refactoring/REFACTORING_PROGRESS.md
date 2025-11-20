@@ -179,39 +179,64 @@ Progress:  ███████████████████▓  54% com
 
 ---
 
-## Phase 3: Helper Utilities ⏳
+## Phase 3: Helper Utilities 🔵
 
-**Status:** ⏳ PENDING
+**Status:** 🔵 IN PROGRESS (Phase 3.1 & 3.2 Complete, 3.3 Pending)
+**Started:** 2025-11-19
 **Estimated Duration:** 2-3 days
 **Target:** Reduce code duplication by ~320 lines
 
-### Utilities to Create
+### Phase 3.1: Database Connection Consolidation ✅
 
-1. **DatabaseManager** (~100 lines)
-   - Eliminate 60 lines of duplicated DB connection code
-   - Centralize transaction handling
-   - Files affected: 6
+**Completed:** 2025-11-19
+**Status:** ✅ COMPLETE
 
-2. **LLMClient** (~150 lines)
-   - Eliminate 90 lines of duplicated LLM API calls
-   - Standardize markdown cleanup
-   - Files affected: 3
+- **Action:** Consolidated duplicate `get_db_connection()` functions
+- **Files Modified:**
+  - `core/workflow_history.py` - Now imports from `utils/db_connection`
+  - `core/adw_lock.py` - Now imports from `utils/db_connection`
+- **Lines Eliminated:** ~27 lines of duplicated DB connection code
+- **Result:** Both files now use centralized `utils/db_connection.get_connection()`
 
-3. **ProcessRunner** (~80 lines)
-   - Eliminate 120 lines of duplicated subprocess code
-   - Consistent timeout/error handling
-   - Files affected: 15
+### Phase 3.2: LLMClient Utility ✅
 
-4. **Frontend Formatters** (~50 lines)
-   - Eliminate 50 lines of duplicated formatting
-   - Consistent date/cost/duration formatting
-   - Files affected: 5
+**Completed:** 2025-11-19
+**Status:** ✅ COMPLETE
 
-### Expected Impact
+- **Action:** Created unified `utils/llm_client.py` with SQLGenerationClient
+- **Files Created:**
+  - `utils/llm_client.py` (547 lines) - Comprehensive LLM client
+- **Files Modified:**
+  - `core/llm_processor.py` (288→135 lines, -153 lines reduction)
+- **Lines Eliminated:** ~153 lines of duplicated LLM API code
+- **Features Added:**
+  - Automatic provider detection (OpenAI/Anthropic)
+  - Unified chat completion interface
+  - JSON completion support
+  - Markdown cleanup utilities
+  - SQLGenerationClient subclass for SQL-specific tasks
 
-- Total duplication eliminated: ~320 lines
-- New utility code: ~380 lines
-- Net reduction: Improved maintainability + ~50 line reduction
+### Phase 3.3: ProcessRunner Utility ⏳
+
+**Status:** ⏳ PENDING
+**Next Action Required**
+
+- **Target:** Eliminate ~120 lines of duplicated subprocess code
+- **Files to Modify:** 4-6 (services/service_controller.py, services/health_service.py, etc.)
+- **Utility to Create:** `utils/process_runner.py` (~80 lines)
+- **Expected Impact:** Consistent timeout/error handling across all subprocess calls
+
+### Phase 3.4: Frontend Formatters
+
+**Status:** DEFERRED
+**Reason:** Phase 3 focuses on Python backend utilities; frontend TypeScript utilities deferred to future phase
+
+### Phase 3 Summary (Partial)
+
+- **Lines Eliminated So Far:** ~180 lines (DB: 27, LLM: 153)
+- **New Utility Code:** +688 lines (db_connection: 141, llm_client: 547)
+- **Progress:** 2/3 sub-phases complete (66%)
+- **Remaining:** ProcessRunner utility (Phase 3.3)
 
 ---
 

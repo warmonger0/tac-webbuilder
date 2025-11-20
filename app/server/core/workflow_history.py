@@ -9,10 +9,11 @@ and detailed status information.
 import json
 import logging
 import sqlite3
-from contextlib import contextmanager
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from utils.db_connection import get_connection as get_db_connection
 from core.cost_estimate_storage import get_cost_estimate
 from core.cost_tracker import read_cost_history
 from core.data_models import CostData
@@ -29,6 +30,32 @@ logger = logging.getLogger(__name__)
 
 # Database path
 DB_PATH = Path(__file__).parent.parent / "db" / "workflow_history.db"
+
+
+def fetch_github_issue_state(issue_number: int) -> str | None:
+    """
+    Fetch the current state of a GitHub issue using gh CLI.
+
+    Args:
+        issue_number: GitHub issue number
+
+    Returns:
+        'open', 'closed', or None if unable to fetch
+    """
+    try:
+        result = subprocess.run(
+            ["gh", "issue", "view", str(issue_number), "--json", "state", "--jq", ".state"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            state = result.stdout.strip().lower()
+            return state if state in ['open', 'closed'] else None
+        return None
+    except Exception as e:
+        logger.debug(f"Failed to fetch GitHub issue state for #{issue_number}: {e}")
+        return None
 
 
 def calculate_phase_metrics(cost_data: CostData) -> dict:
@@ -178,21 +205,6 @@ def estimate_complexity(steps_total: int, duration_seconds: int) -> str:
     return "medium"
 
 
-@contextmanager
-def get_db_connection():
-    """Context manager for database connections"""
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row  # Return rows as dictionaries
-    try:
-        yield conn
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        conn.close()
-
-
 def init_db():
     """
     Initialize the workflow history database with schema.
@@ -214,6 +226,7 @@ def init_db():
                 issue_number INTEGER,
                 nl_input TEXT,
                 github_url TEXT,
+                gh_issue_state TEXT,  -- GitHub issue state: 'open', 'closed', or NULL
                 workflow_template TEXT,
                 model_used TEXT,
                 status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'completed', 'failed')),
@@ -296,6 +309,15 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_workflow_template ON workflow_history(workflow_template)
         """)
 
+        # Migration: Add gh_issue_state column if it doesn't exist
+        try:
+            cursor.execute("SELECT gh_issue_state FROM workflow_history LIMIT 1")
+        except sqlite3.OperationalError:
+            # Column doesn't exist, add it
+            logger.info("[DB] Adding gh_issue_state column to workflow_history table")
+            cursor.execute("ALTER TABLE workflow_history ADD COLUMN gh_issue_state TEXT")
+            conn.commit()
+
         logger.info(f"[DB] Workflow history database initialized at {DB_PATH}")
 
 
@@ -333,11 +355,11 @@ def insert_workflow_history(
 
         # Build dynamic query based on provided kwargs
         fields = [
-            "adw_id", "issue_number", "nl_input", "github_url",
+            "adw_id", "issue_number", "nl_input", "github_url", "gh_issue_state",
             "workflow_template", "model_used", "status"
         ]
         values = [
-            adw_id, issue_number, nl_input, github_url,
+            adw_id, issue_number, nl_input, github_url, kwargs.get("gh_issue_state"),
             workflow_template, model_used, status
         ]
 
@@ -383,6 +405,54 @@ def insert_workflow_history(
 
         logger.info(f"[DB] Inserted workflow history for ADW {adw_id} (ID: {row_id})")
         return row_id
+
+
+def update_workflow_history_by_issue(
+    issue_number: int,
+    **kwargs
+) -> int:
+    """
+    Update all workflow history records for a given issue number.
+
+    Args:
+        issue_number: The GitHub issue number
+        **kwargs: Fields to update (gh_issue_state, etc.)
+
+    Returns:
+        int: Number of records updated
+    """
+    if not kwargs:
+        logger.warning(f"[DB] No fields provided to update for issue #{issue_number}")
+        return 0
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        # Build UPDATE query
+        set_clauses = []
+        values = []
+        for field, value in kwargs.items():
+            set_clauses.append(f"{field} = ?")
+            values.append(value)
+
+        set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+        values.append(issue_number)
+
+        query = f"""
+            UPDATE workflow_history
+            SET {", ".join(set_clauses)}
+            WHERE issue_number = ?
+        """
+
+        cursor.execute(query, values)
+        updated_count = cursor.rowcount
+
+        if updated_count > 0:
+            logger.info(f"[DB] Updated {updated_count} workflow(s) for issue #{issue_number}")
+        else:
+            logger.warning(f"[DB] No workflows found for issue #{issue_number}")
+
+        return updated_count
 
 
 def update_workflow_history(
@@ -925,6 +995,16 @@ def sync_workflow_history() -> int:
 
         except Exception as e:
             logger.debug(f"[SYNC] No cost data for {adw_id}: {e}")
+
+        # Fetch GitHub issue state if issue_number is available
+        if workflow_data.get("issue_number"):
+            try:
+                gh_state = fetch_github_issue_state(int(workflow_data["issue_number"]))
+                if gh_state:
+                    workflow_data["gh_issue_state"] = gh_state
+                    logger.debug(f"[SYNC] Fetched GitHub issue state for #{workflow_data['issue_number']}: {gh_state}")
+            except Exception as e:
+                logger.debug(f"[SYNC] Could not fetch GitHub issue state for {adw_id}: {e}")
 
         # Try to get estimated cost from storage (only for new workflows)
         if not existing and workflow_data.get("issue_number"):

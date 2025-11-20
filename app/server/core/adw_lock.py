@@ -8,28 +8,14 @@ processes a given issue at any time.
 
 import logging
 import sqlite3
-from contextlib import contextmanager
 from pathlib import Path
+
+from utils.db_connection import get_connection as get_db_connection
 
 logger = logging.getLogger(__name__)
 
 # Database path
 DB_PATH = Path(__file__).parent.parent / "db" / "database.db"
-
-
-@contextmanager
-def get_db_connection():
-    """Context manager for database connections"""
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        conn.close()
 
 
 def init_adw_locks_table() -> None:
