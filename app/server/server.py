@@ -747,21 +747,30 @@ async def get_workflow_analytics(adw_id: str) -> WorkflowAnalyticsDetail:
         if not workflow:
             raise HTTPException(status_code=404, detail=f"Workflow {adw_id} not found")
 
-        # Parse JSON fields
+        # Parse JSON fields (handle both string and already-parsed data)
         similar_workflow_ids = []
         if workflow.get("similar_workflow_ids"):
-            with suppress(json.JSONDecodeError):
-                similar_workflow_ids = json.loads(workflow["similar_workflow_ids"])
+            if isinstance(workflow["similar_workflow_ids"], list):
+                similar_workflow_ids = workflow["similar_workflow_ids"]
+            else:
+                with suppress(json.JSONDecodeError, TypeError):
+                    similar_workflow_ids = json.loads(workflow["similar_workflow_ids"])
 
         anomaly_flags = []
         if workflow.get("anomaly_flags"):
-            with suppress(json.JSONDecodeError):
-                anomaly_flags = json.loads(workflow["anomaly_flags"])
+            if isinstance(workflow["anomaly_flags"], list):
+                anomaly_flags = workflow["anomaly_flags"]
+            else:
+                with suppress(json.JSONDecodeError, TypeError):
+                    anomaly_flags = json.loads(workflow["anomaly_flags"])
 
         optimization_recommendations = []
         if workflow.get("optimization_recommendations"):
-            with suppress(json.JSONDecodeError):
-                optimization_recommendations = json.loads(workflow["optimization_recommendations"])
+            if isinstance(workflow["optimization_recommendations"], list):
+                optimization_recommendations = workflow["optimization_recommendations"]
+            else:
+                with suppress(json.JSONDecodeError, TypeError):
+                    optimization_recommendations = json.loads(workflow["optimization_recommendations"])
 
         analytics = WorkflowAnalyticsDetail(
             adw_id=adw_id,
