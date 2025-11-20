@@ -15,11 +15,13 @@ from typing import List, Tuple
 
 from core.data_models import (
     Route,
+    TrendDataPoint,
     Workflow,
     WorkflowHistoryAnalytics,
     WorkflowHistoryFilters,
     WorkflowHistoryItem,
     WorkflowHistoryResponse,
+    WorkflowTrends,
 )
 from core.workflow_history import (
     get_history_analytics,
@@ -299,3 +301,116 @@ class WorkflowService:
                 "sort_by": "created_at",
                 "sort_order": "DESC",
             }
+
+    def get_workflow_trends(self, days: int = 30, group_by: str = "day") -> WorkflowTrends:
+        """
+        Get trend data over time for workflows.
+
+        Args:
+            days: Number of days to look back (default: 30)
+            group_by: Grouping period - "hour", "day", or "week" (default: "day")
+
+        Returns:
+            WorkflowTrends object with cost, duration, success rate, and cache efficiency trends
+        """
+        from collections import defaultdict
+        from datetime import datetime, timedelta
+
+        # Calculate date range
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+
+        # Fetch workflows in date range
+        workflows, _ = get_workflow_history(
+            limit=10000,
+            offset=0,
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat()
+        )
+
+        # Group by time period
+        cost_by_period = defaultdict(lambda: {"total": 0.0, "count": 0})
+        duration_by_period = defaultdict(lambda: {"total": 0, "count": 0})
+        success_by_period = defaultdict(lambda: {"success": 0, "total": 0})
+        cache_by_period = defaultdict(lambda: {"total": 0.0, "count": 0})
+
+        for workflow in workflows:
+            if not workflow.get("created_at"):
+                continue
+
+            try:
+                created_dt = datetime.fromisoformat(workflow["created_at"].replace("Z", "+00:00"))
+
+                # Determine period key based on group_by
+                if group_by == "hour":
+                    period_key = created_dt.strftime("%Y-%m-%d %H:00")
+                elif group_by == "week":
+                    period_key = created_dt.strftime("%Y-W%U")
+                else:  # day
+                    period_key = created_dt.strftime("%Y-%m-%d")
+
+                # Aggregate metrics
+                if workflow.get("actual_cost_total"):
+                    cost_by_period[period_key]["total"] += workflow["actual_cost_total"]
+                    cost_by_period[period_key]["count"] += 1
+
+                if workflow.get("duration_seconds"):
+                    duration_by_period[period_key]["total"] += workflow["duration_seconds"]
+                    duration_by_period[period_key]["count"] += 1
+
+                if workflow.get("status") in ["completed", "failed"]:
+                    success_by_period[period_key]["total"] += 1
+                    if workflow["status"] == "completed":
+                        success_by_period[period_key]["success"] += 1
+
+                if workflow.get("cache_efficiency_percent") is not None:
+                    cache_by_period[period_key]["total"] += workflow["cache_efficiency_percent"]
+                    cache_by_period[period_key]["count"] += 1
+
+            except Exception as e:
+                logger.debug(f"Error processing workflow {workflow.get('adw_id')}: {e}")
+                continue
+
+        # Convert to trend data points
+        cost_trend = [
+            TrendDataPoint(
+                timestamp=period,
+                value=data["total"] / data["count"] if data["count"] > 0 else 0,
+                count=data["count"]
+            )
+            for period, data in sorted(cost_by_period.items())
+        ]
+
+        duration_trend = [
+            TrendDataPoint(
+                timestamp=period,
+                value=data["total"] / data["count"] if data["count"] > 0 else 0,
+                count=data["count"]
+            )
+            for period, data in sorted(duration_by_period.items())
+        ]
+
+        success_rate_trend = [
+            TrendDataPoint(
+                timestamp=period,
+                value=(data["success"] / data["total"] * 100) if data["total"] > 0 else 0,
+                count=data["total"]
+            )
+            for period, data in sorted(success_by_period.items())
+        ]
+
+        cache_efficiency_trend = [
+            TrendDataPoint(
+                timestamp=period,
+                value=data["total"] / data["count"] if data["count"] > 0 else 0,
+                count=data["count"]
+            )
+            for period, data in sorted(cache_by_period.items())
+        ]
+
+        return WorkflowTrends(
+            cost_trend=cost_trend,
+            duration_trend=duration_trend,
+            success_rate_trend=success_rate_trend,
+            cache_efficiency_trend=cache_efficiency_trend
+        )
