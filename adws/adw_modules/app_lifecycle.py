@@ -8,7 +8,6 @@ import os
 import subprocess
 import time
 import logging
-import requests
 from typing import Tuple, Optional, Dict, Any
 
 
@@ -124,8 +123,9 @@ def start_application(
 
     # Start application in background
     # The start.sh script automatically detects and uses .ports.env if present
-    result = subprocess.run(
-        ["nohup", "sh", "./scripts/start.sh"],
+    # Use Popen (not run) to truly detach without waiting for completion
+    subprocess.Popen(
+        ["sh", "./scripts/start.sh"],
         cwd=cwd,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -133,7 +133,7 @@ def start_application(
     )
 
     # Give services a moment to start
-    time.sleep(2)
+    time.sleep(5)  # Increased from 2 to 5 for reliable startup
 
     if logger:
         logger.info("Application started in background")
@@ -218,6 +218,8 @@ def wait_for_application_health(
     Returns:
         Tuple of (success, error_message)
     """
+    import requests  # Lazy import to avoid module-level dependency
+
     backend_health_url = f"http://localhost:{backend_port}/api/health"
     frontend_url = f"http://localhost:{frontend_port}"
 
