@@ -84,6 +84,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSock
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from services.background_tasks import BackgroundTaskManager
+from services.service_controller import ServiceController
 from services.websocket_manager import ConnectionManager
 from services.workflow_service import WorkflowService
 
@@ -155,6 +156,14 @@ os.makedirs("db", exist_ok=True)
 # Initialize services
 manager = ConnectionManager()
 workflow_service = WorkflowService()
+service_controller = ServiceController(
+    webhook_port=8001,
+    webhook_script_path="adw_triggers/trigger_webhook.py",
+    cloudflare_tunnel_token=os.environ.get("CLOUDFLARED_TUNNEL_TOKEN"),
+    github_pat=os.environ.get("GITHUB_PAT"),
+    github_repo="warmonger0/tac-webbuilder",
+    github_webhook_id=os.environ.get("GITHUB_WEBHOOK_ID", "580534779")
+)
 background_task_manager = BackgroundTaskManager(
     websocket_manager=manager,
     workflow_service=workflow_service,
@@ -633,331 +642,23 @@ async def get_system_status() -> SystemStatusResponse:
 
 @app.post("/api/services/webhook/start")
 async def start_webhook_service() -> dict:
-    """Start the webhook service on port 8001"""
-    try:
-        # Check if already running
-        result = subprocess.run(
-            ["lsof", "-i", ":8001"],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode == 0:
-            return {
-                "status": "already_running",
-                "message": "Webhook service is already running on port 8001"
-            }
-
-        # Get the adws directory path
-        server_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(server_dir)
-        adws_dir = os.path.join(project_root, "adws")
-
-        # Start the webhook service in background
-        subprocess.Popen(
-            ["uv", "run", "adw_triggers/trigger_webhook.py"],
-            cwd=adws_dir,
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-
-        # Wait a moment for service to start
-        import time
-        time.sleep(2)
-
-        # Verify it started
-        try:
-            with urllib.request.urlopen("http://localhost:8001/health", timeout=3) as response:
-                if response.status == 200:
-                    return {
-                        "status": "started",
-                        "message": "Webhook service started successfully on port 8001"
-                    }
-        except Exception:
-            pass
-
-        return {
-            "status": "started",
-            "message": "Webhook service start command issued (port 8001)"
-        }
-    except Exception as e:
-        logger.error(f"Failed to start webhook service: {e}")
-        return {
-            "status": "error",
-            "message": f"Failed to start webhook service: {str(e)}"
-        }
+    """Start the webhook service - delegates to ServiceController"""
+    return service_controller.start_webhook_service()
 
 @app.post("/api/services/cloudflare/restart")
 async def restart_cloudflare_tunnel() -> dict:
-    """Restart the Cloudflare tunnel"""
-    try:
-        # Check if CLOUDFLARED_TUNNEL_TOKEN is set
-        tunnel_token = os.environ.get("CLOUDFLARED_TUNNEL_TOKEN")
-        if not tunnel_token:
-            return {
-                "status": "error",
-                "message": "CLOUDFLARED_TUNNEL_TOKEN environment variable not set"
-            }
-
-        # Kill existing cloudflared process
-        subprocess.run(
-            ["pkill", "-f", "cloudflared tunnel run"],
-            capture_output=True
-        )
-
-        # Wait a moment
-        import time
-        time.sleep(1)
-
-        # Start new tunnel in background
-        subprocess.Popen(
-            ["cloudflared", "tunnel", "run", "--token", tunnel_token],
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-
-        time.sleep(2)
-
-        # Verify it's running
-        result = subprocess.run(
-            ["ps", "aux"],
-            capture_output=True,
-            text=True
-        )
-        if "cloudflared tunnel run" in result.stdout:
-            return {
-                "status": "restarted",
-                "message": "Cloudflare tunnel restarted successfully"
-            }
-
-        return {
-            "status": "started",
-            "message": "Cloudflare tunnel restart command issued"
-        }
-    except Exception as e:
-        logger.error(f"Failed to restart Cloudflare tunnel: {e}")
-        return {
-            "status": "error",
-            "message": f"Failed to restart Cloudflare tunnel: {str(e)}"
-        }
+    """Restart the Cloudflare tunnel - delegates to ServiceController"""
+    return service_controller.restart_cloudflare_tunnel()
 
 @app.get("/api/services/github-webhook/health")
 async def get_github_webhook_health() -> dict:
-    """Check GitHub webhook health by testing recent deliveries"""
-    try:
-        # Get GitHub PAT
-        github_pat = os.environ.get("GITHUB_PAT")
-        if not github_pat:
-            return {
-                "status": "error",
-                "message": "GITHUB_PAT not configured"
-            }
-
-        # Get webhook ID from environment or use default
-        webhook_id = os.environ.get("GITHUB_WEBHOOK_ID", "580534779")
-        repo = "warmonger0/tac-webbuilder"
-
-        # Check recent webhook deliveries using gh CLI
-        result = subprocess.run(
-            ["gh", "api", f"repos/{repo}/hooks/{webhook_id}/deliveries", "--jq", ".[0:5] | .[] | {id: .id, status: .status_code, delivered_at: .delivered_at}"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-
-        if result.returncode == 0:
-            deliveries_output = result.stdout.strip()
-            if deliveries_output:
-                # Parse the deliveries
-                deliveries = []
-                for line in deliveries_output.split('\n'):
-                    if line.strip():
-                        try:
-                            delivery = json.loads(line)
-                            deliveries.append(delivery)
-                        except json.JSONDecodeError:
-                            pass
-
-                # Check if most recent delivery was successful
-                if deliveries:
-                    latest = deliveries[0]
-                    status_code = latest.get('status', 0)
-
-                    if status_code == 200:
-                        status = "healthy"
-                        message = f"Latest delivery successful (HTTP {status_code})"
-                    elif status_code >= 500:
-                        status = "error"
-                        message = f"Latest delivery failed with HTTP {status_code} (Server Error)"
-                    elif status_code >= 400:
-                        status = "degraded"
-                        message = f"Latest delivery failed with HTTP {status_code} (Client Error)"
-                    else:
-                        status = "unknown"
-                        message = f"Latest delivery status: HTTP {status_code}"
-
-                    return {
-                        "status": status,
-                        "message": message,
-                        "webhook_url": "https://webhook.directmyagent.com",
-                        "recent_deliveries": deliveries[:3],
-                        "webhook_id": webhook_id
-                    }
-
-        # Fallback: try to ping the webhook endpoint directly
-        try:
-            with urllib.request.urlopen("https://webhook.directmyagent.com/health", timeout=3) as response:
-                if response.status == 200:
-                    return {
-                        "status": "healthy",
-                        "message": "Webhook endpoint is accessible",
-                        "webhook_url": "https://webhook.directmyagent.com"
-                    }
-        except Exception:
-            pass
-
-        return {
-            "status": "unknown",
-            "message": "Unable to verify webhook health"
-        }
-    except Exception as e:
-        logger.error(f"Failed to check GitHub webhook health: {e}")
-        return {
-            "status": "error",
-            "message": f"Health check failed: {str(e)}"
-        }
+    """Check GitHub webhook health - delegates to ServiceController"""
+    return service_controller.get_github_webhook_health()
 
 @app.post("/api/services/github-webhook/redeliver")
 async def redeliver_github_webhook() -> dict:
-    """
-    Redeliver the most recent failed GitHub webhook with intelligent diagnostics.
-
-    This endpoint will:
-    1. Check if webhook and tunnel services are healthy
-    2. Automatically restart services if they're down (best effort)
-    3. Redeliver the most recent failed webhook delivery
-    4. Provide detailed diagnostics about any issues
-    """
-    import subprocess
-    import urllib.error
-    import urllib.request
-
-    try:
-        diagnostics = []
-        auto_fix_attempted = False
-
-        # Step 1: Check webhook service health
-        webhook_healthy = False
-        try:
-            with urllib.request.urlopen("http://localhost:8001/webhook-status", timeout=2) as response:
-                webhook_healthy = response.status == 200
-                diagnostics.append("✓ Webhook service is running (port 8001)")
-        except urllib.error.URLError:
-            diagnostics.append("✗ Webhook service is DOWN (port 8001)")
-            auto_fix_attempted = True
-            # Attempt to restart webhook service
-            try:
-                restart_result = subprocess.run(
-                    ["bash", "-c", "cd adws && uv run adw_triggers/trigger_webhook.py &"],
-                    capture_output=True,
-                    text=True,
-                    timeout=3
-                )
-                diagnostics.append("⚙ Attempted to restart webhook service")
-            except Exception:
-                diagnostics.append("✗ Failed to restart webhook service automatically")
-
-        # Step 2: Check Cloudflare tunnel health
-        tunnel_healthy = False
-        try:
-            result = subprocess.run(
-                ["ps", "aux"],
-                capture_output=True,
-                text=True,
-                timeout=2
-            )
-            tunnel_healthy = "cloudflared tunnel run" in result.stdout
-            if tunnel_healthy:
-                diagnostics.append("✓ Cloudflare tunnel is running")
-            else:
-                diagnostics.append("✗ Cloudflare tunnel is DOWN")
-        except Exception:
-            diagnostics.append("? Unable to check Cloudflare tunnel status")
-
-        # Step 3: Check public webhook endpoint
-        public_endpoint_healthy = False
-        try:
-            with urllib.request.urlopen("https://webhook.directmyagent.com/webhook-status", timeout=3) as response:
-                public_endpoint_healthy = response.status == 200
-                diagnostics.append("✓ Public webhook endpoint is accessible")
-        except Exception as e:
-            diagnostics.append(f"✗ Public webhook endpoint failed: {str(e)[:50]}")
-
-        # Step 4: Get webhook info and attempt redelivery
-        webhook_id = os.environ.get("GITHUB_WEBHOOK_ID", "580534779")
-        repo = "warmonger0/tac-webbuilder"
-
-        # Get most recent failed delivery
-        result = subprocess.run(
-            ["gh", "api", f"repos/{repo}/hooks/{webhook_id}/deliveries", "--jq", '.[] | select(.status_code != 200) | .id'],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-
-        if result.returncode == 0 and result.stdout.strip():
-            delivery_id = result.stdout.strip().split('\n')[0]
-            diagnostics.append(f"Found failed delivery: {delivery_id}")
-
-            # Only attempt redelivery if services are healthy
-            if not webhook_healthy or not tunnel_healthy:
-                return {
-                    "status": "warning",
-                    "message": "Services need attention before redelivery",
-                    "diagnostics": diagnostics,
-                    "recommendations": [
-                        "Webhook service is down - restart it" if not webhook_healthy else None,
-                        "Cloudflare tunnel is down - restart it" if not tunnel_healthy else None,
-                    ]
-                }
-
-            # Redeliver
-            redeliver_result = subprocess.run(
-                ["gh", "api", "-X", "POST", f"repos/{repo}/hooks/{webhook_id}/deliveries/{delivery_id}/attempts"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-
-            if redeliver_result.returncode == 0:
-                return {
-                    "status": "success",
-                    "message": "Webhook redelivered successfully",
-                    "diagnostics": diagnostics,
-                    "delivery_id": delivery_id
-                }
-            else:
-                diagnostics.append(f"✗ Redelivery failed: {redeliver_result.stderr}")
-                return {
-                    "status": "error",
-                    "message": "Failed to redeliver webhook",
-                    "diagnostics": diagnostics
-                }
-
-        diagnostics.append("No failed deliveries found to redeliver")
-        return {
-            "status": "info",
-            "message": "No failed deliveries to redeliver (all recent deliveries succeeded)",
-            "diagnostics": diagnostics
-        }
-    except Exception as e:
-        logger.error(f"Failed to redeliver webhook: {e}")
-        return {
-            "status": "error",
-            "message": f"Redelivery failed: {str(e)}",
-            "diagnostics": diagnostics if 'diagnostics' in locals() else []
-        }
+    """Redeliver GitHub webhook - delegates to ServiceController"""
+    return service_controller.redeliver_github_webhook()
 
 @app.get("/api/routes", response_model=RoutesResponse)
 async def get_routes() -> RoutesResponse:

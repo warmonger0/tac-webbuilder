@@ -8,6 +8,7 @@ and background task management.
 
 from services.background_tasks import BackgroundTaskManager
 from services.health_service import HealthService
+from services.service_controller import ServiceController
 from services.websocket_manager import ConnectionManager
 from services.workflow_service import WorkflowService
 
@@ -15,5 +16,6 @@ __all__ = [
     "BackgroundTaskManager",
     "ConnectionManager",
     "HealthService",
+    "ServiceController",
     "WorkflowService",
 ]
