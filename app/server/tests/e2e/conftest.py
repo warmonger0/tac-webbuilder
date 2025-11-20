@@ -714,7 +714,10 @@ def response_validator():
             assert response.status_code == 200
             data = response.json()
             assert "status" in data
-            assert data["status"] in ["healthy", "degraded", "unhealthy"]
+            # HealthCheckResponse uses "ok" or "error", not "healthy"/"degraded"/"unhealthy"
+            assert data["status"] in ["ok", "error"]
+            assert "database_connected" in data
+            assert "tables_count" in data
 
         @staticmethod
         def validate_workflow_response(response):
