@@ -25,7 +25,7 @@ def init_adw_locks_table() -> None:
     This table tracks active ADW instances per issue to prevent
     concurrent workflows from competing for the same work.
     """
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -60,7 +60,7 @@ def acquire_lock(issue_number: int, adw_id: str, github_url: str | None = None) 
     Returns:
         True if lock acquired successfully, False if issue is already locked
     """
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         # Check if there's an existing lock for this issue
@@ -108,7 +108,7 @@ def update_lock_status(issue_number: int, adw_id: str, new_status: str) -> bool:
     Returns:
         True if update successful, False if no matching lock found
     """
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -139,7 +139,7 @@ def release_lock(issue_number: int, adw_id: str) -> bool:
     Returns:
         True if lock released successfully, False if no matching lock found
     """
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -171,7 +171,7 @@ def force_release_lock(issue_number: int) -> bool:
     Returns:
         True if lock released, False if no lock existed
     """
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -194,7 +194,7 @@ def get_active_locks() -> list[dict]:
     Returns:
         List of dictionaries containing lock information
     """
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -233,7 +233,7 @@ def cleanup_stale_locks(max_age_hours: int = 24) -> int:
     Returns:
         Number of stale locks cleaned up
     """
-    with get_db_connection() as conn:
+    with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
         cursor.execute("""
