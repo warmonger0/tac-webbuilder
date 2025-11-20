@@ -1,8 +1,51 @@
 {
-  "adw_id": "7dc3d593",
-  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/7dc3d593",
-  "created_at": "2025-11-19T04:58:13.741751",
+  "adw_id": "63f8bd05",
+  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/63f8bd05",
+  "created_at": "2025-11-19T16:20:30.670943",
+  "spec_file": "/Users/Warmonger0/tac/tac-webbuilder/trees/63f8bd05/specs/patch/patch-adw-63f8bd05-request-1-3-migrate-core-modules-to-database-conne.md",
   "changed_files": [
-    ".mcp.json"
-  ]
+    ".adw-context.json",
+    ".mcp.json",
+    "app/server/core/insights.py",
+    "app/server/core/sql_processor.py",
+    "app/server/server.py",
+    "app/server/tests/core/test_sql_processor.py",
+    "app/server/tests/test_sql_injection.py",
+    "specs/patch/patch-adw-63f8bd05-request-1-3-migrate-core-modules-to-database-conne.md"
+  ],
+  "changed_files_stats": {
+    ".adw-context.json": {
+      "additions": 16,
+      "deletions": 5
+    },
+    ".mcp.json": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/core/insights.py": {
+      "additions": 88,
+      "deletions": 89
+    },
+    "app/server/core/sql_processor.py": {
+      "additions": 74,
+      "deletions": 79
+    },
+    "app/server/server.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/tests/core/test_sql_processor.py": {
+      "additions": 3,
+      "deletions": 3
+    },
+    "app/server/tests/test_sql_injection.py": {
+      "additions": 4,
+      "deletions": 4
+    },
+    "specs/patch/patch-adw-63f8bd05-request-1-3-migrate-core-modules-to-database-conne.md": {
+      "additions": 71,
+      "deletions": 0
+    }
+  },
+  "documentation_screenshots_dir": "/Users/Warmonger0/tac/tac-webbuilder/trees/63f8bd05/agents/63f8bd05/reviewer/review_img"
 }

@@ -193,6 +193,15 @@
 - `app_docs/feature-04a76d25-validation-optimization-routes-viz.md` - API routes visualization, AST parsing, routes_analyzer.py, Routes tab UI
 - `app_docs/feature-4fc73599-api-routes-display.md` - Dynamic API routes introspection, /api/routes endpoint, route display functionality, FastAPI route discovery
 
+### Database & Infrastructure Features
+- `app_docs/feature-63f8bd05-db-connection-migration.md` - Database connection utility migration, centralized connection management, get_connection() context manager
+  - Conditions:
+    - Working with database connections in core modules
+    - Implementing new database operations
+    - Refactoring database code to use centralized utilities
+    - Troubleshooting connection management issues
+    - Understanding utils.db_connection patterns
+
 ### Templates & Integration Features
 - `app_docs/feature-0f04f66d-project-templates-docs.md` - Project templates, scaffolding scripts, setup_new_project.sh
 - `templates/existing_webapp/integration_guide.md` - Integrating ADW into existing projects

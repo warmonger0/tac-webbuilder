@@ -42,7 +42,7 @@ def test_db():
     conn.commit()
 
     # Patch the database connection to use our in-memory database
-    with patch('core.sql_processor.sqlite3.connect') as mock_connect:
+    with patch('utils.db_connection.sqlite3.connect') as mock_connect:
         mock_connect.return_value = conn
         yield conn
 
@@ -149,7 +149,7 @@ class TestSQLProcessor:
 
     def test_get_database_schema_empty_database(self):
         # Test with empty in-memory database
-        with patch('core.sql_processor.sqlite3.connect') as mock_connect:
+        with patch('utils.db_connection.sqlite3.connect') as mock_connect:
             conn = sqlite3.connect(':memory:')
             mock_connect.return_value = conn
 
@@ -158,7 +158,7 @@ class TestSQLProcessor:
 
     def test_get_database_schema_error(self):
         # Test database connection error
-        with patch('core.sql_processor.sqlite3.connect', side_effect=sqlite3.Error("Connection failed")):
+        with patch('utils.db_connection.sqlite3.connect', side_effect=sqlite3.Error("Connection failed")):
             result = get_database_schema()
 
             assert result == {'tables': {}, 'error': 'Connection failed'}

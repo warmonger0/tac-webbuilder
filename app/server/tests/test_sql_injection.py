@@ -200,7 +200,7 @@ class TestSQLSecurityModule:
 class TestSQLProcessorSecurity:
     """Test SQL processor with security enhancements"""
 
-    @patch('core.sql_processor.sqlite3.connect')
+    @patch('utils.db_connection.sqlite3.connect')
     def test_execute_sql_safely_blocks_dangerous_queries(self, mock_connect):
         """Test that dangerous SQL queries are blocked"""
         # Test DROP statement
@@ -218,7 +218,7 @@ class TestSQLProcessorSecurity:
         assert result['error'] is not None
         assert "Security error" in result['error']
 
-    @patch('core.sql_processor.sqlite3.connect')
+    @patch('utils.db_connection.sqlite3.connect')
     def test_execute_sql_safely_allows_select(self, mock_connect):
         """Test that safe SELECT queries are allowed"""
         mock_conn = MagicMock()
@@ -258,14 +258,14 @@ class TestFileProcessorSecurity:
 class TestInsightsSecurity:
     """Test insights module with security enhancements"""
 
-    @patch('core.insights.sqlite3.connect')
+    @patch('utils.db_connection.sqlite3.connect')
     def test_generate_insights_validates_table_name(self, mock_connect):
         """Test that table names are validated"""
         with pytest.raises(Exception) as exc_info:
             generate_insights("users'; DROP TABLE users; --")
         assert "Invalid" in str(exc_info.value)
 
-    @patch('core.insights.sqlite3.connect')
+    @patch('utils.db_connection.sqlite3.connect')
     def test_generate_insights_validates_column_names(self, mock_connect):
         """Test that column names are validated"""
         mock_conn = MagicMock()
