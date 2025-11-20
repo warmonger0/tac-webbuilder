@@ -83,7 +83,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from services.background_tasks import BackgroundTaskManager
 from services.websocket_manager import ConnectionManager
+from services.workflow_service import WorkflowService
 
 from utils.db_connection import get_connection
 
@@ -108,10 +110,6 @@ logging.basicConfig(
 # Create logger for this module
 logger = logging.getLogger(__name__)
 
-# Cache for workflow history sync to prevent redundant operations
-_last_sync_time = 0
-_sync_cache_seconds = 10  # Only sync once every 10 seconds
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
@@ -119,24 +117,16 @@ async def lifespan(app: FastAPI):
     init_workflow_history_db()
     logger.info("[STARTUP] Workflow history database initialized")
 
-    # Start background watchers and store references for cleanup
-    watcher_tasks = [
-        asyncio.create_task(watch_workflows()),
-        asyncio.create_task(watch_routes()),
-        asyncio.create_task(watch_workflow_history())
-    ]
+    # Start background watchers using BackgroundTaskManager
+    watcher_tasks = await background_task_manager.start_all()
     logger.info("[STARTUP] Workflow, routes, and history watchers started")
 
     yield
 
-    # Shutdown: Cancel background tasks
-    logger.info("[SHUTDOWN] Application shutting down, cancelling background tasks...")
-    for task in watcher_tasks:
-        task.cancel()
-
-    # Wait for all tasks to be cancelled
-    await asyncio.gather(*watcher_tasks, return_exceptions=True)
-    logger.info("[SHUTDOWN] All background tasks cancelled")
+    # Shutdown: Stop background tasks using BackgroundTaskManager
+    logger.info("[SHUTDOWN] Application shutting down, stopping background tasks...")
+    await background_task_manager.stop_all()
+    logger.info("[SHUTDOWN] All background tasks stopped")
 
 app = FastAPI(
     title="Natural Language SQL Interface",
@@ -162,263 +152,51 @@ pending_requests = {}  # Store pending GitHub issue requests
 # Ensure database directory exists
 os.makedirs("db", exist_ok=True)
 
-# WebSocket connection manager
+# Initialize services
 manager = ConnectionManager()
+workflow_service = WorkflowService()
+background_task_manager = BackgroundTaskManager(
+    websocket_manager=manager,
+    workflow_service=workflow_service,
+    workflow_watch_interval=10.0,
+    routes_watch_interval=10.0,
+    history_watch_interval=10.0,
+)
+# Set app reference for routes introspection (done after app is created above)
+background_task_manager.set_app(app)
+
+# LEGACY WRAPPER FUNCTIONS
+# These maintain backwards compatibility with existing code
+# All logic has been moved to services
 
 def get_workflows_data() -> list[Workflow]:
-    """Helper function to get workflow data - only returns OPEN workflows"""
-    workflows = []
-    agents_dir = os.path.join(os.path.dirname(__file__), "..", "..", "agents")
+    """
+    Legacy wrapper - delegates to WorkflowService
 
-    # Check if agents directory exists
-    if not os.path.exists(agents_dir):
-        return []
-
-    # Scan for workflow directories
-    for adw_id in os.listdir(agents_dir):
-        adw_dir = os.path.join(agents_dir, adw_id)
-        state_file = os.path.join(adw_dir, "adw_state.json")
-
-        # Skip if not a directory or no state file
-        if not os.path.isdir(adw_dir) or not os.path.exists(state_file):
-            continue
-
-        # Read state file
-        try:
-            with open(state_file) as f:
-                state = json.load(f)
-
-            # Validate issue_number - must be convertible to int
-            issue_num_raw = state.get("issue_number", 0)
-            try:
-                issue_number = int(issue_num_raw)
-            except (ValueError, TypeError):
-                # Skip workflows with invalid issue numbers (debug workflows, tests, etc.)
-                logger.debug(f"[WORKFLOW] Skipping workflow {adw_id} with invalid issue_number: {issue_num_raw}")
-                continue
-
-            # Note: We no longer check GitHub issue status in the watch loop
-            # This was causing blocking subprocess calls every 2 seconds (24 workflows × 5s = 120s!)
-            # Workflow status comes from adw_state.json instead
-
-            # Determine current phase by checking which phase directories exist
-            phase_order = ["plan", "build", "test", "review", "document", "ship"]
-            current_phase = "plan"  # Default
-
-            for phase in reversed(phase_order):
-                phase_dir = os.path.join(adw_dir, f"adw_{phase}_iso")
-                if os.path.exists(phase_dir):
-                    current_phase = phase
-                    break
-
-            # Get GitHub repo from git config
-            github_repo = os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder")
-            github_url = f"https://github.com/{github_repo}/issues/{issue_number}"
-
-            # Create workflow object
-            workflow = Workflow(
-                adw_id=state["adw_id"],
-                issue_number=issue_number,
-                phase=current_phase,
-                github_url=github_url
-            )
-            workflows.append(workflow)
-
-        except Exception as e:
-            logger.error(f"[ERROR] Failed to process workflow {adw_id}: {str(e)}")
-            continue
-
-    return workflows
+    DEPRECATED: Use workflow_service.get_workflows() directly
+    """
+    return workflow_service.get_workflows()
 
 def get_routes_data() -> list[Route]:
-    """Helper function to get API routes data"""
-    route_list = []
+    """
+    Legacy wrapper - delegates to WorkflowService
 
-    try:
-        # Introspect FastAPI routes
-        for route in app.routes:
-            # Filter for HTTP routes (not WebSocket, static, etc.)
-            if hasattr(route, "methods") and hasattr(route, "path"):
-                # Skip internal routes
-                if route.path.startswith("/docs") or route.path.startswith("/redoc") or route.path.startswith("/openapi"):
-                    continue
-
-                # Extract route information
-                for method in route.methods:
-                    # Skip OPTIONS method (automatically added by CORS)
-                    if method == "OPTIONS":
-                        continue
-
-                    # Get handler name
-                    handler_name = route.endpoint.__name__ if hasattr(route, "endpoint") else "unknown"
-
-                    # Get description from docstring
-                    description = ""
-                    if hasattr(route, "endpoint") and route.endpoint.__doc__:
-                        # Get first line of docstring
-                        description = route.endpoint.__doc__.strip().split("\n")[0].strip()
-
-                    route_info = Route(
-                        method=method,
-                        path=route.path,
-                        handler=handler_name,
-                        description=description
-                    )
-                    route_list.append(route_info)
-    except Exception as e:
-        logger.error(f"[ERROR] Failed to get routes data: {str(e)}")
-
-    return route_list
-
-async def watch_workflows() -> None:
-    """Background task to watch for workflow changes and broadcast updates"""
-    try:
-        while True:
-            try:
-                if len(manager.active_connections) > 0:
-                    workflows = get_workflows_data()
-
-                    # Convert to dict for comparison
-                    current_state = json.dumps([w.model_dump() for w in workflows], sort_keys=True)
-
-                    # Only broadcast if state changed
-                    if current_state != manager.last_workflow_state:
-                        manager.last_workflow_state = current_state
-                        await manager.broadcast({
-                            "type": "workflows_update",
-                            "data": [w.model_dump() for w in workflows]
-                        })
-                        logger.info(f"[WS] Broadcasted workflow update to {len(manager.active_connections)} clients")
-
-                await asyncio.sleep(10)  # Check every 10 seconds
-            except Exception as e:
-                logger.error(f"[WS] Error in workflow watcher: {e}")
-                await asyncio.sleep(5)  # Back off on error
-    except asyncio.CancelledError:
-        logger.info("[WS] Workflow watcher cancelled")
-
-async def watch_routes() -> None:
-    """Background task to watch for route changes and broadcast updates"""
-    try:
-        while True:
-            try:
-                if len(manager.active_connections) > 0:
-                    routes = get_routes_data()
-
-                    # Convert to dict for comparison
-                    current_state = json.dumps([r.model_dump() for r in routes], sort_keys=True)
-
-                    # Only broadcast if state changed
-                    if current_state != manager.last_routes_state:
-                        manager.last_routes_state = current_state
-                        await manager.broadcast({
-                            "type": "routes_update",
-                            "data": [r.model_dump() for r in routes]
-                        })
-                        logger.info(f"[WS] Broadcasted routes update to {len(manager.active_connections)} clients")
-
-                await asyncio.sleep(10)  # Check every 10 seconds
-            except Exception as e:
-                logger.error(f"[WS] Error in routes watcher: {e}")
-                await asyncio.sleep(5)  # Back off on error
-    except asyncio.CancelledError:
-        logger.info("[WS] Routes watcher cancelled")
+    DEPRECATED: Use workflow_service.get_routes(app) directly
+    """
+    return workflow_service.get_routes(app)
 
 def get_workflow_history_data(filters: WorkflowHistoryFilters | None = None) -> tuple[WorkflowHistoryResponse, bool]:
-    """Helper function to get workflow history data
+    """
+    Legacy wrapper - delegates to WorkflowService
+
+    DEPRECATED: Use workflow_service.get_workflow_history_with_cache() directly
 
     Returns:
         tuple: (WorkflowHistoryResponse, did_sync: bool) - did_sync indicates if sync found changes
     """
-    global _last_sync_time
+    return workflow_service.get_workflow_history_with_cache(filters)
 
-    did_sync = False
-    try:
-        # Only sync if cache has expired (prevents redundant syncs on rapid requests)
-        current_time = time.time()
-        if current_time - _last_sync_time >= _sync_cache_seconds:
-            logger.debug(f"[SYNC] Cache expired, syncing workflow history (last sync {current_time - _last_sync_time:.1f}s ago)")
-            synced_count = sync_workflow_history()
-            _last_sync_time = current_time
-            did_sync = synced_count > 0  # Only True if actual changes were found
-        else:
-            logger.debug(f"[SYNC] Using cached data (last sync {current_time - _last_sync_time:.1f}s ago)")
-
-        # Apply filters if provided
-        filter_params = {}
-        if filters:
-            filter_params = {
-                'limit': filters.limit or 20,
-                'offset': filters.offset or 0,
-                'status': filters.status,
-                'model': filters.model,
-                'template': filters.template,
-                'start_date': filters.start_date,
-                'end_date': filters.end_date,
-                'search': filters.search,
-                'sort_by': filters.sort_by or 'created_at',
-                'sort_order': filters.sort_order or 'DESC',
-            }
-        else:
-            filter_params = {'limit': 20, 'offset': 0, 'sort_by': 'created_at', 'sort_order': 'DESC'}
-
-        # Get workflow history
-        workflows, total_count = get_workflow_history(**filter_params)
-
-        # Get analytics
-        analytics = get_history_analytics()
-
-        # Convert database rows to Pydantic models
-        workflow_items = [WorkflowHistoryItem(**workflow) for workflow in workflows]
-        analytics_model = WorkflowHistoryAnalytics(**analytics)
-
-        return (
-            WorkflowHistoryResponse(
-                workflows=workflow_items,
-                total_count=total_count,
-                analytics=analytics_model
-            ),
-            did_sync
-        )
-    except Exception as e:
-        logger.error(f"[ERROR] Failed to get workflow history data: {str(e)}")
-        # Return empty response on error
-        return (
-            WorkflowHistoryResponse(
-                workflows=[],
-                total_count=0,
-                analytics=WorkflowHistoryAnalytics()
-            ),
-            False
-        )
-
-async def watch_workflow_history() -> None:
-    """Background task to watch for workflow history changes and broadcast updates"""
-    try:
-        while True:
-            try:
-                if len(manager.active_connections) > 0:
-                    # Get latest workflow history - did_sync tells us if anything changed
-                    history_data, did_sync = get_workflow_history_data(WorkflowHistoryFilters(limit=50, offset=0))
-
-                    # Only broadcast if sync found actual changes
-                    if did_sync:
-                        await manager.broadcast({
-                            "type": "workflow_history_update",
-                            "data": {
-                                "workflows": [w.model_dump() for w in history_data.workflows],
-                                "total_count": history_data.total_count,
-                                "analytics": history_data.analytics.model_dump()
-                            }
-                        })
-                        logger.info(f"[WS] Broadcasted workflow history update to {len(manager.active_connections)} clients")
-
-                await asyncio.sleep(10)  # Check every 10 seconds (increased from 2s)
-            except Exception as e:
-                logger.error(f"[WS] Error in workflow history watcher: {e}")
-                await asyncio.sleep(5)  # Back off on error
-    except asyncio.CancelledError:
-        logger.info("[WS] Workflow history watcher cancelled")
+# API ENDPOINTS START HERE
 
 @app.post("/api/upload", response_model=FileUploadResponse)
 async def upload_file(file: UploadFile = File(...)) -> FileUploadResponse:
@@ -2092,4 +1870,19 @@ async def confirm_and_post_issue(request_id: str) -> ConfirmResponse:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=int(os.environ.get("BACKEND_PORT", "8000")), reload=True)
+    uvicorn.run(
+        "server:app",
+        host="0.0.0.0",
+        port=int(os.environ.get("BACKEND_PORT", "8000")),
+        reload=True,
+        reload_excludes=[
+            "tests/*",
+            "*.log",
+            "*.db",
+            "*.db-journal",
+            "__pycache__/*",
+            ".pytest_cache/*",
+            "coverage/*",
+            ".coverage",
+        ]
+    )
