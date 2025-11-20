@@ -61,6 +61,7 @@ def mock_db():
         CREATE TABLE workflow_history (
             workflow_id TEXT PRIMARY KEY,
             error_count INTEGER,
+            error_message TEXT,
             duration_seconds INTEGER,
             retry_count INTEGER,
             total_tokens INTEGER,

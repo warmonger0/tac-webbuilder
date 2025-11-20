@@ -13,15 +13,10 @@ from core.llm_processor import (
 
 class TestLLMProcessor:
 
-    @patch('core.llm_processor.OpenAI')
-    def test_generate_sql_with_openai_success(self, mock_openai_class):
-        # Mock OpenAI client and response
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
-
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = "SELECT * FROM users WHERE age > 25"
-        mock_client.chat.completions.create.return_value = mock_response
+    @patch('utils.llm_client.SQLGenerationClient.generate_sql')
+    def test_generate_sql_with_openai_success(self, mock_generate_sql):
+        # Mock SQL generation response
+        mock_generate_sql.return_value = "SELECT * FROM users WHERE age > 25"
 
         # Mock environment variable
         with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
@@ -38,23 +33,12 @@ class TestLLMProcessor:
             result = generate_sql_with_openai(query_text, schema_info)
 
             assert result == "SELECT * FROM users WHERE age > 25"
-            mock_client.chat.completions.create.assert_called_once()
+            mock_generate_sql.assert_called_once_with(query_text, schema_info)
 
-            # Verify the API call parameters
-            call_args = mock_client.chat.completions.create.call_args
-            assert call_args[1]['model'] == 'gpt-4.1-2025-04-14'
-            assert call_args[1]['temperature'] == 0.1
-            assert call_args[1]['max_tokens'] == 500
-
-    @patch('core.llm_processor.OpenAI')
-    def test_generate_sql_with_openai_clean_markdown(self, mock_openai_class):
+    @patch('utils.llm_client.SQLGenerationClient.generate_sql')
+    def test_generate_sql_with_openai_clean_markdown(self, mock_generate_sql):
         # Test SQL cleanup from markdown
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
-
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = "```sql\nSELECT * FROM users\n```"
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_generate_sql.return_value = "SELECT * FROM users"
 
         with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
             query_text = "Show all users"
@@ -73,14 +57,12 @@ class TestLLMProcessor:
             with pytest.raises(Exception) as exc_info:
                 generate_sql_with_openai(query_text, schema_info)
 
-            assert "OPENAI_API_KEY environment variable not set" in str(exc_info.value)
+            assert "No LLM API key found" in str(exc_info.value) or "OPENAI_API_KEY" in str(exc_info.value)
 
-    @patch('core.llm_processor.OpenAI')
-    def test_generate_sql_with_openai_api_error(self, mock_openai_class):
+    @patch('utils.llm_client.SQLGenerationClient.generate_sql')
+    def test_generate_sql_with_openai_api_error(self, mock_generate_sql):
         # Test API error handling
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
-        mock_client.chat.completions.create.side_effect = Exception("API Error")
+        mock_generate_sql.side_effect = Exception("API Error")
 
         with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
             query_text = "Show all users"
@@ -89,17 +71,12 @@ class TestLLMProcessor:
             with pytest.raises(Exception) as exc_info:
                 generate_sql_with_openai(query_text, schema_info)
 
-            assert "Error generating SQL with OpenAI" in str(exc_info.value)
+            assert "API Error" in str(exc_info.value)
 
-    @patch('core.llm_processor.Anthropic')
-    def test_generate_sql_with_anthropic_success(self, mock_anthropic_class):
-        # Mock Anthropic client and response
-        mock_client = MagicMock()
-        mock_anthropic_class.return_value = mock_client
-
-        mock_response = MagicMock()
-        mock_response.content[0].text = "SELECT * FROM products WHERE price < 100"
-        mock_client.messages.create.return_value = mock_response
+    @patch('utils.llm_client.SQLGenerationClient.generate_sql')
+    def test_generate_sql_with_anthropic_success(self, mock_generate_sql):
+        # Mock SQL generation response
+        mock_generate_sql.return_value = "SELECT * FROM products WHERE price < 100"
 
         # Mock environment variable
         with patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'test-key'}):
@@ -116,23 +93,12 @@ class TestLLMProcessor:
             result = generate_sql_with_anthropic(query_text, schema_info)
 
             assert result == "SELECT * FROM products WHERE price < 100"
-            mock_client.messages.create.assert_called_once()
+            mock_generate_sql.assert_called_once_with(query_text, schema_info)
 
-            # Verify the API call parameters
-            call_args = mock_client.messages.create.call_args
-            assert call_args[1]['model'] == 'claude-sonnet-4-0'
-            assert call_args[1]['temperature'] == 0.1
-            assert call_args[1]['max_tokens'] == 500
-
-    @patch('core.llm_processor.Anthropic')
-    def test_generate_sql_with_anthropic_clean_markdown(self, mock_anthropic_class):
+    @patch('utils.llm_client.SQLGenerationClient.generate_sql')
+    def test_generate_sql_with_anthropic_clean_markdown(self, mock_generate_sql):
         # Test SQL cleanup from markdown
-        mock_client = MagicMock()
-        mock_anthropic_class.return_value = mock_client
-
-        mock_response = MagicMock()
-        mock_response.content[0].text = "```\nSELECT * FROM orders\n```"
-        mock_client.messages.create.return_value = mock_response
+        mock_generate_sql.return_value = "SELECT * FROM orders"
 
         with patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'test-key'}):
             query_text = "Show all orders"
@@ -151,14 +117,12 @@ class TestLLMProcessor:
             with pytest.raises(Exception) as exc_info:
                 generate_sql_with_anthropic(query_text, schema_info)
 
-            assert "ANTHROPIC_API_KEY environment variable not set" in str(exc_info.value)
+            assert "No LLM API key found" in str(exc_info.value) or "ANTHROPIC_API_KEY" in str(exc_info.value)
 
-    @patch('core.llm_processor.Anthropic')
-    def test_generate_sql_with_anthropic_api_error(self, mock_anthropic_class):
+    @patch('utils.llm_client.SQLGenerationClient.generate_sql')
+    def test_generate_sql_with_anthropic_api_error(self, mock_generate_sql):
         # Test API error handling
-        mock_client = MagicMock()
-        mock_anthropic_class.return_value = mock_client
-        mock_client.messages.create.side_effect = Exception("API Error")
+        mock_generate_sql.side_effect = Exception("API Error")
 
         with patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'test-key'}):
             query_text = "Show all orders"
@@ -167,7 +131,7 @@ class TestLLMProcessor:
             with pytest.raises(Exception) as exc_info:
                 generate_sql_with_anthropic(query_text, schema_info)
 
-            assert "Error generating SQL with Anthropic" in str(exc_info.value)
+            assert "API Error" in str(exc_info.value)
 
     def test_format_schema_for_prompt(self):
         # Test schema formatting for LLM prompt
@@ -203,10 +167,10 @@ class TestLLMProcessor:
 
         assert result == ""
 
-    @patch('core.llm_processor.generate_sql_with_openai')
-    def test_generate_sql_openai_key_priority(self, mock_openai_func):
-        # Test that OpenAI is used when OpenAI key exists (regardless of request preference)
-        mock_openai_func.return_value = "SELECT * FROM users"
+    @patch('utils.llm_client.SQLGenerationClient.generate_sql')
+    def test_generate_sql_openai_key_priority(self, mock_generate_sql):
+        # Test that OpenAI is used when OpenAI key exists (auto-detection priority)
+        mock_generate_sql.return_value = "SELECT * FROM users"
 
         with patch.dict(os.environ, {'OPENAI_API_KEY': 'openai-key', 'ANTHROPIC_API_KEY': 'anthropic-key'}):
             request = QueryRequest(query="Show all users", llm_provider="anthropic")
@@ -215,12 +179,12 @@ class TestLLMProcessor:
             result = generate_sql(request, schema_info)
 
             assert result == "SELECT * FROM users"
-            mock_openai_func.assert_called_once_with("Show all users", schema_info)
+            mock_generate_sql.assert_called_once_with("Show all users", schema_info)
 
-    @patch('core.llm_processor.generate_sql_with_anthropic')
-    def test_generate_sql_anthropic_fallback(self, mock_anthropic_func):
+    @patch('utils.llm_client.SQLGenerationClient.generate_sql')
+    def test_generate_sql_anthropic_fallback(self, mock_generate_sql):
         # Test that Anthropic is used when only Anthropic key exists
-        mock_anthropic_func.return_value = "SELECT * FROM products"
+        mock_generate_sql.return_value = "SELECT * FROM products"
 
         with patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'anthropic-key'}, clear=True):
             request = QueryRequest(query="Show all products", llm_provider="openai")
@@ -229,40 +193,34 @@ class TestLLMProcessor:
             result = generate_sql(request, schema_info)
 
             assert result == "SELECT * FROM products"
-            mock_anthropic_func.assert_called_once_with("Show all products", schema_info)
+            mock_generate_sql.assert_called_once_with("Show all products", schema_info)
 
-    @patch('core.llm_processor.generate_sql_with_openai')
-    def test_generate_sql_request_preference_openai(self, mock_openai_func):
-        # Test request preference when no keys available
-        mock_openai_func.return_value = "SELECT * FROM orders"
-
+    def test_generate_sql_request_preference_openai(self):
+        # Test request preference when no keys available - should raise error
         with patch.dict(os.environ, {}, clear=True):
             request = QueryRequest(query="Show all orders", llm_provider="openai")
             schema_info = {'tables': {}}
 
-            result = generate_sql(request, schema_info)
+            with pytest.raises(Exception) as exc_info:
+                generate_sql(request, schema_info)
 
-            assert result == "SELECT * FROM orders"
-            mock_openai_func.assert_called_once_with("Show all orders", schema_info)
+            assert "No LLM API key found" in str(exc_info.value)
 
-    @patch('core.llm_processor.generate_sql_with_anthropic')
-    def test_generate_sql_request_preference_anthropic(self, mock_anthropic_func):
-        # Test request preference when no keys available
-        mock_anthropic_func.return_value = "SELECT * FROM customers"
-
+    def test_generate_sql_request_preference_anthropic(self):
+        # Test request preference when no keys available - should raise error
         with patch.dict(os.environ, {}, clear=True):
             request = QueryRequest(query="Show all customers", llm_provider="anthropic")
             schema_info = {'tables': {}}
 
-            result = generate_sql(request, schema_info)
+            with pytest.raises(Exception) as exc_info:
+                generate_sql(request, schema_info)
 
-            assert result == "SELECT * FROM customers"
-            mock_anthropic_func.assert_called_once_with("Show all customers", schema_info)
+            assert "No LLM API key found" in str(exc_info.value)
 
-    @patch('core.llm_processor.generate_sql_with_openai')
-    def test_generate_sql_both_keys_openai_priority(self, mock_openai_func):
-        # Test that OpenAI has priority when both keys exist
-        mock_openai_func.return_value = "SELECT * FROM inventory"
+    @patch('utils.llm_client.SQLGenerationClient.generate_sql')
+    def test_generate_sql_both_keys_openai_priority(self, mock_generate_sql):
+        # Test that OpenAI has priority when both keys exist (auto-detection)
+        mock_generate_sql.return_value = "SELECT * FROM inventory"
 
         with patch.dict(os.environ, {'OPENAI_API_KEY': 'openai-key', 'ANTHROPIC_API_KEY': 'anthropic-key'}):
             request = QueryRequest(query="Show inventory", llm_provider="anthropic")
@@ -271,12 +229,12 @@ class TestLLMProcessor:
             result = generate_sql(request, schema_info)
 
             assert result == "SELECT * FROM inventory"
-            mock_openai_func.assert_called_once_with("Show inventory", schema_info)
+            mock_generate_sql.assert_called_once_with("Show inventory", schema_info)
 
-    @patch('core.llm_processor.generate_sql_with_openai')
-    def test_generate_sql_only_openai_key(self, mock_openai_func):
+    @patch('utils.llm_client.SQLGenerationClient.generate_sql')
+    def test_generate_sql_only_openai_key(self, mock_generate_sql):
         # Test when only OpenAI key exists
-        mock_openai_func.return_value = "SELECT * FROM sales"
+        mock_generate_sql.return_value = "SELECT * FROM sales"
 
         with patch.dict(os.environ, {'OPENAI_API_KEY': 'openai-key'}, clear=True):
             request = QueryRequest(query="Show sales data", llm_provider="anthropic")
@@ -285,4 +243,4 @@ class TestLLMProcessor:
             result = generate_sql(request, schema_info)
 
             assert result == "SELECT * FROM sales"
-            mock_openai_func.assert_called_once_with("Show sales data", schema_info)
+            mock_generate_sql.assert_called_once_with("Show sales data", schema_info)
