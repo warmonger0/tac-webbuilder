@@ -150,6 +150,18 @@ export function WorkflowHistoryCard({ workflow }: WorkflowHistoryCardProps) {
               ADW: {workflow.adw_id}
             </h3>
             <StatusBadge status={workflow.status} />
+            {workflow.gh_issue_state && (
+              <span
+                className={`text-xs px-2 py-1 rounded ${
+                  workflow.gh_issue_state === 'open'
+                    ? 'bg-green-100 text-green-800 border border-green-300'
+                    : 'bg-purple-100 text-purple-800 border border-purple-300'
+                }`}
+                title={`GitHub Issue Status: ${workflow.gh_issue_state}`}
+              >
+                Issue: {workflow.gh_issue_state.toUpperCase()}
+              </span>
+            )}
             {workflow.structured_input?.classification && (
               <span className={`text-xs px-2 py-1 rounded border ${getClassificationColor(workflow.structured_input.classification)}`}>
                 {workflow.structured_input.classification.toUpperCase()}

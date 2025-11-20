@@ -500,10 +500,35 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
             # Ignore issues from ADW bot to prevent loops
             if ADW_BOT_IDENTIFIER in issue_body:
                 print(f"⏭️  Ignoring ADW bot issue to prevent loop")
-            # Check if body contains "adw_"
-            elif "adw_" in issue_body.lower():
+            # Check if body contains ADW workflow command (not just adw_modules, adw_triggers, etc.)
+            # Only trigger on patterns like "adw_plan_iso", "adw_build_iso", etc.
+            elif re.search(r'\badw_[a-z]+(?:_[a-z]+)*_iso\b', issue_body.lower()):
                 should_process = True
                 trigger_source = "New issue"
+
+        # Check if this is an issue state change (closed/reopened)
+        elif event_type == "issues" and action in ["closed", "reopened"] and issue_number:
+            # Update workflow history database with new GitHub issue state
+            print(f"📝 Issue #{issue_number} {action} - updating workflow history")
+            try:
+                # Import here to avoid circular dependency
+                sys.path.insert(0, app_server_path)
+                from core.workflow_history import update_workflow_history_by_issue
+
+                # Update all workflows for this issue number
+                new_state = "closed" if action == "closed" else "open"
+                updated_count = update_workflow_history_by_issue(
+                    issue_number=issue_number,
+                    gh_issue_state=new_state
+                )
+                print(f"✅ Updated {updated_count} workflow(s) for issue #{issue_number} to state: {new_state}")
+            except Exception as e:
+                print(f"⚠️ Failed to update workflow history: {e}")
+
+            return {
+                "status": "ok",
+                "message": f"Issue state updated to {action}"
+            }
 
         # Check if this is an issue comment
         elif event_type == "issue_comment" and action == "created" and issue_number:
@@ -516,8 +541,9 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
             # Ignore comments from ADW bot to prevent loops
             if ADW_BOT_IDENTIFIER in comment_body:
                 print(f"⏭️  Ignoring ADW bot comment to prevent loop")
-            # Check if comment contains "adw_"
-            elif "adw_" in comment_body.lower():
+            # Check if comment contains ADW workflow command (not just adw_modules, adw_triggers, etc.)
+            # Only trigger on patterns like "adw_plan_iso", "adw_build_iso", etc.
+            elif re.search(r'\badw_[a-z]+(?:_[a-z]+)*_iso\b', comment_body.lower()):
                 should_process = True
                 trigger_source = "Comment"
 

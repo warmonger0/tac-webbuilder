@@ -129,8 +129,10 @@ export interface CostEstimate {
 export interface Route {
   path: string;
   method: string;
-  handler: string;
-  description: string;
+  name?: string;
+  summary?: string;
+  description?: string;
+  tags?: string[];
 }
 
 export interface RoutesResponse {
@@ -187,6 +189,7 @@ export interface WorkflowHistoryItem {
   issue_number?: number;
   nl_input?: string;
   github_url?: string;
+  gh_issue_state?: 'open' | 'closed';  // GitHub issue state
   workflow_template?: string;
   model_used?: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
