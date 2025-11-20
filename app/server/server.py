@@ -822,69 +822,11 @@ async def get_workflows() -> list[Workflow]:
 
 @app.get("/api/workflow-catalog", response_model=WorkflowCatalogResponse)
 async def get_workflow_catalog() -> WorkflowCatalogResponse:
-    """Get catalog of available ADW workflow templates"""
+    """Get workflow catalog - delegates to WorkflowService"""
     try:
-        workflows = [
-            WorkflowTemplate(
-                name="adw_lightweight_iso",
-                display_name="Lightweight Workflow",
-                phases=["Plan (minimal)", "Build", "Ship"],
-                purpose="Optimized for simple UI changes, docs updates, and single-file modifications. Skips extensive testing and review.",
-                cost_range="$0.20 - $0.50",
-                best_for=["UI-only changes", "Documentation updates", "Simple bug fixes", "Single-file modifications"]
-            ),
-            WorkflowTemplate(
-                name="adw_sdlc_iso",
-                display_name="Full SDLC Workflow",
-                phases=["Plan", "Build", "Test", "Review", "Document", "Ship"],
-                purpose="Complete software development lifecycle for standard features and improvements.",
-                cost_range="$3 - $5",
-                best_for=["Standard features", "Multi-file changes", "Features requiring validation", "General improvements"]
-            ),
-            WorkflowTemplate(
-                name="adw_plan_build_test_iso",
-                display_name="Plan-Build-Test Workflow",
-                phases=["Plan", "Build", "Test"],
-                purpose="Focused on implementation and testing without full documentation phase. Good for bugs and medium complexity features.",
-                cost_range="$3 - $5",
-                best_for=["Bug fixes requiring testing", "Medium complexity features", "Changes needing validation"]
-            ),
-            WorkflowTemplate(
-                name="adw_plan_iso",
-                display_name="Planning Only",
-                phases=["Plan"],
-                purpose="Generate implementation plan without executing. Useful for proposal review or complex planning.",
-                cost_range="$0.50 - $1",
-                best_for=["Architecture planning", "Proposal generation", "Complex feature scoping"]
-            ),
-            WorkflowTemplate(
-                name="adw_ship_iso",
-                display_name="Ship Only",
-                phases=["Ship"],
-                purpose="Create PR and merge existing branch work. Use after manual development.",
-                cost_range="$0.30 - $0.50",
-                best_for=["Shipping manual changes", "Creating PR for existing work", "Final merge step"]
-            ),
-            WorkflowTemplate(
-                name="adw_plan_build_iso",
-                display_name="Plan-Build",
-                phases=["Plan", "Build"],
-                purpose="Quick implementation without testing or documentation. Use when you'll test manually.",
-                cost_range="$2 - $3",
-                best_for=["Prototypes", "Quick implementations", "Manual testing workflows"]
-            ),
-            WorkflowTemplate(
-                name="adw_plan_build_test_review_iso",
-                display_name="Plan-Build-Test-Review",
-                phases=["Plan", "Build", "Test", "Review"],
-                purpose="Comprehensive workflow with code review but no documentation phase.",
-                cost_range="$4 - $6",
-                best_for=["High-quality implementations", "Critical features", "Production code requiring review"]
-            ),
-        ]
-
-        logger.info(f"[SUCCESS] Retrieved {len(workflows)} workflow templates")
-        return WorkflowCatalogResponse(workflows=workflows, total=len(workflows))
+        catalog = workflow_service.get_workflow_catalog()
+        logger.info(f"[SUCCESS] Retrieved {catalog.total} workflow templates")
+        return catalog
     except Exception as e:
         logger.error(f"[ERROR] Failed to retrieve workflow catalog: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
