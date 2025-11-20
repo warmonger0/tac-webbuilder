@@ -73,12 +73,14 @@ def e2e_test_environment():
     shutil.rmtree(test_dir, ignore_errors=True)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def e2e_database(e2e_test_environment):
     """
     Create a fully initialized database for E2E testing.
 
     Includes complete schema and realistic seed data.
+
+    Session-scoped to prevent UNIQUE constraint violations from re-inserting seed data.
 
     Usage:
         def test_workflow_query_journey(e2e_database):
@@ -387,17 +389,14 @@ def e2e_test_db_cleanup(e2e_database):
             # Cleanup happens automatically after test
     """
     import sqlite3
+    import time
 
-    yield e2e_database
-
-    # Cleanup after test: delete test records (keep only original seed data: E2E-001, E2E-002, E2E-003)
+    # Cleanup BEFORE test to ensure clean state
     try:
-        conn = sqlite3.connect(e2e_database)
+        conn = sqlite3.connect(str(e2e_database), timeout=10.0)
         cursor = conn.cursor()
 
-        # Delete any records created during tests (not in the original seed data)
-        # Keep: E2E-001, E2E-002, E2E-003 (original seed data)
-        # Delete: TEST-*, E2E-EXEC-*, E2E-FACTORY-*, or anything without a known seed prefix
+        # Delete any records created during previous tests
         cursor.execute("""
             DELETE FROM workflow_history
             WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
@@ -410,15 +409,41 @@ def e2e_test_db_cleanup(e2e_database):
                 WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
             """)
         except sqlite3.OperationalError:
-            # Table might not exist, that's ok
+            pass  # Table might not exist
+
+        conn.commit()
+        conn.close()
+        time.sleep(0.1)  # Allow DB lock to fully release
+    except Exception as e:
+        import logging
+        logging.warning(f"Failed to cleanup E2E test database before test: {e}")
+
+    yield e2e_database
+
+    # Cleanup AFTER test as well
+    try:
+        conn = sqlite3.connect(str(e2e_database), timeout=10.0)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            DELETE FROM workflow_history
+            WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
+        """)
+
+        try:
+            cursor.execute("""
+                DELETE FROM adw_locks
+                WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
+            """)
+        except sqlite3.OperationalError:
             pass
 
         conn.commit()
         conn.close()
+        time.sleep(0.1)  # Allow DB lock to fully release
     except Exception as e:
-        # Cleanup failure shouldn't fail the test
         import logging
-        logging.warning(f"Failed to cleanup E2E test database: {e}")
+        logging.warning(f"Failed to cleanup E2E test database after test: {e}")
 
 
 @pytest.fixture
