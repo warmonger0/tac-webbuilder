@@ -793,66 +793,15 @@ async def get_workflow_trends(days: int = 30, group_by: str = "day") -> Workflow
         raise HTTPException(status_code=500, detail=f"Failed to retrieve trends: {str(e)}")
 
 @app.get("/api/cost-predictions", response_model=CostPrediction)
-async def predict_workflow_cost(
-    classification: str,
-    complexity: str,
-    model: str
-) -> CostPrediction:
-    """Predict workflow cost based on historical data"""
+async def predict_workflow_cost(classification: str, complexity: str, model: str) -> CostPrediction:
+    """Predict workflow cost - delegates to WorkflowService"""
     try:
-        from core.workflow_history import get_workflow_history
-
-        # Fetch similar historical workflows
-        workflows, _ = get_workflow_history(
-            limit=1000,
-            offset=0,
-            template=classification,
+        prediction = workflow_service.predict_workflow_cost(
+            classification=classification,
+            complexity=complexity,
             model=model
         )
-
-        # Filter by complexity if specified
-        if complexity:
-            workflows = [
-                w for w in workflows
-                if w.get("complexity_actual") == complexity or w.get("complexity_estimated") == complexity
-            ]
-
-        # Extract costs
-        costs = [
-            w["actual_cost_total"]
-            for w in workflows
-            if w.get("actual_cost_total") and w["actual_cost_total"] > 0
-        ]
-
-        if not costs:
-            # No historical data, return conservative estimate
-            return CostPrediction(
-                predicted_cost=0.05,
-                confidence=0.0,
-                sample_size=0,
-                min_cost=0.0,
-                max_cost=0.0,
-                avg_cost=0.0
-            )
-
-        # Calculate statistics
-        avg_cost = sum(costs) / len(costs)
-        min_cost = min(costs)
-        max_cost = max(costs)
-
-        # Confidence based on sample size (diminishing returns)
-        confidence = min(100.0, (len(costs) / 10) * 100)
-
-        prediction = CostPrediction(
-            predicted_cost=round(avg_cost, 4),
-            confidence=round(confidence, 2),
-            sample_size=len(costs),
-            min_cost=round(min_cost, 4),
-            max_cost=round(max_cost, 4),
-            avg_cost=round(avg_cost, 4)
-        )
-
-        logger.info(f"[SUCCESS] Generated cost prediction for {classification}/{complexity}/{model}: ${avg_cost:.4f}")
+        logger.info(f"[SUCCESS] Generated cost prediction for {classification}/{complexity}/{model}: ${prediction.predicted_cost:.4f}")
         return prediction
     except Exception as e:
         logger.error(f"[ERROR] Failed to predict workflow cost: {str(e)}")
