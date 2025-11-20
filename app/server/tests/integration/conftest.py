@@ -48,9 +48,9 @@ def integration_test_db() -> Generator[Path, None, None]:
         temp_db_path = Path(f.name)
 
     # Initialize database schema
-    from core.workflow_history import init_db
+    from core.workflow_history_utils.database import init_db
 
-    with patch('core.workflow_history.DB_PATH', temp_db_path):
+    with patch('core.workflow_history_utils.database.DB_PATH', temp_db_path):
         init_db()
 
     yield temp_db_path

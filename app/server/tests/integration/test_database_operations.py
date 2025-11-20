@@ -33,14 +33,14 @@ from unittest.mock import patch
 
 import pytest
 
-from core.workflow_history import (
+from core.workflow_history import sync_workflow_history
+from core.workflow_history_utils.database import (
     DB_PATH as WORKFLOW_DB_PATH,
     get_history_analytics,
     get_workflow_by_adw_id,
     get_workflow_history,
     init_db,
     insert_workflow_history,
-    sync_workflow_history,
     update_workflow_history,
 )
 from core.adw_lock import (

@@ -20,17 +20,19 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.workflow_history import (
+    resync_all_completed_workflows,
+    resync_workflow_cost,
+    sync_workflow_history,
+)
+from core.workflow_history_utils.database import (
     get_history_analytics,
     get_workflow_by_adw_id,
     get_workflow_history,
     init_db,
     insert_workflow_history,
-    resync_all_completed_workflows,
-    resync_workflow_cost,
-    scan_agents_directory,
-    sync_workflow_history,
     update_workflow_history,
 )
+from core.workflow_history_utils.filesystem import scan_agents_directory
 
 
 @pytest.fixture
@@ -41,7 +43,7 @@ def temp_db():
         temp_db_path = f.name
 
     # Patch the DB_PATH
-    with patch('core.workflow_history.DB_PATH', Path(temp_db_path)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db_path)):
         # Initialize the database
         init_db()
         yield temp_db_path
@@ -75,7 +77,7 @@ def test_init_db(temp_db):
 
 def test_insert_workflow_history(temp_db):
     """Test inserting a new workflow history record"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert a workflow
         row_id = insert_workflow_history(
             adw_id="test-123",
@@ -99,7 +101,7 @@ def test_insert_workflow_history(temp_db):
 
 def test_insert_duplicate_adw_id(temp_db):
     """Test that inserting duplicate adw_id raises an error"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         insert_workflow_history(adw_id="test-123", status="pending")
 
         # Inserting the same adw_id should raise an error
@@ -109,7 +111,7 @@ def test_insert_duplicate_adw_id(temp_db):
 
 def test_update_workflow_history(temp_db):
     """Test updating an existing workflow history record"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert a workflow
         insert_workflow_history(adw_id="test-456", status="pending")
 
@@ -129,7 +131,7 @@ def test_update_workflow_history(temp_db):
 
 def test_update_nonexistent_workflow(temp_db):
     """Test updating a workflow that doesn't exist"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         success = update_workflow_history(
             adw_id="nonexistent",
             status="completed"
@@ -139,7 +141,7 @@ def test_update_nonexistent_workflow(temp_db):
 
 def test_get_workflow_by_adw_id(temp_db):
     """Test retrieving a workflow by ADW ID"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert a workflow
         insert_workflow_history(
             adw_id="test-789",
@@ -160,7 +162,7 @@ def test_get_workflow_by_adw_id(temp_db):
 
 def test_get_workflow_history_pagination(temp_db):
     """Test pagination in get_workflow_history"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert multiple workflows
         for i in range(25):
             insert_workflow_history(
@@ -187,7 +189,7 @@ def test_get_workflow_history_pagination(temp_db):
 
 def test_get_workflow_history_filters(temp_db):
     """Test filtering in get_workflow_history"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert workflows with different statuses
         insert_workflow_history(adw_id="test-1", status="completed", model_used="claude-sonnet-4-5")
         insert_workflow_history(adw_id="test-2", status="failed", model_used="claude-opus")
@@ -211,7 +213,7 @@ def test_get_workflow_history_filters(temp_db):
 
 def test_get_workflow_history_search(temp_db):
     """Test search functionality in get_workflow_history"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert workflows with different inputs
         insert_workflow_history(
             adw_id="test-search-1",
@@ -237,7 +239,7 @@ def test_get_workflow_history_search(temp_db):
 
 def test_get_workflow_history_sorting(temp_db):
     """Test sorting in get_workflow_history"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert workflows with different durations
         insert_workflow_history(adw_id="test-1", status="completed", duration_seconds=100)
         insert_workflow_history(adw_id="test-2", status="completed", duration_seconds=50)
@@ -262,7 +264,7 @@ def test_get_workflow_history_sorting(temp_db):
 
 def test_get_history_analytics(temp_db):
     """Test analytics calculation"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert workflows with various statuses
         insert_workflow_history(adw_id="test-1", status="completed", duration_seconds=100)
         insert_workflow_history(adw_id="test-2", status="completed", duration_seconds=200)
@@ -332,7 +334,7 @@ def test_scan_agents_directory_with_workflows(temp_db):
 
 def test_sync_workflow_history(temp_db):
     """Test syncing workflow history"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Mock scan_agents_directory to return test data
         mock_workflows = [
             {
@@ -357,7 +359,7 @@ def test_sync_workflow_history(temp_db):
 
 def test_invalid_sort_field(temp_db):
     """Test that invalid sort fields are handled safely"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         insert_workflow_history(adw_id="test-1", status="completed")
 
         # Try to sort by invalid field (should default to created_at)
@@ -370,7 +372,7 @@ def test_invalid_sort_field(temp_db):
 
 def test_analytics_with_empty_database(temp_db):
     """Test analytics with empty database"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         analytics = get_history_analytics()
 
         assert analytics["total_workflows"] == 0
@@ -385,7 +387,7 @@ def test_cost_sync_completed_workflow_updates_final_cost(temp_db):
     """Test that completed workflows always get final cost, even if cost already exists"""
     from core.data_models import CostData, PhaseCost, TokenBreakdown
 
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert workflow with initial partial cost ($0.09)
         insert_workflow_history(
             adw_id="cost-test-1",
@@ -473,7 +475,7 @@ def test_cost_sync_running_workflow_progressive_updates(temp_db):
     """Test that running workflows only update if cost increased"""
     from core.data_models import CostData, PhaseCost, TokenBreakdown
 
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert workflow with initial cost ($0.50)
         insert_workflow_history(
             adw_id="cost-test-2",
@@ -533,7 +535,7 @@ def test_cost_sync_running_workflow_progressive_updates(temp_db):
 
 def test_cost_sync_running_workflow_prevents_decreases(temp_db):
     """Test that running workflows prevent cost decreases"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert workflow with higher cost ($2.00)
         insert_workflow_history(
             adw_id="cost-test-3",
@@ -573,7 +575,7 @@ def test_cost_sync_failed_workflow_updates_final_cost(temp_db):
     """Test that failed workflows always get final cost"""
     from core.data_models import CostData, PhaseCost, TokenBreakdown
 
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert workflow with initial cost
         insert_workflow_history(
             adw_id="cost-test-4",
@@ -637,7 +639,7 @@ def test_cost_sync_logging(temp_db, caplog):
 
     from core.data_models import CostData, PhaseCost, TokenBreakdown
 
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert workflow with initial cost
         insert_workflow_history(
             adw_id="cost-test-5",
@@ -702,7 +704,7 @@ def test_cost_sync_logging(temp_db, caplog):
 
 def test_resync_workflow_cost_single(temp_db):
     """Test resyncing cost data for a single workflow"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert a workflow
         insert_workflow_history(
             adw_id="resync-test-1",
@@ -742,7 +744,7 @@ def test_resync_workflow_cost_single(temp_db):
 
 def test_resync_workflow_cost_force_clear(temp_db):
     """Test force resync clears and recalculates cost data"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert a workflow with existing cost data
         insert_workflow_history(
             adw_id="resync-test-2",
@@ -782,7 +784,7 @@ def test_resync_workflow_cost_force_clear(temp_db):
 
 def test_resync_workflow_cost_nonexistent(temp_db):
     """Test error handling for nonexistent workflow"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         result = resync_workflow_cost("nonexistent-workflow", force=False)
 
         assert result["success"] is False
@@ -792,7 +794,7 @@ def test_resync_workflow_cost_nonexistent(temp_db):
 
 def test_resync_workflow_cost_no_cost_file(temp_db):
     """Test error handling when cost file doesn't exist"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert a workflow
         insert_workflow_history(
             adw_id="resync-test-3",
@@ -810,7 +812,7 @@ def test_resync_workflow_cost_no_cost_file(temp_db):
 
 def test_resync_all_completed_workflows(temp_db):
     """Test bulk resync of all completed workflows"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert multiple workflows
         insert_workflow_history(adw_id="bulk-1", status="completed", actual_cost_total=0.0)
         insert_workflow_history(adw_id="bulk-2", status="completed", actual_cost_total=0.0)
@@ -850,7 +852,7 @@ def test_resync_all_completed_workflows(temp_db):
 
 def test_resync_all_completed_workflows_force(temp_db):
     """Test force resync clears and recalculates all workflows"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert workflows with existing costs
         insert_workflow_history(adw_id="force-1", status="completed", actual_cost_total=1.0)
         insert_workflow_history(adw_id="force-2", status="completed", actual_cost_total=2.0)
@@ -886,7 +888,7 @@ def test_resync_all_completed_workflows_force(temp_db):
 
 def test_resync_all_completed_workflows_error_handling(temp_db):
     """Test partial success with errors"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Insert workflows
         insert_workflow_history(adw_id="error-1", status="completed")
         insert_workflow_history(adw_id="error-2", status="completed")
@@ -928,7 +930,7 @@ def test_resync_all_completed_workflows_error_handling(temp_db):
 @pytest.mark.skipif(True, reason="Endpoint tests require full server setup with all dependencies")
 def test_resync_endpoint_single_workflow(temp_db):
     """Test POST /api/workflow-history/resync with single workflow"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Setup: Insert a workflow
         insert_workflow_history(
             adw_id="endpoint-test-1",
@@ -962,7 +964,7 @@ def test_resync_endpoint_single_workflow(temp_db):
 @pytest.mark.skipif(True, reason="Endpoint tests require full server setup with all dependencies")
 def test_resync_endpoint_all_workflows(temp_db):
     """Test POST /api/workflow-history/resync without parameters"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Mock the bulk resync function
         mock_workflows = [
             {"adw_id": "bulk-1", "status": "completed", "cost_updated": True},
@@ -986,7 +988,7 @@ def test_resync_endpoint_all_workflows(temp_db):
 @pytest.mark.skipif(True, reason="Endpoint tests require full server setup with all dependencies")
 def test_resync_endpoint_force_mode(temp_db):
     """Test POST /api/workflow-history/resync with force=true"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Mock the bulk resync function with force
         mock_workflows = [{"adw_id": "force-1", "status": "completed", "cost_updated": True}]
         mock_errors = []
@@ -1007,7 +1009,7 @@ def test_resync_endpoint_force_mode(temp_db):
 @pytest.mark.skipif(True, reason="Endpoint tests require full server setup with all dependencies")
 def test_resync_endpoint_error_cases(temp_db):
     """Test error responses from resync endpoint"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         # Test 1: Single workflow not found
         mock_result = {
             "success": False,
@@ -1044,7 +1046,7 @@ def test_resync_endpoint_error_cases(temp_db):
 @pytest.mark.skipif(True, reason="Endpoint tests require full server setup with all dependencies")
 def test_resync_endpoint_unexpected_error(temp_db):
     """Test handling of unexpected errors in resync endpoint"""
-    with patch('core.workflow_history.DB_PATH', Path(temp_db)):
+    with patch('core.workflow_history_utils.database.DB_PATH', Path(temp_db)):
         from server import app
         client = TestClient(app)
 
