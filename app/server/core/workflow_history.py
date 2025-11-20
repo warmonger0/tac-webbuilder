@@ -31,6 +31,21 @@ from core.workflow_history_utils.sync_manager import (
 
 logger = logging.getLogger(__name__)
 
+# Define public API
+__all__ = [
+    # Database operations
+    "init_db",
+    "insert_workflow_history",
+    "update_workflow_history_by_issue",
+    "update_workflow_history",
+    "get_workflow_by_adw_id",
+    "get_workflow_history",
+    "get_history_analytics",
+    # Synchronization operations
+    "sync_workflow_history",
+    "resync_workflow_cost",
+    "resync_all_completed_workflows",
+]
 
 # All functionality is re-exported from submodules for backwards compatibility.
 # See workflow_history_utils/ for implementation details:
