@@ -13,5 +13,65 @@
     "reasoning": "Database changes required | Complex testing required | Workflow/automation changes | Explicitly marked as complex",
     "recommended_workflow": "adw_sdlc_zte_iso",
     "timestamp": "2025-11-18T14:25:41.219536"
+  },
+  "49": {
+    "estimated_cost_total": 4.0,
+    "estimated_cost_breakdown": {
+      "plan": 0.8,
+      "build": 1.4,
+      "test": 1.0,
+      "review": 0.4,
+      "document": 0.4
+    },
+    "level": "complex",
+    "confidence": 1.0,
+    "reasoning": "Database changes required | Workflow/automation changes | Explicitly marked as complex",
+    "recommended_workflow": "adw_sdlc_zte_iso",
+    "timestamp": "2025-11-19T03:57:15.299410"
+  },
+  "50": {
+    "estimated_cost_total": 4.0,
+    "estimated_cost_breakdown": {
+      "plan": 0.8,
+      "build": 1.4,
+      "test": 1.0,
+      "review": 0.4,
+      "document": 0.4
+    },
+    "level": "complex",
+    "confidence": 1.0,
+    "reasoning": "Database changes required | Workflow/automation changes | Explicitly marked as complex",
+    "recommended_workflow": "adw_sdlc_zte_iso",
+    "timestamp": "2025-11-19T04:04:59.104388"
+  },
+  "52": {
+    "estimated_cost_total": 4.0,
+    "estimated_cost_breakdown": {
+      "plan": 0.8,
+      "build": 1.4,
+      "test": 1.0,
+      "review": 0.4,
+      "document": 0.4
+    },
+    "level": "complex",
+    "confidence": 1.0,
+    "reasoning": "Database changes required | Multiple components affected (3) | Workflow/automation changes | Large-scale changes indicated | Explicitly marked as complex",
+    "recommended_workflow": "adw_sdlc_zte_iso",
+    "timestamp": "2025-11-19T05:20:15.006129"
+  },
+  "54": {
+    "estimated_cost_total": 4.0,
+    "estimated_cost_breakdown": {
+      "plan": 0.8,
+      "build": 1.4,
+      "test": 1.0,
+      "review": 0.4,
+      "document": 0.4
+    },
+    "level": "complex",
+    "confidence": 1.0,
+    "reasoning": "Full-stack integration required | Database changes required | Workflow/automation changes | Explicitly marked as complex",
+    "recommended_workflow": "adw_sdlc_zte_iso",
+    "timestamp": "2025-11-19T18:10:04.434767"
   }
 }
