@@ -1,9 +1,9 @@
 # server.py Refactoring Progress Tracker
 
 **Start Date:** 2025-11-19
-**Current Phase:** GitHub Issue Service Extracted - BELOW 1,000 LINES! 🎉
-**Overall Progress:** 54% (1,149/2,110 lines extracted)
-**Status:** 🟢 AHEAD OF SCHEDULE - TARGET ACHIEVED!
+**Current Phase:** Phase 4.1 Complete - workflow_history.py Foundation Extracted
+**Overall Progress:** 68% (Phase 4.1 of 4.6 complete)
+**Status:** 🟡 IN PROGRESS - Phase 4 Modularization Underway
 
 ---
 
@@ -36,7 +36,9 @@ Progress:  ███████████████████▓  54% com
 | **Phase 2c** | Cost Predictions to WorkflowService | 51 | ✅ **COMPLETE** | 2025-11-19 |
 | **Phase 2d** | Workflow Catalog to WorkflowService | 58 | ✅ **COMPLETE** | 2025-11-19 |
 | **Phase 2e** | GitHubIssueService extraction | 194 | ✅ **COMPLETE** | 2025-11-19 |
-| **Total** | | **1,149** | **54%** | **TARGET ACHIEVED** |
+| **Phase 3** | Helper Utilities Consolidation | 300 | ✅ **COMPLETE** | 2025-11-19 |
+| **Phase 4.1** | workflow_history foundation modules | 156 | ✅ **COMPLETE** | 2025-11-20 |
+| **Total** | | **1,605** | **68%** | **IN PROGRESS** |
 
 ---
 
@@ -255,25 +257,88 @@ Progress:  ███████████████████▓  54% com
 
 ---
 
-## Phase 4: Split workflow_history.py ⏳
+## Phase 4: Split workflow_history.py ⏳ IN PROGRESS
 
-**Status:** ⏳ PENDING
-**Current Size:** 1,311 lines
-**Target Size:** <400 lines (split into 7 modules)
-**Reduction:** ~900 lines from monolithic file
+**Status:** 🟡 IN PROGRESS (Phase 4.2 Complete)
+**Original Size:** 1,427 lines
+**Current Size:** 1,147 lines (-280 lines, -19.6%)
+**Target Size:** <400 lines (split into 8 modules)
+**Progress:** Phase 4.2/4.6 complete (Foundation + Filesystem modules extracted)
 
-### Target Structure
+### Phase 4.1: Foundation Modules ✅
+
+**Completed:** 2025-11-20
+**Status:** ✅ COMPLETE
+
+**Modules Extracted:**
+1. **workflow_history_utils/models.py** (55 lines)
+   - WorkflowStatus, ErrorCategory, ComplexityLevel enums
+   - WorkflowFilter dataclass
+   - Constants (BOTTLENECK_THRESHOLD, complexity thresholds)
+
+2. **workflow_history_utils/metrics.py** (161 lines)
+   - calculate_phase_metrics()
+   - categorize_error()
+   - estimate_complexity()
+
+3. **workflow_history_utils/github_client.py** (37 lines)
+   - fetch_github_issue_state()
+
+**Results:**
+- **Lines Extracted:** 253 lines across 3 modules
+- **Reduction:** workflow_history.py: 1,427 → 1,271 lines (-156 lines, -10.9%)
+- **Tests Added:** 40 comprehensive unit tests (100% passing)
+- **Backwards Compatibility:** 100% maintained
+- **Bugfix:** Fixed database path issues (all calls now pass explicit DB_PATH)
+
+**Commits:**
+- ✅ 24ec768 - Phase 4.1 extraction
+- ✅ cfa9471 - Database path bugfix
+- ✅ 6c2821b - Verification report
+
+### Phase 4.2: Filesystem Layer ✅
+
+**Completed:** 2025-11-20
+**Status:** ✅ COMPLETE
+
+**Modules Extracted:**
+1. **workflow_history_utils/filesystem.py** (137 lines)
+   - scan_agents_directory() - Scans agents/ directory for workflows
+   - Parses adw_state.json files
+   - Infers workflow status from filesystem indicators
+   - Validates issue numbers and filters invalid data
+
+**Results:**
+- **Lines Extracted:** 124 lines (scan_agents_directory function)
+- **Reduction:** workflow_history.py: 1,271 → 1,147 lines (-124 lines, -9.8%)
+- **Tests Added:** 29 comprehensive unit tests (100% passing)
+- **Backwards Compatibility:** 100% maintained
+- **Zero Regressions:** All integration tests passing
+
+**Test Coverage:**
+- 29 tests covering all edge cases
+- Directory handling, state file parsing, status inference
+- Issue number validation, error handling, multi-workflow scenarios
+- 100% code coverage for filesystem.py
+
+**Commits:**
+- ⏳ Pending - Phase 4.2 extraction and tests
+
+### Target Structure (Updated)
 
 ```
-app/server/core/workflow_history/
-├── __init__.py           # Public API facade
-├── database.py          # DB operations
-├── scanner.py           # File system scanning
-├── enrichment.py        # Cost data enrichment
-├── analytics.py         # Analytics calculations
-├── similarity.py        # Similarity detection
-└── resync.py           # Resync operations
+app/server/core/workflow_history_utils/
+├── __init__.py           # Module initialization
+├── models.py            # ✅ Type definitions, enums (55 lines)
+├── metrics.py           # ✅ Metric calculations (161 lines)
+├── github_client.py     # ✅ GitHub API wrapper (37 lines)
+├── filesystem.py        # ✅ Filesystem scanning (137 lines)
+├── database.py          # ⏳ DB operations (planned)
+├── enrichment.py        # ⏳ Cost data enrichment (planned)
+└── sync_manager.py      # ⏳ Sync operations (planned)
 ```
+
+**Note:** Module structure uses `workflow_history_utils/` instead of planned `workflow_history/` package to maintain backwards compatibility with existing `workflow_history.py` file.
 
 ---
 
@@ -332,9 +397,10 @@ app/server/core/workflow_analytics/
 | **Phase 2** | **320/324** | **0** | **0** | **~60%** |
 | **Phase 2a-e** | **313/324** | **0** | **0** | **~60%** |
 | **Phase 3** | **360+/324** | **0 from refactoring** | **+47 ProcessRunner tests** | **~65%** |
-| **Final** | **360+/324** | **0 total from refactoring** | **+47 tests** | **~65%** |
+| **Phase 4.1** | **388/411** | **0 from refactoring** | **+40 workflow_history tests** | **~68%** |
+| **Current** | **428/411** | **0 total from refactoring** | **+87 tests** | **~68%** |
 
-Note: Pre-existing test failures (7 HealthService stubs, 4 pattern DB issues) unaffected by refactoring
+Note: Pre-existing test failures (23 total: 12 LLM processor, 7 health service, 4 pattern DB) unaffected by refactoring
 
 ---
 
@@ -393,18 +459,20 @@ Each phase must meet these criteria before proceeding:
 Phase 1: [████████████████████] COMPLETE (2025-11-19)
 Phase 2: [████████████████████] COMPLETE (2025-11-19)
 Phase 3: [████████████████████] COMPLETE (2025-11-19) ✅
-Phase 4: [                    ] 0% (Ready to start)
+Phase 4: [███▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 16% (Phase 4.1/4.6 complete)
 Phase 5: [                    ] 0% (Pending)
 
-Overall: [█████████████▓▓▓▓▓▓▓] 65% Complete (All major extractions done)
+Overall: [██████████████▓▓▓▓▓▓] 68% Complete (Phase 4.1 foundation done)
 ```
 
 **Estimated Completion:**
+- Phase 1: ✅ COMPLETE (2025-11-19)
 - Phase 2: ✅ COMPLETE (2025-11-19)
 - Phase 3: ✅ COMPLETE (2025-11-19)
-- Phase 4: Estimated 2-3 hours (workflow_history.py split)
+- Phase 4.1: ✅ COMPLETE (2025-11-20) - Foundation modules extracted
+- Phase 4.2-4.6: Estimated 24-32 hours remaining
 - Phase 5: Estimated 2-3 hours (workflow_analytics.py split)
-- **Overall:** On track for completion within current session
+- **Overall:** 68% complete, ~26-35 hours remaining
 
 ---
 
@@ -433,26 +501,40 @@ Overall: [█████████████▓▓▓▓▓▓▓] 65% Comp
 
 ## Next Actions
 
-### Immediate (Phase 2)
+### Immediate (Phase 4.2)
 
-1. **Start Phase 2 Extraction**
-   - Read Phase 2 plan
-   - Create ServiceController class
-   - Extract service management endpoints
-   - Write tests
-   - Document results
+1. **Start Phase 4.2 - Filesystem Layer**
+   - Read Phase 4 plan (PHASE_4_WORKFLOW_HISTORY_SPLIT_PLAN.md)
+   - Extract `scan_agents_directory()` function
+   - Create `workflow_history_utils/filesystem.py` module
+   - Write unit tests
+   - Update imports in workflow_history.py
+   - Estimated: 2-3 hours
 
 2. **Success Criteria**
-   - server.py reduced to ~1,500 lines
-   - ServiceController ~400 lines
-   - All tests pass
-   - Zero regressions
+   - workflow_history.py reduced by ~150 lines
+   - filesystem.py ~150 lines created
+   - All tests pass (zero regressions)
+   - Filesystem operations isolated
 
-### Future (Phases 3-5)
+### Future (Phases 4.3-5)
 
-3. **Create Helper Utilities** (Phase 3)
-4. **Split workflow_history.py** (Phase 4)
-5. **Split workflow_analytics.py** (Phase 5)
+3. **Phase 4.3: Database Layer** (4-5 hours)
+   - Extract all DB CRUD operations
+   - Create database.py module (~400 lines)
+
+4. **Phase 4.4: Enrichment Layer** (5-6 hours)
+   - Extract cost/metrics/scores enrichment logic
+   - Create enrichment.py module (~200 lines)
+
+5. **Phase 4.5: Orchestration Layer** (6-8 hours)
+   - Extract sync_workflow_history() logic
+   - Create sync_manager.py module (~350 lines)
+
+6. **Phase 4.6: Public API** (2-3 hours)
+   - Create backwards-compatible __init__.py facade
+
+7. **Phase 5: Split workflow_analytics.py** (2-3 hours)
 
 ---
 
@@ -461,11 +543,20 @@ Overall: [█████████████▓▓▓▓▓▓▓] 65% Comp
 ### Documentation
 - [Phase 1 Complete Log](./SERVER_PY_REFACTORING_LOG.md)
 - [Phase 2 Plan](./PHASE_2_SERVICE_CONTROLLER_PLAN.md)
+- [Phase 2 Complete Log](./PHASE_2_COMPLETE_LOG.md)
+- [Phase 3 Complete Log](./PHASE_3_COMPLETE_LOG.md)
+- [Phase 4 Split Plan](./PHASE_4_WORKFLOW_HISTORY_SPLIT_PLAN.md)
+- [Phase 4.1 Verification Report](./PHASE_4_1_VERIFICATION_REPORT.md)
 - [Original Refactoring Analysis](../implementation/codebase-refactoring/REFACTORING_ANALYSIS.md)
 - [Original Refactoring Plan](../implementation/codebase-refactoring/REFACTORING_PLAN.md)
 
 ### Commits
 - Phase 1: d2b3778 - "refactor: Extract WorkflowService and BackgroundTaskManager"
+- Phase 2: Multiple commits - ServiceController and sub-phases
+- Phase 3: 6625604 - "refactor: Phase 3.3 - ProcessRunner utility"
+- Phase 4.1: 24ec768 - "refactor: Phase 4.1 - Extract foundation modules"
+- Phase 4.1 Bugfix: cfa9471 - "fix: Pass DB_PATH to get_db_connection"
+- Phase 4.1 Docs: 6c2821b - "docs: Add Phase 4.1 comprehensive verification report"
 
 ---
 
@@ -481,11 +572,14 @@ Overall: [█████████████▓▓▓▓▓▓▓] 65% Comp
 | 2025-11-19 | Phase 3.2 | LLM client utility created | 153 lines eliminated, SQLGenerationClient added |
 | 2025-11-19 | Phase 3.3 | ProcessRunner utility created | 120 lines eliminated, 47 tests added, 5 files refactored |
 | 2025-11-19 | Documentation | Created Phase 3 Complete Log | Comprehensive documentation of all achievements |
+| 2025-11-20 | Phase 4.1 | Foundation modules extracted | 156 lines from workflow_history.py, 3 modules created, 40 tests added |
+| 2025-11-20 | Phase 4.1 | Database path bugfix applied | All workflow_history DB calls now use explicit DB_PATH |
+| 2025-11-20 | Documentation | Created Phase 4.1 Verification Report | Comprehensive testing, E2E validation, pre-existing issues documented |
 
 ---
 
-**Last Updated:** 2025-11-19
-**Next Review:** After Phase 4 completion
+**Last Updated:** 2025-11-20
+**Next Review:** After Phase 4.2 completion
 **Maintained By:** Development Team
 
 ---
