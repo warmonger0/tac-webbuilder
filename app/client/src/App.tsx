@@ -10,9 +10,6 @@ const queryClient = new QueryClient();
 const ACTIVE_TAB_STORAGE_KEY = 'tac-webbuilder-active-tab';
 
 function App() {
-  // Intentional TypeScript error for CI testing
-  const testError: string = 123; // Type error: number assigned to string
-
   const [activeTab, setActiveTab] = useState<
     'request' | 'workflows' | 'history' | 'routes'
   >(() => {
