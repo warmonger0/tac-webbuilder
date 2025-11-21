@@ -57,6 +57,7 @@ Output Schema:
 import argparse
 import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, Any
 
@@ -194,7 +195,7 @@ def run_workflow(params: Dict[str, Any]) -> Dict[str, Any]:
                 "skipped": 0,
                 "duration_seconds": total_duration
             },
-            "failures": [result_to_dict(f) if hasattr(f, '__dict__') else f for f in all_failures],
+            "failures": [asdict(f) for f in all_failures],
             "coverage": {
                 "percentage": coverage.percentage if coverage else 0.0,
                 "lines_covered": coverage.lines_covered if coverage else 0,
