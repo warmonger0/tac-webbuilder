@@ -341,4 +341,221 @@ describe('RequestForm', () => {
       });
     });
   });
+
+  describe('Form State Persistence', () => {
+    it('should save nlInput to localStorage on change with debounce', async () => {
+      vi.useFakeTimers();
+      render(<RequestForm />);
+
+      const nlInput = screen.getByPlaceholderText(/Build a REST API/i);
+      await userEvent.type(nlInput, 'Test description');
+
+      // Fast-forward debounce timer
+      vi.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        const savedState = JSON.parse(
+          localStorageMock.getItem('tac-webbuilder-request-form-state') || '{}'
+        );
+        expect(savedState.nlInput).toBe('Test description');
+      });
+
+      vi.useRealTimers();
+    });
+
+    it('should save autoPost checkbox state to localStorage on change', async () => {
+      vi.useFakeTimers();
+      render(<RequestForm />);
+
+      const autoPostCheckbox = screen.getByLabelText(/Auto-post to GitHub/i);
+      await userEvent.click(autoPostCheckbox);
+
+      // Fast-forward debounce timer
+      vi.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        const savedState = JSON.parse(
+          localStorageMock.getItem('tac-webbuilder-request-form-state') || '{}'
+        );
+        expect(savedState.autoPost).toBe(true);
+      });
+
+      vi.useRealTimers();
+    });
+
+    it('should restore all form state from localStorage on mount', () => {
+      const mockState = {
+        version: 1,
+        nlInput: 'Restored description',
+        projectPath: '/restored/path',
+        autoPost: true,
+        timestamp: new Date().toISOString(),
+      };
+      localStorageMock.setItem('tac-webbuilder-request-form-state', JSON.stringify(mockState));
+
+      render(<RequestForm />);
+
+      const nlInput = screen.getByPlaceholderText(/Build a REST API/i);
+      const projectPathInput = screen.getByPlaceholderText(/projects\/my-app/i);
+      const autoPostCheckbox = screen.getByLabelText(/Auto-post to GitHub/i);
+
+      expect(nlInput).toHaveValue('Restored description');
+      expect(projectPathInput).toHaveValue('/restored/path');
+      expect(autoPostCheckbox).toBeChecked();
+    });
+
+    it('should clear form state from localStorage after successful submission', async () => {
+      vi.useFakeTimers();
+      const mockHealthStatus = {
+        overall_status: 'healthy' as const,
+        services: {},
+        summary: { healthy_services: 5, total_services: 5, health_percentage: 100 },
+      };
+      const mockSubmitResponse = { request_id: 'test-123' };
+      const mockPreview = {
+        title: 'Test',
+        body: 'Test',
+        labels: [],
+        classification: 'feature',
+        workflow: 'adw_plan_iso',
+        model_set: 'base',
+      };
+      const mockConfirmResponse = {
+        issue_number: 42,
+        github_url: 'https://github.com/user/repo/issues/42',
+      };
+
+      vi.spyOn(client, 'getSystemStatus').mockResolvedValue(mockHealthStatus);
+      vi.spyOn(client, 'submitRequest').mockResolvedValue(mockSubmitResponse);
+      vi.spyOn(client, 'getPreview').mockResolvedValue(mockPreview);
+      vi.spyOn(client, 'getCostEstimate').mockResolvedValue({
+        level: 'lightweight',
+        min_cost: 0.5,
+        max_cost: 1.0,
+        confidence: 0.8,
+        reasoning: 'Test reasoning',
+        recommended_workflow: 'adw_plan_iso',
+      });
+      vi.spyOn(client, 'confirmAndPost').mockResolvedValue(mockConfirmResponse);
+
+      render(<RequestForm />);
+
+      const nlInput = screen.getByPlaceholderText(/Build a REST API/i);
+      const autoPostCheckbox = screen.getByLabelText(/Auto-post to GitHub/i);
+      const submitButton = screen.getByText('Generate Issue');
+
+      await userEvent.type(nlInput, 'Test request');
+      await userEvent.click(autoPostCheckbox);
+
+      // Let auto-save happen
+      vi.advanceTimersByTime(300);
+
+      // Verify state was saved
+      await waitFor(() => {
+        const savedState = localStorageMock.getItem('tac-webbuilder-request-form-state');
+        expect(savedState).not.toBeNull();
+      });
+
+      vi.useRealTimers();
+      await userEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Issue #42 created successfully/)).toBeInTheDocument();
+      });
+
+      // Verify state was cleared after successful submission
+      expect(localStorageMock.getItem('tac-webbuilder-request-form-state')).toBeNull();
+    });
+
+    it('should not clear form state if submission fails', async () => {
+      vi.useFakeTimers();
+      const mockHealthStatus = {
+        overall_status: 'healthy' as const,
+        services: {},
+        summary: { healthy_services: 5, total_services: 5, health_percentage: 100 },
+      };
+
+      vi.spyOn(client, 'getSystemStatus').mockResolvedValue(mockHealthStatus);
+      vi.spyOn(client, 'submitRequest').mockRejectedValue(new Error('Submission failed'));
+
+      render(<RequestForm />);
+
+      const nlInput = screen.getByPlaceholderText(/Build a REST API/i);
+      const submitButton = screen.getByText('Generate Issue');
+
+      await userEvent.type(nlInput, 'Test request');
+
+      // Let auto-save happen
+      vi.advanceTimersByTime(300);
+
+      // Verify state was saved
+      await waitFor(() => {
+        const savedState = localStorageMock.getItem('tac-webbuilder-request-form-state');
+        expect(savedState).not.toBeNull();
+      });
+
+      vi.useRealTimers();
+      await userEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Submission failed/)).toBeInTheDocument();
+      });
+
+      // State should still be present after failed submission
+      expect(localStorageMock.getItem('tac-webbuilder-request-form-state')).not.toBeNull();
+    });
+
+    it('should handle localStorage quota exceeded gracefully', async () => {
+      vi.useFakeTimers();
+      const mockSetItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        const error = new Error('QuotaExceededError');
+        error.name = 'QuotaExceededError';
+        throw error;
+      });
+
+      render(<RequestForm />);
+
+      const nlInput = screen.getByPlaceholderText(/Build a REST API/i);
+      await userEvent.type(nlInput, 'Test request');
+
+      // Fast-forward debounce timer
+      vi.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Unable to save form state/i)
+        ).toBeInTheDocument();
+      });
+
+      mockSetItem.mockRestore();
+      vi.useRealTimers();
+    });
+
+    it('should handle corrupted localStorage data gracefully', () => {
+      localStorageMock.setItem('tac-webbuilder-request-form-state', 'invalid json');
+
+      render(<RequestForm />);
+
+      const nlInput = screen.getByPlaceholderText(/Build a REST API/i);
+      // Should render with empty form instead of crashing
+      expect(nlInput).toHaveValue('');
+    });
+
+    it('should validate storage version and ignore old versions', () => {
+      const oldVersionState = {
+        version: 999, // Future version
+        nlInput: 'Should be ignored',
+        projectPath: '/should/be/ignored',
+        autoPost: true,
+        timestamp: new Date().toISOString(),
+      };
+      localStorageMock.setItem('tac-webbuilder-request-form-state', JSON.stringify(oldVersionState));
+
+      render(<RequestForm />);
+
+      const nlInput = screen.getByPlaceholderText(/Build a REST API/i);
+      // Should render with empty form since version doesn't match
+      expect(nlInput).toHaveValue('');
+    });
+  });
 });

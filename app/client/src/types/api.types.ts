@@ -337,3 +337,12 @@ export interface CostResponse {
     tokens_used?: number;
   }>;
 }
+
+// Request Form Persistence Types
+export interface RequestFormPersistedState {
+  version: number;
+  nlInput: string;
+  projectPath: string;
+  autoPost: boolean;
+  timestamp: string;
+}
