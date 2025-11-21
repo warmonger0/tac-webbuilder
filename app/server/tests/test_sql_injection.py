@@ -26,10 +26,10 @@ from core.sql_security import (
 @pytest.fixture
 def test_db():
     """Create a test database with sample data"""
-    db_file = tempfile.NamedTemporaryFile(delete=False, suffix='.db')
-    db_file.close()
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as db_file:
+        db_path = db_file.name
 
-    conn = sqlite3.connect(db_file.name)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Create test tables
@@ -61,10 +61,10 @@ def test_db():
     conn.commit()
     conn.close()
 
-    yield db_file.name
+    yield db_path
 
     # Cleanup
-    os.unlink(db_file.name)
+    os.unlink(db_path)
 
 
 class TestSQLSecurityModule:
@@ -261,9 +261,8 @@ class TestInsightsSecurity:
     @patch('utils.db_connection.sqlite3.connect')
     def test_generate_insights_validates_table_name(self, mock_connect):
         """Test that table names are validated"""
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="Invalid"):
             generate_insights("users'; DROP TABLE users; --")
-        assert "Invalid" in str(exc_info.value)
 
     @patch('utils.db_connection.sqlite3.connect')
     def test_generate_insights_validates_column_names(self, mock_connect):
@@ -273,9 +272,8 @@ class TestInsightsSecurity:
         mock_connect.return_value = mock_conn
         mock_conn.cursor.return_value = mock_cursor
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="Invalid column name"):
             generate_insights("users", ["name", "'; DROP TABLE users; --"])
-        assert "Invalid column name" in str(exc_info.value)
 
 
 class TestEndToEndSQLInjection:

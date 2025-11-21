@@ -9,17 +9,14 @@ services, databases, and workflow orchestration where possible.
 """
 
 import asyncio
+import contextlib
 import json
-import os
-import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Generator
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
-
 
 # ============================================================================
 # E2E Test Environment Setup
@@ -172,7 +169,7 @@ def e2e_database(e2e_test_environment):
         conn.commit()
         conn.close()
 
-    yield db_path
+    return db_path
 
 
 # ============================================================================
@@ -389,7 +386,6 @@ def e2e_test_db_cleanup(e2e_database):
             # Cleanup happens automatically after test
     """
     import sqlite3
-    import time
 
     # Cleanup BEFORE test to ensure clean state
     try:
@@ -403,13 +399,11 @@ def e2e_test_db_cleanup(e2e_database):
         """)
 
         # Also clear adw_locks if the table exists
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("""
                 DELETE FROM adw_locks
                 WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
             """)
-        except sqlite3.OperationalError:
-            pass  # Table might not exist
 
         conn.commit()
         conn.close()
@@ -430,13 +424,11 @@ def e2e_test_db_cleanup(e2e_database):
             WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
         """)
 
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("""
                 DELETE FROM adw_locks
                 WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
             """)
-        except sqlite3.OperationalError:
-            pass
 
         conn.commit()
         conn.close()
@@ -496,7 +488,6 @@ def performance_monitor():
             metrics = performance_monitor.get_metrics()
             assert metrics["workflow_creation"]["duration"] < 5.0
     """
-    import time
 
     class PerformanceMonitor:
         def __init__(self):

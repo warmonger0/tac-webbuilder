@@ -16,11 +16,9 @@ Covers edge cases including:
 import json
 import logging
 import sqlite3
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-
 from core.workflow_history_utils.database import (
     DB_PATH,
     get_history_analytics,
@@ -31,7 +29,6 @@ from core.workflow_history_utils.database import (
     update_workflow_history,
     update_workflow_history_by_issue,
 )
-
 
 # ============================================================================
 # Test Fixtures
@@ -1372,7 +1369,7 @@ class TestGetHistoryAnalytics:
             [],
         ]
 
-        analytics = get_history_analytics()
+        get_history_analytics()
 
         # Verify query filters for completed status (3rd query executed)
         # Query execution order: 1. COUNT(*) 2. GROUP BY status 3. AVG(duration) for completed
@@ -1397,7 +1394,7 @@ class TestGetHistoryAnalytics:
             [],
         ]
 
-        analytics = get_history_analytics()
+        get_history_analytics()
 
         # Verify cost query filters (6th query executed)
         # Query order: 1.COUNT 2.status 3.duration 4.model 5.template 6.cost 7.tokens
@@ -1557,7 +1554,7 @@ class TestEdgeCasesAndErrorHandling:
             "nested": {"key": "value"}
         }
 
-        row_id = insert_workflow_history(
+        insert_workflow_history(
             adw_id="test-json-types",
             status="completed",
             structured_input=complex_data

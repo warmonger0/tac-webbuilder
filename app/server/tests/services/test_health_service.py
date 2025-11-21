@@ -8,9 +8,9 @@ expected data structures.
 """
 
 import asyncio
-import pytest
-from services.health_service import HealthService, ServiceStatus
+
 from core.data_models import ServiceHealth
+from services.health_service import HealthService, ServiceStatus
 
 
 class TestServiceStatus:

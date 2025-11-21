@@ -10,19 +10,17 @@ mocked external dependencies (GitHub API, OpenAI/Anthropic APIs).
 """
 
 import asyncio
-import json
 import os
 import sqlite3
 import subprocess
 import tempfile
 import time
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-
 
 # ============================================================================
 # Server Integration Fixtures
@@ -107,7 +105,7 @@ def integration_client(integration_app) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture
-def db_with_workflows(integration_test_db: Path) -> Generator[Path, None, None]:
+def db_with_workflows(integration_test_db: Path) -> Path:
     """
     Create a test database pre-populated with sample workflow data.
 
@@ -197,7 +195,7 @@ def db_with_workflows(integration_test_db: Path) -> Generator[Path, None, None]:
     conn.commit()
     conn.close()
 
-    yield integration_test_db
+    return integration_test_db
 
 
 # ============================================================================

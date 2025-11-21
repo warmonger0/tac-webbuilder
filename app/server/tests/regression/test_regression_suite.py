@@ -5,11 +5,11 @@ Tests for previously fixed bugs to prevent regressions.
 Each test corresponds to a specific GitHub issue.
 """
 
-import pytest
 import subprocess
-from typing import Dict, Any
 from pathlib import Path
+from typing import Any
 
+import pytest
 
 # Registry of regression tests for critical bugs
 REGRESSION_TESTS = {
@@ -42,9 +42,9 @@ class TestRegressionSuite:
         This test creates a fresh database to verify the schema definition is correct,
         not that existing databases have been migrated.
         """
+        import os
         import sqlite3
         import tempfile
-        import os
 
         # Create a temporary database to test the schema
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp_file:
@@ -53,8 +53,6 @@ class TestRegressionSuite:
         try:
             # Create a fresh database with the schema from database.py
             # We'll manually execute the CREATE TABLE statement from init_db
-            from core.workflow_history_utils.database import init_db
-            from utils.db_connection import get_connection as get_db_connection
 
             # Temporarily point to our test database by creating it directly
             conn = sqlite3.connect(tmp_db_path)
@@ -175,7 +173,7 @@ class TestRegressionSuite:
             "Type guard error: 'service' type annotation missing"
 
 
-def generate_regression_report() -> Dict[str, Any]:
+def generate_regression_report() -> dict[str, Any]:
     """
     Generate comprehensive regression test report.
 

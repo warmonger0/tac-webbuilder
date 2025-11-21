@@ -1,8 +1,9 @@
 """Pytest configuration for regression tests."""
 
-import pytest
 import sqlite3
 from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture
@@ -24,7 +25,7 @@ def clean_test_db(tmp_path):
     schema_path = Path(__file__).parent.parent.parent / "db" / "schema.sql"
 
     if schema_path.exists():
-        with open(schema_path, 'r') as f:
+        with open(schema_path) as f:
             schema = f.read()
             conn.executescript(schema)
 

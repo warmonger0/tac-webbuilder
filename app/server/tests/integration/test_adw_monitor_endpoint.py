@@ -13,17 +13,22 @@ Uses real FastAPI app with mocked filesystem.
 """
 
 import json
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from fastapi.testclient import TestClient
 
 
 @pytest.mark.integration
 class TestAdwMonitorEndpoint:
     """Test the /api/adw-monitor endpoint."""
+
+    @pytest.fixture(autouse=True)
+    def clear_cache(self):
+        """Clear the ADW monitor cache before each test."""
+        from core.adw_monitor import _monitor_cache
+        _monitor_cache["data"] = None
+        _monitor_cache["timestamp"] = None
+        return
 
     def test_adw_monitor_endpoint_exists(self, integration_client):
         """Verify /api/adw-monitor endpoint is available."""
@@ -377,6 +382,14 @@ class TestAdwMonitorEndpoint:
 @pytest.mark.integration
 class TestAdwMonitorCaching:
     """Test caching behavior of the ADW monitor endpoint."""
+
+    @pytest.fixture(autouse=True)
+    def clear_cache(self):
+        """Clear the ADW monitor cache before each test."""
+        from core.adw_monitor import _monitor_cache
+        _monitor_cache["data"] = None
+        _monitor_cache["timestamp"] = None
+        return
 
     def test_adw_monitor_caching_works(self, integration_client, tmp_path):
         """Test that responses are cached for 5 seconds."""

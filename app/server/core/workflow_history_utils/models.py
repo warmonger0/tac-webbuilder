@@ -5,9 +5,8 @@ This module contains type definitions, enums, constants, and dataclasses
 used throughout the workflow history tracking system.
 """
 
-from enum import Enum
 from dataclasses import dataclass
-from typing import Optional
+from enum import Enum
 
 
 class WorkflowStatus(Enum):
@@ -37,13 +36,13 @@ class ComplexityLevel(Enum):
 @dataclass
 class WorkflowFilter:
     """Filter criteria for querying workflow history."""
-    issue_number: Optional[int] = None
-    status: Optional[WorkflowStatus] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    model: Optional[str] = None
-    template: Optional[str] = None
-    search: Optional[str] = None
+    issue_number: int | None = None
+    status: WorkflowStatus | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    model: str | None = None
+    template: str | None = None
+    search: str | None = None
 
 
 # Constants

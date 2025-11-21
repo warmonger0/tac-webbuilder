@@ -12,12 +12,10 @@ Tests cover:
 """
 
 import json
-import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import Mock, patch
 
-import pytest
 from core.adw_monitor import (
     aggregate_adw_monitor_data,
     build_workflow_status,

@@ -4,14 +4,13 @@ Unit tests for workflow_history.models module.
 Tests type definitions, enums, and dataclasses.
 """
 
-import pytest
 from core.workflow_history_utils.models import (
-    WorkflowStatus,
-    ErrorCategory,
-    ComplexityLevel,
-    WorkflowFilter,
-    DEFAULT_SCORING_VERSION,
     BOTTLENECK_THRESHOLD,
+    DEFAULT_SCORING_VERSION,
+    ComplexityLevel,
+    ErrorCategory,
+    WorkflowFilter,
+    WorkflowStatus,
 )
 
 
@@ -65,28 +64,28 @@ class TestWorkflowFilter:
 
     def test_default_values(self):
         """Verify all fields default to None."""
-        filter = WorkflowFilter()
-        assert filter.issue_number is None
-        assert filter.status is None
-        assert filter.start_date is None
-        assert filter.end_date is None
-        assert filter.model is None
-        assert filter.template is None
-        assert filter.search is None
+        workflow_filter = WorkflowFilter()
+        assert workflow_filter.issue_number is None
+        assert workflow_filter.status is None
+        assert workflow_filter.start_date is None
+        assert workflow_filter.end_date is None
+        assert workflow_filter.model is None
+        assert workflow_filter.template is None
+        assert workflow_filter.search is None
 
     def test_partial_initialization(self):
         """Verify partial initialization works correctly."""
-        filter = WorkflowFilter(
+        workflow_filter = WorkflowFilter(
             issue_number=123,
             status=WorkflowStatus.COMPLETED
         )
-        assert filter.issue_number == 123
-        assert filter.status == WorkflowStatus.COMPLETED
-        assert filter.start_date is None
+        assert workflow_filter.issue_number == 123
+        assert workflow_filter.status == WorkflowStatus.COMPLETED
+        assert workflow_filter.start_date is None
 
     def test_full_initialization(self):
         """Verify full initialization works correctly."""
-        filter = WorkflowFilter(
+        workflow_filter = WorkflowFilter(
             issue_number=456,
             status=WorkflowStatus.RUNNING,
             start_date="2024-01-01",
@@ -95,13 +94,13 @@ class TestWorkflowFilter:
             template="sdlc",
             search="test query"
         )
-        assert filter.issue_number == 456
-        assert filter.status == WorkflowStatus.RUNNING
-        assert filter.start_date == "2024-01-01"
-        assert filter.end_date == "2024-01-31"
-        assert filter.model == "claude-sonnet-4-5"
-        assert filter.template == "sdlc"
-        assert filter.search == "test query"
+        assert workflow_filter.issue_number == 456
+        assert workflow_filter.status == WorkflowStatus.RUNNING
+        assert workflow_filter.start_date == "2024-01-01"
+        assert workflow_filter.end_date == "2024-01-31"
+        assert workflow_filter.model == "claude-sonnet-4-5"
+        assert workflow_filter.template == "sdlc"
+        assert workflow_filter.search == "test query"
 
 
 class TestConstants:
@@ -118,10 +117,10 @@ class TestConstants:
     def test_complexity_thresholds(self):
         """Verify complexity threshold constants."""
         from core.workflow_history_utils.models import (
-            LOW_COMPLEXITY_STEPS,
-            LOW_COMPLEXITY_DURATION,
-            HIGH_COMPLEXITY_STEPS,
             HIGH_COMPLEXITY_DURATION,
+            HIGH_COMPLEXITY_STEPS,
+            LOW_COMPLEXITY_DURATION,
+            LOW_COMPLEXITY_STEPS,
         )
         assert LOW_COMPLEXITY_STEPS == 5
         assert LOW_COMPLEXITY_DURATION == 60

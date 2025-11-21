@@ -616,7 +616,7 @@ class TestIntegration:
         performance = calculate_performance_score(minimal_workflow)
         quality = calculate_quality_score(minimal_workflow)
 
-        assert isinstance(clarity, (int, float))
-        assert isinstance(cost, (int, float))
-        assert isinstance(performance, (int, float))
-        assert isinstance(quality, (int, float))
+        assert isinstance(clarity, int | float)
+        assert isinstance(cost, int | float)
+        assert isinstance(performance, int | float)
+        assert isinstance(quality, int | float)

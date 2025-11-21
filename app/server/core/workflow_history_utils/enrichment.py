@@ -9,11 +9,9 @@ and scoring systems.
 import json
 import logging
 from datetime import datetime
-from typing import Optional
 
 from core.cost_estimate_storage import get_cost_estimate
 from core.cost_tracker import read_cost_history
-from core.data_models import CostData
 from core.workflow_analytics import (
     calculate_cost_efficiency_score,
     calculate_nl_input_clarity_score,
@@ -194,7 +192,7 @@ def enrich_error_category(workflow_data: dict) -> None:
         workflow_data["error_category"] = categorize_error(workflow_data["error_message"])
 
 
-def enrich_duration(workflow_data: dict, adw_id: str) -> Optional[int]:
+def enrich_duration(workflow_data: dict, adw_id: str) -> int | None:
     """
     Calculate workflow duration from start_time to current time.
 
@@ -221,7 +219,7 @@ def enrich_duration(workflow_data: dict, adw_id: str) -> Optional[int]:
         return None
 
 
-def enrich_complexity(workflow_data: dict, duration_seconds: Optional[int]) -> None:
+def enrich_complexity(workflow_data: dict, duration_seconds: int | None) -> None:
     """
     Estimate workflow complexity from steps and duration.
 
@@ -394,8 +392,8 @@ def enrich_workflow(
     workflow_data: dict,
     adw_id: str,
     is_new: bool,
-    all_workflows: Optional[list] = None
-) -> Optional[int]:
+    all_workflows: list | None = None
+) -> int | None:
     """
     Main enrichment orchestrator - applies all enrichment functions.
 

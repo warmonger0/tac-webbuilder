@@ -149,7 +149,7 @@ class LLMClient:
                     prompt, system_message, temperature, max_tokens
                 )
         except Exception as e:
-            raise Exception(f"Error getting chat completion: {str(e)}")
+            raise Exception(f"Error getting chat completion: {str(e)}") from e
 
     def _chat_completion_openai(
         self,
@@ -209,10 +209,7 @@ class LLMClient:
             The model's response as a string.
         """
         # Combine system message with prompt if provided
-        if system_message:
-            full_prompt = f"{system_message}\n\n{prompt}"
-        else:
-            full_prompt = prompt
+        full_prompt = f"{system_message}\n\n{prompt}" if system_message else prompt
 
         response = self._client.messages.create(
             model=self.anthropic_model,
@@ -275,9 +272,9 @@ class LLMClient:
         except json.JSONDecodeError as e:
             raise Exception(
                 f"Failed to parse JSON response: {str(e)}. Response: {result}"
-            )
+            ) from e
         except Exception as e:
-            raise Exception(f"Error getting JSON completion: {str(e)}")
+            raise Exception(f"Error getting JSON completion: {str(e)}") from e
 
     def text_completion(
         self,
@@ -453,7 +450,7 @@ SQL Query:"""
             return self._clean_markdown(result)
 
         except Exception as e:
-            raise Exception(f"Error generating SQL: {str(e)}")
+            raise Exception(f"Error generating SQL: {str(e)}") from e
 
     def generate_random_query(
         self,
@@ -519,7 +516,7 @@ Natural language query:"""
             )
 
         except Exception as e:
-            raise Exception(f"Error generating random query: {str(e)}")
+            raise Exception(f"Error generating random query: {str(e)}") from e
 
     @staticmethod
     def _format_schema_for_prompt(schema_info: dict[str, Any]) -> str:

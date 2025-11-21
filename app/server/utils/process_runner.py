@@ -12,9 +12,8 @@ This utility consolidates ~120 lines of duplicated subprocess code across
 service_controller.py, health_service.py, github_poster.py, and workflow_history.py.
 """
 
-import subprocess
 import logging
-from typing import Optional
+import subprocess
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -45,11 +44,11 @@ class ProcessRunner:
     @staticmethod
     def run(
         command: list[str],
-        timeout: Optional[float] = 30,
+        timeout: float | None = 30,
         check: bool = False,
         capture_output: bool = True,
         text: bool = True,
-        cwd: Optional[str] = None,
+        cwd: str | None = None,
         log_command: bool = False
     ) -> ProcessResult:
         """
@@ -154,7 +153,7 @@ class ProcessRunner:
     @staticmethod
     def run_git_command(
         args: list[str],
-        cwd: Optional[str] = None,
+        cwd: str | None = None,
         timeout: float = 10
     ) -> ProcessResult:
         """
@@ -179,8 +178,8 @@ class ProcessRunner:
     @staticmethod
     def run_shell(
         shell_command: str,
-        timeout: Optional[float] = 30,
-        cwd: Optional[str] = None
+        timeout: float | None = 30,
+        cwd: str | None = None
     ) -> ProcessResult:
         """
         Run shell command via bash -c for complex commands with pipes/expansion.

@@ -18,12 +18,11 @@ Test Coverage:
 - TC-005: Cost estimate accuracy validation
 """
 
-import json
-import pytest
+import contextlib
 import sqlite3
-import uuid
-from unittest.mock import AsyncMock, Mock, patch, MagicMock
-from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 
 @pytest.mark.e2e
@@ -139,7 +138,7 @@ class TestCompleteGitHubIssueFlow:
         """
         # Cleanup before test
         try:
-            if isinstance(e2e_test_db_cleanup, (str, bytes)):
+            if isinstance(e2e_test_db_cleanup, str | bytes):
                 db_path = e2e_test_db_cleanup
             else:
                 db_path = str(e2e_test_db_cleanup)
@@ -154,13 +153,11 @@ class TestCompleteGitHubIssueFlow:
             """)
 
             # Also clear adw_locks if the table exists
-            try:
+            with contextlib.suppress(sqlite3.OperationalError):
                 cursor.execute("""
                     DELETE FROM adw_locks
                     WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
                 """)
-            except sqlite3.OperationalError:
-                pass  # Table might not exist
 
             conn.commit()
             conn.close()
@@ -168,7 +165,7 @@ class TestCompleteGitHubIssueFlow:
             import logging
             logging.warning(f"Failed to cleanup before test: {e}")
 
-        yield
+        return
 
     def test_complete_nl_request_to_issue_creation(
         self,
@@ -435,7 +432,7 @@ class TestCompleteGitHubIssueFlow:
         first_confirm = e2e_test_client.post(f"/api/confirm/{request_id}")
 
         assert first_confirm.status_code == 200
-        first_issue_number = first_confirm.json()["issue_number"]
+        first_confirm.json()["issue_number"]
 
         # Verify GitHub poster called once
         assert mock_github_poster.post_issue.call_count == 1
@@ -552,7 +549,7 @@ class TestGitHubIssueFlowEdgeCases:
         """
         # Cleanup before test
         try:
-            if isinstance(e2e_test_db_cleanup, (str, bytes)):
+            if isinstance(e2e_test_db_cleanup, str | bytes):
                 db_path = e2e_test_db_cleanup
             else:
                 db_path = str(e2e_test_db_cleanup)
@@ -567,13 +564,11 @@ class TestGitHubIssueFlowEdgeCases:
             """)
 
             # Also clear adw_locks if the table exists
-            try:
+            with contextlib.suppress(sqlite3.OperationalError):
                 cursor.execute("""
                     DELETE FROM adw_locks
                     WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
                 """)
-            except sqlite3.OperationalError:
-                pass  # Table might not exist
 
             conn.commit()
             conn.close()
@@ -581,7 +576,7 @@ class TestGitHubIssueFlowEdgeCases:
             import logging
             logging.warning(f"Failed to cleanup before test: {e}")
 
-        yield
+        return
 
     @pytest.fixture
     def mock_failing_webhook(self):
@@ -832,7 +827,7 @@ class TestGitHubIssueFlowDataPersistence:
         """
         # Cleanup before test
         try:
-            if isinstance(e2e_test_db_cleanup, (str, bytes)):
+            if isinstance(e2e_test_db_cleanup, str | bytes):
                 db_path = e2e_test_db_cleanup
             else:
                 db_path = str(e2e_test_db_cleanup)
@@ -847,13 +842,11 @@ class TestGitHubIssueFlowDataPersistence:
             """)
 
             # Also clear adw_locks if the table exists
-            try:
+            with contextlib.suppress(sqlite3.OperationalError):
                 cursor.execute("""
                     DELETE FROM adw_locks
                     WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
                 """)
-            except sqlite3.OperationalError:
-                pass  # Table might not exist
 
             conn.commit()
             conn.close()
@@ -861,7 +854,7 @@ class TestGitHubIssueFlowDataPersistence:
             import logging
             logging.warning(f"Failed to cleanup before test: {e}")
 
-        yield
+        return
 
     def test_cost_estimate_saved_correctly(
         self,
@@ -970,7 +963,7 @@ class TestGitHubIssueFlowPerformance:
         """
         # Cleanup before test
         try:
-            if isinstance(e2e_test_db_cleanup, (str, bytes)):
+            if isinstance(e2e_test_db_cleanup, str | bytes):
                 db_path = e2e_test_db_cleanup
             else:
                 db_path = str(e2e_test_db_cleanup)
@@ -985,13 +978,11 @@ class TestGitHubIssueFlowPerformance:
             """)
 
             # Also clear adw_locks if the table exists
-            try:
+            with contextlib.suppress(sqlite3.OperationalError):
                 cursor.execute("""
                     DELETE FROM adw_locks
                     WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
                 """)
-            except sqlite3.OperationalError:
-                pass  # Table might not exist
 
             conn.commit()
             conn.close()
@@ -999,7 +990,7 @@ class TestGitHubIssueFlowPerformance:
             import logging
             logging.warning(f"Failed to cleanup before test: {e}")
 
-        yield
+        return
 
     def test_request_processing_performance(
         self,

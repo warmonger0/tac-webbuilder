@@ -75,7 +75,7 @@ def format_issue(issue: GitHubIssue, template_data: dict[str, Any]) -> str:
         formatted = template.format(**template_data)
         return formatted
     except KeyError as e:
-        raise ValueError(f"Missing required template field: {e}")
+        raise ValueError(f"Missing required template field: {e}") from e
 
 
 def validate_issue_body(body: str) -> bool:

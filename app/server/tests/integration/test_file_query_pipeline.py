@@ -23,7 +23,6 @@ Endpoints Tested:
 
 import io
 import json
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -76,15 +75,20 @@ Eve,32,Boston"""
         """Provide a shared test database for all file operations and queries."""
         # Patch all database paths to use the test database
         # Patch where functions are used (in server module), not where they're defined
-        with patch('server.convert_csv_to_sqlite') as mock_csv, \
-             patch('server.convert_json_to_sqlite') as mock_json, \
-             patch('server.convert_jsonl_to_sqlite') as mock_jsonl, \
-             patch('utils.db_connection.get_connection') as mock_conn:
+        with patch('routes.data_routes.convert_csv_to_sqlite') as mock_csv, \
+             patch('routes.data_routes.convert_json_to_sqlite') as mock_json, \
+             patch('routes.data_routes.convert_jsonl_to_sqlite') as mock_jsonl, \
+             patch('core.sql_processor.get_connection') as mock_conn, \
+             patch('core.insights.get_connection') as mock_conn2:
 
             # Import the real functions
             from core.file_processor import (
                 convert_csv_to_sqlite as real_csv,
+            )
+            from core.file_processor import (
                 convert_json_to_sqlite as real_json,
+            )
+            from core.file_processor import (
                 convert_jsonl_to_sqlite as real_jsonl,
             )
             from utils.db_connection import get_connection as real_conn
@@ -94,14 +98,15 @@ Eve,32,Boston"""
             mock_json.side_effect = lambda content, table: real_json(content, table, str(integration_test_db))
             mock_jsonl.side_effect = lambda content, table: real_jsonl(content, table, str(integration_test_db))
             mock_conn.side_effect = lambda **kwargs: real_conn(db_path=str(integration_test_db))
+            mock_conn2.side_effect = lambda **kwargs: real_conn(db_path=str(integration_test_db))
 
             yield integration_test_db
 
     @pytest.fixture
     def mock_sql_generation(self):
         """Mock SQL generation to avoid LLM API calls."""
-        # Patch where the function is used (in server module), not where it's defined
-        with patch('server.generate_sql') as mock_gen:
+        # Patch where the function is used (in routes.data_routes module), not where it's defined
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             # Return different SQL based on the query
             def generate_sql_mock(request, schema_info=None):
                 # Handle both request objects and direct query strings
@@ -529,12 +534,13 @@ Eve,32,Boston"""
         invalid_data = invalid_sql_response.json()
         # Error should be present and non-empty (handle both None and empty string)
         error = invalid_data.get("error")
-        assert error is not None and error != ""
+        assert error is not None
+        assert error != ""
         assert invalid_data.get("results", []) == []
 
         # Test 2: Query non-existent table
         # We need to mock SQL generation to reference a non-existent table
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "SELECT * FROM nonexistent_table"
 
             nonexistent_response = integration_client.post(
@@ -548,7 +554,8 @@ Eve,32,Boston"""
             assert nonexistent_response.status_code == 200
             nonexistent_data = nonexistent_response.json()
             error = nonexistent_data.get("error")
-            assert error is not None and error != ""
+            assert error is not None
+            assert error != ""
             assert "no such table" in error.lower()
 
         # Test 3: Empty query
@@ -591,7 +598,7 @@ Eve,32,Boston"""
         assert upload_response.status_code == 200
 
         # Test 1: DROP TABLE injection attempt
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "DROP TABLE people; --"
 
             drop_response = integration_client.post(
@@ -605,11 +612,12 @@ Eve,32,Boston"""
             assert drop_response.status_code == 200
             drop_data = drop_response.json()
             error = drop_data.get("error")
-            assert error is not None and error != ""
+            assert error is not None
+            assert error != ""
             assert "security error" in error.lower() or "dangerous" in error.lower()
 
         # Test 2: DELETE injection attempt
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "DELETE FROM people WHERE 1=1"
 
             delete_response = integration_client.post(
@@ -623,11 +631,12 @@ Eve,32,Boston"""
             assert delete_response.status_code == 200
             delete_data = delete_response.json()
             error = delete_data.get("error")
-            assert error is not None and error != ""
+            assert error is not None
+            assert error != ""
             assert "security error" in error.lower() or "dangerous" in error.lower()
 
         # Test 3: UPDATE injection attempt
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "UPDATE people SET age = 99 WHERE name = 'Alice'"
 
             update_response = integration_client.post(
@@ -641,11 +650,12 @@ Eve,32,Boston"""
             assert update_response.status_code == 200
             update_data = update_response.json()
             error = update_data.get("error")
-            assert error is not None and error != ""
+            assert error is not None
+            assert error != ""
             assert "security error" in error.lower() or "dangerous" in error.lower()
 
         # Test 4: SQL comment injection attempt
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "SELECT * FROM people -- WHERE age > 30"
 
             comment_response = integration_client.post(
@@ -659,11 +669,12 @@ Eve,32,Boston"""
             assert comment_response.status_code == 200
             comment_data = comment_response.json()
             error = comment_data.get("error")
-            assert error is not None and error != ""
+            assert error is not None
+            assert error != ""
             assert "security error" in error.lower() or "comment" in error.lower()
 
         # Test 5: Multiple statement injection
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "SELECT * FROM people; DROP TABLE people;"
 
             multi_response = integration_client.post(
@@ -677,11 +688,12 @@ Eve,32,Boston"""
             assert multi_response.status_code == 200
             multi_data = multi_response.json()
             error = multi_data.get("error")
-            assert error is not None and error != ""
+            assert error is not None
+            assert error != ""
             assert "security error" in error.lower() or "dangerous" in error.lower()
 
         # Test 6: Verify data still exists after all injection attempts
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "SELECT COUNT(*) as count FROM people"
 
             verify_response = integration_client.post(
@@ -898,15 +910,20 @@ Eve,32,Boston"""
         """Provide a shared test database for all file operations and queries."""
         # Patch all database paths to use the test database
         # Patch where functions are used (in server module), not where they're defined
-        with patch('server.convert_csv_to_sqlite') as mock_csv, \
-             patch('server.convert_json_to_sqlite') as mock_json, \
-             patch('server.convert_jsonl_to_sqlite') as mock_jsonl, \
-             patch('utils.db_connection.get_connection') as mock_conn:
+        with patch('routes.data_routes.convert_csv_to_sqlite') as mock_csv, \
+             patch('routes.data_routes.convert_json_to_sqlite') as mock_json, \
+             patch('routes.data_routes.convert_jsonl_to_sqlite') as mock_jsonl, \
+             patch('core.sql_processor.get_connection') as mock_conn, \
+             patch('core.insights.get_connection') as mock_conn2:
 
             # Import the real functions
             from core.file_processor import (
                 convert_csv_to_sqlite as real_csv,
+            )
+            from core.file_processor import (
                 convert_json_to_sqlite as real_json,
+            )
+            from core.file_processor import (
                 convert_jsonl_to_sqlite as real_jsonl,
             )
             from utils.db_connection import get_connection as real_conn
@@ -916,6 +933,7 @@ Eve,32,Boston"""
             mock_json.side_effect = lambda content, table: real_json(content, table, str(integration_test_db))
             mock_jsonl.side_effect = lambda content, table: real_jsonl(content, table, str(integration_test_db))
             mock_conn.side_effect = lambda **kwargs: real_conn(db_path=str(integration_test_db))
+            mock_conn2.side_effect = lambda **kwargs: real_conn(db_path=str(integration_test_db))
 
             yield integration_test_db
 
@@ -924,7 +942,7 @@ Eve,32,Boston"""
         import concurrent.futures
 
         def upload_file(file_num: int):
-            csv_data = f"id,value\n{file_num},test{file_num}".encode('utf-8')
+            csv_data = f"id,value\n{file_num},test{file_num}".encode()
             response = integration_client.post(
                 "/api/upload",
                 files={"file": (f"file{file_num}.csv", io.BytesIO(csv_data), "text/csv")},
@@ -946,7 +964,7 @@ Eve,32,Boston"""
         columns = [f"col{i}" for i in range(100)]
         header = ','.join(columns)
         row = ','.join(str(i) for i in range(100))
-        csv_data = f"{header}\n{row}".encode('utf-8')
+        csv_data = f"{header}\n{row}".encode()
 
         response = integration_client.post(
             "/api/upload",
