@@ -146,6 +146,12 @@
 - `app_docs/feature-6445fc8f-light-sky-blue-background.md` - Light sky blue background variants
 - `app_docs/feature-cc73faf1-upload-button-text.md` - Upload button text and labeling
 - `app_docs/feature-ba65b834-landing-page-visual-design.md` - Landing page layout, visual separators, Tailwind config
+- `app_docs/feature-c80e348c-zte-hopper-queue-card.md` - ZTE Hopper Queue card component, two-column grid layout, RequestForm modifications
+  - Conditions:
+    - Working with RequestForm component or layout
+    - Implementing card-based UI components
+    - Modifying ZteHopperQueueCard component
+    - Troubleshooting two-column grid layout issues
 - `app/client/src/style.css` - Direct CSS modifications
 
 ### Backend & Model Features

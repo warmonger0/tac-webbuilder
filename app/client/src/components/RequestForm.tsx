@@ -5,6 +5,7 @@ import { IssuePreview } from './IssuePreview';
 import { CostEstimateCard } from './CostEstimateCard';
 import { ConfirmDialog } from './ConfirmDialog';
 import { SystemStatusPanel } from './SystemStatusPanel';
+import { ZteHopperQueueCard } from './ZteHopperQueueCard';
 
 const PROJECT_PATH_STORAGE_KEY = 'tac-webbuilder-project-path';
 
@@ -146,10 +147,11 @@ export function RequestForm() {
   return (
     <>
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-6 space-y-4">
-        <h2 className="text-2xl font-bold text-gray-900">
-          Create New Request
-        </h2>
+        <div className="grid grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg shadow p-6 space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900">
+              Create New Request
+            </h2>
 
         <div>
           <label
@@ -237,7 +239,10 @@ export function RequestForm() {
             <IssuePreview issue={preview} />
           </div>
         )}
-      </div>
+          </div>
+
+          <ZteHopperQueueCard />
+        </div>
 
         {showConfirm && preview && (
           <ConfirmDialog
