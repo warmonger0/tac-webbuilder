@@ -200,22 +200,39 @@ def insert_workflow_history(
             "created_at"
         ]
 
+        # Get existing columns from database to validate fields before inserting
+        cursor.execute(f"PRAGMA table_info(workflow_history)")
+        existing_columns = {row["name"] for row in cursor.fetchall()}
+
+        # Map field names from code schema to database schema
+        field_name_mapping = {
+            "hour_of_day": "submission_hour",
+            "day_of_week": "submission_day_of_week"
+        }
+
         for field in optional_fields:
             if field in kwargs:
-                fields.append(field)
-                # Convert dicts and lists to JSON strings
-                json_fields = [
-                    "structured_input", "cost_breakdown", "token_breakdown",
-                    "phase_durations", "retry_reasons", "error_phase_distribution",
-                    "anomaly_flags", "optimization_recommendations"
-                ]
-                if field in json_fields:
-                    if isinstance(kwargs[field], (dict, list)):
-                        values.append(json.dumps(kwargs[field]))
+                # Map field name if needed
+                db_field = field_name_mapping.get(field, field)
+
+                # Only add field if column exists in database
+                if db_field in existing_columns:
+                    fields.append(db_field)
+                    # Convert dicts and lists to JSON strings
+                    json_fields = [
+                        "structured_input", "cost_breakdown", "token_breakdown",
+                        "phase_durations", "retry_reasons", "error_phase_distribution",
+                        "anomaly_flags", "optimization_recommendations"
+                    ]
+                    if field in json_fields:
+                        if isinstance(kwargs[field], (dict, list)):
+                            values.append(json.dumps(kwargs[field]))
+                        else:
+                            values.append(kwargs[field])
                     else:
                         values.append(kwargs[field])
                 else:
-                    values.append(kwargs[field])
+                    logger.debug(f"[DB] Skipping field '{field}' (maps to '{db_field}') - column doesn't exist in database")
 
         placeholders = ", ".join(["?" for _ in values])
         fields_str = ", ".join(fields)
@@ -298,6 +315,10 @@ def update_workflow_history(
     with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 
+        # Get existing columns from database to validate fields before updating
+        cursor.execute(f"PRAGMA table_info(workflow_history)")
+        existing_columns = {row["name"] for row in cursor.fetchall()}
+
         # Convert dicts and lists to JSON strings
         json_fields = [
             "structured_input", "cost_breakdown", "token_breakdown",
@@ -308,8 +329,27 @@ def update_workflow_history(
             if field in kwargs and isinstance(kwargs[field], (dict, list)):
                 kwargs[field] = json.dumps(kwargs[field])
 
-        # Build update query
-        set_clauses = [f"{field} = ?" for field in kwargs]
+        # Map field names from code schema to database schema
+        field_name_mapping = {
+            "hour_of_day": "submission_hour",
+            "day_of_week": "submission_day_of_week"
+        }
+
+        # Build update query with mapped field names, only including fields that exist in DB
+        mapped_kwargs = {}
+        for field, value in kwargs.items():
+            db_field = field_name_mapping.get(field, field)
+            # Only add field if column exists in database
+            if db_field in existing_columns:
+                mapped_kwargs[db_field] = value
+            else:
+                logger.debug(f"[DB] Skipping field '{field}' (maps to '{db_field}') - column doesn't exist in database")
+
+        if not mapped_kwargs:
+            logger.warning(f"[DB] No valid fields to update for ADW {adw_id}")
+            return False
+
+        set_clauses = [f"{field} = ?" for field in mapped_kwargs]
         set_clauses.append("updated_at = CURRENT_TIMESTAMP")
 
         query = f"""
@@ -318,7 +358,7 @@ def update_workflow_history(
             WHERE adw_id = ?
         """
 
-        values = list(kwargs.values()) + [adw_id]
+        values = list(mapped_kwargs.values()) + [adw_id]
         cursor.execute(query, values)
 
         if cursor.rowcount > 0:
@@ -346,6 +386,15 @@ def get_workflow_by_adw_id(adw_id: str) -> dict | None:
 
         if row:
             result = dict(row)
+
+            # Map database field names to code field names for backward compatibility
+            # Database has: submission_hour, submission_day_of_week
+            # Code expects: hour_of_day, day_of_week
+            if "submission_hour" in result:
+                result["hour_of_day"] = result["submission_hour"]
+            if "submission_day_of_week" in result:
+                result["day_of_week"] = result["submission_day_of_week"]
+
             # Parse JSON fields
             json_fields = [
                 "structured_input", "cost_breakdown", "token_breakdown",
@@ -453,15 +502,8 @@ def get_workflow_history(
             sort_order = "DESC"
 
         # Get paginated results
-        # Note: Use column aliases to bridge schema mismatch between DB and Pydantic models
-        # Database has: submission_hour, submission_day_of_week
-        # Pydantic expects: hour_of_day, day_of_week
-        # This allows existing data to work without migration
         query = f"""
-            SELECT
-                *,
-                submission_hour as hour_of_day,
-                submission_day_of_week as day_of_week
+            SELECT *
             FROM workflow_history
             {where_sql}
             ORDER BY {sort_by} {sort_order}
@@ -473,6 +515,15 @@ def get_workflow_history(
         results = []
         for row in rows:
             result = dict(row)
+
+            # Map database field names to code field names for backward compatibility
+            # Database has: submission_hour, submission_day_of_week
+            # Code expects: hour_of_day, day_of_week
+            if "submission_hour" in result:
+                result["hour_of_day"] = result["submission_hour"]
+            if "submission_day_of_week" in result:
+                result["day_of_week"] = result["submission_day_of_week"]
+
             # Parse JSON fields
             json_fields = [
                 "structured_input", "cost_breakdown", "token_breakdown",
@@ -491,15 +542,17 @@ def get_workflow_history(
                     if field in ["anomaly_flags", "optimization_recommendations"]:
                         result[field] = []
 
-            # Convert None to defaults for score fields (legacy data compatibility)
-            score_fields = {
+            # Convert None to defaults for score and temporal fields (legacy data compatibility)
+            default_fields = {
                 "nl_input_clarity_score": 0.0,
                 "cost_efficiency_score": 0.0,
                 "performance_score": 0.0,
                 "quality_score": 0.0,
                 "estimated_cost_total": 0.0,
+                "hour_of_day": -1,
+                "day_of_week": -1,
             }
-            for field, default_value in score_fields.items():
+            for field, default_value in default_fields.items():
                 if result.get(field) is None:
                     result[field] = default_value
 
