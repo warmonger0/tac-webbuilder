@@ -7,10 +7,11 @@ AI Developer Workflow - Automated development via isolated git worktrees + Claud
 - **Isolation:** Each workflow runs in `trees/{adw_id}/` (complete repo copy)
 - **Ports:** Backend 9100-9114, Frontend 9200-9214 (supports 15 concurrent)
 - **State:** `agents/{adw_id}/adw_state.json` tracks progress
-- **Phases (Complete):** Plan → Build → Lint → Test → Review → Doc → Ship → Cleanup (ALL 8)
-- **Phases (Legacy):** Plan → Build → Test → Review → Document (5 only - missing lint, ship, cleanup)
+- **Phases (Complete):** Plan → Validate → Build → Lint → Test → Review → Doc → Ship → Cleanup (ALL 9)
+- **Phases (Legacy):** Plan → Build → Test → Review → Document (5 only - missing validate, lint, ship, cleanup)
 
 ## New Features in Complete Workflows
+- **Validate Phase (Nov 2025):** Pre-build validation detects inherited errors from main branch
 - **Lint Phase:** TypeScript/ESLint validation prevents deploying broken code
 - **Ship Phase:** Automatic PR approval and merge (in ZTE workflows)
 - **Cleanup Phase:** Automatic worktree removal and artifact organization
@@ -34,10 +35,10 @@ cd adws/
 # Stepwise refinement - analyzes issue complexity (ATOMIC vs DECOMPOSE)
 uv run adw_stepwise_iso.py <issue-number>
 
-# Complete SDLC with ALL 8 phases (Plan → Build → Lint → Test → Review → Doc → Ship → Cleanup)
+# Complete SDLC with ALL 9 phases (Plan → Validate → Build → Lint → Test → Review → Doc → Ship → Cleanup)
 uv run adw_sdlc_complete_iso.py <issue-number> [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
 
-# Zero Touch Execution with ALL 8 phases + auto-merge (⚠️ auto-merges to main!)
+# Zero Touch Execution with ALL 9 phases + auto-merge (⚠️ auto-merges to main!)
 uv run adw_sdlc_complete_zte_iso.py <issue-number> [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
 ```
 
@@ -121,7 +122,36 @@ python3 -c "from adw_modules.cleanup_operations import cleanup_shipped_issue; \
   cleanup_shipped_issue('33', '88405eb3')"
 ```
 
+## New Validate Phase (Nov 2025)
+
+All complete workflows now include a Validate phase:
+
+```
+OLD: Plan → Build → Lint → Test → Review → Doc → Ship → Cleanup (8 phases)
+NEW: Plan → Validate → Build → Lint → Test → Review → Doc → Ship → Cleanup (9 phases)
+```
+
+**Purpose**: Detect inherited errors BEFORE implementation to prevent false positives
+
+**How it Works**:
+1. **Validate Phase**: Runs build check on UNMODIFIED worktree, captures baseline errors
+2. **Build Phase**: Runs build check on MODIFIED worktree, calculates differential errors
+3. **Result**: Only NEW errors introduced by your changes will block the workflow
+
+**Benefits**:
+- ✅ Work on issues even when main branch has errors
+- ✅ No false positives from inherited errors
+- ✅ Get credit for fixing inherited errors
+- ✅ Maintains clean code standards
+
+**Usage**: Automatic in all `adw_sdlc_complete_*.py` workflows
+
+**Manual**: `uv run adw_validate_iso.py <issue-number> <adw-id>`
+
+**Best Practices**: See `docs/ADW_WORKFLOW_BEST_PRACTICES.md` for complete guide
+
 ## When to Load Full Docs
 - **Complete ADW guide:** `adws/README.md` (3,900 tokens)
 - **All workflows:** `.claude/commands/references/adw_workflows.md` (1,500 tokens)
 - **Architecture:** `.claude/commands/references/architecture_overview.md` (900 tokens)
+- **Best Practices:** `docs/ADW_WORKFLOW_BEST_PRACTICES.md` (workflow troubleshooting)
