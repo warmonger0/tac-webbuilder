@@ -1,9 +1,111 @@
 {
-  "adw_id": "d7e1040d",
-  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/d7e1040d",
-  "created_at": "2025-11-21T04:31:03.976271",
+  "adw_id": "da86f01c",
+  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/da86f01c",
+  "created_at": "2025-11-21T06:12:35.207146",
+  "spec_file": "/Users/Warmonger0/tac/tac-webbuilder/trees/da86f01c/specs/issue-72-adw-da86f01c-sdlc_planner-move-docs-planned-features-adw-monitor-folder-to-d.md",
   "changed_files": [
     ".adw-context.json",
-    ".mcp.json"
-  ]
+    ".claude/commands/e2e/test_adw_monitor.md",
+    ".mcp.json",
+    ".playwright-mcp/01_adw_monitor_api_response.png",
+    ".playwright-mcp/02_adw_monitor_swagger_docs.png",
+    "app/server/core/adw_monitor.py",
+    "app/server/core/data_models.py",
+    "app/server/routes/__init__.py",
+    "app/server/routes/data_routes.py",
+    "app/server/routes/github_routes.py",
+    "app/server/routes/system_routes.py",
+    "app/server/routes/websocket_routes.py",
+    "app/server/routes/workflow_routes.py",
+    "app/server/server.py",
+    "app/server/tests/core/test_adw_monitor.py",
+    "app/server/tests/integration/test_adw_monitor_endpoint.py",
+    "docs/implementation/adw-monitor/ADW_MONITOR_IMPLEMENTATION_OVERVIEW.md",
+    "docs/implementation/adw-monitor/ISSUE_ADW_MONITOR_DESIGN.md",
+    "docs/implementation/adw-monitor/PHASE_1_BACKEND_API.md",
+    "specs/patch/patch-adw-da86f01c-refactor-server-py-routes.md"
+  ],
+  "changed_files_stats": {
+    ".adw-context.json": {
+      "additions": 18,
+      "deletions": 5
+    },
+    ".claude/commands/e2e/test_adw_monitor.md": {
+      "additions": 153,
+      "deletions": 0
+    },
+    ".mcp.json": {
+      "additions": 1,
+      "deletions": 1
+    },
+    ".playwright-mcp/01_adw_monitor_api_response.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    ".playwright-mcp/02_adw_monitor_swagger_docs.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    "app/server/core/adw_monitor.py": {
+      "additions": 446,
+      "deletions": 0
+    },
+    "app/server/core/data_models.py": {
+      "additions": 38,
+      "deletions": 0
+    },
+    "app/server/routes/__init__.py": {
+      "additions": 10,
+      "deletions": 0
+    },
+    "app/server/routes/data_routes.py": {
+      "additions": 303,
+      "deletions": 0
+    },
+    "app/server/routes/github_routes.py": {
+      "additions": 46,
+      "deletions": 0
+    },
+    "app/server/routes/system_routes.py": {
+      "additions": 109,
+      "deletions": 0
+    },
+    "app/server/routes/websocket_routes.py": {
+      "additions": 99,
+      "deletions": 0
+    },
+    "app/server/routes/workflow_routes.py": {
+      "additions": 354,
+      "deletions": 0
+    },
+    "app/server/server.py": {
+      "additions": 17,
+      "deletions": 805
+    },
+    "app/server/tests/core/test_adw_monitor.py": {
+      "additions": 494,
+      "deletions": 0
+    },
+    "app/server/tests/integration/test_adw_monitor_endpoint.py": {
+      "additions": 398,
+      "deletions": 0
+    },
+    "docs/implementation/adw-monitor/ADW_MONITOR_IMPLEMENTATION_OVERVIEW.md": {
+      "additions": 68,
+      "deletions": 0
+    },
+    "docs/implementation/adw-monitor/ISSUE_ADW_MONITOR_DESIGN.md": {
+      "additions": 444,
+      "deletions": 0
+    },
+    "docs/implementation/adw-monitor/PHASE_1_BACKEND_API.md": {
+      "additions": 116,
+      "deletions": 0
+    },
+    "specs/patch/patch-adw-da86f01c-refactor-server-py-routes.md": {
+      "additions": 207,
+      "deletions": 0
+    }
+  },
+  "documentation_screenshots_dir": "/Users/Warmonger0/tac/tac-webbuilder/trees/da86f01c/agents/da86f01c/reviewer/review_img"
 }

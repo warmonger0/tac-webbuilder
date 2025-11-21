@@ -404,3 +404,41 @@ class CostPrediction(BaseModel):
     min_cost: float = Field(..., description="Minimum cost from historical data")
     max_cost: float = Field(..., description="Maximum cost from historical data")
     avg_cost: float = Field(..., description="Average cost from historical data")
+
+# ADW Monitor Models
+class AdwWorkflowStatus(BaseModel):
+    """Status of a single ADW workflow for monitoring"""
+    adw_id: str = Field(..., description="ADW workflow identifier")
+    issue_number: int | None = Field(None, description="GitHub issue number")
+    issue_class: str = Field("", description="Issue classification (/bug, /feature, etc.)")
+    title: str = Field("", description="Workflow title (truncated nl_input)")
+    status: Literal["running", "completed", "failed", "paused", "queued"] = Field(..., description="Current workflow status")
+    current_phase: str | None = Field(None, description="Current phase name")
+    phase_progress: float = Field(0.0, description="Phase progress percentage (0-100)")
+    workflow_template: str = Field("", description="Workflow template name")
+    start_time: str | None = Field(None, description="Start time (ISO format)")
+    end_time: str | None = Field(None, description="End time (ISO format)")
+    duration_seconds: int | None = Field(None, description="Duration in seconds")
+    github_url: str | None = Field(None, description="GitHub issue URL")
+    worktree_path: str | None = Field(None, description="Path to worktree directory")
+    current_cost: float | None = Field(None, description="Current cost in dollars")
+    estimated_cost_total: float | None = Field(None, description="Estimated total cost in dollars")
+    error_count: int = Field(0, description="Number of errors encountered")
+    last_error: str | None = Field(None, description="Last error message")
+    is_process_active: bool = Field(False, description="Whether process is actively running")
+    phases_completed: list[str] = Field(default_factory=list, description="List of completed phase names")
+    total_phases: int = Field(8, description="Total number of phases in workflow")
+
+class AdwMonitorSummary(BaseModel):
+    """Summary statistics for ADW monitoring"""
+    total: int = Field(0, description="Total number of workflows")
+    running: int = Field(0, description="Number of running workflows")
+    completed: int = Field(0, description="Number of completed workflows")
+    failed: int = Field(0, description="Number of failed workflows")
+    paused: int = Field(0, description="Number of paused workflows")
+
+class AdwMonitorResponse(BaseModel):
+    """Complete response for ADW monitoring endpoint"""
+    summary: AdwMonitorSummary = Field(..., description="Summary statistics")
+    workflows: list[AdwWorkflowStatus] = Field(..., description="List of workflow statuses")
+    last_updated: str = Field(..., description="Last update timestamp (ISO format)")

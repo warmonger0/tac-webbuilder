@@ -185,6 +185,14 @@
 - `app_docs/feature-09115cf1-zte-hopper-queue-system.md` - ZTE Hopper queue system, batch processing, zte_hopper.sh
 - `app_docs/feature-d2ac5466-workflows-documentation-tab.md` - ADW workflow documentation display, workflow categorization, workflows section UI
 - `app_docs/feature-a5b80595-workflow-history-ui-enhancements.md` - Workflow history UI enhancements, classification badges, workflow journey display, structured input visualization, WorkflowHistoryCard component
+- `app_docs/feature-da86f01c-adw-monitor-api.md` - ADW Monitor backend API, /api/adw-monitor endpoint, real-time workflow monitoring, state aggregation, process detection, phase progress tracking, modular route architecture
+  - Conditions:
+    - Working with ADW workflow monitoring or status tracking
+    - Implementing new API endpoints in app/server/routes/
+    - Understanding server route organization (data, workflow, system, github, websocket modules)
+    - Working with app/server/core/adw_monitor.py
+    - Troubleshooting workflow status detection or progress calculation
+    - Implementing real-time monitoring features or caching strategies
 
 ### Analytics & Insights Features
 - `app_docs/feature-a7c948e2-insights-recommendations.md` - Phase 3D anomaly detection, optimization recommendations, workflow analytics insights, complexity detection, statistical thresholds
