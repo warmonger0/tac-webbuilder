@@ -905,7 +905,7 @@ def main():
         # Run external tests
         success, external_results = run_external_tests(issue_number, adw_id, logger, state)
 
-        # CRITICAL FIX: Check if external tool failed and exit immediately
+        # Infrastructure failure fallback path
         if "error" in external_results:
             # External tool failed critically (e.g., JSONDecodeError, timeout, crash)
             error_info = external_results.get("error", {})
@@ -932,41 +932,76 @@ def main():
                 format_issue_message(adw_id, AGENT_TESTER, error_comment)
             )
 
-            # FAIL FAST: Exit immediately with error code
-            logger.error("Exiting due to external test tool failure")
-            sys.exit(1)
+            # FALLBACK: Try inline test execution with resolution loop
+            logger.info("🔄 Attempting fallback to inline test execution due to external tool failure")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    AGENT_TESTER,
+                    f"🔄 External test tool failed ({error_type}), falling back to inline test execution with resolution loop..."
+                )
+            )
 
-        # Process external results
-        summary = external_results.get("summary", {})
-        failures = external_results.get("failures", [])
+            # Run tests with resolution and retry logic
+            results, passed_count, failed_count, test_response = run_tests_with_resolution(
+                adw_id, issue_number, logger, worktree_path
+            )
 
-        passed_count = summary.get("passed", 0)
-        failed_count = summary.get("failed", 0)
-        total = summary.get("total", passed_count + failed_count)
+            # Track results
+            test_results = results
 
-        # Format results comment
-        if success:
-            comment = f"✅ All {total} tests passed!\n"
-            comment += f"⚡ Context savings: ~90% (using external tools)"
+            if results:
+                comment = format_test_results_comment(results, passed_count, failed_count)
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, AGENT_TESTER, comment)
+                )
+                logger.info(f"Fallback test results: {passed_count} passed, {failed_count} failed")
+            else:
+                logger.warning("No test results found in fallback execution")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id, AGENT_TESTER, "⚠️ No test results found in fallback execution"
+                    ),
+                )
+
+            # Continue to normal flow with fallback results
+            # Do not exit here - let the workflow handle test failures normally
+
         else:
-            comment = f"❌ {failed_count} test(s) failed out of {total}\n\n"
-            comment += "**Failures:**\n"
-            for failure in failures[:10]:  # Limit to first 10
-                file_path = failure.get("file", "unknown")
-                line = failure.get("line", "?")
-                error = failure.get("error", "unknown error")
-                comment += f"- `{file_path}:{line}` - {error}\n"
+            # External tool success path - process external results normally
+            summary = external_results.get("summary", {})
+            failures = external_results.get("failures", [])
 
-            if len(failures) > 10:
-                comment += f"\n... and {len(failures) - 10} more failures\n"
+            passed_count = summary.get("passed", 0)
+            failed_count = summary.get("failed", 0)
+            total = summary.get("total", passed_count + failed_count)
 
-            comment += f"\n⚡ Context savings: ~84% (compact failure reporting)"
+            # Format results comment
+            if success:
+                comment = f"✅ All {total} tests passed!\n"
+                comment += f"⚡ Context savings: ~90% (using external tools)"
+            else:
+                comment = f"❌ {failed_count} test(s) failed out of {total}\n\n"
+                comment += "**Failures:**\n"
+                for failure in failures[:10]:  # Limit to first 10
+                    file_path = failure.get("file", "unknown")
+                    line = failure.get("line", "?")
+                    error = failure.get("error", "unknown error")
+                    comment += f"- `{file_path}:{line}` - {error}\n"
 
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, AGENT_TESTER, comment)
-        )
-        logger.info(f"External test results: {passed_count} passed, {failed_count} failed")
+                if len(failures) > 10:
+                    comment += f"\n... and {len(failures) - 10} more failures\n"
+
+                comment += f"\n⚡ Context savings: ~84% (compact failure reporting)"
+
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_TESTER, comment)
+            )
+            logger.info(f"External test results: {passed_count} passed, {failed_count} failed")
 
     else:
         # Use inline test execution (existing behavior)
