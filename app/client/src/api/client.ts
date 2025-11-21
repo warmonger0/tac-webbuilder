@@ -213,7 +213,7 @@ export async function getWebhookStatus(): Promise<any> {
     if (response.ok) {
       return response.json();
     }
-  } catch (err) {
+  } catch {
     // Fallback to backend proxy if direct access fails
   }
 
