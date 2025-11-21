@@ -247,7 +247,7 @@ function displayResults(response: QueryResponse, query: string) {
     exportButton.onclick = async () => {
       try {
         await api.exportQueryResults(response.results, response.columns);
-      } catch (error) {
+      } catch {
         displayError('Failed to export results');
       }
     };
@@ -345,7 +345,7 @@ function displayTables(tables: TableSchema[]) {
     exportButton.onclick = async () => {
       try {
         await api.exportTable(table.name);
-      } catch (error) {
+      } catch {
         displayError('Failed to export table');
       }
     };
