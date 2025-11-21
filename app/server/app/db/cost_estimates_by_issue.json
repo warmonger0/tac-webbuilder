@@ -73,5 +73,74 @@
     "reasoning": "Full-stack integration required | Database changes required | Workflow/automation changes | Explicitly marked as complex",
     "recommended_workflow": "adw_sdlc_zte_iso",
     "timestamp": "2025-11-19T18:10:04.434767"
+  },
+  "123": {
+    "estimated_cost_total": 0.5,
+    "estimated_cost_breakdown": {},
+    "level": "standard",
+    "confidence": 0.8,
+    "reasoning": "Standard complexity",
+    "recommended_workflow": "adw_sdlc_iso",
+    "timestamp": "2025-11-20T18:20:43.280604"
+  },
+  "58": {
+    "estimated_cost_total": 4.0,
+    "estimated_cost_breakdown": {
+      "plan": 0.8,
+      "build": 1.4,
+      "test": 1.0,
+      "review": 0.4,
+      "document": 0.4
+    },
+    "level": "complex",
+    "confidence": 0.6666666666666666,
+    "reasoning": "Database changes required | Workflow/automation changes",
+    "recommended_workflow": "adw_sdlc_zte_iso",
+    "timestamp": "2025-11-20T18:21:05.691326"
+  },
+  "62": {
+    "estimated_cost_total": 4.0,
+    "estimated_cost_breakdown": {
+      "plan": 0.8,
+      "build": 1.4,
+      "test": 1.0,
+      "review": 0.4,
+      "document": 0.4
+    },
+    "level": "complex",
+    "confidence": 0.6666666666666666,
+    "reasoning": "Database changes required | Workflow/automation changes",
+    "recommended_workflow": "adw_sdlc_zte_iso",
+    "timestamp": "2025-11-20T20:44:45.737553"
+  },
+  "64": {
+    "estimated_cost_total": 4.0,
+    "estimated_cost_breakdown": {
+      "plan": 0.8,
+      "build": 1.4,
+      "test": 1.0,
+      "review": 0.4,
+      "document": 0.4
+    },
+    "level": "complex",
+    "confidence": 1.0,
+    "reasoning": "Full-stack integration required | Database changes required | External integration required | Multiple components affected (9) | Workflow/automation changes",
+    "recommended_workflow": "adw_sdlc_zte_iso",
+    "timestamp": "2025-11-20T21:41:46.777802"
+  },
+  "66": {
+    "estimated_cost_total": 4.0,
+    "estimated_cost_breakdown": {
+      "plan": 0.8,
+      "build": 1.4,
+      "test": 1.0,
+      "review": 0.4,
+      "document": 0.4
+    },
+    "level": "complex",
+    "confidence": 0.6666666666666666,
+    "reasoning": "Database changes required | Workflow/automation changes",
+    "recommended_workflow": "adw_sdlc_zte_iso",
+    "timestamp": "2025-11-20T22:56:13.522010"
   }
 }

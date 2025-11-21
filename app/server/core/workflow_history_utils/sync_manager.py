@@ -156,7 +156,7 @@ def sync_workflow_history() -> int:
             # Insert new workflow
             insert_data = {
                 **workflow_data,
-                "created_at": workflow_data.get("start_time", datetime.now().isoformat()),
+                "created_at": workflow_data.get("start_time") or datetime.now().isoformat(),
             }
 
             if duration_seconds:

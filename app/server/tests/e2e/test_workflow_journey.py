@@ -30,7 +30,7 @@ class TestWorkflowCreationJourney:
         3. User retrieves workflow details
         """
         # Step 1: Create workflow
-        with patch('core.workflow_history.DB_PATH', e2e_database):
+        with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
             create_response = e2e_test_client.post("/api/workflows/create", json={
                 "nl_input": sample_workflow_data["nl_input"],
                 "issue_number": sample_workflow_data["issue_number"],
@@ -64,7 +64,7 @@ class TestWorkflowAnalyticsJourney:
         2. User filters workflows by status
         3. User views detailed metrics
         """
-        with patch('core.workflow_history.DB_PATH', e2e_database):
+        with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
             # Step 1: Get analytics overview
             analytics_response = e2e_test_client.get("/api/workflows/analytics")
 
@@ -255,7 +255,7 @@ class TestMultiWorkflowJourney:
         conn.close()
 
         # View all workflows
-        with patch('core.workflow_history.DB_PATH', e2e_database):
+        with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
             response = e2e_test_client.get("/api/workflows/history")
 
             if response.status_code == 200:
@@ -280,7 +280,7 @@ class TestDataExportJourney:
         2. User chooses export format (CSV, JSON)
         3. User downloads exported data
         """
-        with patch('core.workflow_history.DB_PATH', e2e_database):
+        with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
             # Test CSV export (if endpoint exists)
             export_response = e2e_test_client.post("/api/export", json={
                 "format": "csv",

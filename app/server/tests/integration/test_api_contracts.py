@@ -50,7 +50,7 @@ class TestWorkflowEndpoints:
 
     def test_workflow_history_endpoint(self, integration_client, db_with_workflows):
         """Verify workflow history endpoint returns data."""
-        with patch('core.workflow_history.DB_PATH', db_with_workflows):
+        with patch('core.workflow_history_utils.database.DB_PATH', db_with_workflows):
             # Correct endpoint is /api/workflow-history (not /api/workflows/history)
             response = integration_client.get("/api/workflow-history")
 
@@ -62,7 +62,7 @@ class TestWorkflowEndpoints:
 
     def test_workflow_analytics_endpoint(self, integration_client, db_with_workflows):
         """Verify analytics endpoint returns metrics."""
-        with patch('core.workflow_history.DB_PATH', db_with_workflows):
+        with patch('core.workflow_history_utils.database.DB_PATH', db_with_workflows):
             response = integration_client.get("/api/workflows/analytics")
 
             if response.status_code == 200:

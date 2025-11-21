@@ -93,7 +93,7 @@ def test_database_operation(integration_test_db):
     """Test database operations with real schema."""
     from core.workflow_history import insert_workflow_history, get_workflow_by_adw_id
 
-    with pytest.mock.patch('core.workflow_history.DB_PATH', integration_test_db):
+    with pytest.mock.patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
         # Insert workflow
         row_id = insert_workflow_history(
             adw_id="TEST-001",
@@ -126,7 +126,7 @@ def test_complete_workflow(e2e_test_client, e2e_database):
     """Test complete user workflow from start to finish."""
     from unittest.mock import patch
 
-    with patch('core.workflow_history.DB_PATH', e2e_database):
+    with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
         # Step 1: Create workflow
         create_response = e2e_test_client.post("/api/workflows/create", json={
             "nl_input": "Test workflow",
@@ -303,7 +303,7 @@ def test_new_endpoint(integration_client, mock_anthropic_api):
 def test_db_operation(integration_test_db):
     from core.workflow_history import insert_workflow_history
 
-    with pytest.mock.patch('core.workflow_history.DB_PATH', integration_test_db):
+    with pytest.mock.patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
         row_id = insert_workflow_history(adw_id="TEST", status="completed")
         assert row_id > 0
 ```
@@ -314,7 +314,7 @@ def test_db_operation(integration_test_db):
 def test_user_flow(e2e_test_client, e2e_database):
     from unittest.mock import patch
 
-    with patch('core.workflow_history.DB_PATH', e2e_database):
+    with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
         # Create
         create_resp = e2e_test_client.post("/api/create", json={...})
         assert create_resp.status_code == 201

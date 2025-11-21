@@ -141,12 +141,12 @@ class TestInitDB:
             None,  # ALTER TABLE (add column)
         ]
 
-        with patch.object(mock_conn, 'commit'):
-            init_db()
+        init_db()
 
         # Verify ALTER TABLE was called
         execute_calls = [str(call[0][0]) for call in mock_cursor.execute.call_args_list]
         assert any("ALTER TABLE workflow_history ADD COLUMN gh_issue_state" in call for call in execute_calls)
+        # Verify commit was called after ALTER TABLE
         mock_conn.commit.assert_called()
 
     def test_migration_skips_if_column_exists(self, mock_get_db_connection):
@@ -1341,8 +1341,9 @@ class TestGetHistoryAnalytics:
 
         analytics = get_history_analytics()
 
-        # Verify query filters for completed status
-        avg_duration_query = mock_cursor.execute.call_args_list[1][0][0]
+        # Verify query filters for completed status (3rd query executed)
+        # Query execution order: 1. COUNT(*) 2. GROUP BY status 3. AVG(duration) for completed
+        avg_duration_query = mock_cursor.execute.call_args_list[2][0][0]
         assert "WHERE status = 'completed'" in avg_duration_query
         assert "duration_seconds IS NOT NULL" in avg_duration_query
 
@@ -1365,13 +1366,14 @@ class TestGetHistoryAnalytics:
 
         analytics = get_history_analytics()
 
-        # Verify cost query filters
-        cost_query = mock_cursor.execute.call_args_list[2][0][0]
+        # Verify cost query filters (6th query executed)
+        # Query order: 1.COUNT 2.status 3.duration 4.model 5.template 6.cost 7.tokens
+        cost_query = mock_cursor.execute.call_args_list[5][0][0]
         assert "actual_cost_total IS NOT NULL" in cost_query
         assert "actual_cost_total > 0" in cost_query
 
-        # Verify token query filters
-        token_query = mock_cursor.execute.call_args_list[3][0][0]
+        # Verify token query filters (7th query executed)
+        token_query = mock_cursor.execute.call_args_list[6][0][0]
         assert "total_tokens IS NOT NULL" in token_query
         assert "total_tokens > 0" in token_query
 

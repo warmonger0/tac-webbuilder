@@ -13,6 +13,7 @@ import logging
 
 # Database operations
 from core.workflow_history_utils.database import (
+    DB_PATH,
     init_db,
     insert_workflow_history,
     update_workflow_history_by_issue,
@@ -33,6 +34,8 @@ logger = logging.getLogger(__name__)
 
 # Define public API
 __all__ = [
+    # Database path (for testing)
+    "DB_PATH",
     # Database operations
     "init_db",
     "insert_workflow_history",

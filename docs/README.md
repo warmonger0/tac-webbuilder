@@ -12,17 +12,22 @@ Documentation is organized into the following categories:
 - **[architecture/](architecture/)** - System architecture, technical design, cleanup, and performance optimization
 - **[features/](features/)** - **Implemented** feature-specific documentation
 - **[implementation/](implementation/)** - **Completed** implementation guides and strategies
+  - **[completed-refactoring/](implementation/completed-refactoring/)** - ✅ **Complete backend refactoring archive** (Phases 1-4.7)
 - **[testing/](testing/)** - Testing guides, test coverage reports, and test deliverables
 
 ### Planned & Future Features (Not Yet Implemented)
 - **[planned_features/](planned_features/)** - **Planned features awaiting approval/implementation**
-  - `codebase-refactoring/` - Systematic refactoring plan (15-20 days)
+  - ~~`codebase-refactoring/`~~ - ✅ **COMPLETE** (see [implementation/completed-refactoring/](implementation/completed-refactoring/))
   - `pattern-learning/` - Out-loop coding and pattern detection
   - `auto-tool-routing/` - Automated workflow optimization
 
 ### Historical & Reference
-- **[Archive/](Archive/)** - Historical documentation and session notes
-- **[Archived Issues/](Archived%20Issues/)** - Completed issue documentation with specs and summaries
+- **[Archive/](Archive/)** - Historical documentation, session notes, and completed work
+  - `issues/` - Archived issue documentation (issue-8, issue-11, issue-64, workflow-history-enhancements, general)
+  - `testing-sessions/` - Historical E2E testing session notes
+  - `refactoring-sessions/` - Backend refactoring session documentation
+  - `adw-guides/` - Legacy ADW execution guides
+  - `sessions/` - General session handoff documents
 
 ## Core Documentation
 

@@ -80,7 +80,7 @@ class TestWorkflowHistoryDatabase:
 
         # Act: Initialize database
         with patch.object(Path, 'parent', integration_test_db.parent):
-            with patch('core.workflow_history.DB_PATH', integration_test_db):
+            with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
                 init_db()
 
         # Assert: Database file was created
@@ -127,7 +127,7 @@ class TestWorkflowHistoryDatabase:
         conn.close()
 
         # Act: Call init_db() again (idempotence test)
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()  # Should not raise any errors
 
         # Assert: Database still valid and no errors occurred
@@ -148,7 +148,7 @@ class TestWorkflowHistoryDatabase:
         - Timestamps are set automatically
         """
         # Arrange
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             workflow_data = {
@@ -228,7 +228,7 @@ class TestWorkflowHistoryDatabase:
         - Partial updates work correctly
         """
         # Arrange
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             # Insert initial workflow
@@ -307,7 +307,7 @@ class TestWorkflowHistoryDatabase:
         - Total count returned correctly
         """
         # Arrange: Insert 50 diverse workflows
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             base_time = datetime(2025, 11, 1, 10, 0, 0)
@@ -431,7 +431,7 @@ class TestWorkflowHistoryDatabase:
         - Token usage averages
         """
         # Arrange: Insert 20 workflows with varying outcomes
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             workflows = [
@@ -591,7 +591,7 @@ class TestWorkflowHistoryDatabase:
         (workflow2_dir / "adw_state.json").write_text(json.dumps(state2))
         (workflow2_dir / "error.log").write_text("Test error occurred")
 
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             # Act: First sync - Create a simpler mock approach
@@ -635,11 +635,11 @@ class TestWorkflowHistoryDatabase:
 
                 return workflows
 
-            with patch.object(wh_module, 'scan_agents_directory', mocked_scan):
+            with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', mocked_scan):
                 # Also mock cost/GitHub functions to avoid external dependencies
-                with patch('core.workflow_history.read_cost_history') as mock_cost:
-                    with patch('core.workflow_history.fetch_github_issue_state') as mock_gh:
-                        with patch('core.workflow_history.get_cost_estimate') as mock_est:
+                with patch('core.cost_tracker.read_cost_history') as mock_cost:
+                    with patch('core.workflow_history_utils.github_client.fetch_github_issue_state') as mock_gh:
+                        with patch('core.cost_estimate_storage.get_cost_estimate') as mock_est:
                             mock_cost.side_effect = Exception("No cost data")
                             mock_gh.return_value = "open"
                             mock_est.return_value = None
@@ -650,7 +650,7 @@ class TestWorkflowHistoryDatabase:
         assert synced_count == 2
 
         # Verify workflow 1 was inserted with correct status
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             wf1 = get_workflow_by_adw_id("TEST-SYNC-001")
             assert wf1 is not None
             assert wf1["issue_number"] == 200
@@ -664,10 +664,10 @@ class TestWorkflowHistoryDatabase:
             assert wf2["status"] == "failed"  # Inferred from error.log
 
             # Act: Sync again (should not create duplicates)
-            with patch('core.workflow_history.scan_agents_directory', mocked_scan):
-                with patch('core.workflow_history.read_cost_history') as mock_cost:
-                    with patch('core.workflow_history.fetch_github_issue_state') as mock_gh:
-                        with patch('core.workflow_history.get_cost_estimate') as mock_est:
+            with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', mocked_scan):
+                with patch('core.cost_tracker.read_cost_history') as mock_cost:
+                    with patch('core.workflow_history_utils.github_client.fetch_github_issue_state') as mock_gh:
+                        with patch('core.cost_estimate_storage.get_cost_estimate') as mock_est:
                             mock_cost.side_effect = Exception("No cost data")
                             mock_gh.return_value = "open"
                             mock_est.return_value = None
@@ -675,7 +675,7 @@ class TestWorkflowHistoryDatabase:
                             synced_count2 = sync_workflow_history()
 
         # Assert: No new workflows created (updates only)
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             all_workflows, total = get_workflow_history(limit=100)
             assert total == 2  # Still only 2 workflows
 
@@ -1086,7 +1086,7 @@ class TestDatabaseIntegrity:
         - IntegrityError raised on duplicate
         """
         # Arrange
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             # Insert first workflow
@@ -1111,7 +1111,7 @@ class TestDatabaseIntegrity:
         - No exceptions raised
         """
         # Arrange
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             # Act
@@ -1129,7 +1129,7 @@ class TestDatabaseIntegrity:
         - No exceptions raised
         """
         # Arrange
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             # Act
@@ -1151,7 +1151,7 @@ class TestDatabaseIntegrity:
         - Percentages handle division by zero
         """
         # Arrange
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             # Act
@@ -1178,7 +1178,7 @@ class TestDatabaseIntegrity:
         - Nested structures preserved
         """
         # Arrange
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             complex_data = {
@@ -1228,7 +1228,7 @@ class TestDatabasePerformance:
         - Database remains responsive
         """
         # Arrange
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             num_workflows = 100
@@ -1261,7 +1261,7 @@ class TestDatabasePerformance:
         - Sorting is efficient
         """
         # Arrange: Insert 200 workflows
-        with patch('core.workflow_history.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
             for i in range(200):
