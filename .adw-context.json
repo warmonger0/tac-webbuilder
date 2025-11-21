@@ -1,9 +1,22 @@
 {
   "adw_id": "da86f01c",
   "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/da86f01c",
-  "created_at": "2025-11-21T05:44:39.799461",
+  "created_at": "2025-11-21T06:09:45.645955",
+  "spec_file": "/Users/Warmonger0/tac/tac-webbuilder/trees/da86f01c/specs/issue-72-adw-da86f01c-sdlc_planner-move-docs-planned-features-adw-monitor-folder-to-d.md",
   "changed_files": [
     ".adw-context.json",
-    ".mcp.json"
-  ]
+    ".claude/commands/e2e/test_adw_monitor.md",
+    ".mcp.json",
+    "app/server/core/adw_monitor.py",
+    "app/server/core/data_models.py",
+    "app/server/server.py",
+    "app/server/tests/core/test_adw_monitor.py",
+    "app/server/tests/integration/test_adw_monitor_endpoint.py",
+    "docs/implementation/adw-monitor/ADW_MONITOR_IMPLEMENTATION_OVERVIEW.md",
+    "docs/implementation/adw-monitor/ISSUE_ADW_MONITOR_DESIGN.md",
+    "docs/implementation/adw-monitor/PHASE_1_BACKEND_API.md"
+  ],
+  "review_image_dir": "/Users/Warmonger0/tac/tac-webbuilder/trees/da86f01c/agents/da86f01c/reviewer/review_img",
+  "backend_port": 9100,
+  "frontend_port": 9200
 }
