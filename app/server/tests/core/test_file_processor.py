@@ -88,10 +88,8 @@ class TestFileProcessor:
         table_name = "inconsistent_table"
 
         # Pandas will fail on inconsistent CSV data
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="Error converting CSV to SQLite"):
             convert_csv_to_sqlite(csv_data, table_name, test_db)
-
-        assert "Error converting CSV to SQLite" in str(exc_info.value)
 
     def test_convert_json_to_sqlite_success(self, test_db, test_assets_dir):
         # Load real JSON file
@@ -131,30 +129,24 @@ class TestFileProcessor:
         json_data = b'invalid json'
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="Error converting JSON to SQLite"):
             convert_json_to_sqlite(json_data, table_name, test_db)
-
-        assert "Error converting JSON to SQLite" in str(exc_info.value)
 
     def test_convert_json_to_sqlite_not_array(self, test_db):
         # Test with JSON that's not an array
         json_data = b'{"name": "John", "age": 25}'
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="JSON must be an array of objects"):
             convert_json_to_sqlite(json_data, table_name, test_db)
-
-        assert "JSON must be an array of objects" in str(exc_info.value)
 
     def test_convert_json_to_sqlite_empty_array(self, test_db):
         # Test with empty JSON array
         json_data = b'[]'
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="JSON array is empty"):
             convert_json_to_sqlite(json_data, table_name, test_db)
-
-        assert "JSON array is empty" in str(exc_info.value)
 
     def test_flatten_json_object_nested_dict(self):
         """Test flattening nested dictionary objects"""
@@ -242,10 +234,8 @@ class TestFileProcessor:
         """Test field discovery with invalid JSON"""
         jsonl_content = b'{"valid": "json"}\n{invalid json}'
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Invalid JSON on line 2"):
             discover_jsonl_fields(jsonl_content)
-
-        assert "Invalid JSON on line 2" in str(exc_info.value)
 
     def test_discover_jsonl_fields_empty_lines(self):
         """Test field discovery with empty lines"""
@@ -349,30 +339,24 @@ class TestFileProcessor:
         jsonl_data = b'{"valid": "json"}\n{invalid json}'
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="Invalid JSON on line 2"):
             convert_jsonl_to_sqlite(jsonl_data, table_name, test_db)
-
-        assert "Invalid JSON on line 2" in str(exc_info.value)
 
     def test_convert_jsonl_to_sqlite_empty_file(self, test_db):
         """Test JSONL conversion with empty file"""
         jsonl_data = b''
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="No valid JSON objects found in JSONL file"):
             convert_jsonl_to_sqlite(jsonl_data, table_name, test_db)
-
-        assert "No valid JSON objects found in JSONL file" in str(exc_info.value)
 
     def test_convert_jsonl_to_sqlite_blank_lines_only(self, test_db):
         """Test JSONL conversion with only blank lines"""
         jsonl_data = b'\n\n\n'
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="No valid JSON objects found in JSONL file"):
             convert_jsonl_to_sqlite(jsonl_data, table_name, test_db)
-
-        assert "No valid JSON objects found in JSONL file" in str(exc_info.value)
 
     def test_convert_jsonl_to_sqlite_inconsistent_schema(self, test_db):
         """Test JSONL conversion with inconsistent schema across lines"""

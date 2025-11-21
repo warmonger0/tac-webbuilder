@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["Workflows"])
 
 
-def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_history_data_func):
+def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_history_data_func):  # noqa: C901
     """
     Initialize workflow routes with service dependencies.
 
@@ -257,7 +257,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
             raise
         except Exception as e:
             logger.error(f"[BATCH] Error fetching workflows: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
     @router.get("/api/workflow-analytics/{adw_id}", response_model=WorkflowAnalyticsDetail)
     async def get_workflow_analytics(adw_id: str) -> WorkflowAnalyticsDetail:
@@ -311,7 +311,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
         except Exception as e:
             logger.error(f"[ERROR] Failed to retrieve analytics for {adw_id}: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(status_code=500, detail=f"Failed to retrieve analytics: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to retrieve analytics: {str(e)}") from e
 
     @router.get("/api/workflow-trends", response_model=WorkflowTrends)
     async def get_workflow_trends(days: int = 30, group_by: str = "day") -> WorkflowTrends:
@@ -323,7 +323,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
         except Exception as e:
             logger.error(f"[ERROR] Failed to retrieve workflow trends: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(status_code=500, detail=f"Failed to retrieve trends: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to retrieve trends: {str(e)}") from e
 
     @router.get("/api/cost-predictions", response_model=CostPrediction)
     async def predict_workflow_cost(classification: str, complexity: str, model: str) -> CostPrediction:
@@ -339,7 +339,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
         except Exception as e:
             logger.error(f"[ERROR] Failed to predict workflow cost: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(status_code=500, detail=f"Failed to predict cost: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to predict cost: {str(e)}") from e
 
     @router.get("/api/workflow-catalog", response_model=WorkflowCatalogResponse)
     async def get_workflow_catalog() -> WorkflowCatalogResponse:

@@ -32,19 +32,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-from core.workflow_history import sync_workflow_history
-from core.workflow_history_utils.database import (
-    DB_PATH as WORKFLOW_DB_PATH,
-    get_history_analytics,
-    get_workflow_by_adw_id,
-    get_workflow_history,
-    init_db,
-    insert_workflow_history,
-    update_workflow_history,
-)
 from core.adw_lock import (
-    DB_PATH as LOCK_DB_PATH,
     acquire_lock,
     cleanup_stale_locks,
     force_release_lock,
@@ -53,7 +41,15 @@ from core.adw_lock import (
     release_lock,
     update_lock_status,
 )
-
+from core.workflow_history import sync_workflow_history
+from core.workflow_history_utils.database import (
+    get_history_analytics,
+    get_workflow_by_adw_id,
+    get_workflow_history,
+    init_db,
+    insert_workflow_history,
+    update_workflow_history,
+)
 
 # ============================================================================
 # Workflow History Database Tests
@@ -79,9 +75,9 @@ class TestWorkflowHistoryDatabase:
             integration_test_db.unlink()
 
         # Act: Initialize database
-        with patch.object(Path, 'parent', integration_test_db.parent):
-            with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
-                init_db()
+        with patch.object(Path, 'parent', integration_test_db.parent), \
+             patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+            init_db()
 
         # Assert: Database file was created
         assert integration_test_db.exists()
@@ -283,7 +279,7 @@ class TestWorkflowHistoryDatabase:
                 # Allow for small timing differences (< 1 second means it didn't change)
                 time_diff = abs((updated_ts - initial_ts).total_seconds())
                 assert time_diff > 0.05, f"Timestamp should have changed: {initial_updated_at} vs {updated['updated_at']}"
-            except:
+            except Exception:
                 # Fallback to direct comparison if parsing fails
                 assert updated["updated_at"] != initial_updated_at
         else:
@@ -532,7 +528,7 @@ class TestWorkflowHistoryDatabase:
         assert 5.0 <= analytics["total_cost"] <= 5.1
 
         # Average cost (18 workflows with cost data)
-        avg_cost = total_cost / 18
+        total_cost / 18
         assert 0.25 <= analytics["avg_cost"] <= 0.35
 
         # Assert: Token analytics
@@ -597,7 +593,6 @@ class TestWorkflowHistoryDatabase:
             init_db()
 
             # Act: First sync - Create a simpler mock approach
-            import core.workflow_history as wh_module
 
             def mocked_scan():
                 """Scan our test agents directory."""
@@ -637,16 +632,16 @@ class TestWorkflowHistoryDatabase:
 
                 return workflows
 
-            with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', mocked_scan):
+            with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', mocked_scan), \
+                 patch('core.cost_tracker.read_cost_history') as mock_cost, \
+                 patch('core.workflow_history_utils.github_client.fetch_github_issue_state') as mock_gh, \
+                 patch('core.cost_estimate_storage.get_cost_estimate') as mock_est:
                 # Also mock cost/GitHub functions to avoid external dependencies
-                with patch('core.cost_tracker.read_cost_history') as mock_cost:
-                    with patch('core.workflow_history_utils.github_client.fetch_github_issue_state') as mock_gh:
-                        with patch('core.cost_estimate_storage.get_cost_estimate') as mock_est:
-                            mock_cost.side_effect = Exception("No cost data")
-                            mock_gh.return_value = "open"
-                            mock_est.return_value = None
+                mock_cost.side_effect = Exception("No cost data")
+                mock_gh.return_value = "open"
+                mock_est.return_value = None
 
-                            synced_count = sync_workflow_history()
+                synced_count = sync_workflow_history()
 
         # Assert: Workflows were synced
         assert synced_count == 2
@@ -666,15 +661,15 @@ class TestWorkflowHistoryDatabase:
             assert wf2["status"] == "failed"  # Inferred from error.log
 
             # Act: Sync again (should not create duplicates)
-            with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', mocked_scan):
-                with patch('core.cost_tracker.read_cost_history') as mock_cost:
-                    with patch('core.workflow_history_utils.github_client.fetch_github_issue_state') as mock_gh:
-                        with patch('core.cost_estimate_storage.get_cost_estimate') as mock_est:
-                            mock_cost.side_effect = Exception("No cost data")
-                            mock_gh.return_value = "open"
-                            mock_est.return_value = None
+            with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', mocked_scan), \
+                 patch('core.cost_tracker.read_cost_history') as mock_cost, \
+                 patch('core.workflow_history_utils.github_client.fetch_github_issue_state') as mock_gh, \
+                 patch('core.cost_estimate_storage.get_cost_estimate') as mock_est:
+                mock_cost.side_effect = Exception("No cost data")
+                mock_gh.return_value = "open"
+                mock_est.return_value = None
 
-                            synced_count2 = sync_workflow_history()
+                sync_workflow_history()
 
         # Assert: No new workflows created (updates only)
         with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
@@ -863,7 +858,7 @@ class TestADWLockDatabase:
                     # Allow for small timing differences (< 1 second means it didn't change)
                     time_diff = abs((updated_ts - initial_ts).total_seconds())
                     assert time_diff > 0.05, f"Timestamp should have changed: {initial_updated_at} vs {updated_lock['updated_at']}"
-                except:
+                except Exception:
                     # Fallback to direct comparison if parsing fails
                     assert updated_lock["updated_at"] != initial_updated_at
             else:
