@@ -1,15 +1,36 @@
 {
   "adw_id": "af4246c1",
   "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/af4246c1",
-  "created_at": "2025-11-20T21:50:50.185697",
+  "created_at": "2025-11-20T21:54:20.125741",
   "spec_file": "/Users/Warmonger0/tac/tac-webbuilder/trees/af4246c1/specs/issue-64-adw-af4246c1-sdlc_planner-bug-diagnose-and-fix-tac-webbuilder-s-inability-to.md",
   "changed_files": [
     ".adw-context.json",
     ".mcp.json",
+    ".playwright-mcp/01_workflow_history_page_loading_successfully.png",
     "app/server/db/migrations/003_add_analytics_metrics.sql",
     "app/server/db/migrations/005_rename_temporal_columns.sql"
   ],
-  "review_image_dir": "/Users/Warmonger0/tac/tac-webbuilder/trees/af4246c1/agents/af4246c1/reviewer/review_img",
-  "backend_port": 9104,
-  "frontend_port": 9204
+  "changed_files_stats": {
+    ".adw-context.json": {
+      "additions": 11,
+      "deletions": 5
+    },
+    ".mcp.json": {
+      "additions": 1,
+      "deletions": 1
+    },
+    ".playwright-mcp/01_workflow_history_page_loading_successfully.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    "app/server/db/migrations/003_add_analytics_metrics.sql": {
+      "additions": 6,
+      "deletions": 4
+    },
+    "app/server/db/migrations/005_rename_temporal_columns.sql": {
+      "additions": 127,
+      "deletions": 0
+    }
+  },
+  "documentation_screenshots_dir": "/Users/Warmonger0/tac/tac-webbuilder/trees/af4246c1/agents/af4246c1/reviewer/review_img"
 }

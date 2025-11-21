@@ -207,6 +207,13 @@
     - Refactoring database code to use centralized utilities
     - Troubleshooting connection management issues
     - Understanding utils.db_connection patterns
+- `app_docs/feature-af4246c1-workflow-history-schema-fix.md` - Workflow history schema fix, temporal column renaming (hour_of_day, day_of_week), SQLite migration patterns
+  - Conditions:
+    - Working with workflow_history database schema
+    - Troubleshooting workflow history data retrieval errors
+    - Creating database migrations that rename columns in SQLite
+    - Understanding temporal analytics columns (hour_of_day, day_of_week)
+    - Fixing schema mismatches between Python models and database tables
 
 ### Templates & Integration Features
 - `app_docs/feature-0f04f66d-project-templates-docs.md` - Project templates, scaffolding scripts, setup_new_project.sh
