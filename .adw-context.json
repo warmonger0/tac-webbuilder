@@ -1,12 +1,19 @@
 {
   "adw_id": "c80e348c",
   "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/c80e348c",
-  "created_at": "2025-11-20T18:36:25.549537",
+  "created_at": "2025-11-20T18:42:21.921745",
+  "spec_file": "/Users/Warmonger0/tac/tac-webbuilder/trees/c80e348c/specs/issue-58-adw-c80e348c-sdlc_planner-add-a-new-zte-hopper-queue-card-to-the-right-of-th.md",
   "changed_files": [
     ".adw-context.json",
+    ".claude/commands/e2e/test_zte_hopper_queue_card.md",
     ".mcp.json",
-    "app/client/src/components/ZteHopperQueueCard.tsx",
+    ".playwright-mcp/01_initial_state.png",
+    ".playwright-mcp/02_two_card_layout.png",
+    ".playwright-mcp/03_complete_layout_with_system_status.png",
     "app/client/src/components/RequestForm.tsx",
-    ".claude/commands/e2e/test_zte_hopper_queue_card.md"
-  ]
+    "app/client/src/components/ZteHopperQueueCard.tsx"
+  ],
+  "review_image_dir": "/Users/Warmonger0/tac/tac-webbuilder/trees/c80e348c/agents/c80e348c/reviewer/review_img",
+  "backend_port": 9106,
+  "frontend_port": 9206
 }
