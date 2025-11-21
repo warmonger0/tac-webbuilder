@@ -142,5 +142,20 @@
     "reasoning": "Database changes required | Workflow/automation changes",
     "recommended_workflow": "adw_sdlc_zte_iso",
     "timestamp": "2025-11-20T22:56:13.522010"
+  },
+  "70": {
+    "estimated_cost_total": 1.5,
+    "estimated_cost_breakdown": {
+      "plan": 0.22499999999999998,
+      "build": 0.675,
+      "test": 0.30000000000000004,
+      "review": 0.15000000000000002,
+      "document": 0.15000000000000002
+    },
+    "level": "standard",
+    "confidence": 0.7,
+    "reasoning": "Simple UI change detected | Database changes required | Workflow/automation changes",
+    "recommended_workflow": "adw_sdlc_iso",
+    "timestamp": "2025-11-21T04:28:01.230131"
   }
 }

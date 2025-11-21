@@ -129,7 +129,12 @@ def verify_merge_landed(
         merge_commit_sha = result.stdout.strip()
         logger.info(f"Merge commit SHA: {merge_commit_sha}")
 
-        # Step 2: Verify commit exists on target branch
+        # Step 2: Fetch latest from origin BEFORE verification
+        # This ensures we have the latest state from remote
+        logger.info(f"Fetching latest changes from origin/{target_branch}...")
+        subprocess.run(["git", "fetch", "origin", target_branch], check=False)
+
+        # Step 3: Verify commit exists on target branch
         # Use git branch --contains to check if merge commit is on target
         result = subprocess.run(
             ["git", "branch", "-r", "--contains", merge_commit_sha],
@@ -159,9 +164,7 @@ def verify_merge_landed(
 
         logger.info(f"✅ Verified: Commit {merge_commit_sha} exists on {expected_branch}")
 
-        # Step 3: Fetch latest and verify target branch moved forward
-        subprocess.run(["git", "fetch", "origin", target_branch], check=False)
-
+        # Step 4: Verify merge commit is ancestor of target branch HEAD
         result = subprocess.run(
             ["git", "log", f"origin/{target_branch}", "-1", "--format=%H"],
             capture_output=True,
