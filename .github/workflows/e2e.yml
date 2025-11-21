@@ -1,0 +1,55 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'  # Run daily at 2am
+
+jobs:
+  e2e-tests:
+    name: End-to-End User Journeys
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install backend dependencies
+        run: cd app/server && uv sync
+
+      - name: Install frontend dependencies
+        run: cd app/client && bun install
+
+      - name: Start backend server
+        run: |
+          cd app/server
+          uv run python server.py &
+          sleep 5
+
+      - name: Start frontend server
+        run: |
+          cd app/client
+          bun run dev &
+          sleep 5
+
+      - name: Run E2E tests
+        run: cd app/server && uv run pytest tests/e2e/ -v --tb=short
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: e2e-failure-screenshots
+          path: app/server/tests/e2e/screenshots/
