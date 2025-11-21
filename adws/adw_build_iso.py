@@ -264,27 +264,81 @@ def main():
             type_errors = summary.get("type_errors", 0)
             build_errors = summary.get("build_errors", 0)
 
-            # Format results comment
-            if build_success:
-                comment = f"✅ Build check passed! No type or build errors.\n"
-                comment += f"⚡ Context savings: ~93% (using external tools)"
+            # Load baseline from Validate phase (if it ran)
+            baseline_errors_data = state.get("baseline_errors", {})
+            baseline_frontend = baseline_errors_data.get("frontend", {})
+            baseline_error_details = baseline_frontend.get("error_details", [])
+
+            # Calculate differential errors
+            if baseline_error_details:
+                logger.info("📊 Baseline detected - calculating differential errors")
+
+                # Create sets of errors for comparison (file:line:message)
+                baseline_error_set = {
+                    (e.get("file", ""), e.get("line", 0), e.get("message", ""))
+                    for e in baseline_error_details
+                }
+                final_error_set = {
+                    (e.get("file", ""), e.get("line", 0), e.get("message", ""))
+                    for e in errors
+                }
+
+                # Calculate new and fixed errors
+                new_errors_tuples = final_error_set - baseline_error_set
+                fixed_errors_tuples = baseline_error_set - final_error_set
+
+                # Convert back to error dictionaries
+                new_errors = [e for e in errors if (e.get("file", ""), e.get("line", 0), e.get("message", "")) in new_errors_tuples]
+                num_new_errors = len(new_errors)
+                num_fixed_errors = len(fixed_errors_tuples)
+                num_baseline_errors = len(baseline_error_set)
+
+                logger.info(f"Baseline: {num_baseline_errors}, New: {num_new_errors}, Fixed: {num_fixed_errors}")
+
+                # Override build_success based on new errors only
+                build_success = (num_new_errors == 0)
+
+                # Update total_errors to reflect only new errors
+                total_errors = num_new_errors
             else:
-                comment = f"❌ Build check failed: {total_errors} error(s)\n"
-                comment += f"   - Type errors: {type_errors}\n"
-                comment += f"   - Build errors: {build_errors}\n\n"
-                comment += "**Errors:**\n"
-                for error in errors[:10]:  # Limit to first 10
+                logger.info("No baseline detected - all errors are considered new")
+                new_errors = errors
+                num_new_errors = len(errors)
+                num_fixed_errors = 0
+                num_baseline_errors = 0
+
+            # Format results comment with differential information
+            if build_success:
+                comment = f"✅ Build check passed! No NEW errors introduced.\n"
+                if num_baseline_errors > 0:
+                    comment += f"\n**Differential Error Analysis:**\n"
+                    comment += f"- Baseline (inherited): {num_baseline_errors} errors (ignored)\n"
+                    comment += f"- New errors: 0 ✅\n"
+                    if num_fixed_errors > 0:
+                        comment += f"- Fixed errors: {num_fixed_errors} 🎉\n"
+                comment += f"\n⚡ Context savings: ~93% (using external tools)"
+            else:
+                comment = f"❌ Build check failed: {num_new_errors} NEW error(s) introduced\n\n"
+                if num_baseline_errors > 0:
+                    comment += f"**Differential Error Analysis:**\n"
+                    comment += f"- Baseline (inherited): {num_baseline_errors} errors (ignored)\n"
+                    comment += f"- New errors: {num_new_errors} ❌\n"
+                    if num_fixed_errors > 0:
+                        comment += f"- Fixed errors: {num_fixed_errors} ✨\n"
+                    comment += f"\n"
+                comment += "**New Errors (blocking):**\n"
+                for error in new_errors[:10]:  # Limit to first 10
                     file_path = error.get("file", "unknown")
                     line = error.get("line", "?")
                     col = error.get("column", "?")
                     msg = error.get("message", "unknown error")
                     comment += f"- `{file_path}:{line}:{col}` - {msg}\n"
 
-                if len(errors) > 10:
-                    comment += f"\n... and {len(errors) - 10} more errors\n"
+                if len(new_errors) > 10:
+                    comment += f"\n... and {len(new_errors) - 10} more errors\n"
 
                 comment += f"\n⚡ Context savings: ~83% (compact error reporting)"
-                comment += f"\n\n⚠️ Fix build errors before committing"
+                comment += f"\n\n⚠️ Fix NEW build errors before committing"
 
             make_issue_comment(
                 issue_number,

@@ -39,7 +39,9 @@ class ADWState:
             "worktree_path", "backend_port", "frontend_port", "model_set", "all_adws",
             "estimated_cost_total", "estimated_cost_breakdown",
             # Workflow history sync fields
-            "status", "workflow_template", "model_used", "start_time", "nl_input", "github_url"
+            "status", "workflow_template", "model_used", "start_time", "nl_input", "github_url",
+            # Validate phase fields
+            "baseline_errors"
         }
         for key, value in kwargs.items():
             if key in core_fields:

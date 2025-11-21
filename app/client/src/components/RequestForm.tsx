@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { confirmAndPost, getCostEstimate, getPreview, getSystemStatus, submitRequest } from '../api/client';
-import type { CostEstimate, GitHubIssue, RequestFormPersistedState } from '../types';
+import type { CostEstimate, GitHubIssue, RequestFormPersistedState, ServiceHealth } from '../types';
 import { IssuePreview } from './IssuePreview';
 import { CostEstimateCard } from './CostEstimateCard';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -57,22 +57,24 @@ function clearFormState(): void {
   }
 }
 
-function validateFormState(data: unknown): boolean {
+function validateFormState(data: unknown): data is RequestFormPersistedState {
   if (!data || typeof data !== 'object') {
     return false;
   }
 
+  const obj = data as Record<string, unknown>;
+
   // Check version
-  if (data.version !== REQUEST_FORM_STATE_VERSION) {
+  if (obj.version !== REQUEST_FORM_STATE_VERSION) {
     return false;
   }
 
   // Check required fields
   if (
-    typeof data.nlInput !== 'string' ||
-    typeof data.projectPath !== 'string' ||
-    typeof data.autoPost !== 'boolean' ||
-    typeof data.timestamp !== 'string'
+    typeof obj.nlInput !== 'string' ||
+    typeof obj.projectPath !== 'string' ||
+    typeof obj.autoPost !== 'boolean' ||
+    typeof obj.timestamp !== 'string'
   ) {
     return false;
   }
@@ -176,8 +178,8 @@ export function RequestForm() {
       const healthStatus = await getSystemStatus();
       if (healthStatus.overall_status === 'error') {
         const unhealthyServices = Object.entries(healthStatus.services)
-          .filter(([, service]) => service.status === 'error')
-          .map(([, service]) => service.name);
+          .filter(([, service]) => (service as ServiceHealth).status === 'error')
+          .map(([, service]) => (service as ServiceHealth).name);
 
         setHealthWarning(
           `Warning: Critical services are down: ${unhealthyServices.join(', ')}. ` +

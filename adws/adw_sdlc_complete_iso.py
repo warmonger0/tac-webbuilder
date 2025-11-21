@@ -8,15 +8,16 @@ ADW SDLC Complete Iso - Complete Software Development Life Cycle with ALL phases
 
 Usage: uv run adw_sdlc_complete_iso.py <issue-number> [adw-id] [flags]
 
-This script runs the COMPLETE ADW SDLC pipeline in isolation with all 8 phases:
+This script runs the COMPLETE ADW SDLC pipeline in isolation with all 9 phases:
 1. adw_plan_iso.py - Planning phase (isolated)
-2. adw_build_iso.py - Implementation phase (isolated)
-3. adw_lint_iso.py - Linting phase (isolated) ✨ NEW
-4. adw_test_iso.py - Testing phase (isolated)
-5. adw_review_iso.py - Review phase (isolated)
-6. adw_document_iso.py - Documentation phase (isolated)
-7. adw_ship_iso.py - Ship phase (approve & merge PR) ✨ NEW
-8. Cleanup - Documentation organization (pure Python) ✨ NEW
+2. adw_validate_iso.py - Baseline validation phase (isolated) ✨ NEW
+3. adw_build_iso.py - Implementation phase (isolated)
+4. adw_lint_iso.py - Linting phase (isolated)
+5. adw_test_iso.py - Testing phase (isolated)
+6. adw_review_iso.py - Review phase (isolated)
+7. adw_document_iso.py - Documentation phase (isolated)
+8. adw_ship_iso.py - Ship phase (approve & merge PR)
+9. Cleanup - Documentation organization (pure Python)
 
 This is the RECOMMENDED workflow for feature implementation. It includes all
 quality gates and ships to production when all phases pass.
@@ -58,16 +59,17 @@ def main():
 
     if len(sys.argv) < 2:
         print("Usage: uv run adw_sdlc_complete_iso.py <issue-number> [adw-id] [flags]")
-        print("\n🎯 Complete SDLC: All 8 phases for production-ready features")
+        print("\n🎯 Complete SDLC: All 9 phases for production-ready features")
         print("\nThis runs the COMPLETE isolated Software Development Life Cycle:")
         print("  1. Plan (isolated)")
-        print("  2. Build (isolated)")
-        print("  3. Lint (isolated) ✨")
-        print("  4. Test (isolated)")
-        print("  5. Review (isolated)")
-        print("  6. Document (isolated)")
-        print("  7. Ship (approve & merge PR) ✨")
-        print("  8. Cleanup (organize documentation) ✨")
+        print("  2. Validate (baseline detection) ✨ NEW")
+        print("  3. Build (isolated)")
+        print("  4. Lint (isolated)")
+        print("  5. Test (isolated)")
+        print("  6. Review (isolated)")
+        print("  7. Document (isolated)")
+        print("  8. Ship (approve & merge PR)")
+        print("  9. Cleanup (organize documentation)")
         print("\nFlags:")
         print("  --skip-e2e: Skip E2E tests")
         print("  --skip-resolution: Skip automatic resolution of review failures")
@@ -89,15 +91,16 @@ def main():
         make_issue_comment(
             issue_number,
             f"{adw_id}_ops: 🎯 **Starting Complete SDLC Workflow**\n\n"
-            "This workflow will execute ALL 8 phases:\n"
+            "This workflow will execute ALL 9 phases:\n"
             "1. ✍️ Plan the implementation\n"
-            "2. 🔨 Build the solution\n"
-            "3. 🧹 Lint the code\n"
-            "4. 🧪 Test the code\n"
-            "5. 👀 Review the implementation\n"
-            "6. 📚 Generate documentation\n"
-            "7. 🚢 Ship to production\n"
-            "8. 🗂️ Cleanup and organize\n\n"
+            "2. 📊 Validate baseline (detect inherited errors)\n"
+            "3. 🔨 Build the solution\n"
+            "4. 🧹 Lint the code\n"
+            "5. 🧪 Test the code\n"
+            "6. 👀 Review the implementation\n"
+            "7. 📚 Generate documentation\n"
+            "8. 🚢 Ship to production\n"
+            "9. 🗂️ Cleanup and organize\n\n"
             f"**Configuration:**\n"
             f"- External tools: {'✅ Enabled' if use_external else '❌ Disabled'}\n"
             f"- Optimized planner: {'✅ Enabled' if use_optimized_plan else '❌ Disabled'}\n"
@@ -122,7 +125,7 @@ def main():
         adw_id,
     ]
     print(f"\n{'='*60}")
-    print(f"PHASE 1/8: PLAN ({plan_script})")
+    print(f"PHASE 1/9: PLAN ({plan_script})")
     print(f"{'='*60}")
     print(f"Running: {' '.join(plan_cmd)}")
     plan = subprocess.run(plan_cmd)
@@ -138,7 +141,26 @@ def main():
         sys.exit(1)
 
     # ========================================
-    # PHASE 2: BUILD
+    # PHASE 2: VALIDATE (NEW)
+    # ========================================
+    validate_cmd = [
+        "uv",
+        "run",
+        os.path.join(script_dir, "adw_validate_iso.py"),
+        issue_number,
+        adw_id,
+    ]
+    print(f"\n{'='*60}")
+    print(f"PHASE 2/9: VALIDATE (Baseline Error Detection)")
+    print(f"{'='*60}")
+    print(f"Running: {' '.join(validate_cmd)}")
+    validate = subprocess.run(validate_cmd)
+    # Validation NEVER fails - always continue
+    if validate.returncode != 0:
+        print("⚠️ Validate phase encountered issues, but continuing...")
+
+    # ========================================
+    # PHASE 3: BUILD (formerly PHASE 2)
     # ========================================
     build_cmd = [
         "uv",
@@ -151,7 +173,7 @@ def main():
         build_cmd.append("--no-external")
 
     print(f"\n{'='*60}")
-    print(f"PHASE 2/8: BUILD")
+    print(f"PHASE 3/9: BUILD")
     print(f"{'='*60}")
     print(f"Running: {' '.join(build_cmd)}")
     build = subprocess.run(build_cmd)
@@ -180,7 +202,7 @@ def main():
         lint_cmd.append("--no-external")
 
     print(f"\n{'='*60}")
-    print(f"PHASE 3/8: LINT ✨")
+    print(f"PHASE 4/9: LINT")
     print(f"{'='*60}")
     print(f"Running: {' '.join(lint_cmd)}")
     lint = subprocess.run(lint_cmd)
@@ -211,7 +233,7 @@ def main():
         test_cmd.append("--no-external")
 
     print(f"\n{'='*60}")
-    print(f"PHASE 4/8: TEST")
+    print(f"PHASE 5/9: TEST")
     print(f"{'='*60}")
     print(f"Running: {' '.join(test_cmd)}")
     test = subprocess.run(test_cmd)
@@ -241,7 +263,7 @@ def main():
         review_cmd.append("--skip-resolution")
 
     print(f"\n{'='*60}")
-    print(f"PHASE 5/8: REVIEW")
+    print(f"PHASE 6/9: REVIEW")
     print(f"{'='*60}")
     print(f"Running: {' '.join(review_cmd)}")
     review = subprocess.run(review_cmd)
@@ -268,7 +290,7 @@ def main():
         adw_id,
     ]
     print(f"\n{'='*60}")
-    print(f"PHASE 6/8: DOCUMENT")
+    print(f"PHASE 7/9: DOCUMENT")
     print(f"{'='*60}")
     print(f"Running: {' '.join(document_cmd)}")
     document = subprocess.run(document_cmd)
@@ -294,7 +316,7 @@ def main():
         adw_id,
     ]
     print(f"\n{'='*60}")
-    print(f"PHASE 7/8: SHIP ✨")
+    print(f"PHASE 8/9: SHIP")
     print(f"{'='*60}")
     print(f"Running: {' '.join(ship_cmd)}")
     ship = subprocess.run(ship_cmd)
@@ -314,7 +336,7 @@ def main():
     # PHASE 8: CLEANUP ✨ NEW
     # ========================================
     print(f"\n{'='*60}")
-    print(f"PHASE 8/8: CLEANUP ✨")
+    print(f"PHASE 9/9: CLEANUP")
     print(f"{'='*60}")
     print(f"Running cleanup operations directly (pure Python, no LLM)...")
 
