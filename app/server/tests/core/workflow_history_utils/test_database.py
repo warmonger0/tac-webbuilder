@@ -67,6 +67,28 @@ def mock_get_db_connection(mock_db_connection):
     """
     mock_conn, mock_cursor = mock_db_connection
 
+    # Mock PRAGMA table_info to return all database columns
+    # This is needed because insert_workflow_history checks existing columns
+    # Create mock Row objects that support dict-like access
+    pragma_columns = [
+        "id", "adw_id", "issue_number", "nl_input", "github_url", "gh_issue_state",
+        "workflow_template", "model_used", "status", "start_time", "end_time",
+        "duration_seconds", "error_message", "phase_count", "current_phase",
+        "success_rate", "retry_count", "worktree_path", "backend_port", "frontend_port",
+        "concurrent_workflows", "input_tokens", "output_tokens", "cached_tokens",
+        "cache_hit_tokens", "cache_miss_tokens", "total_tokens", "cache_efficiency_percent",
+        "estimated_cost_total", "actual_cost_total", "estimated_cost_per_step",
+        "actual_cost_per_step", "cost_per_token", "structured_input", "cost_breakdown",
+        "token_breakdown", "worktree_reused", "steps_completed", "steps_total",
+        "hour_of_day", "day_of_week", "nl_input_clarity_score", "cost_efficiency_score",
+        "performance_score", "quality_score", "scoring_version", "anomaly_flags",
+        "optimization_recommendations", "created_at", "updated_at"
+    ]
+    mock_pragma_rows = [{"name": col} for col in pragma_columns]
+
+    # Set up fetchall to return column info when PRAGMA is called
+    mock_cursor.fetchall.return_value = mock_pragma_rows
+
     with patch('core.workflow_history_utils.database.get_db_connection') as mock_get_conn:
         mock_get_conn.return_value = mock_conn
         yield mock_get_conn, mock_conn, mock_cursor
@@ -192,9 +214,12 @@ class TestInsertWorkflowHistory:
 
         assert row_id == 123
 
-        # Verify INSERT was called with adw_id and default status
-        mock_cursor.execute.assert_called_once()
-        query, values = mock_cursor.execute.call_args[0]
+        # Verify execute was called (PRAGMA + INSERT)
+        assert mock_cursor.execute.call_count == 2
+
+        # Get the INSERT call (second call)
+        insert_call = mock_cursor.execute.call_args_list[1]
+        query, values = insert_call[0]
 
         assert "INSERT INTO workflow_history" in query
         assert "adw_id" in query
@@ -221,7 +246,9 @@ class TestInsertWorkflowHistory:
 
         assert row_id == 456
 
-        query, values = mock_cursor.execute.call_args[0]
+        # Get the INSERT call (second call after PRAGMA)
+        insert_call = mock_cursor.execute.call_args_list[1]
+        query, values = insert_call[0]
 
         assert "test-002" in values
         assert 42 in values
@@ -253,7 +280,7 @@ class TestInsertWorkflowHistory:
 
         assert row_id == 789
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         # Verify optional fields are included
         assert 900 in values  # duration_seconds
@@ -282,7 +309,7 @@ class TestInsertWorkflowHistory:
 
         assert row_id == 111
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         # Verify JSON fields are serialized
         assert json.dumps(cost_breakdown) in values
@@ -304,7 +331,7 @@ class TestInsertWorkflowHistory:
 
         assert row_id == 222
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         # Verify string is passed as-is
         assert cost_breakdown_str in values
@@ -328,7 +355,7 @@ class TestInsertWorkflowHistory:
 
         assert row_id == 333
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         assert 14 in values  # hour_of_day
         assert 2 in values   # day_of_week
@@ -356,7 +383,7 @@ class TestInsertWorkflowHistory:
 
         assert row_id == 444
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         assert json.dumps(optimization_recommendations) in values
 
@@ -383,7 +410,7 @@ class TestInsertWorkflowHistory:
 
         assert row_id == 555
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         assert "closed" in values
 
@@ -402,7 +429,7 @@ class TestInsertWorkflowHistory:
 
         assert row_id == 666
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         assert custom_timestamp in values
 
@@ -428,7 +455,7 @@ class TestUpdateWorkflowHistoryByIssue:
 
         assert updated_count == 2
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         assert "UPDATE workflow_history" in query
         assert "gh_issue_state = ?" in query
@@ -455,7 +482,7 @@ class TestUpdateWorkflowHistoryByIssue:
 
         assert updated_count == 3
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         assert "gh_issue_state = ?" in query
         assert "status = ?" in query
@@ -507,7 +534,7 @@ class TestUpdateWorkflowHistoryByIssue:
             gh_issue_state="closed"
         )
 
-        query = mock_cursor.execute.call_args[0][0]
+        query = mock_cursor.execute.call_args_list[1][0][0]
 
         # Verify updated_at is always included
         assert "updated_at = CURRENT_TIMESTAMP" in query
@@ -534,7 +561,7 @@ class TestUpdateWorkflowHistory:
 
         assert success is True
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         assert "UPDATE workflow_history" in query
         assert "status = ?" in query
@@ -563,7 +590,7 @@ class TestUpdateWorkflowHistory:
 
         assert success is True
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         assert "status = ?" in query
         assert "end_time = ?" in query
@@ -591,7 +618,7 @@ class TestUpdateWorkflowHistory:
 
         assert success is True
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         # Verify JSON is serialized
         assert json.dumps(cost_breakdown) in values
@@ -613,7 +640,7 @@ class TestUpdateWorkflowHistory:
 
         assert success is True
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         # Verify list is serialized to JSON
         assert json.dumps(anomaly_flags) in values
@@ -659,7 +686,7 @@ class TestUpdateWorkflowHistory:
             status="running"
         )
 
-        query = mock_cursor.execute.call_args[0][0]
+        query = mock_cursor.execute.call_args_list[1][0][0]
 
         # Verify updated_at is always included
         assert "updated_at = CURRENT_TIMESTAMP" in query
@@ -683,7 +710,7 @@ class TestUpdateWorkflowHistory:
 
         assert success is True
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         # Verify all JSON fields are in the query
         for field in ["structured_input", "cost_breakdown", "token_breakdown",
@@ -1446,7 +1473,7 @@ class TestEdgeCasesAndErrorHandling:
 
         assert row_id == 999
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
         assert "" in values  # Empty strings should be preserved
 
     def test_update_with_none_values(self, mock_get_db_connection):
@@ -1462,7 +1489,7 @@ class TestEdgeCasesAndErrorHandling:
 
         assert success is True
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
         assert None in values  # None values should be allowed
 
     def test_get_workflow_history_with_zero_limit(self, mock_get_db_connection):
@@ -1530,7 +1557,7 @@ class TestEdgeCasesAndErrorHandling:
             structured_input=complex_data
         )
 
-        query, values = mock_cursor.execute.call_args[0]
+        query, values = mock_cursor.execute.call_args_list[1][0]
 
         # Verify JSON serialization
         json_str = json.dumps(complex_data)
