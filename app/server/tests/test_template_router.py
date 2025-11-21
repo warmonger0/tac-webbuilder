@@ -47,8 +47,8 @@ def test_template_routing_standard():
     print("\n=== Test 2: Standard SDLC Pattern Matching ===")
 
     test_cases = [
-        ("Add new API endpoint for user registration", "adw_sdlc_iso"),
-        ("Create database table for products", "adw_sdlc_iso"),
+        ("Add new API endpoint for user registration", "adw_sdlc_complete_iso"),
+        ("Create database table for products", "adw_sdlc_complete_iso"),
     ]
 
     for nl_input, expected_workflow in test_cases:
@@ -168,7 +168,7 @@ def test_suggest_workflow_backward_compatibility():
     print("\nOld usage: suggest_adw_workflow('bug', 'low')")
     print(f"  Result: {workflow}, {model_set}")
     assert workflow == "adw_sdlc_complete_iso", "Bug should use complete SDLC"
-    assert model_set == "base", "Bug should use base model"
+    assert model_set == "lightweight", "Bug should use lightweight model (Haiku for cost optimization)"
 
     workflow, model_set = suggest_adw_workflow("feature", "high")
     print("\nOld usage: suggest_adw_workflow('feature', 'high')")
@@ -197,7 +197,7 @@ def test_suggest_workflow_with_characteristics():
     print(f"  Result: {workflow}, {model_set}")
     assert workflow == "adw_lightweight_iso", "UI-only should use lightweight"
 
-    # Multi-file backend change should use standard SDLC
+    # Multi-file backend change should use complete SDLC
     characteristics = {
         "ui_only": False,
         "backend_changes": True,
@@ -209,7 +209,7 @@ def test_suggest_workflow_with_characteristics():
     print("\nBackend feature:")
     print(f"  Characteristics: {characteristics}")
     print(f"  Result: {workflow}, {model_set}")
-    assert workflow == "adw_sdlc_iso", "Backend changes should use standard SDLC"
+    assert workflow == "adw_sdlc_complete_iso", "Backend changes should use complete SDLC"
 
     print("\n✅ Characteristics-based routing tests passed!")
 

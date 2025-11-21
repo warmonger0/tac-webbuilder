@@ -204,20 +204,20 @@ def analyze_issue_complexity(issue: GitHubIssue, issue_class: str) -> Complexity
     if complexity_score <= -2:
         level = "lightweight"
         confidence = min(1.0, abs(complexity_score) / 5.0)
-        cost_range = (0.20, 0.50)
+        cost_range = (0.10, 0.30)  # Haiku is cheaper
         workflow = "adw_lightweight_iso"
 
     elif complexity_score <= 2:
         level = "standard"
         confidence = 0.7
-        cost_range = (1.00, 2.00)
-        workflow = "adw_sdlc_iso"
+        cost_range = (3.00, 5.00)  # Full SDLC with Sonnet
+        workflow = "adw_sdlc_complete_iso"
 
     else:
         level = "complex"
         confidence = min(1.0, complexity_score / 6.0)
-        cost_range = (3.00, 5.00)
-        workflow = "adw_sdlc_zte_iso"
+        cost_range = (5.00, 8.00)  # Full SDLC with Opus
+        workflow = "adw_sdlc_complete_iso"
 
     reasoning = " | ".join(reasons) if reasons else "Default classification based on issue type"
 

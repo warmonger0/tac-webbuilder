@@ -167,7 +167,7 @@ def create_feature_issue_body(
     description: str,
     requirements: list,
     technical_approach: str = "",
-    workflow: str = "adw_sdlc_iso",
+    workflow: str = "adw_sdlc_complete_iso",
     model_set: str = "base"
 ) -> str:
     """

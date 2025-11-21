@@ -22,7 +22,8 @@ class RetryCode(str, Enum):
 IssueClassSlashCommand = Literal["/chore", "/bug", "/feature", "/patch"]
 
 # Model set types for ADW workflows
-ModelSet = Literal["base", "heavy"]
+# lightweight = Haiku (cheap, fast), base = Sonnet (smart), heavy = Opus (most capable)
+ModelSet = Literal["base", "heavy", "lightweight"]
 
 # ADW workflow types (all isolated now)
 ADWWorkflow = Literal[
