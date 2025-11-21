@@ -205,10 +205,8 @@ def insert_workflow_history(
         existing_columns = {row["name"] for row in cursor.fetchall()}
 
         # Map field names from code schema to database schema
-        field_name_mapping = {
-            "hour_of_day": "submission_hour",
-            "day_of_week": "submission_day_of_week"
-        }
+        # Note: Currently no mapping needed - code and DB use same names
+        field_name_mapping = {}
 
         for field in optional_fields:
             if field in kwargs:
@@ -330,10 +328,8 @@ def update_workflow_history(
                 kwargs[field] = json.dumps(kwargs[field])
 
         # Map field names from code schema to database schema
-        field_name_mapping = {
-            "hour_of_day": "submission_hour",
-            "day_of_week": "submission_day_of_week"
-        }
+        # Note: Currently no mapping needed - code and DB use same names
+        field_name_mapping = {}
 
         # Build update query with mapped field names, only including fields that exist in DB
         mapped_kwargs = {}
@@ -387,13 +383,7 @@ def get_workflow_by_adw_id(adw_id: str) -> dict | None:
         if row:
             result = dict(row)
 
-            # Map database field names to code field names for backward compatibility
-            # Database has: submission_hour, submission_day_of_week
-            # Code expects: hour_of_day, day_of_week
-            if "submission_hour" in result:
-                result["hour_of_day"] = result["submission_hour"]
-            if "submission_day_of_week" in result:
-                result["day_of_week"] = result["submission_day_of_week"]
+            # No field name mapping needed - database and code use same names
 
             # Parse JSON fields
             json_fields = [
@@ -516,13 +506,7 @@ def get_workflow_history(
         for row in rows:
             result = dict(row)
 
-            # Map database field names to code field names for backward compatibility
-            # Database has: submission_hour, submission_day_of_week
-            # Code expects: hour_of_day, day_of_week
-            if "submission_hour" in result:
-                result["hour_of_day"] = result["submission_hour"]
-            if "submission_day_of_week" in result:
-                result["day_of_week"] = result["submission_day_of_week"]
+            # No field name mapping needed - database and code use same names
 
             # Parse JSON fields
             json_fields = [

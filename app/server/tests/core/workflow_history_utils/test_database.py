@@ -80,9 +80,15 @@ def mock_get_db_connection(mock_db_connection):
         "estimated_cost_total", "actual_cost_total", "estimated_cost_per_step",
         "actual_cost_per_step", "cost_per_token", "structured_input", "cost_breakdown",
         "token_breakdown", "worktree_reused", "steps_completed", "steps_total",
+        # Analytics fields - actual database column names
         "hour_of_day", "day_of_week", "nl_input_clarity_score", "cost_efficiency_score",
         "performance_score", "quality_score", "scoring_version", "anomaly_flags",
-        "optimization_recommendations", "created_at", "updated_at"
+        "optimization_recommendations",
+        # Additional fields for analytics
+        "phase_durations", "idle_time_seconds", "bottleneck_phase",
+        "error_category", "retry_reasons", "error_phase_distribution",
+        "recovery_time_seconds", "complexity_estimated", "complexity_actual",
+        "created_at", "updated_at"
     ]
     mock_pragma_rows = [{"name": col} for col in pragma_columns]
 
@@ -455,7 +461,7 @@ class TestUpdateWorkflowHistoryByIssue:
 
         assert updated_count == 2
 
-        query, values = mock_cursor.execute.call_args_list[1][0]
+        query, values = mock_cursor.execute.call_args[0]
 
         assert "UPDATE workflow_history" in query
         assert "gh_issue_state = ?" in query
@@ -482,7 +488,7 @@ class TestUpdateWorkflowHistoryByIssue:
 
         assert updated_count == 3
 
-        query, values = mock_cursor.execute.call_args_list[1][0]
+        query, values = mock_cursor.execute.call_args[0]
 
         assert "gh_issue_state = ?" in query
         assert "status = ?" in query
@@ -534,7 +540,7 @@ class TestUpdateWorkflowHistoryByIssue:
             gh_issue_state="closed"
         )
 
-        query = mock_cursor.execute.call_args_list[1][0][0]
+        query = mock_cursor.execute.call_args[0][0]
 
         # Verify updated_at is always included
         assert "updated_at = CURRENT_TIMESTAMP" in query
