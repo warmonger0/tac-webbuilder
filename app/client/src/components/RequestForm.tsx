@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { confirmAndPost, getCostEstimate, getPreview, getSystemStatus, submitRequest } from '../api/client';
-import type { CostEstimate, GitHubIssue } from '../types';
+import type { CostEstimate, GitHubIssue, RequestFormPersistedState } from '../types';
 import { IssuePreview } from './IssuePreview';
 import { CostEstimateCard } from './CostEstimateCard';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -8,6 +8,77 @@ import { SystemStatusPanel } from './SystemStatusPanel';
 import { ZteHopperQueueCard } from './ZteHopperQueueCard';
 
 const PROJECT_PATH_STORAGE_KEY = 'tac-webbuilder-project-path';
+const REQUEST_FORM_STATE_STORAGE_KEY = 'tac-webbuilder-request-form-state';
+const REQUEST_FORM_STATE_VERSION = 1;
+
+// Storage utility functions
+function saveFormState(state: Omit<RequestFormPersistedState, 'version' | 'timestamp'>): void {
+  try {
+    const persistedState: RequestFormPersistedState = {
+      version: REQUEST_FORM_STATE_VERSION,
+      timestamp: new Date().toISOString(),
+      ...state,
+    };
+    localStorage.setItem(REQUEST_FORM_STATE_STORAGE_KEY, JSON.stringify(persistedState));
+  } catch (err) {
+    // Handle quota exceeded or unavailable storage
+    console.error('Failed to save form state:', err);
+    throw err;
+  }
+}
+
+function loadFormState(): RequestFormPersistedState | null {
+  try {
+    const savedData = localStorage.getItem(REQUEST_FORM_STATE_STORAGE_KEY);
+    if (!savedData) {
+      return null;
+    }
+
+    const parsed = JSON.parse(savedData);
+
+    // Validate structure and version
+    if (!validateFormState(parsed)) {
+      console.warn('Invalid form state found, ignoring');
+      return null;
+    }
+
+    return parsed as RequestFormPersistedState;
+  } catch (err) {
+    console.error('Failed to load form state:', err);
+    return null;
+  }
+}
+
+function clearFormState(): void {
+  try {
+    localStorage.removeItem(REQUEST_FORM_STATE_STORAGE_KEY);
+  } catch (err) {
+    console.error('Failed to clear form state:', err);
+  }
+}
+
+function validateFormState(data: unknown): boolean {
+  if (!data || typeof data !== 'object') {
+    return false;
+  }
+
+  // Check version
+  if (data.version !== REQUEST_FORM_STATE_VERSION) {
+    return false;
+  }
+
+  // Check required fields
+  if (
+    typeof data.nlInput !== 'string' ||
+    typeof data.projectPath !== 'string' ||
+    typeof data.autoPost !== 'boolean' ||
+    typeof data.timestamp !== 'string'
+  ) {
+    return false;
+  }
+
+  return true;
+}
 
 export function RequestForm() {
   const [nlInput, setNlInput] = useState('');
@@ -22,14 +93,76 @@ export function RequestForm() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [systemHealthy, setSystemHealthy] = useState(true);
   const [healthWarning, setHealthWarning] = useState<string | null>(null);
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
 
-  // Load project path from localStorage on mount
+  // Ref for debounce timer
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load form state from localStorage on mount
   useEffect(() => {
-    const savedPath = localStorage.getItem(PROJECT_PATH_STORAGE_KEY);
-    if (savedPath) {
-      setProjectPath(savedPath);
+    const savedState = loadFormState();
+    if (savedState) {
+      setNlInput(savedState.nlInput);
+      setProjectPath(savedState.projectPath);
+      setAutoPost(savedState.autoPost);
+    } else {
+      // Backward compatibility: check for legacy project path key
+      const savedPath = localStorage.getItem(PROJECT_PATH_STORAGE_KEY);
+      if (savedPath) {
+        setProjectPath(savedPath);
+      }
     }
   }, []);
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    // Clear existing timer
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    // Set new timer for auto-save
+    saveTimerRef.current = setTimeout(() => {
+      try {
+        saveFormState({
+          nlInput,
+          projectPath,
+          autoPost,
+        });
+        setStorageWarning(null);
+      } catch {
+        setStorageWarning('Unable to save form state. Your work may not persist if you navigate away.');
+      }
+    }, 300); // AUTO_SAVE_DEBOUNCE_MS = 300
+
+    // Cleanup on unmount
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [nlInput, projectPath, autoPost]);
+
+  // Save form state before page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        saveFormState({
+          nlInput,
+          projectPath,
+          autoPost,
+        });
+      } catch {
+        // Silent failure on unload - no action needed
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [nlInput, projectPath, autoPost]);
 
   const handleSubmit = async () => {
     if (!nlInput.trim()) {
@@ -43,8 +176,8 @@ export function RequestForm() {
       const healthStatus = await getSystemStatus();
       if (healthStatus.overall_status === 'error') {
         const unhealthyServices = Object.entries(healthStatus.services)
-          .filter(([_, service]: [string, any]) => service.status === 'error')
-          .map(([_, service]: [string, any]) => service.name);
+          .filter(([, service]) => service.status === 'error')
+          .map(([, service]) => service.name);
 
         setHealthWarning(
           `Warning: Critical services are down: ${unhealthyServices.join(', ')}. ` +
@@ -62,7 +195,7 @@ export function RequestForm() {
       } else {
         setSystemHealthy(true);
       }
-    } catch (err) {
+    } catch {
       // If health check fails, warn but allow submission
       setHealthWarning('Unable to check system health. Proceeding anyway.');
     }
@@ -103,6 +236,8 @@ export function RequestForm() {
         // Don't clear project path - it will persist from localStorage
         setPreview(null);
         setCostEstimate(null);
+        // Clear persisted form state after successful submission
+        clearFormState();
       } else {
         setShowConfirm(true);
       }
@@ -130,6 +265,8 @@ export function RequestForm() {
       setNlInput('');
       // Don't clear project path - it will persist from localStorage
       setRequestId(null);
+      // Clear persisted form state after successful submission
+      clearFormState();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -199,6 +336,12 @@ export function RequestForm() {
             Auto-post to GitHub (skip confirmation)
           </label>
         </div>
+
+        {storageWarning && (
+          <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-200 text-yellow-800">
+            {storageWarning}
+          </div>
+        )}
 
         {healthWarning && (
           <div className={`p-4 border rounded-lg ${systemHealthy ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
