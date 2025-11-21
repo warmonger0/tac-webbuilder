@@ -33,8 +33,14 @@ class ADWState:
 
     def update(self, **kwargs):
         """Update state with new key-value pairs."""
-        # Filter to only our core fields
-        core_fields = {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class", "worktree_path", "backend_port", "frontend_port", "model_set", "all_adws"}
+        # Filter to only our core fields + workflow history sync fields
+        core_fields = {
+            "adw_id", "issue_number", "branch_name", "plan_file", "issue_class",
+            "worktree_path", "backend_port", "frontend_port", "model_set", "all_adws",
+            "estimated_cost_total", "estimated_cost_breakdown",
+            # Workflow history sync fields
+            "status", "workflow_template", "model_used", "start_time", "nl_input", "github_url"
+        }
         for key, value in kwargs.items():
             if key in core_fields:
                 self.data[key] = value
@@ -77,7 +83,7 @@ class ADWState:
         state_path = self.get_state_path()
         os.makedirs(os.path.dirname(state_path), exist_ok=True)
 
-        # Create ADWStateData for validation of core fields
+        # Create ADWStateData for validation of core fields + sync fields
         state_data = ADWStateData(
             adw_id=self.data.get("adw_id"),
             issue_number=self.data.get("issue_number"),
@@ -89,6 +95,15 @@ class ADWState:
             frontend_port=self.data.get("frontend_port"),
             model_set=self.data.get("model_set", "base"),
             all_adws=self.data.get("all_adws", []),
+            estimated_cost_total=self.data.get("estimated_cost_total"),
+            estimated_cost_breakdown=self.data.get("estimated_cost_breakdown"),
+            # Workflow history sync fields
+            status=self.data.get("status"),
+            workflow_template=self.data.get("workflow_template"),
+            model_used=self.data.get("model_used"),
+            start_time=self.data.get("start_time"),
+            nl_input=self.data.get("nl_input"),
+            github_url=self.data.get("github_url"),
         )
 
         # Start with validated core fields

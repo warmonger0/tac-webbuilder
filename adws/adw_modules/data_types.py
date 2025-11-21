@@ -237,6 +237,14 @@ class ADWStateData(BaseModel):
     estimated_cost_total: Optional[float] = None
     estimated_cost_breakdown: Optional[dict] = None  # Per-phase estimates
 
+    # Workflow history sync fields (required for database sync)
+    status: Optional[str] = "running"  # pending, running, completed, failed
+    workflow_template: Optional[str] = None  # e.g., "adw_sdlc_complete_zte_iso"
+    model_used: Optional[str] = None  # e.g., "sonnet", "haiku", "opus"
+    start_time: Optional[str] = None  # ISO format timestamp
+    nl_input: Optional[str] = None  # Natural language input from user
+    github_url: Optional[str] = None  # GitHub issue URL
+
 
 class ReviewIssue(BaseModel):
     """Individual review issue found during spec verification."""

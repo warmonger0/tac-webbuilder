@@ -18,6 +18,7 @@ Environment Requirements:
 """
 
 import os
+import re
 import subprocess
 import sys
 import asyncio
@@ -33,7 +34,7 @@ import uvicorn
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from adw_modules.utils import make_adw_id, setup_logger, get_safe_subprocess_env
-from adw_modules.github import make_issue_comment, ADW_BOT_IDENTIFIER
+from adw_modules.github import make_issue_comment, ADW_BOT_IDENTIFIER, get_repo_url, extract_repo_path
 from adw_modules.workflow_ops import extract_adw_info, AVAILABLE_ADW_WORKFLOWS
 from adw_modules.state import ADWState
 
@@ -316,24 +317,62 @@ async def process_webhook_background(
             # Use provided ADW ID for continuing workflow
             adw_id = provided_adw_id
 
+        # Build GitHub URL for this issue
+        repo_url = get_repo_url()
+        repo_path = extract_repo_path(repo_url)
+        github_url = f"https://github.com/{repo_path}/issues/{issue_number}"
+
+        # Get current timestamp in ISO format
+        start_time = datetime.now().isoformat()
+
+        # Determine model_used based on model_set
+        # For now, default to "sonnet" for base, can be refined later
+        model_mapping = {
+            "base": "sonnet",
+            "advanced": "opus",
+            "lightweight": "haiku"
+        }
+        model_used = model_mapping.get(model_set, "sonnet")
+
         # If ADW ID was provided, update/create state file
         if provided_adw_id:
             state = ADWState.load(provided_adw_id)
             if state:
-                state.update(issue_number=str(issue_number), model_set=model_set)
+                state.update(
+                    issue_number=str(issue_number),
+                    model_set=model_set,
+                    workflow_template=workflow,
+                    model_used=model_used,
+                    github_url=github_url,
+                    nl_input=content_to_check[:500],  # First 500 chars of trigger content
+                )
             else:
                 state = ADWState(provided_adw_id)
                 state.update(
                     adw_id=provided_adw_id,
                     issue_number=str(issue_number),
                     model_set=model_set,
+                    status="running",
+                    workflow_template=workflow,
+                    model_used=model_used,
+                    start_time=start_time,
+                    nl_input=content_to_check[:500],
+                    github_url=github_url,
                 )
             state.save("webhook_trigger")
         else:
             # Create new state for newly generated ADW ID
             state = ADWState(adw_id)
             state.update(
-                adw_id=adw_id, issue_number=str(issue_number), model_set=model_set
+                adw_id=adw_id,
+                issue_number=str(issue_number),
+                model_set=model_set,
+                status="running",
+                workflow_template=workflow,
+                model_used=model_used,
+                start_time=start_time,
+                nl_input=content_to_check[:500],
+                github_url=github_url,
             )
             state.save("webhook_trigger")
 
