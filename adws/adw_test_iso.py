@@ -104,6 +104,9 @@ def run_external_tests(
 
     Returns:
         Tuple of (success: bool, results: Dict)
+
+    Note: If external tool fails, returns (False, {"error": {...}})
+          Caller MUST check for "error" key and exit immediately.
     """
     logger.info("🔧 Using external test tools for context optimization")
 
@@ -113,26 +116,110 @@ def run_external_tests(
 
     if not test_external_script.exists():
         logger.error(f"External test script not found: {test_external_script}")
-        return False, {"error": "External test script not found"}
+        return False, {
+            "error": {
+                "type": "FileNotFoundError",
+                "message": f"External test script not found: {test_external_script}"
+            },
+            "summary": {"total": 0, "passed": 0, "failed": 0},
+            "failures": [],
+            "next_steps": ["Verify adw_test_external.py exists in adws/ directory"]
+        }
 
     # Run external test ADW
     cmd = ["uv", "run", str(test_external_script), issue_number, adw_id]
 
     logger.info(f"Executing: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+
+        # Check if subprocess exited with non-zero code
+        if result.returncode != 0:
+            logger.error(f"External test tool exited with code {result.returncode}")
+            logger.error(f"Stderr: {result.stderr}")
+
+            # Try to extract error from stderr
+            error_message = result.stderr.strip() if result.stderr else "Unknown error"
+
+            return False, {
+                "error": {
+                    "type": "SubprocessError",
+                    "message": f"External test tool exited with code {result.returncode}",
+                    "details": error_message[:500]  # Limit error details
+                },
+                "summary": {"total": 0, "passed": 0, "failed": 0},
+                "failures": [],
+                "next_steps": [
+                    "Check adw_test_external.py logs",
+                    "Verify worktree is valid",
+                    "Check if test dependencies are installed"
+                ]
+            }
+
+    except subprocess.TimeoutExpired:
+        logger.error("External test tool timed out after 10 minutes")
+        return False, {
+            "error": {
+                "type": "TimeoutError",
+                "message": "External test tool timed out after 10 minutes"
+            },
+            "summary": {"total": 0, "passed": 0, "failed": 0},
+            "failures": [],
+            "next_steps": [
+                "Check for infinite loops in tests",
+                "Verify test infrastructure is responsive",
+                "Check if services are hanging"
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Unexpected error running external tests: {e}")
+        return False, {
+            "error": {
+                "type": type(e).__name__,
+                "message": str(e)
+            },
+            "summary": {"total": 0, "passed": 0, "failed": 0},
+            "failures": [],
+            "next_steps": [f"Investigate exception: {type(e).__name__}: {str(e)}"]
+        }
 
     # Reload state to get external test results
     reloaded_state = ADWState.load(adw_id)
     if not reloaded_state:
         logger.error("Failed to reload state after external tests")
-        return False, {"error": "Failed to reload state"}
+        return False, {
+            "error": {
+                "type": "StateError",
+                "message": "Failed to reload state after external tests"
+            },
+            "summary": {"total": 0, "passed": 0, "failed": 0},
+            "failures": [],
+            "next_steps": [
+                "Check if state file exists",
+                "Verify external test workflow saved results to state"
+            ]
+        }
+
     test_results = reloaded_state.get("external_test_results", {})
 
     if not test_results:
         logger.warning("No external_test_results found in state after execution")
         logger.debug(f"Stdout: {result.stdout}")
         logger.debug(f"Stderr: {result.stderr}")
-        return False, {"error": "No test results returned from external tool"}
+        return False, {
+            "error": {
+                "type": "ResultsError",
+                "message": "No test results returned from external tool",
+                "details": f"Stdout: {result.stdout[:200]}"
+            },
+            "summary": {"total": 0, "passed": 0, "failed": 0},
+            "failures": [],
+            "next_steps": [
+                "Check adw_test_external.py output",
+                "Verify state is being saved correctly"
+            ]
+        }
 
     success = test_results.get("success", False)
     logger.info(f"External tests completed: {'✅ Success' if success else '❌ Failures detected'}")
@@ -818,45 +905,68 @@ def main():
         # Run external tests
         success, external_results = run_external_tests(issue_number, adw_id, logger, state)
 
+        # CRITICAL FIX: Check if external tool failed and exit immediately
         if "error" in external_results:
-            # External tool failed
-            logger.error(f"External test tool error: {external_results['error']}")
+            # External tool failed critically (e.g., JSONDecodeError, timeout, crash)
+            error_info = external_results.get("error", {})
+            error_type = error_info.get("type", "Unknown")
+            error_message = error_info.get("message", "Unknown error")
+
+            logger.error(f"External test tool error: {error_type}: {error_message}")
+
+            # Post detailed error to GitHub
+            error_comment = f"❌ **External test tool failed**\n\n"
+            error_comment += f"**Error Type:** {error_type}\n"
+            error_comment += f"**Error Message:** {error_message}\n\n"
+
+            if "details" in error_info:
+                error_comment += f"**Details:**\n```\n{error_info['details']}\n```\n\n"
+
+            if "next_steps" in external_results:
+                error_comment += "**Next Steps:**\n"
+                for step in external_results["next_steps"]:
+                    error_comment += f"- {step}\n"
+
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, AGENT_TESTER, f"❌ External test tool error: {external_results['error']}")
+                format_issue_message(adw_id, AGENT_TESTER, error_comment)
             )
+
+            # FAIL FAST: Exit immediately with error code
+            logger.error("Exiting due to external test tool failure")
+            sys.exit(1)
+
+        # Process external results
+        summary = external_results.get("summary", {})
+        failures = external_results.get("failures", [])
+
+        passed_count = summary.get("passed", 0)
+        failed_count = summary.get("failed", 0)
+        total = summary.get("total", passed_count + failed_count)
+
+        # Format results comment
+        if success:
+            comment = f"✅ All {total} tests passed!\n"
+            comment += f"⚡ Context savings: ~90% (using external tools)"
         else:
-            # Process external results
-            summary = external_results.get("summary", {})
-            failures = external_results.get("failures", [])
+            comment = f"❌ {failed_count} test(s) failed out of {total}\n\n"
+            comment += "**Failures:**\n"
+            for failure in failures[:10]:  # Limit to first 10
+                file_path = failure.get("file", "unknown")
+                line = failure.get("line", "?")
+                error = failure.get("error", "unknown error")
+                comment += f"- `{file_path}:{line}` - {error}\n"
 
-            passed_count = summary.get("passed", 0)
-            failed_count = summary.get("failed", 0)
-            total = summary.get("total", passed_count + failed_count)
+            if len(failures) > 10:
+                comment += f"\n... and {len(failures) - 10} more failures\n"
 
-            # Format results comment
-            if success:
-                comment = f"✅ All {total} tests passed!\n"
-                comment += f"⚡ Context savings: ~90% (using external tools)"
-            else:
-                comment = f"❌ {failed_count} test(s) failed out of {total}\n\n"
-                comment += "**Failures:**\n"
-                for failure in failures[:10]:  # Limit to first 10
-                    file_path = failure.get("file", "unknown")
-                    line = failure.get("line", "?")
-                    error = failure.get("error", "unknown error")
-                    comment += f"- `{file_path}:{line}` - {error}\n"
+            comment += f"\n⚡ Context savings: ~84% (compact failure reporting)"
 
-                if len(failures) > 10:
-                    comment += f"\n... and {len(failures) - 10} more failures\n"
-
-                comment += f"\n⚡ Context savings: ~84% (compact failure reporting)"
-
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, AGENT_TESTER, comment)
-            )
-            logger.info(f"External test results: {passed_count} passed, {failed_count} failed")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_TESTER, comment)
+        )
+        logger.info(f"External test results: {passed_count} passed, {failed_count} failed")
 
     else:
         # Use inline test execution (existing behavior)

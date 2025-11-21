@@ -29,7 +29,7 @@ import sys
 import os
 import logging
 import json
-from typing import Optional, List
+from typing import Optional, List, Tuple
 import subprocess
 from dotenv import load_dotenv
 
@@ -293,12 +293,129 @@ def resolve_blocker_issues(
         logger.info(f"Successfully resolved blocker {i}")
 
 
+def validate_review_data_integrity(
+    review_result: ReviewResult,
+    worktree_path: str,
+    backend_port: str,
+    logger: logging.Logger
+) -> Tuple[bool, Optional[str]]:
+    """Validate that review results show expected data, not silent failures.
+
+    This function implements the critical Issue #64 fix: when screenshots show
+    empty data (like "No workflow history found"), we cross-check with the
+    database and backend logs to distinguish between:
+    1. Legitimately empty state (fresh install, no data)
+    2. Silent backend failure (DB has data but query failed)
+
+    Args:
+        review_result: Review result containing screenshots and summary
+        worktree_path: Path to the worktree
+        backend_port: Backend port for API testing
+        logger: Logger instance
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    logger.info("🔍 Validating review data integrity...")
+
+    # Check if review summary mentions "empty" or "no data" states
+    summary_lower = review_result.review_summary.lower()
+    empty_indicators = [
+        "no workflow",
+        "no data",
+        "0 workflows",
+        "0 total",
+        "empty state"
+    ]
+
+    shows_empty_data = any(indicator in summary_lower for indicator in empty_indicators)
+
+    if not shows_empty_data:
+        logger.info("✅ Review does not show empty data state")
+        return True, None
+
+    logger.warning("⚠️  Review shows empty data - validating if legitimate")
+
+    # Step 1: Check database record count
+    db_path = os.path.join(worktree_path, "app/server/db/workflow_history.db")
+
+    if not os.path.exists(db_path):
+        logger.info("No database file exists - empty state is legitimate")
+        return True, None
+
+    try:
+        result = subprocess.run(
+            ["sqlite3", db_path, "SELECT COUNT(*) FROM workflow_history;"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            db_count = int(result.stdout.strip())
+            logger.info(f"Database contains {db_count} workflow records")
+
+            if db_count > 0:
+                # RED FLAG: Database has data but review shows empty!
+                error_msg = (
+                    f"❌ DATA INTEGRITY FAILURE!\n"
+                    f"Database contains {db_count} workflow records, "
+                    f"but review shows empty data.\n\n"
+                    f"This indicates a backend query failure or schema mismatch.\n"
+                    f"Review should NOT be accepted as success."
+                )
+                logger.error(error_msg)
+
+                # Step 2: Check backend logs for errors
+                log_path = os.path.join(worktree_path, "app/server/server.log")
+                if os.path.exists(log_path):
+                    try:
+                        result = subprocess.run(
+                            ["tail", "-100", log_path],
+                            capture_output=True,
+                            text=True,
+                            timeout=2
+                        )
+                        log_tail = result.stdout
+
+                        # Look for error patterns
+                        error_patterns = [
+                            "has no column",
+                            "schema mismatch",
+                            "Failed to get workflow history",
+                            "pydantic validation"
+                        ]
+
+                        found_errors = [
+                            pattern for pattern in error_patterns
+                            if pattern.lower() in log_tail.lower()
+                        ]
+
+                        if found_errors:
+                            error_msg += f"\n\nErrors found in backend logs:\n"
+                            for pattern in found_errors:
+                                error_msg += f"- {pattern}\n"
+
+                    except Exception as e:
+                        logger.warning(f"Could not read backend logs: {e}")
+
+                return False, error_msg
+
+        logger.info("Database is empty - empty state is legitimate")
+        return True, None
+
+    except Exception as e:
+        logger.warning(f"Could not check database: {e}")
+        # If we can't check DB, allow review to proceed
+        return True, None
+
+
 def build_review_summary(review_result: ReviewResult) -> str:
     """Build a formatted summary of the review results for GitHub comment.
-    
+
     Args:
         review_result: The review result containing summary, issues, and screenshot URLs
-        
+
     Returns:
         Formatted markdown string for GitHub comment
     """
@@ -527,9 +644,38 @@ def main():
     
     # Post review results
     if review_result:
+        # CRITICAL FIX: Validate data integrity before accepting review
+        logger.info("Validating review data integrity...")
+        is_valid, integrity_error = validate_review_data_integrity(
+            review_result,
+            worktree_path,
+            backend_port,
+            logger
+        )
+
+        if not is_valid:
+            # Data integrity check failed!
+            logger.error(f"Review data integrity validation failed: {integrity_error}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    AGENT_REVIEWER,
+                    f"❌ **Review Data Integrity Failure**\n\n{integrity_error}\n\n"
+                    f"**Resolution Required:**\n"
+                    f"1. Check backend logs for query errors\n"
+                    f"2. Verify database schema matches code expectations\n"
+                    f"3. Fix underlying issue before re-running review\n\n"
+                    f"This review will NOT be accepted as successful."
+                )
+            )
+            sys.exit(1)
+
+        logger.info("✅ Review data integrity validation passed")
+
         # Upload screenshots to R2 and update URLs
         upload_review_screenshots(review_result, adw_id, worktree_path, logger)
-        
+
         # Build and post the summary comment
         summary = build_review_summary(review_result)
         make_issue_comment(

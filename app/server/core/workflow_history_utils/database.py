@@ -453,8 +453,16 @@ def get_workflow_history(
             sort_order = "DESC"
 
         # Get paginated results
+        # Note: Use column aliases to bridge schema mismatch between DB and Pydantic models
+        # Database has: submission_hour, submission_day_of_week
+        # Pydantic expects: hour_of_day, day_of_week
+        # This allows existing data to work without migration
         query = f"""
-            SELECT * FROM workflow_history
+            SELECT
+                *,
+                submission_hour as hour_of_day,
+                submission_day_of_week as day_of_week
+            FROM workflow_history
             {where_sql}
             ORDER BY {sort_by} {sort_order}
             LIMIT ? OFFSET ?

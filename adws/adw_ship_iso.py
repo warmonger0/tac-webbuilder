@@ -87,13 +87,130 @@ def find_pr_for_branch(branch_name: str, repo_path: str, logger: logging.Logger)
         return None
 
 
-def merge_pr_via_github(pr_number: str, repo_path: str, logger: logging.Logger) -> Tuple[bool, Optional[str]]:
+def verify_merge_landed(
+    pr_number: str,
+    repo_path: str,
+    target_branch: str,
+    logger: logging.Logger
+) -> Tuple[bool, Optional[str]]:
+    """Verify that PR merge actually landed commits on target branch.
+
+    This critical verification step ensures we don't have "phantom merges"
+    where GitHub reports success but commits never land on main.
+
+    Args:
+        pr_number: PR number that was merged
+        repo_path: Repository path (owner/repo)
+        target_branch: Target branch to verify (usually 'main')
+        logger: Logger instance
+
+    Returns:
+        Tuple of (success, error_message)
+    """
+    try:
+        logger.info(f"🔍 Verifying PR #{pr_number} landed on {target_branch}...")
+
+        # Step 1: Get PR merge commit SHA
+        result = subprocess.run(
+            ["gh", "pr", "view", pr_number,
+             "--repo", repo_path,
+             "--json", "mergeCommit",
+             "--jq", ".mergeCommit.oid"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if result.returncode != 0 or not result.stdout.strip():
+            error_msg = f"Failed to get merge commit for PR #{pr_number}"
+            logger.error(error_msg)
+            return False, error_msg
+
+        merge_commit_sha = result.stdout.strip()
+        logger.info(f"Merge commit SHA: {merge_commit_sha}")
+
+        # Step 2: Verify commit exists on target branch
+        # Use git branch --contains to check if merge commit is on target
+        result = subprocess.run(
+            ["git", "branch", "-r", "--contains", merge_commit_sha],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if result.returncode != 0:
+            error_msg = f"Failed to check if commit {merge_commit_sha} is on {target_branch}"
+            logger.error(error_msg)
+            logger.error(f"Git error: {result.stderr}")
+            return False, error_msg
+
+        branches_containing_commit = result.stdout.strip()
+        expected_branch = f"origin/{target_branch}"
+
+        if expected_branch not in branches_containing_commit:
+            error_msg = (
+                f"❌ PHANTOM MERGE DETECTED!\n"
+                f"PR #{pr_number} reported as merged, but commit {merge_commit_sha} "
+                f"not found on {target_branch}\n"
+                f"Branches containing commit:\n{branches_containing_commit}"
+            )
+            logger.error(error_msg)
+            return False, error_msg
+
+        logger.info(f"✅ Verified: Commit {merge_commit_sha} exists on {expected_branch}")
+
+        # Step 3: Fetch latest and verify target branch moved forward
+        subprocess.run(["git", "fetch", "origin", target_branch], check=False)
+
+        result = subprocess.run(
+            ["git", "log", f"origin/{target_branch}", "-1", "--format=%H"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if result.returncode == 0:
+            latest_commit = result.stdout.strip()
+            logger.info(f"Latest commit on origin/{target_branch}: {latest_commit}")
+
+            # Verify our merge commit is reachable from HEAD of target
+            result = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", merge_commit_sha, latest_commit],
+                check=False
+            )
+
+            if result.returncode == 0:
+                logger.info(f"✅ Verified: {merge_commit_sha} is ancestor of {target_branch} HEAD")
+            else:
+                logger.warning(
+                    f"Merge commit may not be direct ancestor of HEAD, "
+                    f"but is present on {target_branch}"
+                )
+
+        return True, None
+
+    except Exception as e:
+        error_msg = f"Exception during merge verification: {e}"
+        logger.error(error_msg)
+        return False, error_msg
+
+
+def merge_pr_via_github(
+    pr_number: str,
+    repo_path: str,
+    logger: logging.Logger,
+    target_branch: str = "main"
+) -> Tuple[bool, Optional[str]]:
     """Merge a PR using GitHub's merge API via gh CLI.
+
+    CRITICAL: This function now includes post-merge verification to prevent
+    "phantom merges" where GitHub reports success but commits never land.
 
     Args:
         pr_number: PR number to merge
         repo_path: Repository path (owner/repo)
         logger: Logger instance
+        target_branch: Target branch to merge into (default: 'main')
 
     Returns:
         Tuple of (success, error_message)
@@ -113,13 +230,44 @@ def merge_pr_via_github(pr_number: str, repo_path: str, logger: logging.Logger) 
         )
 
         if result.returncode == 0:
-            logger.info(f"✅ Successfully merged PR #{pr_number}")
+            logger.info(f"✅ GitHub API reports PR #{pr_number} merged successfully")
+
+            # CRITICAL FIX: Don't trust GitHub API - verify merge actually landed!
+            logger.info("🔍 Verifying merge actually landed on target branch...")
+
+            verify_success, verify_error = verify_merge_landed(
+                pr_number, repo_path, target_branch, logger
+            )
+
+            if not verify_success:
+                # Phantom merge detected!
+                error_msg = (
+                    f"❌ CRITICAL: Merge verification failed!\n"
+                    f"GitHub API reported PR #{pr_number} as merged, "
+                    f"but commits did not land on {target_branch}.\n\n"
+                    f"Details: {verify_error}\n\n"
+                    f"This is a PHANTOM MERGE. Do NOT close the issue.\n"
+                    f"Manual investigation required."
+                )
+                logger.error(error_msg)
+                return False, error_msg
+
+            logger.info(f"✅ Merge verification passed - commits confirmed on {target_branch}")
             return True, None
         else:
             # Check if it's just a branch deletion error (worktree in use)
             if "cannot delete branch" in result.stderr and "used by worktree" in result.stderr:
                 logger.warning("PR merged but branch deletion failed (worktree in use)")
                 logger.info("Branch will be cleaned up with worktree removal")
+
+                # Still verify the merge landed
+                verify_success, verify_error = verify_merge_landed(
+                    pr_number, repo_path, target_branch, logger
+                )
+
+                if not verify_success:
+                    return False, verify_error
+
                 return True, None
 
             error_msg = f"Failed to merge PR #{pr_number}: {result.stderr}"
