@@ -12,13 +12,20 @@ Usage:
 Workflow:
 1. Load state and validate worktree exists
 2. Run application test suite in worktree (optionally via external tools)
-3. Report results to issue
-4. Create commit with test results in worktree
-5. Push and update PR
+3. **NEW (Issue #74):** Automatically retry and resolve test failures with fallback
+4. Report results to issue
+5. Create commit with test results in worktree
+6. Push and update PR
 
 Options:
   --skip-e2e: Skip E2E tests
   --no-external: Disable external test tools (uses inline execution, higher token usage)
+
+Resolution Loop (Issue #74):
+- Infrastructure failures: Retries with fallback to inline mode (max 4 attempts)
+- Test failures: Attempts resolution via inline mode with test fixing
+- Never continues to review phase with failing tests
+- Blocks progression until tests pass or max retries exhausted
 
 This workflow REQUIRES that adw_plan_iso.py or adw_patch_iso.py has been run first
 to create the worktree. It cannot create worktrees itself.
@@ -499,6 +506,128 @@ def resolve_failed_tests(
     return resolved_count, unresolved_count
 
 
+def run_external_tests_with_resolution(
+    adw_id: str,
+    issue_number: str,
+    logger: logging.Logger,
+    state: ADWState,
+    worktree_path: str,
+    max_attempts: int = MAX_TEST_RETRY_ATTEMPTS,
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Run external tests with automatic resolution and retry logic for infrastructure failures.
+    Returns (success, results_dict).
+
+    This handles two failure scenarios:
+    1. Infrastructure failures (JSONDecodeError, SubprocessError, etc.) - attempts retry with fallback
+    2. Test failures (parseable test results) - attempts test resolution via inline mode
+    """
+    attempt = 0
+    last_results = {}
+
+    while attempt < max_attempts:
+        attempt += 1
+        logger.info(f"\n=== External Test Run Attempt {attempt}/{max_attempts} ===")
+
+        # Run external tests
+        success, external_results = run_external_tests(issue_number, adw_id, logger, state)
+        last_results = external_results
+
+        # Check for infrastructure failure (has "error" key)
+        if "error" in external_results:
+            error_info = external_results.get("error", {})
+            error_type = error_info.get("type", "Unknown")
+            error_message = error_info.get("message", "Unknown error")
+
+            logger.error(f"External test tool infrastructure failure: {error_type}: {error_message}")
+
+            # Post infrastructure failure details
+            error_comment = f"❌ **Test infrastructure failure (Attempt {attempt}/{max_attempts})**\n\n"
+            error_comment += f"**Error Type:** {error_type}\n"
+            error_comment += f"**Error Message:** {error_message}\n\n"
+
+            if "details" in error_info:
+                error_comment += f"**Details:**\n```\n{error_info['details']}\n```\n\n"
+
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_TESTER, error_comment)
+            )
+
+            # If this is the last attempt, fall back to inline execution
+            if attempt == max_attempts:
+                logger.warning("Max retry attempts reached for external tests, falling back to inline execution")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id,
+                        "ops",
+                        "⚠️ External test tool failed after max retries. Falling back to inline execution..."
+                    )
+                )
+                # Will fall through to return False, which triggers inline mode in caller
+                return False, external_results
+
+            # Not the last attempt - retry
+            logger.info(f"Retrying external tests (attempt {attempt + 1}/{max_attempts})...")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    "ops",
+                    f"🔄 Retrying test infrastructure (attempt {attempt + 1}/{max_attempts})..."
+                )
+            )
+            continue
+
+        # No infrastructure error - check test results
+        summary = external_results.get("summary", {})
+        failed_count = summary.get("failed", 0)
+
+        # If all tests passed, we're done
+        if success and failed_count == 0:
+            logger.info("All external tests passed")
+            return True, external_results
+
+        # Tests failed - try resolution if not last attempt
+        if attempt < max_attempts and failed_count > 0:
+            logger.info(f"\n=== External tests have {failed_count} failures, attempting resolution ===")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    "ops",
+                    f"🔧 Found {failed_count} test failures. Attempting resolution via inline mode..."
+                )
+            )
+
+            # Fall back to inline mode for resolution
+            logger.info("Using inline test execution for detailed failure analysis and resolution")
+            results, passed_count, failed_count_inline, test_response = run_tests_with_resolution(
+                adw_id, issue_number, logger, worktree_path, max_attempts=1
+            )
+
+            # After inline resolution, retry external tests to verify fix
+            logger.info("Re-running external tests to verify fixes...")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    "ops",
+                    f"🔄 Re-running external tests to verify fixes (attempt {attempt + 1}/{max_attempts})..."
+                )
+            )
+            continue
+
+        # Last attempt with failures - return results
+        logger.warning(f"Reached max attempts with {failed_count} test failures")
+        return False, external_results
+
+    # Exceeded max attempts
+    logger.error(f"Exceeded max attempts ({max_attempts}) for external tests")
+    return False, last_results
+
+
 def run_tests_with_resolution(
     adw_id: str,
     issue_number: str,
@@ -895,78 +1024,75 @@ def main():
     failed_count = 0
 
     if use_external:
-        # Use external test tools (context optimized)
-        logger.info("🔧 Using external test tools for context optimization")
+        # Use external test tools (context optimized) with automatic resolution
+        logger.info("🔧 Using external test tools with automatic resolution for context optimization")
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, AGENT_TESTER, "🔧 Running tests via external tools (70-95% token reduction)...")
+            format_issue_message(adw_id, AGENT_TESTER, "🔧 Running tests via external tools with resolution loop (70-95% token reduction)...")
         )
 
-        # Run external tests
-        success, external_results = run_external_tests(issue_number, adw_id, logger, state)
+        # Run external tests with resolution and retry logic
+        success, external_results = run_external_tests_with_resolution(
+            adw_id, issue_number, logger, state, worktree_path
+        )
 
-        # CRITICAL FIX: Check if external tool failed and exit immediately
-        if "error" in external_results:
-            # External tool failed critically (e.g., JSONDecodeError, timeout, crash)
-            error_info = external_results.get("error", {})
-            error_type = error_info.get("type", "Unknown")
-            error_message = error_info.get("message", "Unknown error")
+        # Check if we fell back to inline mode (infrastructure failure after max retries)
+        if not success and "error" in external_results:
+            # External tools failed completely - fallback to inline mode
+            logger.warning("External test tools failed after retries, using inline execution as fallback")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    "ops",
+                    "⚠️ External test tools failed after max retries. Using inline execution mode for comprehensive analysis..."
+                )
+            )
 
-            logger.error(f"External test tool error: {error_type}: {error_message}")
+            # Use inline mode with full resolution
+            test_results, passed_count, failed_count, test_response = run_tests_with_resolution(
+                adw_id, issue_number, logger, worktree_path
+            )
 
-            # Post detailed error to GitHub
-            error_comment = f"❌ **External test tool failed**\n\n"
-            error_comment += f"**Error Type:** {error_type}\n"
-            error_comment += f"**Error Message:** {error_message}\n\n"
+            if test_results:
+                comment = format_test_results_comment(test_results, passed_count, failed_count)
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, AGENT_TESTER, comment)
+                )
+                logger.info(f"Inline test results: {passed_count} passed, {failed_count} failed")
+        else:
+            # Process external results
+            summary = external_results.get("summary", {})
+            failures = external_results.get("failures", [])
 
-            if "details" in error_info:
-                error_comment += f"**Details:**\n```\n{error_info['details']}\n```\n\n"
+            passed_count = summary.get("passed", 0)
+            failed_count = summary.get("failed", 0)
+            total = summary.get("total", passed_count + failed_count)
 
-            if "next_steps" in external_results:
-                error_comment += "**Next Steps:**\n"
-                for step in external_results["next_steps"]:
-                    error_comment += f"- {step}\n"
+            # Format results comment
+            if success:
+                comment = f"✅ All {total} tests passed!\n"
+                comment += f"⚡ Context savings: ~90% (using external tools with resolution)"
+            else:
+                comment = f"❌ {failed_count} test(s) failed out of {total} after resolution attempts\n\n"
+                comment += "**Remaining Failures:**\n"
+                for failure in failures[:10]:  # Limit to first 10
+                    file_path = failure.get("file", "unknown")
+                    line = failure.get("line", "?")
+                    error_msg = failure.get("error_message", "unknown error")
+                    comment += f"- `{file_path}:{line}` - {error_msg}\n"
+
+                if len(failures) > 10:
+                    comment += f"\n... and {len(failures) - 10} more failures\n"
+
+                comment += f"\n⚡ Context savings: ~84% (compact failure reporting with resolution)"
 
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, AGENT_TESTER, error_comment)
+                format_issue_message(adw_id, AGENT_TESTER, comment)
             )
-
-            # FAIL FAST: Exit immediately with error code
-            logger.error("Exiting due to external test tool failure")
-            sys.exit(1)
-
-        # Process external results
-        summary = external_results.get("summary", {})
-        failures = external_results.get("failures", [])
-
-        passed_count = summary.get("passed", 0)
-        failed_count = summary.get("failed", 0)
-        total = summary.get("total", passed_count + failed_count)
-
-        # Format results comment
-        if success:
-            comment = f"✅ All {total} tests passed!\n"
-            comment += f"⚡ Context savings: ~90% (using external tools)"
-        else:
-            comment = f"❌ {failed_count} test(s) failed out of {total}\n\n"
-            comment += "**Failures:**\n"
-            for failure in failures[:10]:  # Limit to first 10
-                file_path = failure.get("file", "unknown")
-                line = failure.get("line", "?")
-                error = failure.get("error", "unknown error")
-                comment += f"- `{file_path}:{line}` - {error}\n"
-
-            if len(failures) > 10:
-                comment += f"\n... and {len(failures) - 10} more failures\n"
-
-            comment += f"\n⚡ Context savings: ~84% (compact failure reporting)"
-
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, AGENT_TESTER, comment)
-        )
-        logger.info(f"External test results: {passed_count} passed, {failed_count} failed")
+            logger.info(f"External test results: {passed_count} passed, {failed_count} failed")
 
     else:
         # Use inline test execution (existing behavior)
