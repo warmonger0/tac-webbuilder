@@ -15,6 +15,7 @@ from typing import Literal
 import httpx
 from core.cost_tracker import read_cost_history
 from core.data_models import (
+    AdwMonitorResponse,
     ColumnInfo,
     ConfirmResponse,
     CostEstimate,
@@ -424,6 +425,34 @@ async def get_system_status() -> SystemStatusResponse:
     """Comprehensive system health check - delegates to HealthService"""
     status_data = await health_service.get_system_status()
     return SystemStatusResponse(**status_data)
+
+@app.get("/api/adw-monitor", response_model=AdwMonitorResponse)
+async def get_adw_monitor_status() -> AdwMonitorResponse:
+    """
+    Get real-time status of all ADW workflows.
+
+    Aggregates workflow data from:
+    - ADW state files (agents/*/adw_state.json)
+    - Running process checks
+    - Worktree existence validation
+    - Phase progress calculation
+    - Cost tracking
+
+    Returns comprehensive status for monitoring active, paused, and recent workflows.
+    """
+    from core.adw_monitor import aggregate_adw_monitor_data
+
+    try:
+        monitor_data = aggregate_adw_monitor_data()
+        return AdwMonitorResponse(**monitor_data)
+    except Exception as e:
+        logger.error(f"Error getting ADW monitor status: {e}")
+        # Return empty response on error
+        return AdwMonitorResponse(
+            summary={"total": 0, "running": 0, "completed": 0, "failed": 0, "paused": 0},
+            workflows=[],
+            last_updated=datetime.now().isoformat()
+        )
 
 @app.post("/api/services/webhook/start")
 async def start_webhook_service() -> dict:
