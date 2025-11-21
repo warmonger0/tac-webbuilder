@@ -272,38 +272,26 @@ def suggest_adw_workflow(issue_type: str, complexity: str, characteristics: dict
     needs_testing = characteristics.get("testing_needed", False)
     has_backend = characteristics.get("backend_changes", False)
 
-    # Lightweight criteria:
-    # - 1-2 files
-    # - No backend changes
-    # - UI or docs only
-    # - No testing needed
+    # Tier 1: Trivial - lightweight workflow + Haiku model
+    # Criteria: 1-2 files, no backend, no testing, UI/docs only
     if (file_count <= 2 and
         not has_backend and
         not needs_testing and
         (is_ui_only or is_docs_only)):
-        return ("adw_lightweight_iso", "base")
+        return ("adw_lightweight_iso", "lightweight")
 
-    # Lightweight for simple chores
-    if issue_type == "chore" and complexity == "low" and not needs_testing:
-        return ("adw_lightweight_iso", "base")
-
-    # Bugs always need testing - use complete SDLC workflow
+    # Tier 2: Bugs - full SDLC + Haiku (cost optimized, bugs are usually straightforward)
     if issue_type == "bug":
+        return ("adw_sdlc_complete_iso", "lightweight")
+
+    # Tier 3: High complexity - full SDLC + Opus (most capable model)
+    if complexity == "high":
+        return ("adw_sdlc_complete_iso", "heavy")
+
+    # Tier 4: Standard (everything else) - full SDLC + Sonnet
+    # This includes: medium/low complexity features, chores
+    else:
         return ("adw_sdlc_complete_iso", "base")
-
-    # Chores without special characteristics
-    elif issue_type == "chore":
-        return ("adw_sdlc_iso", "base")
-
-    # Features tiered by complexity - use complete SDLC workflow
-    else:  # feature
-        if complexity == "high":
-            return ("adw_sdlc_complete_iso", "heavy")
-        elif complexity == "medium":
-            return ("adw_sdlc_complete_iso", "base")
-        else:  # low
-            # Low complexity features still use SDLC unless they match lightweight criteria
-            return ("adw_sdlc_iso", "base")
 
 
 async def process_request(nl_input: str, project_context: ProjectContext) -> GitHubIssue:

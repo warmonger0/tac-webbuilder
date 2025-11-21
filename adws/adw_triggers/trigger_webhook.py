@@ -326,10 +326,10 @@ async def process_webhook_background(
         start_time = datetime.now().isoformat()
 
         # Determine model_used based on model_set
-        # For now, default to "sonnet" for base, can be refined later
+        # lightweight = Haiku (cheap), base = Sonnet (smart), heavy = Opus (complex)
         model_mapping = {
             "base": "sonnet",
-            "advanced": "opus",
+            "heavy": "opus",
             "lightweight": "haiku"
         }
         model_used = model_mapping.get(model_set, "sonnet")

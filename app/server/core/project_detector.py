@@ -424,11 +424,16 @@ def suggest_workflow(context: ProjectContext) -> str:
 
     Returns:
         Recommended workflow name
+
+    Note: This only returns workflow name. Model set selection happens
+    in suggest_adw_workflow() based on complexity and issue type.
     """
-    if context.complexity == "high" or context.complexity == "medium":
-        return "adw_sdlc_complete_iso"
+    # Low complexity can use lightweight workflow for trivial changes
+    # Otherwise use complete SDLC
+    if context.complexity == "low":
+        return "adw_lightweight_iso"
     else:
-        return "adw_sdlc_iso"
+        return "adw_sdlc_complete_iso"
 
 
 def calculate_complexity(context: ProjectContext) -> str:

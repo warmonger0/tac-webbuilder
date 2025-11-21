@@ -26,26 +26,27 @@ load_dotenv()
 CLAUDE_PATH = os.getenv("CLAUDE_CODE_PATH", "claude")
 
 # Model selection mapping for slash commands
-# Maps each command to its model configuration for base and heavy model sets
+# Maps each command to its model configuration for lightweight, base, and heavy model sets
+# lightweight = Haiku (cheap, fast), base = Sonnet (smart), heavy = Opus (complex tasks)
 SLASH_COMMAND_MODEL_MAP: Final[Dict[SlashCommand, Dict[ModelSet, str]]] = {
-    "/classify_issue": {"base": "sonnet", "heavy": "sonnet"},
-    "/classify_adw": {"base": "sonnet", "heavy": "sonnet"},
-    "/generate_branch_name": {"base": "sonnet", "heavy": "sonnet"},
-    "/implement": {"base": "sonnet", "heavy": "opus"},
-    "/test": {"base": "sonnet", "heavy": "sonnet"},
-    "/resolve_failed_test": {"base": "sonnet", "heavy": "opus"},
-    "/test_e2e": {"base": "sonnet", "heavy": "sonnet"},
-    "/resolve_failed_e2e_test": {"base": "sonnet", "heavy": "opus"},
-    "/review": {"base": "sonnet", "heavy": "sonnet"},
-    "/document": {"base": "sonnet", "heavy": "opus"},
-    "/commit": {"base": "sonnet", "heavy": "sonnet"},
-    "/pull_request": {"base": "sonnet", "heavy": "sonnet"},
-    "/chore": {"base": "sonnet", "heavy": "opus"},
-    "/bug": {"base": "sonnet", "heavy": "opus"},
-    "/feature": {"base": "sonnet", "heavy": "opus"},
-    "/patch": {"base": "sonnet", "heavy": "opus"},
-    "/install_worktree": {"base": "sonnet", "heavy": "sonnet"},
-    "/track_agentic_kpis": {"base": "sonnet", "heavy": "sonnet"},
+    "/classify_issue": {"lightweight": "haiku", "base": "sonnet", "heavy": "sonnet"},
+    "/classify_adw": {"lightweight": "haiku", "base": "sonnet", "heavy": "sonnet"},
+    "/generate_branch_name": {"lightweight": "haiku", "base": "sonnet", "heavy": "sonnet"},
+    "/implement": {"lightweight": "haiku", "base": "sonnet", "heavy": "opus"},
+    "/test": {"lightweight": "haiku", "base": "sonnet", "heavy": "sonnet"},
+    "/resolve_failed_test": {"lightweight": "haiku", "base": "sonnet", "heavy": "opus"},
+    "/test_e2e": {"lightweight": "haiku", "base": "sonnet", "heavy": "sonnet"},
+    "/resolve_failed_e2e_test": {"lightweight": "haiku", "base": "sonnet", "heavy": "opus"},
+    "/review": {"lightweight": "haiku", "base": "sonnet", "heavy": "sonnet"},
+    "/document": {"lightweight": "haiku", "base": "sonnet", "heavy": "opus"},
+    "/commit": {"lightweight": "haiku", "base": "sonnet", "heavy": "sonnet"},
+    "/pull_request": {"lightweight": "haiku", "base": "sonnet", "heavy": "sonnet"},
+    "/chore": {"lightweight": "haiku", "base": "sonnet", "heavy": "opus"},
+    "/bug": {"lightweight": "haiku", "base": "sonnet", "heavy": "opus"},
+    "/feature": {"lightweight": "haiku", "base": "sonnet", "heavy": "opus"},
+    "/patch": {"lightweight": "haiku", "base": "sonnet", "heavy": "opus"},
+    "/install_worktree": {"lightweight": "haiku", "base": "sonnet", "heavy": "sonnet"},
+    "/track_agentic_kpis": {"lightweight": "haiku", "base": "sonnet", "heavy": "sonnet"},
 }
 
 

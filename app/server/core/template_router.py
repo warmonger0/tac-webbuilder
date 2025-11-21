@@ -161,7 +161,7 @@ def match_lightweight(text: str) -> TemplateMatch | None:
             return TemplateMatch(
                 matched=True,
                 workflow="adw_lightweight_iso",
-                model_set="base",
+                model_set="lightweight",
                 classification=pattern["classification"],
                 confidence=pattern["confidence"],
                 pattern_name=pattern["name"],
@@ -180,7 +180,7 @@ def match_standard(text: str) -> TemplateMatch | None:
         if matches_pattern(text, pattern):
             return TemplateMatch(
                 matched=True,
-                workflow="adw_sdlc_iso",
+                workflow="adw_sdlc_complete_iso",
                 model_set="base",
                 classification=pattern["classification"],
                 confidence=pattern["confidence"],
@@ -201,7 +201,7 @@ def match_bug(text: str) -> TemplateMatch | None:
             return TemplateMatch(
                 matched=True,
                 workflow="adw_sdlc_complete_iso",
-                model_set="base",
+                model_set="lightweight",
                 classification="bug",
                 confidence=pattern["confidence"],
                 pattern_name=pattern["name"],
