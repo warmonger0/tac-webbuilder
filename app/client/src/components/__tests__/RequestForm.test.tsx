@@ -558,4 +558,258 @@ describe('RequestForm', () => {
       expect(nlInput).toHaveValue('');
     });
   });
+
+  describe('Drag-and-Drop File Upload', () => {
+    it('should render file upload button', () => {
+      render(<RequestForm />);
+
+      const uploadButton = screen.getByText(/Upload \.md file/i);
+      expect(uploadButton).toBeInTheDocument();
+    });
+
+    it('should render drag-and-drop hint text', () => {
+      render(<RequestForm />);
+
+      const hintText = screen.getByText(/or drag and drop above/i);
+      expect(hintText).toBeInTheDocument();
+    });
+
+    it('should have hidden file input with correct accept attribute', () => {
+      render(<RequestForm />);
+
+      const fileInput = document.querySelector('input[type="file"]');
+      expect(fileInput).toBeInTheDocument();
+      expect(fileInput).toHaveAttribute('accept', '.md,.markdown');
+      expect(fileInput).toHaveAttribute('multiple');
+      expect(fileInput).toHaveClass('hidden');
+    });
+
+    it('should upload file and populate textarea via file input', async () => {
+      render(<RequestForm />);
+
+      const fileContent = '# Test File\n\nThis is test content.';
+      const file = new File([fileContent], 'test.md', { type: 'text/markdown' });
+
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, file);
+
+      await waitFor(() => {
+        const textarea = screen.getByPlaceholderText(/Build a REST API/i);
+        expect(textarea).toHaveValue(fileContent);
+      });
+    });
+
+    it('should show success message after file upload', async () => {
+      render(<RequestForm />);
+
+      const fileContent = '# Test File';
+      const file = new File([fileContent], 'test.md', { type: 'text/markdown' });
+
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(screen.getByText(/File uploaded successfully/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should auto-dismiss success message after 3 seconds', async () => {
+      vi.useFakeTimers();
+      render(<RequestForm />);
+
+      const file = new File(['# Test'], 'test.md', { type: 'text/markdown' });
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(screen.getByText(/File uploaded successfully/i)).toBeInTheDocument();
+      });
+
+      // Fast-forward 3 seconds
+      vi.advanceTimersByTime(3000);
+
+      await waitFor(() => {
+        expect(screen.queryByText(/File uploaded successfully/i)).not.toBeInTheDocument();
+      });
+
+      vi.useRealTimers();
+    });
+
+    it('should show error for invalid file type', async () => {
+      render(<RequestForm />);
+
+      const file = new File(['content'], 'test.txt', { type: 'text/plain' });
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Invalid file type/i)).toBeInTheDocument();
+        expect(screen.getByText(/test\.txt/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should handle multiple file uploads', async () => {
+      render(<RequestForm />);
+
+      const file1 = new File(['# File 1'], 'file1.md', { type: 'text/markdown' });
+      const file2 = new File(['# File 2'], 'file2.md', { type: 'text/markdown' });
+
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, [file1, file2]);
+
+      await waitFor(() => {
+        const textarea = screen.getByPlaceholderText(/Build a REST API/i);
+        expect(textarea).toHaveValue('# File 1\n\n---\n\n# File 2');
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/2 files uploaded successfully/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should append file content to existing textarea content', async () => {
+      render(<RequestForm />);
+
+      const textarea = screen.getByPlaceholderText(/Build a REST API/i);
+      await userEvent.type(textarea, 'Existing content');
+
+      const file = new File(['# New Content'], 'test.md', { type: 'text/markdown' });
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(textarea).toHaveValue('Existing content\n\n---\n\n# New Content');
+      });
+    });
+
+    it('should handle rejected files in multiple file upload', async () => {
+      render(<RequestForm />);
+
+      const mdFile = new File(['# Valid'], 'valid.md', { type: 'text/markdown' });
+      const txtFile = new File(['Invalid'], 'invalid.txt', { type: 'text/plain' });
+
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, [mdFile, txtFile]);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Rejected files: invalid\.txt/i)).toBeInTheDocument();
+      });
+
+      const textarea = screen.getByPlaceholderText(/Build a REST API/i);
+      expect(textarea).toHaveValue('# Valid');
+    });
+
+    it('should show error when no valid files are uploaded', async () => {
+      render(<RequestForm />);
+
+      const txtFile = new File(['content'], 'test.txt', { type: 'text/plain' });
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, txtFile);
+
+      await waitFor(() => {
+        expect(screen.getByText(/No valid \.md files found/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should reset file input after upload', async () => {
+      render(<RequestForm />);
+
+      const file = new File(['# Test'], 'test.md', { type: 'text/markdown' });
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, file);
+
+      await waitFor(() => {
+        expect(fileInput.value).toBe('');
+      });
+    });
+
+    it('should integrate uploaded content with form persistence', async () => {
+      vi.useFakeTimers();
+      render(<RequestForm />);
+
+      const file = new File(['# Uploaded Content'], 'test.md', { type: 'text/markdown' });
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, file);
+
+      await waitFor(() => {
+        const textarea = screen.getByPlaceholderText(/Build a REST API/i);
+        expect(textarea).toHaveValue('# Uploaded Content');
+      });
+
+      // Fast-forward debounce timer to trigger auto-save
+      vi.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        const savedState = JSON.parse(
+          localStorageMock.getItem('tac-webbuilder-request-form-state') || '{}'
+        );
+        expect(savedState.nlInput).toBe('# Uploaded Content');
+      });
+
+      vi.useRealTimers();
+    });
+
+    it('should allow form submission with uploaded content', async () => {
+      const mockHealthStatus = {
+        overall_status: 'healthy' as const,
+        services: {},
+        summary: { healthy_services: 5, total_services: 5, health_percentage: 100 },
+      };
+
+      const mockSubmitResponse = { request_id: 'test-123' };
+      const mockPreview = {
+        title: 'Test Issue',
+        body: 'Test body',
+        labels: [],
+        classification: 'feature',
+        workflow: 'adw_plan_iso',
+        model_set: 'base',
+      };
+
+      vi.spyOn(client, 'getSystemStatus').mockResolvedValue(mockHealthStatus);
+      vi.spyOn(client, 'submitRequest').mockResolvedValue(mockSubmitResponse);
+      vi.spyOn(client, 'getPreview').mockResolvedValue(mockPreview);
+      vi.spyOn(client, 'getCostEstimate').mockResolvedValue({
+        level: 'lightweight',
+        min_cost: 0.5,
+        max_cost: 1.0,
+        confidence: 0.8,
+        reasoning: 'Test reasoning',
+        recommended_workflow: 'adw_plan_iso',
+      });
+
+      render(<RequestForm />);
+
+      const file = new File(['# Feature Request'], 'request.md', { type: 'text/markdown' });
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, file);
+
+      await waitFor(() => {
+        const textarea = screen.getByPlaceholderText(/Build a REST API/i);
+        expect(textarea).toHaveValue('# Feature Request');
+      });
+
+      const submitButton = screen.getByText('Generate Issue');
+      await userEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(client.submitRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            nl_input: '# Feature Request',
+          })
+        );
+      });
+    });
+  });
 });

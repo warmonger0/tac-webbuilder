@@ -6,6 +6,7 @@ import { CostEstimateCard } from './CostEstimateCard';
 import { ConfirmDialog } from './ConfirmDialog';
 import { SystemStatusPanel } from './SystemStatusPanel';
 import { ZteHopperQueueCard } from './ZteHopperQueueCard';
+import { useDragAndDrop } from '../hooks/useDragAndDrop';
 
 const PROJECT_PATH_STORAGE_KEY = 'tac-webbuilder-project-path';
 const REQUEST_FORM_STATE_STORAGE_KEY = 'tac-webbuilder-request-form-state';
@@ -96,9 +97,30 @@ export function RequestForm() {
   const [systemHealthy, setSystemHealthy] = useState(true);
   const [healthWarning, setHealthWarning] = useState<string | null>(null);
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
+  const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
 
   // Ref for debounce timer
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Ref for file input (keyboard accessibility)
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Initialize drag-and-drop hook
+  const { isDragging, error: dragError, isReading, dragHandlers, clearError } = useDragAndDrop({
+    onContentReceived: (content) => {
+      // Append content to existing text with separator if there's existing content
+      if (nlInput.trim()) {
+        setNlInput(prev => prev + '\n\n---\n\n' + content);
+      } else {
+        setNlInput(content);
+      }
+    },
+    onSuccess: (message) => {
+      setUploadSuccessMessage(message);
+      // Auto-dismiss success message after 3 seconds
+      setTimeout(() => setUploadSuccessMessage(null), 3000);
+    }
+  });
 
   // Load form state from localStorage on mount
   useEffect(() => {
@@ -283,6 +305,57 @@ export function RequestForm() {
     setRequestId(null);
   };
 
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setError(null);
+    clearError();
+
+    try {
+      const { handleMultipleFiles } = await import('../utils/fileHandlers');
+      const result = await handleMultipleFiles(Array.from(files));
+
+      if (result.content === '' && result.processedCount === 0) {
+        setError(
+          result.rejectedFiles.length > 0
+            ? `No valid .md files found. Rejected files: ${result.rejectedFiles.join(', ')}`
+            : 'No valid files to process'
+        );
+        return;
+      }
+
+      // Append content to existing text with separator if there's existing content
+      if (nlInput.trim()) {
+        setNlInput(prev => prev + '\n\n---\n\n' + result.content);
+      } else {
+        setNlInput(result.content);
+      }
+
+      // Build success message
+      let successMsg = '';
+      if (result.processedCount === 1) {
+        successMsg = 'File uploaded successfully';
+      } else {
+        successMsg = `${result.processedCount} files uploaded successfully`;
+      }
+
+      if (result.rejectedFiles.length > 0) {
+        successMsg += `. Rejected files: ${result.rejectedFiles.join(', ')}`;
+      }
+
+      setUploadSuccessMessage(successMsg);
+      setTimeout(() => setUploadSuccessMessage(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to read file(s)');
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <>
       <div className="max-w-4xl mx-auto">
@@ -299,14 +372,85 @@ export function RequestForm() {
           >
             Describe what you want to build
           </label>
-          <textarea
-            id="nl-input"
-            placeholder="Example: Build a REST API for user management with CRUD operations..."
-            value={nlInput}
-            onChange={(e) => setNlInput(e.target.value)}
-            rows={6}
-            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
+
+          {/* Drag-and-drop zone */}
+          <div
+            className={`relative ${isDragging ? 'ring-2 ring-primary' : ''}`}
+            {...dragHandlers}
+            aria-busy={isReading}
+          >
+            <textarea
+              id="nl-input"
+              placeholder="Example: Build a REST API for user management with CRUD operations..."
+              value={nlInput}
+              onChange={(e) => setNlInput(e.target.value)}
+              rows={6}
+              className={`w-full p-4 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                isDragging ? 'border-primary bg-blue-50' : 'border-gray-300'
+              }`}
+              disabled={isReading}
+            />
+
+            {/* Drop zone overlay */}
+            {isDragging && (
+              <div className="absolute inset-0 flex items-center justify-center bg-blue-50 bg-opacity-90 border-2 border-dashed border-primary rounded-lg pointer-events-none">
+                <div className="text-center">
+                  <svg className="mx-auto h-12 w-12 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <p className="mt-2 text-sm font-medium text-primary">Drop .md file here</p>
+                </div>
+              </div>
+            )}
+
+            {/* Loading overlay */}
+            {isReading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-2 text-sm text-gray-600">Reading file(s)...</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* File upload button (keyboard accessibility) */}
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".md,.markdown"
+              multiple
+              onChange={handleFileInputChange}
+              className="hidden"
+              id="file-upload"
+              aria-label="Upload markdown files"
+            />
+            <label
+              htmlFor="file-upload"
+              className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 cursor-pointer transition-colors"
+            >
+              <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              Upload .md file
+            </label>
+            <span className="text-xs text-gray-500">or drag and drop above</span>
+          </div>
+
+          {/* Drag-and-drop error message */}
+          {dragError && (
+            <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+              {dragError}
+            </div>
+          )}
+
+          {/* Upload success message */}
+          {uploadSuccessMessage && (
+            <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+              {uploadSuccessMessage}
+            </div>
+          )}
         </div>
 
         <div>
