@@ -7,8 +7,10 @@ ALTER TABLE workflow_history ADD COLUMN nl_input_clarity_score REAL; -- 0-100 sc
 ALTER TABLE workflow_history ADD COLUMN structured_input_completeness_percent REAL;
 
 -- Temporal patterns
-ALTER TABLE workflow_history ADD COLUMN submission_hour INTEGER; -- 0-23
-ALTER TABLE workflow_history ADD COLUMN submission_day_of_week INTEGER; -- 0-6 (Monday=0)
+-- NOTE: Column names corrected to match Python schema (hour_of_day, day_of_week)
+-- Migration 005 renames these columns in existing databases
+ALTER TABLE workflow_history ADD COLUMN hour_of_day INTEGER; -- 0-23
+ALTER TABLE workflow_history ADD COLUMN day_of_week INTEGER; -- 0-6 (Monday=0)
 
 -- Outcome tracking
 ALTER TABLE workflow_history ADD COLUMN pr_merged INTEGER DEFAULT 0; -- Boolean (0 or 1)
@@ -27,8 +29,8 @@ ALTER TABLE workflow_history ADD COLUMN anomaly_flags TEXT; -- JSON array of det
 ALTER TABLE workflow_history ADD COLUMN optimization_recommendations TEXT; -- JSON array of recommendations
 
 -- Create indexes for improved query performance
-CREATE INDEX IF NOT EXISTS idx_submission_hour ON workflow_history(submission_hour);
-CREATE INDEX IF NOT EXISTS idx_submission_day_of_week ON workflow_history(submission_day_of_week);
+CREATE INDEX IF NOT EXISTS idx_hour_of_day ON workflow_history(hour_of_day);
+CREATE INDEX IF NOT EXISTS idx_day_of_week ON workflow_history(day_of_week);
 CREATE INDEX IF NOT EXISTS idx_pr_merged ON workflow_history(pr_merged);
 CREATE INDEX IF NOT EXISTS idx_cost_efficiency_score ON workflow_history(cost_efficiency_score);
 CREATE INDEX IF NOT EXISTS idx_performance_score ON workflow_history(performance_score);
