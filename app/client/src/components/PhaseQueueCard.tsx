@@ -212,3 +212,22 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
     </div>
   );
 }
+
+/**
+ * PhaseQueueList Component
+ *
+ * Displays a scrollable list of phase queue items
+ */
+interface PhaseQueueListProps {
+  phases: PhaseQueueItem[];
+}
+
+export function PhaseQueueList({ phases }: PhaseQueueListProps) {
+  return (
+    <div className="space-y-3 overflow-y-auto h-full pr-2">
+      {phases.map((phase) => (
+        <PhaseQueueCard key={phase.queue_id} queueItem={phase} />
+      ))}
+    </div>
+  );
+}
