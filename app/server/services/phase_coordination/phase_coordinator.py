@@ -39,7 +39,8 @@ class PhaseCoordinator:
         phase_queue_service: PhaseQueueService,
         workflow_db_path: str = "db/workflow_history.db",
         poll_interval: float = 10.0,
-        websocket_manager = None
+        websocket_manager = None,
+        github_poster = None
     ):
         """
         Initialize PhaseCoordinator.
@@ -49,11 +50,13 @@ class PhaseCoordinator:
             workflow_db_path: Path to workflow_history database
             poll_interval: Polling interval in seconds (default: 10.0)
             websocket_manager: WebSocket manager for real-time updates (optional)
+            github_poster: GitHubPoster for just-in-time issue creation (optional)
         """
         self.phase_queue_service = phase_queue_service
         self.workflow_db_path = workflow_db_path
         self.poll_interval = poll_interval
         self.websocket_manager = websocket_manager
+        self.github_poster = github_poster
         self._is_running = False
         self._task: Optional[asyncio.Task] = None
         self._processed_workflows = set()  # Track processed workflow IDs
@@ -190,7 +193,11 @@ class PhaseCoordinator:
         )
 
         # Mark phase complete (triggers next phase automatically)
-        self.phase_queue_service.mark_phase_complete(queue_id)
+        next_phase_triggered = self.phase_queue_service.mark_phase_complete(queue_id)
+
+        # If next phase was triggered, create its GitHub issue just-in-time
+        if next_phase_triggered and self.github_poster:
+            await self._create_next_phase_issue(parent_issue, phase_number + 1)
 
         # Broadcast WebSocket event
         await self._broadcast_queue_update(queue_id, "completed", parent_issue)
@@ -296,3 +303,98 @@ class PhaseCoordinator:
         except Exception as e:
             logger.error(f"[ERROR] Failed to get ready phases: {str(e)}")
             return []
+
+    async def _create_next_phase_issue(self, parent_issue: int, next_phase_number: int):
+        """
+        Create GitHub issue for next phase (just-in-time creation).
+
+        Args:
+            parent_issue: Parent issue number
+            next_phase_number: Phase number to create issue for
+        """
+        try:
+            # Find the next phase in queue
+            all_phases = self.phase_queue_service.get_all_queued()
+            next_phase = None
+            for phase in all_phases:
+                if (phase.parent_issue == parent_issue and
+                    phase.phase_number == next_phase_number):
+                    next_phase = phase
+                    break
+
+            if not next_phase:
+                logger.warning(
+                    f"[WARNING] No phase found for parent #{parent_issue}, "
+                    f"phase {next_phase_number}"
+                )
+                return
+
+            # Check if issue already created
+            if next_phase.issue_number:
+                logger.info(
+                    f"[SKIP] Phase {next_phase_number} already has issue "
+                    f"#{next_phase.issue_number}"
+                )
+                return
+
+            # Get phase data
+            phase_data = next_phase.phase_data
+            total_phases = phase_data.get("total_phases", "?")
+            title = phase_data.get("title", f"Phase {next_phase_number}")
+            content = phase_data.get("content", "")
+            external_docs = phase_data.get("externalDocs", [])
+
+            # Create child issue
+            from core.data_models import GitHubIssue
+
+            child_title = f"Phase {next_phase_number}: {title}"
+            child_body = f"""# Phase {next_phase_number} of {total_phases}
+
+**Parent Issue:** #{parent_issue}
+**Execution Order:** After Phase {next_phase_number - 1}
+
+## Description
+
+{content}
+
+"""
+            if external_docs:
+                child_body += f"""
+## Referenced Documents
+
+{chr(10).join(f'- `{doc}`' for doc in external_docs)}
+
+"""
+
+            child_body += f"""
+---
+
+**Full Context:** See parent issue #{parent_issue} for complete multi-phase request context.
+"""
+
+            child_issue = GitHubIssue(
+                title=child_title,
+                body=child_body,
+                labels=[f"phase-{next_phase_number}", "multi-phase-child"],
+                classification="feature",
+                workflow="adw_sdlc_iso",
+                model_set="base"
+            )
+
+            child_issue_number = self.github_poster.post_issue(child_issue, confirm=False)
+            logger.info(
+                f"[CREATED] Just-in-time issue #{child_issue_number} for "
+                f"Phase {next_phase_number}"
+            )
+
+            # Update queue with issue number
+            self.phase_queue_service.update_issue_number(
+                next_phase.queue_id,
+                child_issue_number
+            )
+
+        except Exception as e:
+            logger.error(
+                f"[ERROR] Failed to create just-in-time issue for Phase "
+                f"{next_phase_number}: {str(e)}"
+            )

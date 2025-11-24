@@ -151,6 +151,10 @@ This is a multi-phase request with {len(request.phases)} phases that will be exe
         """
         Create child issues for each phase and enqueue them.
 
+        JUST-IN-TIME STRATEGY:
+        - Phase 1: Create issue immediately (ready to execute)
+        - Phase 2+: Enqueue WITHOUT issue number (created when phase becomes ready)
+
         Args:
             request: SubmitRequestData with phases
             parent_issue_number: Parent issue number for reference
@@ -164,33 +168,39 @@ This is a multi-phase request with {len(request.phases)} phases that will be exe
         child_issues = []
 
         for phase in request.phases:
-            # Create child issue
-            child_issue_number = await self._create_child_issue(
-                phase,
-                parent_issue_number,
-                len(request.phases)
-            )
-            logger.info(f"[SUCCESS] Created child issue #{child_issue_number} for Phase {phase.number}")
-
-            # Enqueue phase
             depends_on_phase = phase.number - 1 if phase.number > 1 else None
+
+            # Enqueue phase first (without issue number for Phase 2+)
             queue_id = self.phase_queue_service.enqueue(
                 parent_issue=parent_issue_number,
                 phase_number=phase.number,
                 phase_data={
                     "title": phase.title,
                     "content": phase.content,
-                    "externalDocs": phase.externalDocs or []
+                    "externalDocs": phase.externalDocs or [],
+                    "total_phases": len(request.phases)  # Store for just-in-time creation
                 },
                 depends_on_phase=depends_on_phase
             )
 
-            # Update queue with issue number
-            self.phase_queue_service.update_issue_number(queue_id, child_issue_number)
+            # Only create GitHub issue for Phase 1 (ready to execute immediately)
+            child_issue_number = None
+            if phase.number == 1:
+                child_issue_number = await self._create_child_issue(
+                    phase,
+                    parent_issue_number,
+                    len(request.phases)
+                )
+                logger.info(f"[SUCCESS] Created child issue #{child_issue_number} for Phase {phase.number}")
+
+                # Update queue with issue number
+                self.phase_queue_service.update_issue_number(queue_id, child_issue_number)
+            else:
+                logger.info(f"[QUEUED] Phase {phase.number} queued without issue (will be created just-in-time)")
 
             child_issues.append(ChildIssueInfo(
                 phase_number=phase.number,
-                issue_number=child_issue_number,
+                issue_number=child_issue_number,  # None for Phase 2+
                 queue_id=queue_id
             ))
 

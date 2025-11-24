@@ -10,6 +10,7 @@ from core.data_models import (
     WorkflowHistoryFilters,
     WorkflowHistoryResponse,
 )
+from core.github_poster import GitHubPoster
 from core.workflow_history import (
     init_db as init_workflow_history_db,
 )
@@ -109,11 +110,13 @@ health_service = HealthService(
     github_repo="warmonger0/tac-webbuilder"
 )
 phase_queue_service = PhaseQueueService(db_path="db/database.db")
+github_poster = GitHubPoster()
 phase_coordinator = PhaseCoordinator(
     phase_queue_service=phase_queue_service,
     workflow_db_path="db/workflow_history.db",
     poll_interval=10.0,
-    websocket_manager=manager
+    websocket_manager=manager,
+    github_poster=github_poster
 )
 github_issue_service = GitHubIssueService(
     webhook_trigger_url=os.environ.get("WEBHOOK_TRIGGER_URL", "http://localhost:8001"),
