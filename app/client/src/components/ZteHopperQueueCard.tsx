@@ -107,7 +107,7 @@ export function ZteHopperQueueCard() {
                 role="tabpanel"
                 id="in-progress-panel"
                 aria-labelledby="in-progress-tab"
-                className="h-[295px]"
+                className="h-[295px] overflow-hidden"
               >
                 {inProgressPhases.length === 0 ? (
                   <div className="bg-emerald-500 rounded-lg flex items-start p-6 h-full">
@@ -126,7 +126,7 @@ export function ZteHopperQueueCard() {
                 role="tabpanel"
                 id="completed-panel"
                 aria-labelledby="completed-tab"
-                className="h-[295px]"
+                className="h-[295px] overflow-hidden"
               >
                 {completedPhases.length === 0 ? (
                   <div className="rounded-lg flex items-center justify-center bg-gray-50 h-full">
