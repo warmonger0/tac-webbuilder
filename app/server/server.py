@@ -164,6 +164,30 @@ def get_workflow_history_data(filters: WorkflowHistoryFilters | None = None) -> 
     """
     return workflow_service.get_workflow_history_with_cache(filters)
 
+def get_adw_state(adw_id: str) -> dict:
+    """
+    Get ADW state from file system.
+
+    Args:
+        adw_id: The ADW ID to fetch state for
+
+    Returns:
+        dict: ADW state data, or empty dict if not found
+    """
+    import json
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    state_path = os.path.join(project_root, "agents", adw_id, "adw_state.json")
+
+    if not os.path.exists(state_path):
+        return {}
+
+    try:
+        with open(state_path, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Error reading ADW state for {adw_id}: {e}")
+        return {}
+
 # ROUTER REGISTRATION
 # Initialize route modules with service dependencies and register routers
 data_routes.router and app.include_router(data_routes.router)
@@ -180,7 +204,7 @@ app.include_router(github_routes.router)
 queue_routes.init_queue_routes(phase_queue_service)
 app.include_router(queue_routes.router)
 
-websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data)
+websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state)
 app.include_router(websocket_routes.router)
 
 if __name__ == "__main__":

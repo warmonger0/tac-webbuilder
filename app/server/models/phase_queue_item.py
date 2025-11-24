@@ -24,6 +24,8 @@ class PhaseQueueItem:
         created_at: Optional[str] = None,
         updated_at: Optional[str] = None,
         error_message: Optional[str] = None,
+        adw_id: Optional[str] = None,
+        pr_number: Optional[int] = None,
     ):
         self.queue_id = queue_id
         self.parent_issue = parent_issue
@@ -35,6 +37,8 @@ class PhaseQueueItem:
         self.created_at = created_at or datetime.now().isoformat()
         self.updated_at = updated_at or datetime.now().isoformat()
         self.error_message = error_message
+        self.adw_id = adw_id
+        self.pr_number = pr_number
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -49,12 +53,26 @@ class PhaseQueueItem:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "error_message": self.error_message,
+            "adw_id": self.adw_id,
+            "pr_number": self.pr_number,
         }
 
     @classmethod
     def from_db_row(cls, row) -> "PhaseQueueItem":
         """Create PhaseQueueItem from database row"""
         phase_data = json.loads(row["phase_data"]) if row["phase_data"] else {}
+
+        # Safely access adw_id and pr_number (may not exist in older database schemas)
+        try:
+            adw_id = row["adw_id"]
+        except (KeyError, IndexError):
+            adw_id = None
+
+        try:
+            pr_number = row["pr_number"]
+        except (KeyError, IndexError):
+            pr_number = None
+
         return cls(
             queue_id=row["queue_id"],
             parent_issue=row["parent_issue"],
@@ -66,4 +84,6 @@ class PhaseQueueItem:
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             error_message=row["error_message"],
+            adw_id=adw_id,
+            pr_number=pr_number,
         )

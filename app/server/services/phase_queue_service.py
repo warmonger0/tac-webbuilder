@@ -293,13 +293,14 @@ class PhaseQueueService:
             logger.error(f"[ERROR] Failed to update issue number: {str(e)}")
             raise
 
-    def update_status(self, queue_id: str, status: str) -> bool:
+    def update_status(self, queue_id: str, status: str, adw_id: str | None = None) -> bool:
         """
-        Update the status of a phase.
+        Update the status of a phase and optionally set the ADW ID.
 
         Args:
             queue_id: Queue ID to update
             status: New status (queued, ready, running, completed, blocked, failed)
+            adw_id: Optional ADW ID to associate with the phase
 
         Returns:
             bool: True if updated, False if not found
@@ -312,10 +313,10 @@ class PhaseQueueService:
             raise ValueError(f"Invalid status: {status}. Must be one of {valid_statuses}")
 
         try:
-            updated = self.repository.update_status(queue_id, status)
+            updated = self.repository.update_status(queue_id, status, adw_id)
 
             if updated:
-                logger.info(f"[SUCCESS] Updated status to '{status}' (queue_id: {queue_id})")
+                logger.info(f"[SUCCESS] Updated status to '{status}' (queue_id: {queue_id}, adw_id: {adw_id})")
             else:
                 logger.warning(f"[WARNING] Queue ID not found: {queue_id}")
 

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["WebSockets"])
 
 
-def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func, get_workflow_history_data_func):
+def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func, get_workflow_history_data_func, get_adw_state_func):
     """
     Initialize WebSocket routes with service dependencies.
 
@@ -95,5 +95,31 @@ def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func
                     break
         except Exception as e:
             logger.error(f"[WS] Error in workflow history WebSocket connection: {e}")
+        finally:
+            manager.disconnect(websocket)
+
+    @router.websocket("/ws/adw-state/{adw_id}")
+    async def websocket_adw_state(websocket: WebSocket, adw_id: str) -> None:
+        """WebSocket endpoint for real-time ADW workflow state updates"""
+        await manager.connect(websocket)
+
+        try:
+            # Send initial state
+            state_data = get_adw_state_func(adw_id)
+            await websocket.send_json({
+                "type": "adw_state_update",
+                "adw_id": adw_id,
+                "data": state_data
+            })
+
+            # Keep connection alive and handle incoming messages
+            while True:
+                try:
+                    # Wait for any client messages (ping/pong, etc.)
+                    await websocket.receive_text()
+                except WebSocketDisconnect:
+                    break
+        except Exception as e:
+            logger.error(f"[WS] Error in ADW state WebSocket connection: {e}")
         finally:
             manager.disconnect(websocket)

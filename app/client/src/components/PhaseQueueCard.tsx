@@ -5,6 +5,10 @@
  * title, parent issue link, and execution order.
  */
 
+import { useState } from 'react';
+import { executePhase } from '../api/client';
+import { WorkflowStateDisplay } from './WorkflowStateDisplay';
+
 export interface PhaseQueueItem {
   queue_id: string;
   parent_issue: number;
@@ -20,6 +24,8 @@ export interface PhaseQueueItem {
   created_at: string;
   updated_at: string;
   error_message?: string;
+  adw_id?: string;
+  pr_number?: number;
 }
 
 interface PhaseQueueCardProps {
@@ -78,12 +84,40 @@ const STATUS_COLORS = {
 };
 
 export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
-  const { phase_number, phase_data, status, issue_number } = queueItem;
+  const { phase_number, phase_data, status, issue_number, queue_id, adw_id, pr_number } = queueItem;
   const statusStyle = STATUS_COLORS[status];
+  const [isExecuting, setIsExecuting] = useState(false);
 
   const handleClick = () => {
     if (issue_number) {
       window.open(`https://github.com/warmonger0/tac-webbuilder/issues/${issue_number}`, '_blank');
+    }
+  };
+
+  const handlePRClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (pr_number) {
+      window.open(`https://github.com/warmonger0/tac-webbuilder/pull/${pr_number}`, '_blank');
+    }
+  };
+
+  const handleExecute = async (e: React.MouseEvent) => {
+    // Stop propagation to prevent card click
+    e.stopPropagation();
+
+    setIsExecuting(true);
+
+    try {
+      const result = await executePhase(queue_id);
+      console.log('Phase execution started:', result);
+      // Optionally show success toast/notification
+      alert(`✅ ${result.message}\n\nADW ID: ${result.adw_id}\nIssue: #${result.issue_number}`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to execute phase';
+      console.error('Failed to execute phase:', error);
+      alert(`❌ Failed to execute phase:\n\n${errorMsg}`);
+    } finally {
+      setIsExecuting(false);
     }
   };
 
@@ -101,31 +135,82 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
         }
       }}
     >
-      <div className="flex items-center justify-between">
-        {/* Left: Phase Number and Title */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          {/* Phase Number Badge */}
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
-            {phase_number}
+      <div className="flex flex-col gap-2">
+        {/* Top Row: Phase Number, Title, and Status */}
+        <div className="flex items-center justify-between gap-2">
+          {/* Left: Phase Number and Title */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* Phase Number Badge */}
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
+              {phase_number}
+            </div>
+
+            {/* Title with Issue Number */}
+            <h4 className={`font-semibold ${statusStyle.text} text-sm truncate`}>
+              {phase_data.title || `Phase ${phase_number}`} {statusStyle.icon}{' '}
+              {issue_number && `#${issue_number}`}
+            </h4>
           </div>
 
-          {/* Title */}
-          <h4 className={`font-semibold ${statusStyle.text} text-sm truncate`}>
-            {phase_data.title || `Phase ${phase_number}`}
-            {issue_number && (
-              <span className="ml-2 text-xs font-normal opacity-75">
-                #{issue_number}
-              </span>
-            )}
-          </h4>
+          {/* Right: Execute Button (if ready) or Status Badge */}
+          {status === 'ready' ? (
+            <button
+              onClick={handleExecute}
+              disabled={isExecuting}
+              className="flex-shrink-0 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-xs font-medium px-3 py-1 rounded-full transition-colors flex items-center gap-1"
+              title="Start phase execution"
+            >
+              {isExecuting ? (
+                <>
+                  <span className="animate-spin">⚙️</span>
+                  <span>Starting...</span>
+                </>
+              ) : (
+                <>
+                  <span>▶️</span>
+                  <span>Processing</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <span className={`${statusStyle.badge} text-white text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1 flex-shrink-0`}>
+              <span>{statusStyle.icon}</span>
+              <span>{statusStyle.label}</span>
+            </span>
+          )}
         </div>
 
-        {/* Right: Status Badge */}
-        <span className={`${statusStyle.badge} text-white text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1 flex-shrink-0 ml-2`}>
-          <span>{statusStyle.icon}</span>
-          <span>{statusStyle.label}</span>
-        </span>
+        {/* Issue and PR Badges Row */}
+        {(issue_number || pr_number) && (
+          <div className="flex items-center gap-2 ml-11">
+            {issue_number && (
+              <button
+                onClick={handleClick}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors"
+                title={`View Issue #${issue_number}`}
+              >
+                <span>⭕</span>
+                <span>Open</span>
+              </button>
+            )}
+            {pr_number && (
+              <button
+                onClick={handlePRClick}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded transition-colors"
+                title={`View PR #${pr_number}`}
+              >
+                <span>🔀</span>
+                <span>#{pr_number}</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Show workflow state for any phase with an ADW ID (real-time display) */}
+      {adw_id && (
+        <WorkflowStateDisplay adwId={adw_id} />
+      )}
     </div>
   );
 }
@@ -141,7 +226,7 @@ interface PhaseQueueListProps {
 
 export function PhaseQueueList({ phases }: PhaseQueueListProps) {
   return (
-    <div className="flex flex-col justify-end space-y-3 overflow-y-auto h-full pr-2 pb-0">
+    <div className="flex flex-col justify-end space-y-3 overflow-y-auto h-full pr-2">
       {phases.map((phase) => (
         <PhaseQueueCard key={phase.queue_id} queueItem={phase} />
       ))}

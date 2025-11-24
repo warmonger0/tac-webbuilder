@@ -22,8 +22,8 @@ export function PhaseQueueList({ phases }: PhaseQueueListProps) {
     );
   }
 
-  // Sort by phase number (ascending)
-  const sortedPhases = [...phases].sort((a, b) => a.phase_number - b.phase_number);
+  // Sort by phase number (descending - last to first)
+  const sortedPhases = [...phases].sort((a, b) => b.phase_number - a.phase_number);
 
   return (
     <div className="space-y-3 overflow-y-auto max-h-[600px]">

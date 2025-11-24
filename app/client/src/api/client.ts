@@ -278,6 +278,8 @@ export interface PhaseQueueItem {
   created_at: string;
   updated_at: string;
   error_message?: string;
+  adw_id?: string;
+  pr_number?: number;
 }
 
 export interface QueueListResponse {
@@ -296,6 +298,19 @@ export async function getQueueByParent(parentIssue: number): Promise<QueueListRe
 export async function dequeuePhase(queueId: string): Promise<{ success: boolean; message: string }> {
   return fetchJSON<{ success: boolean; message: string }>(`${API_BASE}/queue/${queueId}`, {
     method: 'DELETE'
+  });
+}
+
+export interface ExecutePhaseResponse {
+  success: boolean;
+  message: string;
+  issue_number?: number;
+  adw_id?: string;
+}
+
+export async function executePhase(queueId: string): Promise<ExecutePhaseResponse> {
+  return fetchJSON<ExecutePhaseResponse>(`${API_BASE}/queue/${queueId}/execute`, {
+    method: 'POST'
   });
 }
 
@@ -321,4 +336,5 @@ export const api = {
   getQueueAll,
   getQueueByParent,
   dequeuePhase,
+  executePhase,
 };

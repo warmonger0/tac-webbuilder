@@ -273,3 +273,99 @@ export function useWorkflowHistoryWebSocket() {
 
   return { workflows, totalCount, analytics, isConnected, lastUpdated };
 }
+
+interface ADWStateWebSocketMessage {
+  type: 'adw_state_update';
+  adw_id: string;
+  data: {
+    adw_id: string;
+    issue_number?: string;
+    status?: string;
+    branch_name?: string;
+    plan_file?: string;
+    issue_class?: string;
+    worktree_path?: string;
+    backend_port?: number;
+    frontend_port?: number;
+    model_set?: string;
+    all_adws?: string[];
+    workflow_template?: string;
+    model_used?: string;
+    start_time?: string;
+    nl_input?: string;
+    github_url?: string;
+    [key: string]: any;
+  };
+}
+
+export function useADWStateWebSocket(adwId: string | null) {
+  const [state, setState] = useState<ADWStateWebSocketMessage['data'] | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    // Don't connect if no ADW ID
+    if (!adwId) {
+      return;
+    }
+
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.hostname;
+      const wsUrl = `${protocol}//${host}:8000/ws/adw-state/${adwId}`;
+
+      console.log('[WS] Connecting to ADW state:', wsUrl);
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('[WS] Connected to ADW state updates');
+        setIsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message: ADWStateWebSocketMessage = JSON.parse(event.data);
+
+          if (message.type === 'adw_state_update') {
+            setState(message.data);
+            setLastUpdated(new Date());
+            console.log('[WS] Received ADW state update:', message.adw_id, message.data);
+          }
+        } catch (err) {
+          console.error('[WS] Error parsing ADW state message:', err);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('[WS] ADW state error:', error);
+        setIsConnected(false);
+      };
+
+      ws.onclose = () => {
+        console.log('[WS] ADW state disconnected, will reconnect in 5s...');
+        setIsConnected(false);
+
+        // Reconnect after 5 seconds
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, 5000);
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, [adwId]);
+
+  return { state, isConnected, lastUpdated };
+}

@@ -162,27 +162,38 @@ class PhaseQueueRepository:
             logger.error(f"[ERROR] Failed to find all phases: {str(e)}")
             raise
 
-    def update_status(self, queue_id: str, status: str) -> bool:
+    def update_status(self, queue_id: str, status: str, adw_id: str | None = None) -> bool:
         """
-        Update phase status.
+        Update phase status and optionally set ADW ID.
 
         Args:
             queue_id: Queue ID to update
             status: New status
+            adw_id: Optional ADW ID to associate with the phase
 
         Returns:
             True if updated, False if not found
         """
         try:
             with get_connection(self.db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    UPDATE phase_queue
-                    SET status = ?, updated_at = ?
-                    WHERE queue_id = ?
-                    """,
-                    (status, datetime.now().isoformat(), queue_id),
-                )
+                if adw_id is not None:
+                    cursor = conn.execute(
+                        """
+                        UPDATE phase_queue
+                        SET status = ?, adw_id = ?, updated_at = ?
+                        WHERE queue_id = ?
+                        """,
+                        (status, adw_id, datetime.now().isoformat(), queue_id),
+                    )
+                else:
+                    cursor = conn.execute(
+                        """
+                        UPDATE phase_queue
+                        SET status = ?, updated_at = ?
+                        WHERE queue_id = ?
+                        """,
+                        (status, datetime.now().isoformat(), queue_id),
+                    )
                 return cursor.rowcount > 0
 
         except Exception as e:
