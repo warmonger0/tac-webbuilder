@@ -364,7 +364,7 @@ def build_workflow_status(state: dict[str, Any]) -> dict[str, Any]:
     workflow_status = {
         "adw_id": adw_id,
         "issue_number": state.get("issue_number"),
-        "issue_class": state.get("issue_class", state.get("classification", "")),
+        "issue_class": state.get("issue_class") or state.get("classification") or "",
         "title": state.get("nl_input", "")[:100],  # Truncate to 100 chars
         "status": status,
         "current_phase": current_phase,
