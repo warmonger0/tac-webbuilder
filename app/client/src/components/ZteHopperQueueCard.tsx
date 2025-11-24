@@ -107,7 +107,7 @@ export function ZteHopperQueueCard() {
                 role="tabpanel"
                 id="in-progress-panel"
                 aria-labelledby="in-progress-tab"
-                className="h-[295px] overflow-hidden pb-0"
+                className="h-[295px]"
               >
                 {inProgressPhases.length === 0 ? (
                   <div className="bg-emerald-500 rounded-lg flex items-start p-6 h-full">
@@ -126,7 +126,7 @@ export function ZteHopperQueueCard() {
                 role="tabpanel"
                 id="completed-panel"
                 aria-labelledby="completed-tab"
-                className="h-[295px] overflow-hidden pb-0"
+                className="h-[295px]"
               >
                 {completedPhases.length === 0 ? (
                   <div className="rounded-lg flex items-center justify-center bg-gray-50 h-full">
@@ -143,12 +143,15 @@ export function ZteHopperQueueCard() {
         )}
       </div>
 
-      {/* Refresh Indicator */}
+      {/* Live Update Indicator */}
       {!isLoading && phases.length > 0 && (
         <div className="mt-4 pt-4 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center">
-            Auto-refreshing every 10 seconds
-          </p>
+          <div className="flex items-center justify-center gap-2">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <p className="text-xs text-gray-500">
+              Live Updates
+            </p>
+          </div>
         </div>
       )}
     </div>
