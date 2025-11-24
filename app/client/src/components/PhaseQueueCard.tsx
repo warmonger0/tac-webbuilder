@@ -78,7 +78,7 @@ const STATUS_COLORS = {
 };
 
 export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
-  const { phase_number, phase_data, status, parent_issue, issue_number, depends_on_phase, error_message } = queueItem;
+  const { phase_number, phase_data, status, issue_number } = queueItem;
   const statusStyle = STATUS_COLORS[status];
 
   const handleClick = () => {
@@ -89,7 +89,7 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
 
   return (
     <div
-      className={`${statusStyle.bg} ${statusStyle.border} border-2 rounded-lg p-4 transition-all hover:shadow-md ${
+      className={`${statusStyle.bg} ${statusStyle.border} border-2 rounded-lg p-3 transition-all hover:shadow-md ${
         issue_number ? 'cursor-pointer' : ''
       }`}
       onClick={handleClick}
@@ -101,114 +101,31 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
         }
       }}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between">
+        {/* Left: Phase Number and Title */}
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Phase Number Badge */}
-          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
             {phase_number}
           </div>
 
           {/* Title */}
-          <div>
-            <h4 className={`font-semibold ${statusStyle.text} text-lg`}>
-              {phase_data.title || `Phase ${phase_number}`}
-            </h4>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-gray-600">
-                Parent: #{parent_issue}
+          <h4 className={`font-semibold ${statusStyle.text} text-sm truncate`}>
+            {phase_data.title || `Phase ${phase_number}`}
+            {issue_number && (
+              <span className="ml-2 text-xs font-normal opacity-75">
+                #{issue_number}
               </span>
-              {issue_number && (
-                <>
-                  <span className="text-gray-400">•</span>
-                  <span className="text-xs text-gray-600">
-                    Issue: #{issue_number}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
+            )}
+          </h4>
         </div>
 
-        {/* Status Badge */}
-        <div className="flex flex-col items-end gap-1">
-          <span className={`${statusStyle.badge} text-white text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1`}>
-            <span>{statusStyle.icon}</span>
-            <span>{statusStyle.label}</span>
-          </span>
-          {depends_on_phase && status === 'queued' && (
-            <span className="text-xs text-gray-500">
-              After Phase {depends_on_phase}
-            </span>
-          )}
-        </div>
+        {/* Right: Status Badge */}
+        <span className={`${statusStyle.badge} text-white text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1 flex-shrink-0 ml-2`}>
+          <span>{statusStyle.icon}</span>
+          <span>{statusStyle.label}</span>
+        </span>
       </div>
-
-      {/* Content Preview */}
-      <div className="mb-3">
-        <p className="text-sm text-gray-700 line-clamp-2">
-          {phase_data.content.substring(0, 150)}
-          {phase_data.content.length > 150 && '...'}
-        </p>
-      </div>
-
-      {/* External Docs */}
-      {phase_data.externalDocs && phase_data.externalDocs.length > 0 && (
-        <div className="mb-3 pt-3 border-t border-gray-200">
-          <div className="flex items-start gap-2">
-            <span className="text-sm">📎</span>
-            <div className="flex-1">
-              <div className="text-xs font-medium text-gray-600 mb-1">
-                Referenced Documents:
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {phase_data.externalDocs.map((doc, idx) => (
-                  <code key={idx} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200">
-                    {doc}
-                  </code>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Error Message */}
-      {error_message && (status === 'blocked' || status === 'failed') && (
-        <div className="mt-3 pt-3 border-t border-red-200 bg-red-50 rounded p-2">
-          <div className="flex items-start gap-2">
-            <span className="text-red-600 text-sm">⚠️</span>
-            <div className="flex-1">
-              <div className="text-xs font-medium text-red-700 mb-1">
-                {status === 'blocked' ? 'Blocked by dependency failure' : 'Execution failed'}
-              </div>
-              <p className="text-xs text-red-600">{error_message}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Execution Order Indicator */}
-      {status === 'ready' && (
-        <div className="mt-3 pt-3 border-t border-blue-200">
-          <div className="flex items-center gap-2 text-blue-700">
-            <span className="text-sm">🎯</span>
-            <span className="text-sm font-medium">
-              {phase_number === 1 ? 'Ready to execute first' : `Ready to execute (after Phase ${depends_on_phase})`}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Running Indicator */}
-      {status === 'running' && (
-        <div className="mt-3 pt-3 border-t border-yellow-200">
-          <div className="flex items-center gap-2 text-yellow-700">
-            <span className="text-sm animate-spin">⚙️</span>
-            <span className="text-sm font-medium">Executing now...</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -224,7 +141,7 @@ interface PhaseQueueListProps {
 
 export function PhaseQueueList({ phases }: PhaseQueueListProps) {
   return (
-    <div className="space-y-3 overflow-y-auto h-full pr-2">
+    <div className="flex flex-col justify-end space-y-3 overflow-y-auto h-full pr-2 pb-0">
       {phases.map((phase) => (
         <PhaseQueueCard key={phase.queue_id} queueItem={phase} />
       ))}

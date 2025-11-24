@@ -38,13 +38,12 @@ class MultiPhaseIssueHandler:
 
     async def handle_multi_phase_request(self, request: SubmitRequestData) -> SubmitRequestResponse:
         """
-        Handle multi-phase request by creating parent issue, child issues, and enqueueing phases.
+        Handle multi-phase request by creating sequential issues and enqueueing phases.
 
         Workflow:
-        1. Create parent GitHub issue with overview of all phases
-        2. Create child issues for each phase
-        3. Enqueue phases with dependency tracking
-        4. Link issues via references in issue bodies
+        1. Create Phase 1 issue (ready to execute immediately)
+        2. Enqueue Phase 2+ without issues (created just-in-time)
+        3. Phase 1 issue includes workflow command to auto-trigger
 
         Args:
             request: SubmitRequestData with phases populated
@@ -68,25 +67,21 @@ class MultiPhaseIssueHandler:
             )
 
         try:
-            # 1. Create parent issue
-            parent_issue_number = await self._create_parent_issue(request)
-            logger.info(f"[SUCCESS] Created parent issue #{parent_issue_number}")
+            # Create Phase 1 issue and enqueue all phases
+            child_issues = await self._create_phase_issues_and_enqueue(request)
 
-            # 2. Create child issues and enqueue phases
-            child_issues = await self._create_child_issues_and_enqueue(request, parent_issue_number)
-
-            # 3. Generate unique request ID (for consistency with single-phase flow)
+            # Generate unique request ID (for consistency with single-phase flow)
             request_id = str(uuid.uuid4())
 
             logger.info(
                 f"[SUCCESS] Multi-phase request complete: "
-                f"parent #{parent_issue_number}, {len(child_issues)} child issues created"
+                f"Phase 1 issue #{child_issues[0].issue_number} created, {len(child_issues)-1} phases queued"
             )
 
             return SubmitRequestResponse(
                 request_id=request_id,
                 is_multi_phase=True,
-                parent_issue_number=parent_issue_number,
+                parent_issue_number=None,  # No parent issue in new flow
                 child_issues=child_issues
             )
 
@@ -96,68 +91,19 @@ class MultiPhaseIssueHandler:
             logger.error(f"[ERROR] Failed to handle multi-phase request: {str(e)}")
             raise HTTPException(500, f"Error processing multi-phase request: {str(e)}")
 
-    async def _create_parent_issue(self, request: SubmitRequestData) -> int:
-        """
-        Create parent GitHub issue with overview of all phases.
-
-        Args:
-            request: SubmitRequestData with phases
-
-        Returns:
-            Parent issue number
-
-        Raises:
-            Exception: If GitHub posting fails
-        """
-        parent_title = f"[Multi-Phase] {request.phases[0].title}"
-        parent_body = f"""# Multi-Phase Request
-
-This is a multi-phase request with {len(request.phases)} phases that will be executed sequentially.
-
-## Overview
-
-{request.nl_input}
-
-## Phases
-
-"""
-        for phase in request.phases:
-            parent_body += f"""
-### Phase {phase.number}: {phase.title}
-
-{phase.content[:200]}...
-
-"""
-            if phase.externalDocs:
-                parent_body += f"**Referenced Documents:** {', '.join(phase.externalDocs)}\n\n"
-
-        # Create parent issue
-        parent_issue = GitHubIssue(
-            title=parent_title,
-            body=parent_body,
-            labels=["multi-phase"],
-            classification="feature",  # Default to feature for multi-phase
-            workflow="adw_sdlc_iso",
-            model_set="base"
-        )
-        parent_issue_number = self.github_poster.post_issue(parent_issue, confirm=False)
-        return parent_issue_number
-
-    async def _create_child_issues_and_enqueue(
+    async def _create_phase_issues_and_enqueue(
         self,
-        request: SubmitRequestData,
-        parent_issue_number: int
+        request: SubmitRequestData
     ) -> List[ChildIssueInfo]:
         """
-        Create child issues for each phase and enqueue them.
+        Create Phase 1 issue and enqueue all phases.
 
         JUST-IN-TIME STRATEGY:
-        - Phase 1: Create issue immediately (ready to execute)
+        - Phase 1: Create issue immediately with workflow command (auto-triggers)
         - Phase 2+: Enqueue WITHOUT issue number (created when phase becomes ready)
 
         Args:
             request: SubmitRequestData with phases
-            parent_issue_number: Parent issue number for reference
 
         Returns:
             List of ChildIssueInfo objects
@@ -172,7 +118,7 @@ This is a multi-phase request with {len(request.phases)} phases that will be exe
 
             # Enqueue phase first (without issue number for Phase 2+)
             queue_id = self.phase_queue_service.enqueue(
-                parent_issue=parent_issue_number,
+                parent_issue=0,  # No parent issue in new flow
                 phase_number=phase.number,
                 phase_data={
                     "title": phase.title,
@@ -186,12 +132,11 @@ This is a multi-phase request with {len(request.phases)} phases that will be exe
             # Only create GitHub issue for Phase 1 (ready to execute immediately)
             child_issue_number = None
             if phase.number == 1:
-                child_issue_number = await self._create_child_issue(
+                child_issue_number = await self._create_phase_issue(
                     phase,
-                    parent_issue_number,
                     len(request.phases)
                 )
-                logger.info(f"[SUCCESS] Created child issue #{child_issue_number} for Phase {phase.number}")
+                logger.info(f"[SUCCESS] Created Phase 1 issue #{child_issue_number} with workflow command")
 
                 # Update queue with issue number
                 self.phase_queue_service.update_issue_number(queue_id, child_issue_number)
@@ -206,30 +151,27 @@ This is a multi-phase request with {len(request.phases)} phases that will be exe
 
         return child_issues
 
-    async def _create_child_issue(
+    async def _create_phase_issue(
         self,
         phase,
-        parent_issue_number: int,
         total_phases: int
     ) -> int:
         """
-        Create a single child issue for a phase.
+        Create a single phase issue with workflow command.
 
         Args:
             phase: Phase object with title, content, externalDocs
-            parent_issue_number: Parent issue number for reference
             total_phases: Total number of phases
 
         Returns:
-            Child issue number
+            Phase issue number
 
         Raises:
             Exception: If GitHub posting fails
         """
-        child_title = f"Phase {phase.number}: {phase.title}"
-        child_body = f"""# Phase {phase.number} of {total_phases}
+        phase_title = f"Phase {phase.number}: {phase.title}"
+        phase_body = f"""# Phase {phase.number} of {total_phases}
 
-**Parent Issue:** #{parent_issue_number}
 **Execution Order:** {"Executes first" if phase.number == 1 else f"After Phase {phase.number - 1}"}
 
 ## Description
@@ -238,26 +180,27 @@ This is a multi-phase request with {len(request.phases)} phases that will be exe
 
 """
         if phase.externalDocs:
-            child_body += f"""
+            phase_body += f"""
 ## Referenced Documents
 
 {chr(10).join(f'- `{doc}`' for doc in phase.externalDocs)}
 
 """
 
-        child_body += f"""
+        # Add workflow command to trigger ADW automatically
+        phase_body += f"""
 ---
 
-**Full Context:** See parent issue #{parent_issue_number} for complete multi-phase request context.
+**Workflow:** adw_plan_iso with base model
 """
 
-        child_issue = GitHubIssue(
-            title=child_title,
-            body=child_body,
-            labels=[f"phase-{phase.number}", "multi-phase-child"],
+        phase_issue = GitHubIssue(
+            title=phase_title,
+            body=phase_body,
+            labels=[f"phase-{phase.number}", "multi-phase"],
             classification="feature",
             workflow="adw_sdlc_iso",
             model_set="base"
         )
-        child_issue_number = self.github_poster.post_issue(child_issue, confirm=False)
-        return child_issue_number
+        phase_issue_number = self.github_poster.post_issue(phase_issue, confirm=False)
+        return phase_issue_number

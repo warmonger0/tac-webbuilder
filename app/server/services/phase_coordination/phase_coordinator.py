@@ -347,10 +347,9 @@ class PhaseCoordinator:
             # Create child issue
             from core.data_models import GitHubIssue
 
-            child_title = f"Phase {next_phase_number}: {title}"
-            child_body = f"""# Phase {next_phase_number} of {total_phases}
+            phase_title = f"Phase {next_phase_number}: {title}"
+            phase_body = f"""# Phase {next_phase_number} of {total_phases}
 
-**Parent Issue:** #{parent_issue}
 **Execution Order:** After Phase {next_phase_number - 1}
 
 ## Description
@@ -359,38 +358,39 @@ class PhaseCoordinator:
 
 """
             if external_docs:
-                child_body += f"""
+                phase_body += f"""
 ## Referenced Documents
 
 {chr(10).join(f'- `{doc}`' for doc in external_docs)}
 
 """
 
-            child_body += f"""
+            # Add workflow command to trigger ADW automatically
+            phase_body += f"""
 ---
 
-**Full Context:** See parent issue #{parent_issue} for complete multi-phase request context.
+**Workflow:** adw_plan_iso with base model
 """
 
-            child_issue = GitHubIssue(
-                title=child_title,
-                body=child_body,
-                labels=[f"phase-{next_phase_number}", "multi-phase-child"],
+            phase_issue = GitHubIssue(
+                title=phase_title,
+                body=phase_body,
+                labels=[f"phase-{next_phase_number}", "multi-phase"],
                 classification="feature",
                 workflow="adw_sdlc_iso",
                 model_set="base"
             )
 
-            child_issue_number = self.github_poster.post_issue(child_issue, confirm=False)
+            phase_issue_number = self.github_poster.post_issue(phase_issue, confirm=False)
             logger.info(
-                f"[CREATED] Just-in-time issue #{child_issue_number} for "
+                f"[CREATED] Just-in-time issue #{phase_issue_number} for "
                 f"Phase {next_phase_number}"
             )
 
             # Update queue with issue number
             self.phase_queue_service.update_issue_number(
                 next_phase.queue_id,
-                child_issue_number
+                phase_issue_number
             )
 
         except Exception as e:

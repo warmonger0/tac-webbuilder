@@ -34,13 +34,13 @@ export function ZteHopperQueueCard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Filter phases by status
-  const inProgressPhases = phases.filter(p =>
-    p.status === 'queued' || p.status === 'ready' || p.status === 'running'
-  );
-  const completedPhases = phases.filter(p =>
-    p.status === 'completed' || p.status === 'failed' || p.status === 'blocked'
-  );
+  // Filter phases by status and sort high to low (phase 1 at bottom)
+  const inProgressPhases = phases
+    .filter(p => p.status === 'queued' || p.status === 'ready' || p.status === 'running')
+    .sort((a, b) => b.phase_number - a.phase_number);
+  const completedPhases = phases
+    .filter(p => p.status === 'completed' || p.status === 'failed' || p.status === 'blocked')
+    .sort((a, b) => b.phase_number - a.phase_number);
 
   return (
     <div className="bg-white rounded-lg shadow p-6 h-full flex flex-col">
@@ -107,7 +107,7 @@ export function ZteHopperQueueCard() {
                 role="tabpanel"
                 id="in-progress-panel"
                 aria-labelledby="in-progress-tab"
-                className="h-[295px] overflow-hidden"
+                className="h-[295px] overflow-hidden pb-0"
               >
                 {inProgressPhases.length === 0 ? (
                   <div className="bg-emerald-500 rounded-lg flex items-start p-6 h-full">
@@ -126,7 +126,7 @@ export function ZteHopperQueueCard() {
                 role="tabpanel"
                 id="completed-panel"
                 aria-labelledby="completed-tab"
-                className="h-[295px] overflow-hidden"
+                className="h-[295px] overflow-hidden pb-0"
               >
                 {completedPhases.length === 0 ? (
                   <div className="rounded-lg flex items-center justify-center bg-gray-50 h-full">
