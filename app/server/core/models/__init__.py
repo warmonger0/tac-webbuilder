@@ -1,20 +1,14 @@
 """
-Data models - Backwards compatibility wrapper.
+Data models package - Organized by concern.
 
-This module re-exports all models from the new modular structure for backwards compatibility.
-All models have been organized into focused modules in the models/ package:
-- models/requests.py: API request models
-- models/responses.py: API response models
-- models/domain.py: Core domain/business logic models
-- models/workflow.py: Workflow execution and history models
-
-For new code, prefer importing directly from the models package:
-    from core.models import QueryRequest, QueryResponse
+This package contains Pydantic models organized into focused modules:
+- requests.py: API request models
+- responses.py: API response models
+- domain.py: Core domain/business logic models
+- workflow.py: Workflow execution and history models
 """
 
-# Re-export all models for backwards compatibility
-from .models import (
-    # Domain models
+from .domain import (
     ChildIssueInfo,
     ColumnInfo,
     ColumnInsight,
@@ -25,7 +19,8 @@ from .models import (
     Route,
     ServiceHealth,
     TableSchema,
-    # Request models
+)
+from .requests import (
     DatabaseSchemaRequest,
     ExportRequest,
     HealthCheckRequest,
@@ -36,7 +31,9 @@ from .models import (
     ResyncRequest,
     SubmitRequestData,
     WorkflowHistoryFilters,
-    # Response models
+)
+from .responses import (
+    AdwMonitorResponse,
     ConfirmResponse,
     CostResponse,
     DatabaseSchemaResponse,
@@ -44,16 +41,16 @@ from .models import (
     HealthCheckResponse,
     InsightsResponse,
     NLProcessResponse,
-    QueryResponse,
     RandomQueryResponse,
+    QueryResponse,
     ResyncResponse,
     RoutesResponse,
     SubmitRequestResponse,
     SystemStatusResponse,
     WorkflowCatalogResponse,
     WorkflowHistoryResponse,
-    # Workflow models
-    AdwMonitorResponse,
+)
+from .workflow import (
     AdwMonitorSummary,
     AdwWorkflowStatus,
     CostData,

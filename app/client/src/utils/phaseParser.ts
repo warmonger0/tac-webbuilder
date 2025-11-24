@@ -5,6 +5,12 @@
  * their content, and external document references.
  */
 
+import {
+  PHASE_HEADER_REGEX,
+  extractExternalDocs,
+  parsePhaseNumber,
+} from './phaseUtils';
+
 export interface ParsedPhase {
   number: number;
   title: string;
@@ -20,59 +26,6 @@ export interface PhaseParseResult {
   phases: ParsedPhase[];
   originalContent: string;
   warnings: string[];
-}
-
-/**
- * Flexible phase header patterns:
- * - ## Phase 1: Title
- * - # Phase One - Title
- * - ### Phase: Setup
- * - ## Phase 2
- */
-const PHASE_HEADER_REGEX = /^(#{1,6})\s+Phase\s*[:\-]?\s*(\d+|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten)?(?:[:\-]\s*)?(.*)$/im;
-
-/**
- * Extract external document references (e.g., "see ARCHITECTURE.md", "refer to docs/SETUP.md")
- * Matches: "see FILE.md", "refer to docs/FILE.md", "reference the FILE.md", etc.
- */
-const EXTERNAL_DOC_REGEX = /(?:see|refer to|reference|referenced in|mentioned in|from)(?:\s+the)?\s+([a-zA-Z0-9_\-\/\.]+\.md)/gi;
-
-/**
- * Word-to-number mapping for phase numbers
- */
-const WORD_TO_NUMBER: Record<string, number> = {
-  'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
-  'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
-};
-
-/**
- * Parse phase number from text (supports numeric and word forms)
- */
-function parsePhaseNumber(text: string | undefined, position: number): number {
-  if (!text) return position;
-
-  const numeric = parseInt(text, 10);
-  if (!isNaN(numeric)) return numeric;
-
-  const lowerText = text.toLowerCase();
-  return WORD_TO_NUMBER[lowerText] || position;
-}
-
-/**
- * Extract external document references from content
- */
-function extractExternalDocs(content: string): string[] {
-  const docs = new Set<string>();
-  let match;
-
-  // Reset regex lastIndex
-  const regex = new RegExp(EXTERNAL_DOC_REGEX.source, EXTERNAL_DOC_REGEX.flags);
-
-  while ((match = regex.exec(content)) !== null) {
-    docs.add(match[1]);
-  }
-
-  return Array.from(docs);
 }
 
 /**
@@ -172,56 +125,6 @@ export function parsePhases(markdownContent: string): PhaseParseResult {
   };
 }
 
-/**
- * Validate that phases can be processed
- */
-export function validatePhases(parseResult: PhaseParseResult): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  if (!parseResult.isMultiPhase) {
-    return { valid: true, errors: [] }; // Single-phase is always valid
-  }
-
-  if (parseResult.phases.length === 0) {
-    errors.push('No phases detected in the markdown file.');
-    return { valid: false, errors };
-  }
-
-  // Check for Phase 1
-  const hasPhaseOne = parseResult.phases.some(p => p.number === 1);
-  if (!hasPhaseOne) {
-    errors.push('Multi-phase documents must include Phase 1.');
-  }
-
-  // Check phase sequence
-  const sortedPhases = [...parseResult.phases].sort((a, b) => a.number - b.number);
-  for (let i = 0; i < sortedPhases.length - 1; i++) {
-    const currentNum = sortedPhases[i].number;
-    const nextNum = sortedPhases[i + 1].number;
-
-    if (nextNum - currentNum > 1) {
-      errors.push(`Gap in phase sequence: Phase ${currentNum} is followed by Phase ${nextNum}.`);
-    }
-  }
-
-  // Limit to reasonable number of phases
-  if (parseResult.phases.length > 20) {
-    errors.push(`Too many phases (${parseResult.phases.length}). Maximum is 20 phases.`);
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors
-  };
-}
-
-/**
- * Format phase summary for display
- */
-export function formatPhaseSummary(phase: ParsedPhase): string {
-  const docRefs = phase.externalDocs.length > 0
-    ? ` (refs: ${phase.externalDocs.join(', ')})`
-    : '';
-  const contentPreview = phase.content.substring(0, 100).replace(/\n/g, ' ');
-  return `Phase ${phase.number}: ${phase.title}${docRefs}\n${contentPreview}...`;
-}
+// Re-export for backwards compatibility
+export { validatePhases } from './phaseValidator';
+export { formatPhaseSummary } from './phaseUtils';

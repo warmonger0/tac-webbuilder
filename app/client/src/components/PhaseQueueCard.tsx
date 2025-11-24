@@ -5,23 +5,25 @@
  * title, parent issue link, and execution order.
  */
 
-interface PhaseQueueCardProps {
-  queueItem: {
-    queue_id: string;
-    parent_issue: number;
-    phase_number: number;
-    issue_number?: number;
-    status: 'queued' | 'ready' | 'running' | 'completed' | 'blocked' | 'failed';
-    depends_on_phase?: number;
-    phase_data: {
-      title: string;
-      content: string;
-      externalDocs?: string[];
-    };
-    created_at: string;
-    updated_at: string;
-    error_message?: string;
+export interface PhaseQueueItem {
+  queue_id: string;
+  parent_issue: number;
+  phase_number: number;
+  issue_number?: number;
+  status: 'queued' | 'ready' | 'running' | 'completed' | 'blocked' | 'failed';
+  depends_on_phase?: number;
+  phase_data: {
+    title: string;
+    content: string;
+    externalDocs?: string[];
   };
+  created_at: string;
+  updated_at: string;
+  error_message?: string;
+}
+
+interface PhaseQueueCardProps {
+  queueItem: PhaseQueueItem;
 }
 
 const STATUS_COLORS = {
@@ -207,39 +209,6 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/**
- * PhaseQueueList Component
- *
- * Displays a list of phases in execution order (stacked cards)
- */
-interface PhaseQueueListProps {
-  phases: PhaseQueueCardProps['queueItem'][];
-}
-
-export function PhaseQueueList({ phases }: PhaseQueueListProps) {
-  if (phases.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <span className="text-4xl mb-2 block">📭</span>
-          <p className="text-gray-500 text-lg">No phases in queue</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Sort by phase number (ascending)
-  const sortedPhases = [...phases].sort((a, b) => a.phase_number - b.phase_number);
-
-  return (
-    <div className="space-y-3 overflow-y-auto max-h-[600px]">
-      {sortedPhases.map((phase) => (
-        <PhaseQueueCard key={phase.queue_id} queueItem={phase} />
-      ))}
     </div>
   );
 }

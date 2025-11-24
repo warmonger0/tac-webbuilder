@@ -4,7 +4,7 @@ Request Models
 All API request models for the tac-webbuilder application.
 """
 
-from typing import Literal
+from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
@@ -43,7 +43,7 @@ class ExportRequest(BaseModel):
 
 
 class QueryExportRequest(BaseModel):
-    data: list[dict[str, any]] = Field(..., description="Query result data to export")
+    data: list[dict[str, Any]] = Field(..., description="Query result data to export")
     columns: list[str] = Field(..., description="Column names for the export")
 
 
