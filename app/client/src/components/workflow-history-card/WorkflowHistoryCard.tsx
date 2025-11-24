@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import type { WorkflowHistoryItem } from '../types';
-import { StatusBadge } from './StatusBadge';
-import { formatDate, formatDuration, formatCost, formatNumber, truncateText, getClassificationColor } from './workflow-history-card/helpers';
-import { CostSection } from './workflow-history-card/sections/CostSection';
-import { TokenSection } from './workflow-history-card/sections/TokenSection';
-import { ErrorSection } from './workflow-history-card/sections/ErrorSection';
-import { PerformanceSection } from './workflow-history-card/sections/PerformanceSection';
-import { ResourceSection } from './workflow-history-card/sections/ResourceSection';
-import { WorkflowJourneySection } from './workflow-history-card/sections/WorkflowJourneySection';
-import { ScoresSection } from './workflow-history-card/sections/ScoresSection';
-import { InsightsSection } from './workflow-history-card/sections/InsightsSection';
-import { SimilarWorkflowsSection } from './workflow-history-card/sections/SimilarWorkflowsSection';
+import type { WorkflowHistoryItem } from '../../types';
+import { StatusBadge } from '../StatusBadge';
+import { formatDate, formatDuration, formatCost, formatNumber, truncateText, getClassificationColor } from './helpers';
+import { CostSection } from './sections/CostSection';
+import { TokenSection } from './sections/TokenSection';
+import { ErrorSection } from './sections/ErrorSection';
+import { PerformanceSection } from './sections/PerformanceSection';
+import { ResourceSection } from './sections/ResourceSection';
+import { WorkflowJourneySection } from './sections/WorkflowJourneySection';
+import { ScoresSection } from './sections/ScoresSection';
+import { InsightsSection } from './sections/InsightsSection';
+import { SimilarWorkflowsSection } from './sections/SimilarWorkflowsSection';
 
 interface WorkflowHistoryCardProps {
   workflow: WorkflowHistoryItem;
