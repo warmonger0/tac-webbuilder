@@ -14,11 +14,13 @@ Responsibilities:
 
 import asyncio
 import logging
+import os
 from datetime import datetime
 from typing import Optional
 
 from services.phase_queue_service import PhaseQueueService
 from utils.db_connection import get_connection
+from utils.process_runner import ProcessRunner
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +149,8 @@ class PhaseCoordinator:
                     # Broadcast WebSocket event
                     await self._broadcast_queue_update(queue_id, "completed", parent_issue)
 
-                    # Post GitHub comment (TODO: Phase 3B)
-                    # await self._post_github_comment(parent_issue, phase_number, "completed")
+                    # Post GitHub comment
+                    await self._post_github_comment(parent_issue, phase_number, issue_number, "completed")
 
                 elif workflow_status == "failed":
                     # Workflow failed
@@ -171,8 +173,8 @@ class PhaseCoordinator:
                     for blocked_id in blocked_ids:
                         await self._broadcast_queue_update(blocked_id, "blocked", parent_issue)
 
-                    # Post GitHub comment (TODO: Phase 3B)
-                    # await self._post_github_comment(parent_issue, phase_number, "failed", error_msg)
+                    # Post GitHub comment
+                    await self._post_github_comment(parent_issue, phase_number, issue_number, "failed", error_msg)
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to check workflow completions: {str(e)}")
@@ -280,3 +282,78 @@ class PhaseCoordinator:
         except Exception as e:
             logger.error(f"[ERROR] Failed to get ready phases: {str(e)}")
             return []
+
+    async def _post_github_comment(
+        self,
+        parent_issue: int,
+        phase_number: int,
+        child_issue: int,
+        status: str,
+        error_message: Optional[str] = None
+    ):
+        """
+        Post a comment to the parent GitHub issue about phase completion/failure.
+
+        Args:
+            parent_issue: Parent GitHub issue number
+            phase_number: Phase number that completed/failed
+            child_issue: Child issue number for this phase
+            status: Phase status ('completed' or 'failed')
+            error_message: Error message (for failed status)
+        """
+        try:
+            # Format comment based on status
+            if status == "completed":
+                comment = f"""## Phase {phase_number} Completed ✅
+
+**Issue:** #{child_issue}
+**Status:** Completed
+
+Phase {phase_number} has completed successfully."""
+
+                # Check if there are more phases
+                all_phases = self.phase_queue_service.get_queue_by_parent(parent_issue)
+                next_phase = next((p for p in all_phases if p.phase_number == phase_number + 1), None)
+
+                if next_phase:
+                    comment += f" Moving to Phase {phase_number + 1}."
+                else:
+                    comment += " All phases complete!"
+
+                comment += f"\n\n[View Phase {phase_number} Details](https://github.com/{os.environ.get('GITHUB_REPO', 'owner/repo')}/issues/{child_issue})"
+
+            elif status == "failed":
+                comment = f"""## Phase {phase_number} Failed ❌
+
+**Issue:** #{child_issue}
+**Status:** Failed
+**Error:** {error_message or 'Unknown error'}
+
+Phase {phase_number} has failed. Subsequent phases have been blocked.
+
+[View Phase {phase_number} Details](https://github.com/{os.environ.get('GITHUB_REPO', 'owner/repo')}/issues/{child_issue})"""
+
+            else:
+                logger.warning(f"[WARNING] Unknown status '{status}' for GitHub comment")
+                return
+
+            # Post comment using gh CLI
+            result = ProcessRunner.run_gh_command([
+                "issue", "comment", str(parent_issue),
+                "--body", comment
+            ])
+
+            if result.success:
+                logger.info(
+                    f"[SUCCESS] Posted GitHub comment on issue #{parent_issue} "
+                    f"for Phase {phase_number} ({status})"
+                )
+            else:
+                logger.error(
+                    f"[ERROR] Failed to post GitHub comment: {result.stderr}"
+                )
+
+        except Exception as e:
+            logger.error(
+                f"[ERROR] Failed to post GitHub comment on issue #{parent_issue}: {str(e)}"
+            )
