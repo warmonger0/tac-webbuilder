@@ -1,114 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
 import { confirmAndPost, getCostEstimate, getPreview, getSystemStatus, submitRequest } from '../api/client';
-import type { CostEstimate, GitHubIssue, RequestFormPersistedState, ServiceHealth } from '../types';
+import type { CostEstimate, GitHubIssue, ServiceHealth } from '../types';
 import { IssuePreview } from './IssuePreview';
 import { CostEstimateCard } from './CostEstimateCard';
 import { ConfirmDialog } from './ConfirmDialog';
 import { SystemStatusPanel } from './SystemStatusPanel';
 import { ZteHopperQueueCard } from './ZteHopperQueueCard';
-import { PhasePreview } from './PhasePreview';
 import { useDragAndDrop } from '../hooks/useDragAndDrop';
-import { handleMultipleFiles } from '../utils/fileHandlers';
-import { parsePhases, validatePhases, type PhaseParseResult } from '../utils/phaseParser';
-
-const PROJECT_PATH_STORAGE_KEY = 'tac-webbuilder-project-path';
-const REQUEST_FORM_STATE_STORAGE_KEY = 'tac-webbuilder-request-form-state';
-const REQUEST_FORM_STATE_VERSION = 1;
-
-// Storage utility functions
-function saveFormState(state: Omit<RequestFormPersistedState, 'version' | 'timestamp'>): void {
-  try {
-    const persistedState: RequestFormPersistedState = {
-      version: REQUEST_FORM_STATE_VERSION,
-      timestamp: new Date().toISOString(),
-      ...state,
-    };
-    localStorage.setItem(REQUEST_FORM_STATE_STORAGE_KEY, JSON.stringify(persistedState));
-  } catch (err) {
-    // Handle quota exceeded or unavailable storage
-    console.error('Failed to save form state:', err);
-    throw err;
-  }
-}
-
-function loadFormState(): RequestFormPersistedState | null {
-  try {
-    const savedData = localStorage.getItem(REQUEST_FORM_STATE_STORAGE_KEY);
-    if (!savedData) {
-      return null;
-    }
-
-    const parsed = JSON.parse(savedData);
-
-    // Validate structure and version
-    if (!validateFormState(parsed)) {
-      console.warn('Invalid form state found, ignoring');
-      return null;
-    }
-
-    return parsed as RequestFormPersistedState;
-  } catch (err) {
-    console.error('Failed to load form state:', err);
-    return null;
-  }
-}
-
-function clearFormState(): void {
-  try {
-    localStorage.removeItem(REQUEST_FORM_STATE_STORAGE_KEY);
-  } catch (err) {
-    console.error('Failed to clear form state:', err);
-  }
-}
-
-function validateFormState(data: unknown): data is RequestFormPersistedState {
-  if (!data || typeof data !== 'object') {
-    return false;
-  }
-
-  const obj = data as Record<string, unknown>;
-
-  // Check version
-  if (obj.version !== REQUEST_FORM_STATE_VERSION) {
-    return false;
-  }
-
-  // Check required fields
-  if (
-    typeof obj.nlInput !== 'string' ||
-    typeof obj.projectPath !== 'string' ||
-    typeof obj.autoPost !== 'boolean' ||
-    typeof obj.timestamp !== 'string'
-  ) {
-    return false;
-  }
-
-  return true;
-}
+import { parsePhases } from '../utils/phaseParser';
+import { FileUploadSection } from './request-form/FileUploadSection';
+import { PhaseDetectionHandler } from './request-form/PhaseDetectionHandler';
+import { saveFormState, loadFormState, clearFormState, PROJECT_PATH_STORAGE_KEY } from './request-form/utils/formStorage';
 
 export function RequestForm() {
+  // Form state
   const [nlInput, setNlInput] = useState('');
   const [projectPath, setProjectPath] = useState('');
   const [autoPost, setAutoPost] = useState(false);
+
+  // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
+
+  // Preview state
   const [preview, setPreview] = useState<GitHubIssue | null>(null);
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // System health state
   const [systemHealthy, setSystemHealthy] = useState(true);
   const [healthWarning, setHealthWarning] = useState<string | null>(null);
-  const [storageWarning, setStorageWarning] = useState<string | null>(null);
-  const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
-  const [phasePreview, setPhasePreview] = useState<PhaseParseResult | null>(null);
-  const [showPhasePreview, setShowPhasePreview] = useState(false);
 
   // Ref for debounce timer
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Ref for file input (keyboard accessibility)
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Initialize drag-and-drop hook
   const { isDragging, error: dragError, isReading, dragHandlers, clearError } = useDragAndDrop({
@@ -118,8 +45,7 @@ export function RequestForm() {
 
       // If multi-phase detected, show preview for confirmation
       if (parseResult.isMultiPhase && parseResult.phases.length > 1) {
-        setPhasePreview(parseResult);
-        setShowPhasePreview(true);
+        phaseHandler.openPhasePreview(parseResult);
       } else {
         // Single-phase or no phases: append content normally
         if (nlInput.trim()) {
@@ -129,10 +55,23 @@ export function RequestForm() {
         }
       }
     },
+    onSuccess: () => {
+      // Success message handled by FileUploadSection
+    }
+  });
+
+  // Initialize phase detection handler
+  const phaseHandler = PhaseDetectionHandler({
+    projectPath,
     onSuccess: (message) => {
-      setUploadSuccessMessage(message);
-      // Auto-dismiss success message after 3 seconds
-      setTimeout(() => setUploadSuccessMessage(null), 3000);
+      setSuccessMessage(message);
+      setNlInput('');
+      clearFormState();
+    },
+    onError: (errorMsg) => setError(errorMsg),
+    onFormClear: () => {
+      setNlInput('');
+      clearFormState();
     }
   });
 
@@ -222,9 +161,6 @@ export function RequestForm() {
           `The workflow may fail. Do you want to proceed anyway?`
         );
         setSystemHealthy(false);
-
-        // Optionally, you can prevent submission
-        // return;
       } else if (healthStatus.overall_status === 'degraded') {
         setHealthWarning(
           `Some services are degraded. The workflow may experience delays but should complete.`
@@ -271,10 +207,8 @@ export function RequestForm() {
           `Issue #${confirmResponse.issue_number} created successfully! ${confirmResponse.github_url}`
         );
         setNlInput('');
-        // Don't clear project path - it will persist from localStorage
         setPreview(null);
         setCostEstimate(null);
-        // Clear persisted form state after successful submission
         clearFormState();
       } else {
         setShowConfirm(true);
@@ -301,9 +235,7 @@ export function RequestForm() {
       setPreview(null);
       setCostEstimate(null);
       setNlInput('');
-      // Don't clear project path - it will persist from localStorage
       setRequestId(null);
-      // Clear persisted form state after successful submission
       clearFormState();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -319,141 +251,12 @@ export function RequestForm() {
     setRequestId(null);
   };
 
-  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setError(null);
-    clearError();
-
-    try {
-      const result = await handleMultipleFiles(Array.from(files));
-
-      if (result.content === '' && result.processedCount === 0) {
-        if (result.rejectedFiles.length > 0) {
-          // Show the first error message (most relevant for single file uploads)
-          setError(result.rejectedFiles[0].errorMessage);
-        } else {
-          setError('No valid files to process');
-        }
-        return;
-      }
-
-      // Parse content for phases (only for single file uploads)
-      if (result.processedCount === 1) {
-        const parseResult = parsePhases(result.content);
-
-        // If multi-phase detected, show preview for confirmation
-        if (parseResult.isMultiPhase && parseResult.phases.length > 1) {
-          setPhasePreview(parseResult);
-          setShowPhasePreview(true);
-
-          // Build success message
-          setUploadSuccessMessage(`Multi-phase document detected with ${parseResult.phases.length} phases`);
-          setTimeout(() => setUploadSuccessMessage(null), 3000);
-
-          // Reset file input
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-          return;
-        }
-      }
-
-      // Single-phase or multiple files: append content normally
-      if (nlInput.trim()) {
-        setNlInput(prev => prev + '\n\n---\n\n' + result.content);
-      } else {
-        setNlInput(result.content);
-      }
-
-      // Build success message
-      let successMsg = '';
-      if (result.processedCount === 1) {
-        successMsg = 'File uploaded successfully';
-      } else {
-        successMsg = `${result.processedCount} files uploaded successfully`;
-      }
-
-      if (result.rejectedFiles.length > 0) {
-        const rejectedNames = result.rejectedFiles.map(f => f.fileName).join(', ');
-        successMsg += `. Rejected files: ${rejectedNames}`;
-      }
-
-      setUploadSuccessMessage(successMsg);
-      setTimeout(() => setUploadSuccessMessage(null), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to read file(s)');
+  const handleContentReceived = (content: string) => {
+    if (nlInput.trim()) {
+      setNlInput(prev => prev + content);
+    } else {
+      setNlInput(content);
     }
-
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handlePhasePreviewConfirm = async () => {
-    if (!phasePreview) return;
-
-    // Validate phases before proceeding
-    const validation = validatePhases(phasePreview);
-    if (!validation.valid) {
-      setError(`Cannot submit multi-phase document: ${validation.errors.join(', ')}`);
-      setShowPhasePreview(false);
-      setPhasePreview(null);
-      return;
-    }
-
-    // Submit multi-phase request directly to backend
-    try {
-      setIsLoading(true);
-      setError(null);
-      setShowPhasePreview(false);
-
-      // Convert parsed phases to API format
-      const phases = phasePreview.phases.map(phase => ({
-        number: phase.number,
-        title: phase.title,
-        content: phase.content,
-        externalDocs: phase.externalDocs.length > 0 ? phase.externalDocs : undefined
-      }));
-
-      // Submit multi-phase request
-      const response = await submitRequest({
-        nl_input: phasePreview.originalContent,
-        project_path: projectPath || undefined,
-        auto_post: true,  // Auto-post multi-phase requests
-        phases
-      });
-
-      // Handle multi-phase response
-      if (response.is_multi_phase && response.parent_issue_number) {
-        setSuccessMessage(
-          `✅ Multi-phase request created!\n\n` +
-          `📋 Parent Issue: #${response.parent_issue_number}\n` +
-          `🔢 Child Issues: ${response.child_issues?.map(c => `#${c.issue_number}`).join(', ')}\n\n` +
-          `All ${phases.length} phases have been queued for execution.`
-        );
-
-        // Clear form
-        setNlInput('');
-        setPhasePreview(null);
-        clearFormState();
-      } else {
-        setError('Unexpected response format for multi-phase request');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit multi-phase request');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handlePhasePreviewCancel = () => {
-    setShowPhasePreview(false);
-    setPhasePreview(null);
-    setUploadSuccessMessage('Phase upload cancelled');
-    setTimeout(() => setUploadSuccessMessage(null), 3000);
   };
 
   return (
@@ -466,165 +269,114 @@ export function RequestForm() {
               isDragging ? 'ring-4 ring-primary ring-opacity-50 bg-blue-50' : ''
             }`}
             {...dragHandlers}
-            aria-busy={isReading}
+            aria-busy={isReading || phaseHandler.isSubmitting}
           >
             <h2 className="text-2xl font-bold text-gray-900">
               Create New Request
             </h2>
 
-        <div>
-          <label
-            htmlFor="nl-input"
-            className="block text-sm font-medium text-gray-700 mb-2"
-          >
-            Describe what you want to build
-          </label>
+            <div>
+              <label
+                htmlFor="nl-input"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Describe what you want to build
+              </label>
 
-          <textarea
-            id="nl-input"
-            placeholder="Example: Build a REST API for user management with CRUD operations..."
-            value={nlInput}
-            onChange={(e) => setNlInput(e.target.value)}
-            rows={6}
-            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
-            disabled={isReading}
-          />
+              <textarea
+                id="nl-input"
+                placeholder="Example: Build a REST API for user management with CRUD operations..."
+                value={nlInput}
+                onChange={(e) => setNlInput(e.target.value)}
+                rows={6}
+                className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                disabled={isReading}
+              />
 
-          {/* File upload button (keyboard accessibility) */}
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".md,.markdown"
-              multiple
-              onChange={handleFileInputChange}
-              className="hidden"
-              id="file-upload"
-              aria-label="Upload markdown files"
-            />
-            <label
-              htmlFor="file-upload"
-              className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 cursor-pointer transition-colors"
-            >
-              <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              Upload .md file
-            </label>
-            <span className="text-xs text-gray-500">or drag and drop anywhere</span>
-          </div>
-
-          {/* Drag-and-drop and file input error messages */}
-          {(dragError || error) && (
-            <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
-              {dragError || error}
+              <FileUploadSection
+                onContentReceived={handleContentReceived}
+                onPhasePreviewOpen={phaseHandler.openPhasePreview}
+                isDragging={isDragging}
+                dragError={dragError}
+                isReading={isReading}
+                clearDragError={clearError}
+                currentNlInput={nlInput}
+              />
             </div>
-          )}
 
-          {/* Upload success message */}
-          {uploadSuccessMessage && (
-            <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
-              {uploadSuccessMessage}
+            <div>
+              <label
+                htmlFor="project-path"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Project path (optional)
+              </label>
+              <input
+                id="project-path"
+                type="text"
+                placeholder="/Users/username/projects/my-app"
+                value={projectPath}
+                onChange={(e) => setProjectPath(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
             </div>
-          )}
-        </div>
 
-        <div>
-          <label
-            htmlFor="project-path"
-            className="block text-sm font-medium text-gray-700 mb-2"
-          >
-            Project path (optional)
-          </label>
-          <input
-            id="project-path"
-            type="text"
-            placeholder="/Users/username/projects/my-app"
-            value={projectPath}
-            onChange={(e) => setProjectPath(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
-        </div>
+            <div className="flex items-center">
+              <input
+                id="auto-post"
+                type="checkbox"
+                checked={autoPost}
+                onChange={(e) => setAutoPost(e.target.checked)}
+                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+              />
+              <label htmlFor="auto-post" className="ml-2 text-sm text-gray-700">
+                Auto-post to GitHub (skip confirmation)
+              </label>
+            </div>
 
-        <div className="flex items-center">
-          <input
-            id="auto-post"
-            type="checkbox"
-            checked={autoPost}
-            onChange={(e) => setAutoPost(e.target.checked)}
-            className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-          />
-          <label htmlFor="auto-post" className="ml-2 text-sm text-gray-700">
-            Auto-post to GitHub (skip confirmation)
-          </label>
-        </div>
-
-        {storageWarning && (
-          <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-200 text-yellow-800">
-            {storageWarning}
-          </div>
-        )}
-
-        {healthWarning && (
-          <div className={`p-4 border rounded-lg ${systemHealthy ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-            {healthWarning}
-          </div>
-        )}
-
-        {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
-            {error}
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
-            {successMessage}
-          </div>
-        )}
-
-        <button
-          onClick={handleSubmit}
-          disabled={isLoading}
-          className="w-full bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-        >
-          {isLoading ? 'Processing...' : 'Generate Issue'}
-        </button>
-
-        {preview && !showConfirm && !autoPost && (
-          <div className="mt-6 space-y-6">
-            <h3 className="text-xl font-bold">Preview</h3>
-
-            {/* Cost Estimate Card - Displayed FIRST for visibility */}
-            {costEstimate && (
-              <CostEstimateCard estimate={costEstimate} />
-            )}
-
-            {/* GitHub Issue Preview */}
-            <IssuePreview issue={preview} />
-          </div>
-        )}
-
-            {/* Drop zone overlay - covers entire card */}
-            {isDragging && (
-              <div className="absolute inset-0 flex items-center justify-center bg-blue-50 bg-opacity-95 border-2 border-dashed border-primary rounded-lg pointer-events-none z-10">
-                <div className="text-center">
-                  <svg className="mx-auto h-16 w-16 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  <p className="mt-3 text-lg font-semibold text-primary">Drop .md file anywhere on this card</p>
-                  <p className="mt-1 text-sm text-gray-600">Supports multiple files</p>
-                </div>
+            {storageWarning && (
+              <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-200 text-yellow-800">
+                {storageWarning}
               </div>
             )}
 
-            {/* Loading overlay - covers entire card */}
-            {isReading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-95 rounded-lg z-10">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                  <p className="mt-3 text-base font-medium text-gray-700">Reading file(s)...</p>
-                </div>
+            {healthWarning && (
+              <div className={`p-4 border rounded-lg ${systemHealthy ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                {healthWarning}
+              </div>
+            )}
+
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+                {error}
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
+                {successMessage}
+              </div>
+            )}
+
+            <button
+              onClick={handleSubmit}
+              disabled={isLoading || phaseHandler.isSubmitting}
+              className="w-full bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            >
+              {isLoading ? 'Processing...' : 'Generate Issue'}
+            </button>
+
+            {preview && !showConfirm && !autoPost && (
+              <div className="mt-6 space-y-6">
+                <h3 className="text-xl font-bold">Preview</h3>
+
+                {/* Cost Estimate Card - Displayed FIRST for visibility */}
+                {costEstimate && (
+                  <CostEstimateCard estimate={costEstimate} />
+                )}
+
+                {/* GitHub Issue Preview */}
+                <IssuePreview issue={preview} />
               </div>
             )}
           </div>
@@ -641,13 +393,7 @@ export function RequestForm() {
           />
         )}
 
-        {showPhasePreview && phasePreview && (
-          <PhasePreview
-            parseResult={phasePreview}
-            onConfirm={handlePhasePreviewConfirm}
-            onCancel={handlePhasePreviewCancel}
-          />
-        )}
+        {phaseHandler.modal}
       </div>
 
       <SystemStatusPanel />

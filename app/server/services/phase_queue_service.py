@@ -2,99 +2,46 @@
 PhaseQueue Service
 
 Manages the phase queue for multi-phase workflow execution.
-Handles enqueueing phases, dependency tracking, and sequential execution coordination.
+Orchestrates between repository (database) and dependency tracker (business logic).
 """
 
-import json
 import logging
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from utils.db_connection import get_connection
+from models.phase_queue_item import PhaseQueueItem
+from repositories.phase_queue_repository import PhaseQueueRepository
+from services.phase_dependency_tracker import PhaseDependencyTracker
 
 logger = logging.getLogger(__name__)
-
-
-class PhaseQueueItem:
-    """Represents a single phase in the queue"""
-
-    def __init__(
-        self,
-        queue_id: str,
-        parent_issue: int,
-        phase_number: int,
-        issue_number: Optional[int] = None,
-        status: str = "queued",
-        depends_on_phase: Optional[int] = None,
-        phase_data: Optional[Dict[str, Any]] = None,
-        created_at: Optional[str] = None,
-        updated_at: Optional[str] = None,
-        error_message: Optional[str] = None,
-    ):
-        self.queue_id = queue_id
-        self.parent_issue = parent_issue
-        self.phase_number = phase_number
-        self.issue_number = issue_number
-        self.status = status
-        self.depends_on_phase = depends_on_phase
-        self.phase_data = phase_data or {}
-        self.created_at = created_at or datetime.now().isoformat()
-        self.updated_at = updated_at or datetime.now().isoformat()
-        self.error_message = error_message
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization"""
-        return {
-            "queue_id": self.queue_id,
-            "parent_issue": self.parent_issue,
-            "phase_number": self.phase_number,
-            "issue_number": self.issue_number,
-            "status": self.status,
-            "depends_on_phase": self.depends_on_phase,
-            "phase_data": self.phase_data,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "error_message": self.error_message,
-        }
-
-    @classmethod
-    def from_db_row(cls, row) -> "PhaseQueueItem":
-        """Create PhaseQueueItem from database row"""
-        phase_data = json.loads(row["phase_data"]) if row["phase_data"] else {}
-        return cls(
-            queue_id=row["queue_id"],
-            parent_issue=row["parent_issue"],
-            phase_number=row["phase_number"],
-            issue_number=row["issue_number"],
-            status=row["status"],
-            depends_on_phase=row["depends_on_phase"],
-            phase_data=phase_data,
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-            error_message=row["error_message"],
-        )
 
 
 class PhaseQueueService:
     """
     Service for managing multi-phase workflow queue.
 
-    Responsibilities:
-    - Enqueue phases with dependency tracking
-    - Mark phases as ready/running/completed/blocked/failed
-    - Find next ready phase for execution
-    - Query queue state
+    Orchestrates between:
+    - PhaseQueueRepository (database operations)
+    - PhaseDependencyTracker (dependency logic)
     """
 
-    def __init__(self, db_path: str = "db/database.db"):
+    def __init__(
+        self,
+        repository: Optional[PhaseQueueRepository] = None,
+        dependency_tracker: Optional[PhaseDependencyTracker] = None,
+        db_path: str = "db/database.db"
+    ):
         """
         Initialize PhaseQueueService.
 
         Args:
-            db_path: Path to SQLite database (default: db/database.db)
+            repository: PhaseQueueRepository instance (or creates default)
+            dependency_tracker: PhaseDependencyTracker instance (or creates default)
+            db_path: Path to SQLite database (used if repository not provided)
         """
-        self.db_path = db_path
+        self.repository = repository or PhaseQueueRepository(db_path)
+        self.dependency_tracker = dependency_tracker or PhaseDependencyTracker(self.repository)
         logger.info(f"[INIT] PhaseQueueService initialized (db: {db_path})")
 
     def enqueue(
@@ -122,28 +69,19 @@ class PhaseQueueService:
         queue_id = str(uuid.uuid4())
         status = "ready" if phase_number == 1 else "queued"  # Phase 1 is ready immediately
 
-        try:
-            with get_connection(self.db_path) as conn:
-                conn.execute(
-                    """
-                    INSERT INTO phase_queue (
-                        queue_id, parent_issue, phase_number, status,
-                        depends_on_phase, phase_data, created_at, updated_at
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        queue_id,
-                        parent_issue,
-                        phase_number,
-                        status,
-                        depends_on_phase,
-                        json.dumps(phase_data),
-                        datetime.now().isoformat(),
-                        datetime.now().isoformat(),
-                    ),
-                )
+        item = PhaseQueueItem(
+            queue_id=queue_id,
+            parent_issue=parent_issue,
+            phase_number=phase_number,
+            status=status,
+            depends_on_phase=depends_on_phase,
+            phase_data=phase_data,
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+        )
 
+        try:
+            self.repository.insert_phase(item)
             logger.info(
                 f"[SUCCESS] Enqueued Phase {phase_number} for issue #{parent_issue} "
                 f"(queue_id: {queue_id}, status: {status})"
@@ -168,12 +106,7 @@ class PhaseQueueService:
             Exception: If database operation fails
         """
         try:
-            with get_connection(self.db_path) as conn:
-                cursor = conn.execute(
-                    "DELETE FROM phase_queue WHERE queue_id = ?",
-                    (queue_id,)
-                )
-                deleted = cursor.rowcount > 0
+            deleted = self.repository.delete_phase(queue_id)
 
             if deleted:
                 logger.info(f"[SUCCESS] Dequeued phase (queue_id: {queue_id})")
@@ -201,19 +134,10 @@ class PhaseQueueService:
             Exception: If database operation fails
         """
         try:
-            with get_connection(self.db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    SELECT * FROM phase_queue
-                    WHERE status = 'ready' AND issue_number IS NULL
-                    ORDER BY parent_issue ASC, phase_number ASC
-                    LIMIT 1
-                    """
-                )
-                row = cursor.fetchone()
+            ready_phases = self.repository.find_ready_phases()
 
-            if row:
-                item = PhaseQueueItem.from_db_row(row)
+            if ready_phases:
+                item = ready_phases[0]  # Get first ready phase
                 logger.info(
                     f"[SUCCESS] Found ready phase: Phase {item.phase_number} "
                     f"for issue #{item.parent_issue}"
@@ -229,79 +153,24 @@ class PhaseQueueService:
 
     def mark_phase_complete(self, queue_id: str) -> bool:
         """
-        Mark a phase as completed and check for dependent phases.
+        Mark a phase as completed and trigger next phase.
 
-        When a phase completes:
-        1. Update its status to 'completed'
-        2. Find phases that depend on this phase
-        3. Mark dependent phases as 'ready' if their dependencies are met
+        Uses PhaseDependencyTracker to:
+        1. Mark phase as completed
+        2. Trigger next phase (mark as ready)
 
         Args:
             queue_id: Queue ID to mark complete
 
         Returns:
-            bool: True if updated, False if not found
+            bool: True if next phase was triggered, False otherwise
 
         Raises:
             Exception: If database operation fails
         """
         try:
-            with get_connection(self.db_path) as conn:
-                # Get the completed phase info
-                cursor = conn.execute(
-                    "SELECT parent_issue, phase_number FROM phase_queue WHERE queue_id = ?",
-                    (queue_id,)
-                )
-                row = cursor.fetchone()
-
-                if not row:
-                    logger.warning(f"[WARNING] Queue ID not found: {queue_id}")
-                    return False
-
-                parent_issue = row["parent_issue"]
-                completed_phase_number = row["phase_number"]
-
-                # Mark this phase as completed
-                conn.execute(
-                    """
-                    UPDATE phase_queue
-                    SET status = 'completed', updated_at = ?
-                    WHERE queue_id = ?
-                    """,
-                    (datetime.now().isoformat(), queue_id),
-                )
-
-                # Find dependent phases (next phase in sequence)
-                next_phase_number = completed_phase_number + 1
-                cursor = conn.execute(
-                    """
-                    SELECT queue_id FROM phase_queue
-                    WHERE parent_issue = ? AND phase_number = ? AND status = 'queued'
-                    """,
-                    (parent_issue, next_phase_number),
-                )
-                dependent_rows = cursor.fetchall()
-
-                # Mark dependent phases as ready
-                for dep_row in dependent_rows:
-                    conn.execute(
-                        """
-                        UPDATE phase_queue
-                        SET status = 'ready', updated_at = ?
-                        WHERE queue_id = ?
-                        """,
-                        (datetime.now().isoformat(), dep_row["queue_id"]),
-                    )
-                    logger.info(
-                        f"[SUCCESS] Phase {next_phase_number} marked as ready "
-                        f"(parent: #{parent_issue})"
-                    )
-
-            logger.info(
-                f"[SUCCESS] Phase {completed_phase_number} marked complete "
-                f"(parent: #{parent_issue}, queue_id: {queue_id})"
-            )
-            return True
+            next_queue_id = self.dependency_tracker.trigger_next_phase(queue_id)
+            return next_queue_id is not None
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to mark phase complete: {str(e)}")
@@ -322,23 +191,7 @@ class PhaseQueueService:
             Exception: If database operation fails
         """
         try:
-            with get_connection(self.db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    UPDATE phase_queue
-                    SET status = 'blocked', error_message = ?, updated_at = ?
-                    WHERE queue_id = ?
-                    """,
-                    (reason, datetime.now().isoformat(), queue_id),
-                )
-                updated = cursor.rowcount > 0
-
-            if updated:
-                logger.info(f"[SUCCESS] Phase blocked (queue_id: {queue_id}, reason: {reason})")
-            else:
-                logger.warning(f"[WARNING] Queue ID not found: {queue_id}")
-
-            return updated
+            return self.dependency_tracker.mark_phase_blocked(queue_id, reason)
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to mark phase blocked: {str(e)}")
@@ -347,6 +200,10 @@ class PhaseQueueService:
     def mark_phase_failed(self, queue_id: str, error_message: str) -> List[str]:
         """
         Mark a phase as failed and block all dependent phases.
+
+        Uses PhaseDependencyTracker to:
+        1. Mark phase as failed
+        2. Block all subsequent phases
 
         Args:
             queue_id: Queue ID that failed
@@ -359,61 +216,7 @@ class PhaseQueueService:
             Exception: If database operation fails
         """
         try:
-            with get_connection(self.db_path) as conn:
-                # Get the failed phase info
-                cursor = conn.execute(
-                    "SELECT parent_issue, phase_number FROM phase_queue WHERE queue_id = ?",
-                    (queue_id,)
-                )
-                row = cursor.fetchone()
-
-                if not row:
-                    logger.warning(f"[WARNING] Queue ID not found: {queue_id}")
-                    return []
-
-                parent_issue = row["parent_issue"]
-                failed_phase_number = row["phase_number"]
-
-                # Mark this phase as failed
-                conn.execute(
-                    """
-                    UPDATE phase_queue
-                    SET status = 'failed', error_message = ?, updated_at = ?
-                    WHERE queue_id = ?
-                    """,
-                    (error_message, datetime.now().isoformat(), queue_id),
-                )
-
-                # Block all subsequent phases
-                cursor = conn.execute(
-                    """
-                    SELECT queue_id FROM phase_queue
-                    WHERE parent_issue = ? AND phase_number > ? AND status IN ('queued', 'ready')
-                    """,
-                    (parent_issue, failed_phase_number),
-                )
-                blocked_rows = cursor.fetchall()
-
-                blocked_ids = []
-                block_reason = f"Phase {failed_phase_number} failed: {error_message}"
-                for blocked_row in blocked_rows:
-                    blocked_id = blocked_row["queue_id"]
-                    conn.execute(
-                        """
-                        UPDATE phase_queue
-                        SET status = 'blocked', error_message = ?, updated_at = ?
-                        WHERE queue_id = ?
-                        """,
-                        (block_reason, datetime.now().isoformat(), blocked_id),
-                    )
-                    blocked_ids.append(blocked_id)
-
-            logger.info(
-                f"[SUCCESS] Phase {failed_phase_number} marked failed, "
-                f"blocked {len(blocked_ids)} dependent phases "
-                f"(parent: #{parent_issue})"
-            )
-            return blocked_ids
+            return self.dependency_tracker.block_dependent_phases(queue_id, error_message)
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to mark phase failed: {str(e)}")
@@ -433,18 +236,7 @@ class PhaseQueueService:
             Exception: If database operation fails
         """
         try:
-            with get_connection(self.db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    SELECT * FROM phase_queue
-                    WHERE parent_issue = ?
-                    ORDER BY phase_number ASC
-                    """,
-                    (parent_issue,)
-                )
-                rows = cursor.fetchall()
-
-            items = [PhaseQueueItem.from_db_row(row) for row in rows]
+            items = self.repository.find_by_parent(parent_issue)
             logger.info(f"[SUCCESS] Retrieved {len(items)} phases for issue #{parent_issue}")
             return items
 
@@ -463,16 +255,7 @@ class PhaseQueueService:
             Exception: If database operation fails
         """
         try:
-            with get_connection(self.db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    SELECT * FROM phase_queue
-                    ORDER BY parent_issue ASC, phase_number ASC
-                    """
-                )
-                rows = cursor.fetchall()
-
-            items = [PhaseQueueItem.from_db_row(row) for row in rows]
+            items = self.repository.find_all()
             logger.info(f"[SUCCESS] Retrieved {len(items)} phases from queue")
             return items
 
@@ -497,16 +280,7 @@ class PhaseQueueService:
             Exception: If database operation fails
         """
         try:
-            with get_connection(self.db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    UPDATE phase_queue
-                    SET issue_number = ?, updated_at = ?
-                    WHERE queue_id = ?
-                    """,
-                    (issue_number, datetime.now().isoformat(), queue_id),
-                )
-                updated = cursor.rowcount > 0
+            updated = self.repository.update_issue_number(queue_id, issue_number)
 
             if updated:
                 logger.info(f"[SUCCESS] Updated issue number: {issue_number} (queue_id: {queue_id})")
@@ -538,16 +312,7 @@ class PhaseQueueService:
             raise ValueError(f"Invalid status: {status}. Must be one of {valid_statuses}")
 
         try:
-            with get_connection(self.db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    UPDATE phase_queue
-                    SET status = ?, updated_at = ?
-                    WHERE queue_id = ?
-                    """,
-                    (status, datetime.now().isoformat(), queue_id),
-                )
-                updated = cursor.rowcount > 0
+            updated = self.repository.update_status(queue_id, status)
 
             if updated:
                 logger.info(f"[SUCCESS] Updated status to '{status}' (queue_id: {queue_id})")

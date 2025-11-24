@@ -6,6 +6,7 @@ Handles GitHub issue creation workflow:
 - Generating GitHub issue previews with cost estimates
 - Posting confirmed issues to GitHub
 - Managing pending request state
+- Delegating multi-phase requests to MultiPhaseIssueHandler
 """
 
 import logging
@@ -31,13 +32,12 @@ from core.data_models import (
     CostEstimate,
     ConfirmResponse,
     ProjectContext,
-    Phase,
-    ChildIssueInfo
 )
 from core.project_detector import detect_project_context
 from core.nl_processor import process_request
 from core.github_poster import GitHubPoster
 from core.cost_estimate_storage import save_cost_estimate
+from services.multi_phase_issue_handler import MultiPhaseIssueHandler
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,7 @@ class GitHubIssueService:
     3. Allow preview retrieval
     4. Confirm and post to GitHub
     5. Save cost estimate for workflow tracking
+    6. Delegate multi-phase requests to MultiPhaseIssueHandler
     """
 
     def __init__(
@@ -73,6 +74,12 @@ class GitHubIssueService:
         self.pending_requests: Dict[str, dict] = {}
         self.phase_queue_service = phase_queue_service
 
+        # Initialize multi-phase handler
+        self.multi_phase_handler = MultiPhaseIssueHandler(
+            github_poster=GitHubPoster(),
+            phase_queue_service=phase_queue_service
+        ) if phase_queue_service else None
+
         logger.info(f"[INIT] GitHubIssueService initialized (webhook: {self.webhook_trigger_url}, repo: {self.github_repo})")
 
     async def submit_nl_request(self, request: SubmitRequestData) -> SubmitRequestResponse:
@@ -80,6 +87,7 @@ class GitHubIssueService:
         Process natural language request and generate GitHub issue preview WITH cost estimate.
 
         For multi-phase requests (when request.phases is provided):
+        - Delegates to MultiPhaseIssueHandler
         - Creates parent issue with full content
         - Creates child issues for each phase
         - Enqueues phases with dependency tracking
@@ -103,78 +111,108 @@ class GitHubIssueService:
 
             if is_multi_phase:
                 logger.info(f"[INFO] Multi-phase request detected: {len(request.phases)} phases")
-                return await self._handle_multi_phase_request(request)
+                if not self.multi_phase_handler:
+                    raise HTTPException(500, "Multi-phase requests not supported: PhaseQueueService not initialized")
+                return await self.multi_phase_handler.handle_multi_phase_request(request)
 
             # Standard single-phase flow
-            # Detect project context
-            if request.project_path:
-                project_context = detect_project_context(request.project_path)
-            else:
-                # Default context if no project path provided
-                project_context = ProjectContext(
-                    path=os.getcwd(),
-                    is_new_project=False,
-                    complexity="medium",
-                    has_git=True
-                )
+            return await self._handle_single_phase_request(request)
 
-            # Process the request to generate GitHub issue
-            github_issue = await process_request(request.nl_input, project_context)
-
-            # 🆕 ADD COST ESTIMATION
-            # Create ADW-compatible issue object for complexity analysis
-            # ADW GitHubIssue expects: number, title, body, user (str), labels (List[GitHubLabel])
-            # We'll use a simplified structure since we're just analyzing, not creating a real issue
-            adw_issue = ADWGitHubIssue(
-                number=0,  # Placeholder - not created yet
-                title=github_issue.title,
-                body=github_issue.body,
-                state="open",
-                author={"login": "user", "avatar_url": "", "url": ""},  # Placeholder user
-                assignees=[],
-                labels=[],  # Convert string labels to ADW format if needed
-                milestone=None,
-                comments=[],
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
-                closed_at=None,
-                url=""
-            )
-
-            # Analyze complexity and get cost estimate
-            # Pass classification as issue_class (e.g., "/feature", "/bug", "/chore")
-            issue_class = f"/{github_issue.classification}"
-            cost_analysis = analyze_issue_complexity(adw_issue, issue_class)
-
-            # Generate unique request ID
-            request_id = str(uuid.uuid4())
-
-            # Store in pending requests WITH cost estimate
-            self.pending_requests[request_id] = {
-                'issue': github_issue,
-                'project_context': project_context,
-                'cost_estimate': {  # 🆕 NEW FIELD
-                    'level': cost_analysis.level,
-                    'min_cost': cost_analysis.estimated_cost_range[0],
-                    'max_cost': cost_analysis.estimated_cost_range[1],
-                    'total': cost_analysis.estimated_cost_total,
-                    'breakdown': cost_analysis.cost_breakdown_estimate,
-                    'confidence': cost_analysis.confidence,
-                    'reasoning': cost_analysis.reasoning,
-                    'recommended_workflow': cost_analysis.recommended_workflow
-                }
-            }
-
-            logger.info(
-                f"[SUCCESS] Request processed with cost estimate: {cost_analysis.level} "
-                f"(${cost_analysis.estimated_cost_range[0]:.2f}-${cost_analysis.estimated_cost_range[1]:.2f})"
-            )
-            return SubmitRequestResponse(request_id=request_id)
-
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"[ERROR] Failed to process NL request: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
             raise HTTPException(500, f"Error processing request: {str(e)}")
+
+    async def _handle_single_phase_request(self, request: SubmitRequestData) -> SubmitRequestResponse:
+        """
+        Handle standard single-phase request.
+
+        Args:
+            request: SubmitRequestData with natural language input
+
+        Returns:
+            SubmitRequestResponse with request_id
+
+        Raises:
+            HTTPException: If processing fails
+        """
+        # Detect project context
+        if request.project_path:
+            project_context = detect_project_context(request.project_path)
+        else:
+            # Default context if no project path provided
+            project_context = ProjectContext(
+                path=os.getcwd(),
+                is_new_project=False,
+                complexity="medium",
+                has_git=True
+            )
+
+        # Process the request to generate GitHub issue
+        github_issue = await process_request(request.nl_input, project_context)
+
+        # Generate cost estimate
+        cost_estimate = self._generate_cost_estimate(github_issue)
+
+        # Generate unique request ID
+        request_id = str(uuid.uuid4())
+
+        # Store in pending requests WITH cost estimate
+        self.pending_requests[request_id] = {
+            'issue': github_issue,
+            'project_context': project_context,
+            'cost_estimate': cost_estimate
+        }
+
+        logger.info(
+            f"[SUCCESS] Request processed with cost estimate: {cost_estimate['level']} "
+            f"(${cost_estimate['min_cost']:.2f}-${cost_estimate['max_cost']:.2f})"
+        )
+        return SubmitRequestResponse(request_id=request_id)
+
+    def _generate_cost_estimate(self, github_issue: GitHubIssue) -> dict:
+        """
+        Generate cost estimate for a GitHub issue.
+
+        Args:
+            github_issue: GitHubIssue object
+
+        Returns:
+            dict with cost estimate data
+        """
+        # Create ADW-compatible issue object for complexity analysis
+        adw_issue = ADWGitHubIssue(
+            number=0,  # Placeholder - not created yet
+            title=github_issue.title,
+            body=github_issue.body,
+            state="open",
+            author={"login": "user", "avatar_url": "", "url": ""},  # Placeholder user
+            assignees=[],
+            labels=[],
+            milestone=None,
+            comments=[],
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+            closed_at=None,
+            url=""
+        )
+
+        # Analyze complexity and get cost estimate
+        issue_class = f"/{github_issue.classification}"
+        cost_analysis = analyze_issue_complexity(adw_issue, issue_class)
+
+        return {
+            'level': cost_analysis.level,
+            'min_cost': cost_analysis.estimated_cost_range[0],
+            'max_cost': cost_analysis.estimated_cost_range[1],
+            'total': cost_analysis.estimated_cost_total,
+            'breakdown': cost_analysis.cost_breakdown_estimate,
+            'confidence': cost_analysis.confidence,
+            'reasoning': cost_analysis.reasoning,
+            'recommended_workflow': cost_analysis.recommended_workflow
+        }
 
     async def get_issue_preview(self, request_id: str) -> GitHubIssue:
         """
@@ -352,149 +390,3 @@ class GitHubIssueService:
             logger.error(f"[ERROR] Failed to post issue: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
             raise HTTPException(500, f"Error posting issue: {str(e)}")
-
-    async def _handle_multi_phase_request(self, request: SubmitRequestData) -> SubmitRequestResponse:
-        """
-        Handle multi-phase request by creating parent issue, child issues, and enqueueing phases.
-
-        Args:
-            request: SubmitRequestData with phases populated
-
-        Returns:
-            SubmitRequestResponse with multi-phase information
-
-        Raises:
-            HTTPException: If phase queue service not available or GitHub posting fails
-        """
-        if not self.phase_queue_service:
-            raise HTTPException(
-                500,
-                "Multi-phase requests not supported: PhaseQueueService not initialized"
-            )
-
-        if not request.phases or len(request.phases) < 2:
-            raise HTTPException(
-                400,
-                "Multi-phase request must have at least 2 phases"
-            )
-
-        try:
-            # 1. Create parent GitHub issue with full content
-            parent_title = f"[Multi-Phase] {request.phases[0].title}"
-            parent_body = f"""# Multi-Phase Request
-
-This is a multi-phase request with {len(request.phases)} phases that will be executed sequentially.
-
-## Overview
-
-{request.nl_input}
-
-## Phases
-
-"""
-            for phase in request.phases:
-                parent_body += f"""
-### Phase {phase.number}: {phase.title}
-
-{phase.content[:200]}...
-
-"""
-                if phase.externalDocs:
-                    parent_body += f"**Referenced Documents:** {', '.join(phase.externalDocs)}\n\n"
-
-            # Create parent issue
-            github_poster = GitHubPoster()
-            parent_issue = GitHubIssue(
-                title=parent_title,
-                body=parent_body,
-                labels=["multi-phase"],
-                classification="feature",  # Default to feature for multi-phase
-                workflow="adw_sdlc_iso",
-                model_set="base"
-            )
-            parent_issue_number = github_poster.post_issue(parent_issue, confirm=False)
-            logger.info(f"[SUCCESS] Created parent issue #{parent_issue_number}")
-
-            # 2. Create child issues and enqueue phases
-            child_issues = []
-            for phase in request.phases:
-                # Create child issue
-                child_title = f"Phase {phase.number}: {phase.title}"
-                child_body = f"""# Phase {phase.number} of {len(request.phases)}
-
-**Parent Issue:** #{parent_issue_number}
-**Execution Order:** {"Executes first" if phase.number == 1 else f"After Phase {phase.number - 1}"}
-
-## Description
-
-{phase.content}
-
-"""
-                if phase.externalDocs:
-                    child_body += f"""
-## Referenced Documents
-
-{chr(10).join(f'- `{doc}`' for doc in phase.externalDocs)}
-
-"""
-
-                child_body += f"""
----
-
-**Full Context:** See parent issue #{parent_issue_number} for complete multi-phase request context.
-"""
-
-                child_issue = GitHubIssue(
-                    title=child_title,
-                    body=child_body,
-                    labels=[f"phase-{phase.number}", "multi-phase-child"],
-                    classification="feature",
-                    workflow="adw_sdlc_iso",
-                    model_set="base"
-                )
-                child_issue_number = github_poster.post_issue(child_issue, confirm=False)
-                logger.info(f"[SUCCESS] Created child issue #{child_issue_number} for Phase {phase.number}")
-
-                # 3. Enqueue phase
-                depends_on_phase = phase.number - 1 if phase.number > 1 else None
-                queue_id = self.phase_queue_service.enqueue(
-                    parent_issue=parent_issue_number,
-                    phase_number=phase.number,
-                    phase_data={
-                        "title": phase.title,
-                        "content": phase.content,
-                        "externalDocs": phase.externalDocs or []
-                    },
-                    depends_on_phase=depends_on_phase
-                )
-
-                # Update queue with issue number
-                self.phase_queue_service.update_issue_number(queue_id, child_issue_number)
-
-                child_issues.append(ChildIssueInfo(
-                    phase_number=phase.number,
-                    issue_number=child_issue_number,
-                    queue_id=queue_id
-                ))
-
-            # 4. Generate unique request ID (not used for multi-phase, but required)
-            request_id = str(uuid.uuid4())
-
-            logger.info(
-                f"[SUCCESS] Multi-phase request complete: "
-                f"parent #{parent_issue_number}, {len(child_issues)} child issues created"
-            )
-
-            return SubmitRequestResponse(
-                request_id=request_id,
-                is_multi_phase=True,
-                parent_issue_number=parent_issue_number,
-                child_issues=child_issues
-            )
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"[ERROR] Failed to handle multi-phase request: {str(e)}")
-            logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error processing multi-phase request: {str(e)}")
