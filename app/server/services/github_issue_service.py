@@ -15,7 +15,6 @@ import sys
 import traceback
 import uuid
 from datetime import datetime
-from typing import Dict
 
 import httpx
 from fastapi import HTTPException
@@ -36,6 +35,7 @@ from core.data_models import (
 from core.github_poster import GitHubPoster
 from core.nl_processor import process_request
 from core.project_detector import detect_project_context
+
 from services.multi_phase_issue_handler import MultiPhaseIssueHandler
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class GitHubIssueService:
         """
         self.webhook_trigger_url = webhook_trigger_url or os.environ.get("WEBHOOK_TRIGGER_URL", "http://localhost:8001")
         self.github_repo = github_repo or os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder")
-        self.pending_requests: Dict[str, dict] = {}
+        self.pending_requests: dict[str, dict] = {}
         self.phase_queue_service = phase_queue_service
 
         # Initialize multi-phase handler
