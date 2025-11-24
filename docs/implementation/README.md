@@ -1,426 +1,308 @@
-# Out-Loop Coding Implementation Guide
+# Implementation Documentation
 
-**Complete implementation strategies for building a self-improving, cost-optimizing workflow system.**
+**Central repository for all TAC WebBuilder implementation documentation, organized by status and topic.**
 
----
-
-## 📚 Documentation Overview
-
-This directory contains **detailed, production-ready implementation strategies** for all 5 phases of the out-loop coding system.
-
-**Total:** ~4,800 lines of implementation guidance across 6 documents
+**Last Updated:** 2025-11-24
+**Status:** Active maintenance
 
 ---
 
-## 🗺️ Quick Navigation
+## 📁 Directory Structure
 
-### Start Here
-1. **[OUT_LOOP_CODING_IMPLEMENTATION_PLAN.md](../OUT_LOOP_CODING_IMPLEMENTATION_PLAN.md)**
-   - Executive summary
-   - High-level architecture
-   - Success metrics
-   - Getting started guide
-
-### Detailed Phase Strategies
-
-2. **[PHASE_1_PATTERN_DETECTION.md](PHASE_1_PATTERN_DETECTION.md)** (1,248 lines)
-   - Pattern detection engine implementation
-   - Complete Python code (~900 lines)
-   - Database integration
-   - Backfill script for historical data
-   - **Start here for implementation!**
-
-3. **[PHASE_2_CONTEXT_EFFICIENCY.md](PHASE_2_CONTEXT_EFFICIENCY.md)** (203 lines)
-   - Context usage tracking
-   - File access monitoring via hooks
-   - Context profile builder
-   - Token waste analysis
-
-4. **[PHASE_3_TOOL_ROUTING.md](PHASE_3_TOOL_ROUTING.md)** (1,322 lines)
-   - Pattern matching engine (600 lines of code)
-   - Automated tool routing logic
-   - ADW executor integration
-   - Tool registration system
-
-5. **[PHASE_4_AUTO_DISCOVERY.md](PHASE_4_AUTO_DISCOVERY.md)** (1,044 lines)
-   - Pattern analysis automation
-   - GitHub issue generation
-   - ROI calculations
-   - Cron job setup
-
-6. **[PHASE_5_QUOTA_MANAGEMENT.md](PHASE_5_QUOTA_MANAGEMENT.md)** (992 lines)
-   - Token usage forecasting (500 lines of code)
-   - Workflow budgeting (300 lines of code)
-   - Pre-flight checks
-   - Dashboard API endpoint
-
-### Quick Reference
-7. **[PHASES_3_4_5_SUMMARY.md](PHASES_3_4_5_SUMMARY.md)** (condensed version)
-
----
-
-## 🎯 What Each Phase Delivers
-
-| Phase | Duration | Key Deliverable | Impact |
-|-------|----------|----------------|---------|
-| 1 | Week 1 | Pattern detection engine | 10+ patterns identified |
-| 2 | Week 1-2 | Context efficiency analysis | 40%+ improvement potential |
-| 3 | Week 2 | Automated tool routing | 45K tokens saved per workflow |
-| 4 | Week 3 | Auto-discovery system | Self-improving automation |
-| 5 | Week 3-4 | Quota management | Zero exhaustion incidents |
-
-**Total Timeline:** 4 weeks
-**Total Code:** ~5,100 lines across all phases
-
----
-
-## 📈 Expected Outcomes
-
-### Token Reduction
-- **Before:** 20M tokens/day
-- **After:** 14M tokens/day
-- **Savings:** 30% reduction (6M tokens/day)
-
-### Cost Savings
-- **Monthly:** $9-18
-- **Annual:** $108-216
-- **ROI:** Payback in 2-3 months
-
-### Pattern Library
-- **Week 1:** 10+ patterns
-- **Month 1:** 15+ patterns
-- **Month 3:** 25+ patterns
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Database migration 004 applied ✓
-- Workflow analytics working ✓
-- External tools architecture exists ✓
-- API quota monitoring active ✓
-
-### Implementation Order
-
-**Week 1: Foundation**
-```bash
-# 1. Implement Phase 1 (Pattern Detection)
-# Read: PHASE_1_PATTERN_DETECTION.md
-cd app/server/core
-# Create pattern_detector.py following Phase 1 guide
-
-# 2. Run backfill
-python scripts/backfill_pattern_learning.py
-
-# 3. Verify patterns detected
-sqlite3 app/server/db/workflow_history.db "
-  SELECT COUNT(*) FROM operation_patterns;
-"
 ```
-
-**Week 2: Automation**
-```bash
-# 4. Implement Phase 2 (Context Efficiency)
-# Read: PHASE_2_CONTEXT_EFFICIENCY.md
-cd app/server/core
-# Create context_tracker.py and context_optimizer.py
-
-# 5. Implement Phase 3 (Tool Routing)
-# Read: PHASE_3_TOOL_ROUTING.md
-# Create pattern_matcher.py
-python scripts/register_tools.py
-python scripts/activate_patterns.py
-```
-
-**Week 3: Intelligence**
-```bash
-# 6. Implement Phase 4 (Auto-Discovery)
-# Read: PHASE_4_AUTO_DISCOVERY.md
-python scripts/analyze_patterns.py
-# Set up cron job
-
-# 7. Implement Phase 5 (Quota Management)
-# Read: PHASE_5_QUOTA_MANAGEMENT.md
-export ANTHROPIC_QUOTA_LIMIT=300000000
-# Create quota_forecaster.py and workflow_budgets.py
-```
-
-**Week 4: Testing & Validation**
-```bash
-# 8. End-to-end testing
-# 9. Performance optimization
-# 10. Documentation updates
+docs/implementation/
+├── README.md (this file)
+├── PRODUCTION-CODE-INVENTORY.md - Current production codebase inventory
+│
+├── codebase-refactoring/ - Codebase refactoring documentation
+│   ├── README.md - Phases 1-5 complete
+│   ├── PHASES_3_4_5_SUMMARY.md - Comprehensive refactoring summary
+│   ├── PHASE_1_COMPLETION_REPORT.md
+│   ├── PHASE_2_COMPLETION.md
+│   ├── PHASE_3_COMPLETION.md
+│   ├── PHASE_4_COMPLETION.md
+│   ├── PHASE_5_COMPLETION.md
+│   ├── REFACTORING_ROADMAP.md
+│   └── ... (detailed plans and analysis)
+│
+├── completed/ - Archived completed features
+│   ├── multi-phase-upload/ - Multi-phase upload feature (Issue #77)
+│   │   ├── README-multi-phase-upload.md
+│   │   ├── PHASE-1-COMPLETE-multi-phase-upload.md
+│   │   ├── PHASE-2-COMPLETE-multi-phase-upload.md
+│   │   ├── PHASE-3-COMPLETE-multi-phase-upload.md
+│   │   └── PHASE-4-COMPLETE-multi-phase-upload.md
+│   ├── issue-77/ - Issue #77 session documents
+│   │   ├── issue-77-drag-and-drop-review.md
+│   │   ├── issue-77-session-2-summary.md
+│   │   └── issue-77-session-2025-11-21.md
+│   └── session-continuations/ - Historical continuation prompts
+│       ├── CONTINUATION-PROMPT-issue-77.md
+│       ├── CONTINUATION-PROMPT-issue-77-session-2.md
+│       ├── CONTINUATION-PROMPT-multi-phase-upload-session-2.md
+│       ├── CONTINUATION-PROMPT-multi-phase-upload-session-3.md
+│       └── CONTINUATION-PROMPT-multi-phase-upload-session-4.md
+│
+├── completed-refactoring/ - Historical refactoring archive (pre-Phases 1-5)
+│   └── ... (older refactoring sessions)
+│
+├── adw-monitor/ - ADW monitoring feature documentation
+├── launch-health-fixes/ - Launch and health check fixes
+├── pattern-signatures/ - Pattern signature analysis
+└── refactor/ - Refactoring utilities and scripts
 ```
 
 ---
 
-## 📋 Implementation Checklist
+## 🎯 Active Documentation
 
-### Phase 1: Pattern Detection
-- [ ] Create `pattern_detector.py`
-- [ ] Integrate into workflow sync
-- [ ] Create backfill script
-- [ ] Run unit tests
-- [ ] Verify 10+ patterns detected
+### Production Codebase
 
-### Phase 2: Context Efficiency
-- [ ] Create `context_tracker.py`
-- [ ] Create `context_optimizer.py`
-- [ ] Add hook integration
-- [ ] Build context profiles
-- [ ] Measure efficiency metrics
+**[PRODUCTION-CODE-INVENTORY.md](./PRODUCTION-CODE-INVENTORY.md)**
+- Complete inventory of production code
+- File sizes, purposes, and status
+- Updated: 2025-11-24
+- 462 workflows tracked
 
-### Phase 3: Tool Routing
-- [ ] Create `pattern_matcher.py`
-- [ ] Modify ADW executor
-- [ ] Register tools
-- [ ] Link patterns to tools
-- [ ] Activate patterns
-- [ ] Verify cost savings logged
+### Codebase Refactoring (✅ Phases 1-5 Complete)
 
-### Phase 4: Auto-Discovery
-- [ ] Create `analyze_patterns.py`
-- [ ] Set up cron job
-- [ ] Test issue generation
-- [ ] Verify ROI calculations
-- [ ] Monitor weekly runs
+**[codebase-refactoring/README.md](./codebase-refactoring/README.md)**
 
-### Phase 5: Quota Management
-- [ ] Create `quota_forecaster.py`
-- [ ] Create `workflow_budgets.py`
-- [ ] Add pre-flight checks
-- [ ] Create dashboard endpoint
-- [ ] Set quota limit env var
-- [ ] Test forecasting accuracy
+**Status:** ✅ Complete - All 5 phases implemented
+**Completion Date:** 2025-11-24
+
+**Key Achievements:**
+- **Phase 1-2:** Server services extraction and helper utilities
+- **Phase 3:** workflow_analytics.py refactored (865 → 66 lines, -92%)
+- **Phase 4:** WorkflowHistoryCard.tsx refactored (818 → 168 lines, -79%)
+- **Phase 5:** database.py refactored (666 → 48 lines, -93%)
+
+**Total Impact:**
+- 3 major files: 2,349 → 282 lines (-88%)
+- 26 focused modules created
+- 100% backward compatibility
+- All tests passing
+
+**See:** [PHASES_3_4_5_SUMMARY.md](./codebase-refactoring/PHASES_3_4_5_SUMMARY.md)
 
 ---
 
-## 🧪 Testing Strategy
+## ✅ Completed Features
 
-### Unit Tests
-Each phase includes comprehensive unit tests:
-- `tests/test_pattern_detector.py`
-- `tests/test_context_tracker.py`
-- `tests/test_pattern_matcher.py`
-- All use pytest with fixtures
+### Multi-Phase Upload Feature (Issue #77)
 
-### Integration Tests
-```bash
-# Test pattern detection
-python scripts/backfill_pattern_learning.py
+**Location:** [completed/multi-phase-upload/](./completed/multi-phase-upload/)
 
-# Test tool routing
-cd adws && uv run adw_sdlc_iso.py 42
+**Status:** ✅ Production Ready (Phase 4 Complete)
+**Completion Date:** 2025-11-24
+**GitHub Issue:** #77
 
-# Test forecasting
-python -c "from app.server.core.quota_forecaster import forecast_monthly_usage; print(forecast_monthly_usage())"
-```
+**Documentation:**
+- [README-multi-phase-upload.md](./completed/multi-phase-upload/README-multi-phase-upload.md) - Feature overview
+- [PHASE-1-COMPLETE](./completed/multi-phase-upload/PHASE-1-COMPLETE-multi-phase-upload.md) - Client-side parsing & preview
+- [PHASE-2-COMPLETE](./completed/multi-phase-upload/PHASE-2-COMPLETE-multi-phase-upload.md) - Backend queue system
+- [PHASE-3-COMPLETE](./completed/multi-phase-upload/PHASE-3-COMPLETE-multi-phase-upload.md) - Queue display & coordinator
+- [PHASE-4-COMPLETE](./completed/multi-phase-upload/PHASE-4-COMPLETE-multi-phase-upload.md) - Testing & documentation
 
-### End-to-End Validation
-1. Create test issue
-2. Trigger workflow
-3. Verify pattern match → tool routing
-4. Check cost savings logged
-5. Confirm GitHub comments posted
+**Features:**
+- ✅ Drag-and-drop .md file upload
+- ✅ Automatic multi-phase detection
+- ✅ Phase preview modal
+- ✅ Parent/child GitHub issue creation
+- ✅ Sequential phase execution
+- ✅ ZTE Hopper Queue display
+- ✅ Real-time WebSocket updates
+- ✅ GitHub comment notifications
+- ✅ 77 comprehensive tests
 
----
-
-## 💾 Database Schema
-
-All required tables exist (migration 004):
-
-```sql
--- Pattern learning
-operation_patterns
-pattern_occurrences
-
--- Observability
-tool_calls
-hook_events
-
--- Metrics
-cost_savings_log
-
--- Tools
-adw_tools
-```
-
-Query examples in each phase document.
+**User Guide:** [docs/user-guide/MULTI-PHASE-UPLOADS.md](../user-guide/MULTI-PHASE-UPLOADS.md)
 
 ---
 
-## 📊 Monitoring
+## 📦 Archived Documentation
 
-### Daily
-```bash
-# Check recent patterns
-sqlite3 app/server/db/workflow_history.db "
-SELECT pattern_signature, occurrence_count
-FROM operation_patterns
-WHERE last_seen > datetime('now', '-1 day');"
-```
+### Issue #77 Session Documents
 
-### Weekly
-```bash
-# Review cost savings
-sqlite3 app/server/db/workflow_history.db "
-SELECT optimization_type, SUM(cost_saved_usd)
-FROM cost_savings_log
-WHERE saved_at > datetime('now', '-7 days')
-GROUP BY optimization_type;"
+**Location:** [completed/issue-77/](./completed/issue-77/)
 
-# Check quota forecast
-curl http://localhost:8000/api/quota/forecast | python -m json.tool
-```
+Historical session documents from Issue #77 implementation:
+- Drag-and-drop review
+- Session summaries
+- Implementation progress logs
 
-### Monthly
-```bash
-# Pattern effectiveness report
-python scripts/analyze_patterns.py
+### Session Continuation Prompts
 
-# ROI measurement
-sqlite3 app/server/db/workflow_history.db "
-SELECT SUM(cost_saved_usd) as total_saved
-FROM cost_savings_log
-WHERE saved_at > datetime('now', '-30 days');"
-```
+**Location:** [completed/session-continuations/](./completed/session-continuations/)
+
+Archived continuation prompts from various implementation sessions:
+- Issue #77 sessions (2)
+- Multi-phase upload sessions (4)
+
+**Note:** These are historical artifacts preserved for reference but not actively maintained.
 
 ---
 
-## 🐛 Troubleshooting
+## 🏗️ Current Architecture
 
-### Common Issues
+### Backend (Python/FastAPI)
 
-**Q: No patterns detected after backfill**
-- Check `workflow_history.nl_input` is populated
-- Review pattern detection keywords in `pattern_detector.py`
-- Run with debug logging: `logger.setLevel(logging.DEBUG)`
+**Core Services:**
+- `app/server/server.py` (970 lines) - Main FastAPI server
+- `app/server/services/` - Service layer
+  - `phase_coordinator.py` - Multi-phase coordination
+  - `phase_queue_service.py` - Queue management
+  - `github_issue_service.py` - GitHub integration
+  - `workflow_service.py` (549 lines) - Workflow management
 
-**Q: Tool routing not working**
-- Verify pattern status = 'active': `SELECT * FROM operation_patterns WHERE automation_status='active';`
-- Check tool registered: `SELECT * FROM adw_tools;`
-- Review logs in `adws/` for routing decisions
+**Core Modules:**
+- `app/server/core/workflow_analytics/` - Analytics (10 modules)
+- `app/server/core/workflow_history_utils/database/` - Database ops (5 modules)
+- `app/server/utils/` - Shared utilities
 
-**Q: Quota forecast inaccurate**
-- Need ≥7 days of usage data
-- Check for anomalies: `SELECT DATE(created_at), SUM(total_tokens) FROM workflow_history GROUP BY DATE(created_at);`
-- Verify `ANTHROPIC_QUOTA_LIMIT` set correctly
+### Frontend (React/TypeScript)
 
-**Q: GitHub issues not created**
-- Check `gh` CLI authenticated: `gh auth status`
-- Verify cron job running: `systemctl status pattern-analysis.timer`
-- Review logs: `tail -f logs/pattern_analysis.log`
+**Components:**
+- `app/client/src/components/RequestForm.tsx` - Main request form
+- `app/client/src/components/ZteHopperQueueCard.tsx` - Queue display
+- `app/client/src/components/PhaseQueueCard.tsx` - Phase cards
+- `app/client/src/components/workflow-history-card/` - History display (11 modules)
 
----
-
-## 📚 Additional Resources
-
-### Related Documentation
-- `docs/COST_OPTIMIZATION_INTELLIGENCE.md` - Original design doc
-- `docs/EXTERNAL_TOOLS_INTEGRATION_GUIDE.md` - External tools architecture
-- `docs/ANTHROPIC_API_USAGE_ANALYSIS.md` - Quota analysis
-
-### Code References
-- `app/server/core/workflow_analytics.py` - Existing analytics
-- `app/server/core/workflow_history.py` - Workflow sync
-- `app/server/db/migrations/004_add_observability_and_pattern_learning.sql` - Schema
+**Utilities:**
+- `app/client/src/utils/phaseParser.ts` - Multi-phase parsing
+- `app/client/src/api/client.ts` - API client
 
 ---
 
-## 🎓 Key Concepts
+## 📊 Production Metrics
 
-### Pattern Signature
-Format: `{category}:{subcategory}:{target}`
-- Example: `test:pytest:backend`
-- Used for matching and routing
+**Current Production Status:**
+- **Workflows Tracked:** 462
+- **Backend:** Python/FastAPI on port 8000
+- **Frontend:** React/Vite on port 5173
+- **Webhook:** FastAPI on port 8001
+- **Database:** SQLite (workflow_history.db, database.db)
 
-### Confidence Score
-0-100 score based on:
-- Occurrence frequency
-- Workflow consistency
-- Success rate
-
-### Context Efficiency
-Percentage of loaded context actually used:
-- `files_accessed / files_loaded * 100`
-- Target: >80% efficiency
-
-### ROI Calculation
+**Recent Commits:**
 ```
-monthly_savings = (llm_cost - tool_cost) * frequency
-payback_period = implementation_cost / monthly_savings
-roi_percent = (annual_savings - impl_cost) / impl_cost * 100
+5006cb5 fix: Add missing PhaseQueueList export to PhaseQueueCard.tsx
+50fa3ea docs: Add comprehensive Phases 3-5 summary and update README
+badf247 refactor: Phase 5 - Modularize database.py into repository pattern
+f9f3838 refactor: Phase 4 - Modularize WorkflowHistoryCard.tsx
+6accf2f refactor: Phase 3 - Modularize workflow_analytics.py
+d0947e1 refactor: Phase 2 - Modularize 4 medium-priority files
+fd49183 refactor: Phase 1 - Extract and modularize high-priority files
 ```
 
 ---
 
-## ✅ Success Criteria
+## 🔍 Finding Documentation
 
-### Overall System Success
-- [ ] 30-60% token reduction measured
-- [ ] $9+/month cost savings verified
-- [ ] 15+ automated patterns active
-- [ ] No API quota incidents for 1 month
-- [ ] System learning continuously
+### By Topic
 
-### Phase-Specific Criteria
-See individual phase documents for detailed criteria.
+**Refactoring:**
+- [codebase-refactoring/](./codebase-refactoring/) - Complete refactoring documentation
+- [completed-refactoring/](./completed-refactoring/) - Historical refactoring archive
+
+**Features:**
+- [completed/multi-phase-upload/](./completed/multi-phase-upload/) - Multi-phase upload feature
+- [adw-monitor/](./adw-monitor/) - ADW monitoring
+- [launch-health-fixes/](./launch-health-fixes/) - Launch and health fixes
+
+**Analysis:**
+- [pattern-signatures/](./pattern-signatures/) - Pattern analysis
+- [PRODUCTION-CODE-INVENTORY.md](./PRODUCTION-CODE-INVENTORY.md) - Current codebase
+
+### By Status
+
+**✅ Complete:**
+- Codebase refactoring (Phases 1-5)
+- Multi-phase upload feature (Phases 1-4)
+- Various bug fixes and improvements
+
+**📚 Archived:**
+- [completed/](./completed/) - Completed features and sessions
+- [completed-refactoring/](./completed-refactoring/) - Historical refactoring
+
+**🔧 Active Maintenance:**
+- [PRODUCTION-CODE-INVENTORY.md](./PRODUCTION-CODE-INVENTORY.md)
+- This README
 
 ---
 
-## 🤝 Support
+## 🎓 Best Practices
 
-### Questions?
-Review the detailed phase documents first - they contain:
-- Complete code implementations
-- Step-by-step integration guides
-- Testing strategies
-- Troubleshooting sections
+### Documentation Standards
+
+1. **Completion Reports**
+   - Document scope, changes, metrics
+   - Include testing results
+   - List all files modified
+   - Provide git commit references
+
+2. **Session Continuations**
+   - Archive when session completes
+   - Move to [completed/session-continuations/](./completed/session-continuations/)
+
+3. **Feature Documentation**
+   - Keep in feature-specific directories
+   - Archive to [completed/](./completed/) when finished
+   - Maintain user-facing docs in `docs/user-guide/`
+
+4. **README Maintenance**
+   - Update this file when structure changes
+   - Keep directory tree current
+   - Link to detailed docs, don't duplicate
+
+### Directory Organization
+
+**Active docs:** Root of `docs/implementation/`
+**Completed features:** `docs/implementation/completed/{feature-name}/`
+**Historical archives:** `docs/implementation/completed/{category}/`
+
+---
+
+## 🚀 Next Steps
+
+### Potential Phase 6+ Targets
+
+Based on current codebase analysis:
+
+1. **workflow_service.py** (549 lines)
+   - Extract: route generation, workflow scanning, history management
+
+2. **llm_client.py** (547 lines)
+   - Extract: client initialization, request handling, response parsing
+
+3. **nl_processor.py** (462 lines)
+   - Extract: classification, model selection, validation
+
+4. **server.py** (970 lines)
+   - Further decomposition into route handlers
+
+See [codebase-refactoring/PHASES_3_4_5_SUMMARY.md](./codebase-refactoring/PHASES_3_4_5_SUMMARY.md) for detailed recommendations.
+
+---
+
+## 📞 Support
 
 ### Need Help?
-- Check GitHub issues for similar problems
-- Review logs in `logs/pattern_analysis.log`
-- Query database for diagnostic info
+
+1. **Check existing documentation** - Most questions answered in feature docs
+2. **Review completion reports** - Implementation details and lessons learned
+3. **Consult user guides** - `docs/user-guide/` for end-user documentation
+4. **Check GitHub issues** - Active issues and discussions
+
+### Contributing Documentation
+
+When adding new documentation:
+1. Follow existing structure and naming conventions
+2. Use consistent formatting (markdown, headers, tables)
+3. Include dates and status indicators
+4. Link related documents
+5. Update this README with new sections
 
 ---
 
-## 🔄 Iteration & Improvement
-
-### After Phase 1
-- Review detected patterns for accuracy
-- Adjust signature detection heuristics
-- Add new pattern categories
-
-### After Phase 3
-- Monitor tool success rates
-- Adjust confidence thresholds
-- Activate more patterns
-
-### After Phase 4
-- Review auto-generated issues
-- Refine ROI calculations
-- Implement suggested tools
-
-### After Phase 5
-- Validate forecast accuracy
-- Fine-tune budget estimates
-- Adjust throttling thresholds
-
----
-
-## 🎉 You're Ready!
-
-**Everything you need to implement out-loop coding is in these documents.**
-
-**Start with Phase 1 and build incrementally.**
-
-Each phase is designed to work independently, so you can validate success before moving forward.
-
-**Good luck building your self-improving workflow system!** 🚀
-
----
-
-**Last Updated:** 2025-11-16
-**Status:** Ready for Implementation
-**Next Review:** After Phase 1 completion
+**Document Status:** Active maintenance
+**Primary Maintainer:** Development Team
+**Review Frequency:** After major features or refactorings
