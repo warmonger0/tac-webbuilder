@@ -1,0 +1,84 @@
+"""
+Workflow Completion Detector
+
+Detects workflow status and errors from workflow_history database.
+"""
+
+import logging
+from typing import Optional
+
+from utils.db_connection import get_connection
+
+logger = logging.getLogger(__name__)
+
+
+class WorkflowCompletionDetector:
+    """
+    Detects workflow completion status from workflow_history database.
+
+    Provides methods to query workflow status and error messages
+    for issue-based workflow tracking.
+    """
+
+    def __init__(self, workflow_db_path: str = "db/workflow_history.db"):
+        """
+        Initialize WorkflowCompletionDetector.
+
+        Args:
+            workflow_db_path: Path to workflow_history database
+        """
+        self.workflow_db_path = workflow_db_path
+
+    def get_workflow_status(self, issue_number: int) -> Optional[str]:
+        """
+        Get workflow status from workflow_history by issue number.
+
+        Args:
+            issue_number: GitHub issue number
+
+        Returns:
+            'completed', 'failed', 'running', 'pending', or None if not found
+        """
+        try:
+            with get_connection(self.workflow_db_path) as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT status FROM workflow_history
+                    WHERE issue_number = ?
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """,
+                    (issue_number,)
+                )
+                row = cursor.fetchone()
+                return row["status"] if row else None
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to get workflow status for issue #{issue_number}: {str(e)}")
+            return None
+
+    def get_workflow_error(self, issue_number: int) -> Optional[str]:
+        """
+        Get error message from workflow_history.
+
+        Args:
+            issue_number: GitHub issue number
+
+        Returns:
+            Error message string or None
+        """
+        try:
+            with get_connection(self.workflow_db_path) as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT error_message FROM workflow_history
+                    WHERE issue_number = ? AND status = 'failed'
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """,
+                    (issue_number,)
+                )
+                row = cursor.fetchone()
+                return row["error_message"] if row else None
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to get workflow error for issue #{issue_number}: {str(e)}")
+            return None

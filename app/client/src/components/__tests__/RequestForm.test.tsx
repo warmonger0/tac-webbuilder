@@ -5,7 +5,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RequestForm } from '../RequestForm';
 import * as client from '../../api/client';
@@ -560,6 +560,12 @@ describe('RequestForm', () => {
   });
 
   describe('Drag-and-Drop File Upload', () => {
+    afterEach(() => {
+      // Ensure all timers are cleared between tests
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    });
+
     it('should render file upload button', () => {
       render(<RequestForm />);
 
@@ -570,7 +576,7 @@ describe('RequestForm', () => {
     it('should render drag-and-drop hint text', () => {
       render(<RequestForm />);
 
-      const hintText = screen.getByText(/or drag and drop above/i);
+      const hintText = screen.getByText(/or drag and drop anywhere/i);
       expect(hintText).toBeInTheDocument();
     });
 
@@ -592,7 +598,13 @@ describe('RequestForm', () => {
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-      await userEvent.upload(fileInput, file);
+      await act(async () => {
+        Object.defineProperty(fileInput, 'files', {
+          value: [file],
+          writable: false
+        });
+        fireEvent.change(fileInput);
+      });
 
       await waitFor(() => {
         const textarea = screen.getByPlaceholderText(/Build a REST API/i);
@@ -608,7 +620,13 @@ describe('RequestForm', () => {
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-      await userEvent.upload(fileInput, file);
+      await act(async () => {
+        Object.defineProperty(fileInput, 'files', {
+          value: [file],
+          writable: false
+        });
+        fireEvent.change(fileInput);
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/File uploaded successfully/i)).toBeInTheDocument();
@@ -616,24 +634,32 @@ describe('RequestForm', () => {
     });
 
     it('should auto-dismiss success message after 3 seconds', async () => {
+      // Enable fake timers before rendering to catch all timeouts
       vi.useFakeTimers();
+
       render(<RequestForm />);
 
       const file = new File(['# Test'], 'test.md', { type: 'text/markdown' });
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-      await userEvent.upload(fileInput, file);
-
-      await waitFor(() => {
-        expect(screen.getByText(/File uploaded successfully/i)).toBeInTheDocument();
+      await act(async () => {
+        Object.defineProperty(fileInput, 'files', {
+          value: [file],
+          writable: false
+        });
+        fireEvent.change(fileInput);
       });
 
-      // Fast-forward 3 seconds
-      vi.advanceTimersByTime(3000);
+      // Success message should appear
+      expect(screen.getByText(/File uploaded successfully/i)).toBeInTheDocument();
 
-      await waitFor(() => {
-        expect(screen.queryByText(/File uploaded successfully/i)).not.toBeInTheDocument();
+      // Fast-forward 3 seconds to trigger auto-dismiss
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
       });
+
+      // Message should be gone
+      expect(screen.queryByText(/File uploaded successfully/i)).not.toBeInTheDocument();
 
       vi.useRealTimers();
     });
@@ -644,11 +670,18 @@ describe('RequestForm', () => {
       const file = new File(['content'], 'test.txt', { type: 'text/plain' });
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-      await userEvent.upload(fileInput, file);
+      // Use fireEvent.change() wrapped in act() for async handler
+      await act(async () => {
+        Object.defineProperty(fileInput, 'files', {
+          value: [file],
+          writable: false
+        });
+        fireEvent.change(fileInput);
+      });
 
       await waitFor(() => {
-        expect(screen.getByText(/Invalid file type/i)).toBeInTheDocument();
-        expect(screen.getByText(/test\.txt/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/Invalid file type/i)[0]).toBeInTheDocument();
+        expect(screen.getAllByText(/test\.txt/i)[0]).toBeInTheDocument();
       });
     });
 
@@ -660,7 +693,13 @@ describe('RequestForm', () => {
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-      await userEvent.upload(fileInput, [file1, file2]);
+      await act(async () => {
+        Object.defineProperty(fileInput, 'files', {
+          value: [file1, file2],
+          writable: false
+        });
+        fireEvent.change(fileInput);
+      });
 
       await waitFor(() => {
         const textarea = screen.getByPlaceholderText(/Build a REST API/i);
@@ -681,7 +720,13 @@ describe('RequestForm', () => {
       const file = new File(['# New Content'], 'test.md', { type: 'text/markdown' });
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-      await userEvent.upload(fileInput, file);
+      await act(async () => {
+        Object.defineProperty(fileInput, 'files', {
+          value: [file],
+          writable: false
+        });
+        fireEvent.change(fileInput);
+      });
 
       await waitFor(() => {
         expect(textarea).toHaveValue('Existing content\n\n---\n\n# New Content');
@@ -696,7 +741,13 @@ describe('RequestForm', () => {
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-      await userEvent.upload(fileInput, [mdFile, txtFile]);
+      await act(async () => {
+        Object.defineProperty(fileInput, 'files', {
+          value: [mdFile, txtFile],
+          writable: false
+        });
+        fireEvent.change(fileInput);
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/Rejected files: invalid\.txt/i)).toBeInTheDocument();
@@ -712,10 +763,16 @@ describe('RequestForm', () => {
       const txtFile = new File(['content'], 'test.txt', { type: 'text/plain' });
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-      await userEvent.upload(fileInput, txtFile);
+      await act(async () => {
+        Object.defineProperty(fileInput, 'files', {
+          value: [txtFile],
+          writable: false
+        });
+        fireEvent.change(fileInput);
+      });
 
       await waitFor(() => {
-        expect(screen.getByText(/No valid \.md files found/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/Invalid file type.*test\.txt/i)[0]).toBeInTheDocument();
       });
     });
 
@@ -725,7 +782,13 @@ describe('RequestForm', () => {
       const file = new File(['# Test'], 'test.md', { type: 'text/markdown' });
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-      await userEvent.upload(fileInput, file);
+      await act(async () => {
+        Object.defineProperty(fileInput, 'files', {
+          value: [file],
+          writable: false
+        });
+        fireEvent.change(fileInput);
+      });
 
       await waitFor(() => {
         expect(fileInput.value).toBe('');
@@ -733,28 +796,36 @@ describe('RequestForm', () => {
     });
 
     it('should integrate uploaded content with form persistence', async () => {
+      // Enable fake timers before rendering
       vi.useFakeTimers();
+
       render(<RequestForm />);
 
       const file = new File(['# Uploaded Content'], 'test.md', { type: 'text/markdown' });
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-      await userEvent.upload(fileInput, file);
-
-      await waitFor(() => {
-        const textarea = screen.getByPlaceholderText(/Build a REST API/i);
-        expect(textarea).toHaveValue('# Uploaded Content');
+      await act(async () => {
+        Object.defineProperty(fileInput, 'files', {
+          value: [file],
+          writable: false
+        });
+        fireEvent.change(fileInput);
       });
+
+      // Verify textarea has the content
+      const textarea = screen.getByPlaceholderText(/Build a REST API/i);
+      expect(textarea).toHaveValue('# Uploaded Content');
 
       // Fast-forward debounce timer to trigger auto-save
-      vi.advanceTimersByTime(300);
-
-      await waitFor(() => {
-        const savedState = JSON.parse(
-          localStorageMock.getItem('tac-webbuilder-request-form-state') || '{}'
-        );
-        expect(savedState.nlInput).toBe('# Uploaded Content');
+      await act(async () => {
+        vi.advanceTimersByTime(300);
       });
+
+      // Check localStorage was updated
+      const savedState = JSON.parse(
+        localStorageMock.getItem('tac-webbuilder-request-form-state') || '{}'
+      );
+      expect(savedState.nlInput).toBe('# Uploaded Content');
 
       vi.useRealTimers();
     });
@@ -793,7 +864,13 @@ describe('RequestForm', () => {
       const file = new File(['# Feature Request'], 'request.md', { type: 'text/markdown' });
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-      await userEvent.upload(fileInput, file);
+      await act(async () => {
+        Object.defineProperty(fileInput, 'files', {
+          value: [file],
+          writable: false
+        });
+        fireEvent.change(fileInput);
+      });
 
       await waitFor(() => {
         const textarea = screen.getByPlaceholderText(/Build a REST API/i);

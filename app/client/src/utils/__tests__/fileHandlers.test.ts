@@ -167,8 +167,8 @@ describe('handleMultipleFiles', () => {
     expect(result.processedCount).toBe(1);
     expect(result.content).toBe(mdContent);
     expect(result.rejectedFiles).toHaveLength(2);
-    expect(result.rejectedFiles).toContain('invalid.txt');
-    expect(result.rejectedFiles).toContain('doc.pdf');
+    expect(result.rejectedFiles.map(f => f.fileName)).toContain('invalid.txt');
+    expect(result.rejectedFiles.map(f => f.fileName)).toContain('doc.pdf');
   });
 
   it('should return empty result when no valid files', async () => {
@@ -200,7 +200,7 @@ describe('handleMultipleFiles', () => {
     expect(result.processedCount).toBe(1);
     expect(result.content).toBe('# Normal');
     expect(result.rejectedFiles).toHaveLength(1);
-    expect(result.rejectedFiles).toContain('large.md');
+    expect(result.rejectedFiles.map(f => f.fileName)).toContain('large.md');
   });
 
   it('should process three files correctly', async () => {

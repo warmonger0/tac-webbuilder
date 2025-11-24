@@ -262,6 +262,43 @@ export async function redeliverGitHubWebhook(): Promise<any> {
   return response.json();
 }
 
+// Phase Queue API Functions
+export interface PhaseQueueItem {
+  queue_id: string;
+  parent_issue: number;
+  phase_number: number;
+  issue_number?: number;
+  status: 'queued' | 'ready' | 'running' | 'completed' | 'blocked' | 'failed';
+  depends_on_phase?: number;
+  phase_data: {
+    title: string;
+    content: string;
+    externalDocs?: string[];
+  };
+  created_at: string;
+  updated_at: string;
+  error_message?: string;
+}
+
+export interface QueueListResponse {
+  phases: PhaseQueueItem[];
+  total: number;
+}
+
+export async function getQueueAll(): Promise<QueueListResponse> {
+  return fetchJSON<QueueListResponse>(`${API_BASE}/queue`);
+}
+
+export async function getQueueByParent(parentIssue: number): Promise<QueueListResponse> {
+  return fetchJSON<QueueListResponse>(`${API_BASE}/queue/${parentIssue}`);
+}
+
+export async function dequeuePhase(queueId: string): Promise<{ success: boolean; message: string }> {
+  return fetchJSON<{ success: boolean; message: string }>(`${API_BASE}/queue/${queueId}`, {
+    method: 'DELETE'
+  });
+}
+
 // Export as namespace object for compatibility with existing code
 export const api = {
   submitRequest,
@@ -281,4 +318,7 @@ export const api = {
   exportTable,
   getWebhookStatus,
   getSystemStatus,
+  getQueueAll,
+  getQueueByParent,
+  dequeuePhase,
 };
