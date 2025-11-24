@@ -314,6 +314,47 @@ export async function executePhase(queueId: string): Promise<ExecutePhaseRespons
   });
 }
 
+// ADW Monitor API Functions
+export interface AdwWorkflowStatus {
+  adw_id: string;
+  issue_number: number | null;
+  issue_class: string;
+  title: string;
+  status: 'running' | 'completed' | 'failed' | 'paused' | 'queued';
+  current_phase: string | null;
+  phase_progress: number;
+  workflow_template: string;
+  start_time: string | null;
+  end_time: string | null;
+  duration_seconds: number | null;
+  github_url: string | null;
+  worktree_path: string | null;
+  current_cost: number | null;
+  estimated_cost_total: number | null;
+  error_count: number;
+  last_error: string | null;
+  is_process_active: boolean;
+  phases_completed: string[];
+}
+
+export interface AdwMonitorSummary {
+  total: number;
+  running: number;
+  completed: number;
+  failed: number;
+  paused: number;
+}
+
+export interface AdwMonitorResponse {
+  summary: AdwMonitorSummary;
+  workflows: AdwWorkflowStatus[];
+  last_updated: string;
+}
+
+export async function getAdwMonitor(): Promise<AdwMonitorResponse> {
+  return fetchJSON<AdwMonitorResponse>(`${API_BASE}/adw-monitor`);
+}
+
 // Export as namespace object for compatibility with existing code
 export const api = {
   submitRequest,
@@ -337,4 +378,5 @@ export const api = {
   getQueueByParent,
   dequeuePhase,
   executePhase,
+  getAdwMonitor,
 };

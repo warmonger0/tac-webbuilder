@@ -26,7 +26,7 @@ export function PhaseQueueList({ phases }: PhaseQueueListProps) {
   const sortedPhases = [...phases].sort((a, b) => b.phase_number - a.phase_number);
 
   return (
-    <div className="space-y-3 overflow-y-auto max-h-[600px]">
+    <div className="space-y-3 overflow-y-auto h-full">
       {sortedPhases.map((phase) => (
         <PhaseQueueCard key={phase.queue_id} queueItem={phase} />
       ))}

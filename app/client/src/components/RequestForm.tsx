@@ -6,6 +6,7 @@ import { CostEstimateCard } from './CostEstimateCard';
 import { ConfirmDialog } from './ConfirmDialog';
 import { SystemStatusPanel } from './SystemStatusPanel';
 import { ZteHopperQueueCard } from './ZteHopperQueueCard';
+import { AdwMonitorCard } from './AdwMonitorCard';
 import { useDragAndDrop } from '../hooks/useDragAndDrop';
 import { parsePhases } from '../utils/phaseParser';
 import { FileUploadSection } from './request-form/FileUploadSection';
@@ -394,6 +395,11 @@ export function RequestForm() {
         )}
 
         {phaseHandler.modal}
+      </div>
+
+      {/* ADW Monitor Section */}
+      <div className="max-w-4xl mx-auto mt-8">
+        <AdwMonitorCard />
       </div>
 
       <SystemStatusPanel />
