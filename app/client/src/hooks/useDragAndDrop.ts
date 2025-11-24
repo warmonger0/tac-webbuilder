@@ -117,11 +117,12 @@ export function useDragAndDrop(options: UseDragAndDropOptions): UseDragAndDropRe
       const result = await handleMultipleFiles(files);
 
       if (result.content === '' && result.processedCount === 0) {
-        setError(
-          result.rejectedFiles.length > 0
-            ? `No valid .md files found. Rejected files: ${result.rejectedFiles.join(', ')}`
-            : 'No valid files to process'
-        );
+        if (result.rejectedFiles.length > 0) {
+          // Show the first error message (most relevant for single file uploads)
+          setError(result.rejectedFiles[0].errorMessage);
+        } else {
+          setError('No valid files to process');
+        }
         return;
       }
 
@@ -137,7 +138,8 @@ export function useDragAndDrop(options: UseDragAndDropOptions): UseDragAndDropRe
       }
 
       if (result.rejectedFiles.length > 0) {
-        successMsg += `. Rejected files: ${result.rejectedFiles.join(', ')}`;
+        const rejectedNames = result.rejectedFiles.map(f => f.fileName).join(', ');
+        successMsg += `. Rejected files: ${rejectedNames}`;
       }
 
       // Call success callback if provided

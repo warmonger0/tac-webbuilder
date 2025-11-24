@@ -100,14 +100,32 @@ export interface GitHubIssue {
   model_set: string;
 }
 
+// Multi-Phase Request Types
+export interface Phase {
+  number: number;
+  title: string;
+  content: string;
+  externalDocs?: string[];
+}
+
+export interface ChildIssueInfo {
+  phase_number: number;
+  issue_number: number;
+  queue_id: string;
+}
+
 export interface SubmitRequestData {
   nl_input: string;
   project_path?: string;
   auto_post: boolean;
+  phases?: Phase[];  // NEW: multi-phase data
 }
 
 export interface SubmitRequestResponse {
   request_id: string;
+  is_multi_phase?: boolean;  // NEW
+  parent_issue_number?: number;  // NEW
+  child_issues?: ChildIssueInfo[];  // NEW
 }
 
 export interface ConfirmResponse {

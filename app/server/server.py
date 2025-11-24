@@ -18,10 +18,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import route modules
-from routes import data_routes, github_routes, system_routes, websocket_routes, workflow_routes
+from routes import data_routes, github_routes, queue_routes, system_routes, websocket_routes, workflow_routes
 from services.background_tasks import BackgroundTaskManager
 from services.github_issue_service import GitHubIssueService
 from services.health_service import HealthService
+from services.phase_queue_service import PhaseQueueService
 from services.service_controller import ServiceController
 from services.websocket_manager import ConnectionManager
 from services.workflow_service import WorkflowService
@@ -101,9 +102,11 @@ health_service = HealthService(
     app_start_time=app_start_time,
     github_repo="warmonger0/tac-webbuilder"
 )
+phase_queue_service = PhaseQueueService(db_path="db/database.db")
 github_issue_service = GitHubIssueService(
     webhook_trigger_url=os.environ.get("WEBHOOK_TRIGGER_URL", "http://localhost:8001"),
-    github_repo=os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder")
+    github_repo=os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder"),
+    phase_queue_service=phase_queue_service
 )
 background_task_manager = BackgroundTaskManager(
     websocket_manager=manager,
@@ -158,6 +161,9 @@ app.include_router(system_routes.router)
 
 github_routes.init_github_routes(github_issue_service)
 app.include_router(github_routes.router)
+
+queue_routes.init_queue_routes(phase_queue_service)
+app.include_router(queue_routes.router)
 
 websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data)
 app.include_router(websocket_routes.router)

@@ -139,14 +139,32 @@ class NLProcessResponse(BaseModel):
     project_context: ProjectContext
     error: str | None = None
 
+# Multi-Phase Request Models
+class Phase(BaseModel):
+    """Represents a single phase in a multi-phase request"""
+    number: int = Field(..., description="Phase number (1, 2, 3, ...)")
+    title: str = Field(..., description="Phase title")
+    content: str = Field(..., description="Phase content/description")
+    externalDocs: list[str] | None = Field(None, description="External document references")
+
+class ChildIssueInfo(BaseModel):
+    """Information about a created child issue"""
+    phase_number: int = Field(..., description="Phase number")
+    issue_number: int = Field(..., description="GitHub issue number")
+    queue_id: str = Field(..., description="Queue ID for this phase")
+
 # Web UI Request Models
 class SubmitRequestData(BaseModel):
     nl_input: str = Field(..., description="Natural language description of the request")
     project_path: str | None = Field(None, description="Optional project path for context")
     auto_post: bool = Field(False, description="If True, auto-post to GitHub without confirmation")
+    phases: list[Phase] | None = Field(None, description="Optional multi-phase data")
 
 class SubmitRequestResponse(BaseModel):
     request_id: str = Field(..., description="Unique ID for this request")
+    is_multi_phase: bool | None = Field(None, description="Whether this is a multi-phase request")
+    parent_issue_number: int | None = Field(None, description="Parent issue number (for multi-phase)")
+    child_issues: list[ChildIssueInfo] | None = Field(None, description="Child issue info (for multi-phase)")
 
 class ConfirmResponse(BaseModel):
     issue_number: int = Field(..., description="GitHub issue number")

@@ -30,7 +30,9 @@ from core.data_models import (
     SubmitRequestResponse,
     CostEstimate,
     ConfirmResponse,
-    ProjectContext
+    ProjectContext,
+    Phase,
+    ChildIssueInfo
 )
 from core.project_detector import detect_project_context
 from core.nl_processor import process_request
@@ -55,7 +57,8 @@ class GitHubIssueService:
     def __init__(
         self,
         webhook_trigger_url: str | None = None,
-        github_repo: str | None = None
+        github_repo: str | None = None,
+        phase_queue_service = None
     ):
         """
         Initialize GitHub Issue Service.
@@ -63,10 +66,12 @@ class GitHubIssueService:
         Args:
             webhook_trigger_url: URL of ADW webhook trigger service (default: http://localhost:8001)
             github_repo: GitHub repository in format "owner/repo" (default: from env)
+            phase_queue_service: PhaseQueueService instance for multi-phase support
         """
         self.webhook_trigger_url = webhook_trigger_url or os.environ.get("WEBHOOK_TRIGGER_URL", "http://localhost:8001")
         self.github_repo = github_repo or os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder")
         self.pending_requests: Dict[str, dict] = {}
+        self.phase_queue_service = phase_queue_service
 
         logger.info(f"[INIT] GitHubIssueService initialized (webhook: {self.webhook_trigger_url}, repo: {self.github_repo})")
 
@@ -74,11 +79,18 @@ class GitHubIssueService:
         """
         Process natural language request and generate GitHub issue preview WITH cost estimate.
 
+        For multi-phase requests (when request.phases is provided):
+        - Creates parent issue with full content
+        - Creates child issues for each phase
+        - Enqueues phases with dependency tracking
+        - Returns parent issue number and child issue info
+
         Args:
-            request: Natural language request data with optional project path
+            request: Natural language request data with optional project path and phases
 
         Returns:
             SubmitRequestResponse with unique request ID for preview/confirm
+            For multi-phase: includes is_multi_phase=True, parent_issue_number, and child_issues
 
         Raises:
             HTTPException: If request processing fails
@@ -86,6 +98,14 @@ class GitHubIssueService:
         try:
             logger.info(f"[INFO] Processing NL request: {request.nl_input[:100]}...")
 
+            # Check if this is a multi-phase request
+            is_multi_phase = request.phases is not None and len(request.phases) > 1
+
+            if is_multi_phase:
+                logger.info(f"[INFO] Multi-phase request detected: {len(request.phases)} phases")
+                return await self._handle_multi_phase_request(request)
+
+            # Standard single-phase flow
             # Detect project context
             if request.project_path:
                 project_context = detect_project_context(request.project_path)
@@ -332,3 +352,149 @@ class GitHubIssueService:
             logger.error(f"[ERROR] Failed to post issue: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
             raise HTTPException(500, f"Error posting issue: {str(e)}")
+
+    async def _handle_multi_phase_request(self, request: SubmitRequestData) -> SubmitRequestResponse:
+        """
+        Handle multi-phase request by creating parent issue, child issues, and enqueueing phases.
+
+        Args:
+            request: SubmitRequestData with phases populated
+
+        Returns:
+            SubmitRequestResponse with multi-phase information
+
+        Raises:
+            HTTPException: If phase queue service not available or GitHub posting fails
+        """
+        if not self.phase_queue_service:
+            raise HTTPException(
+                500,
+                "Multi-phase requests not supported: PhaseQueueService not initialized"
+            )
+
+        if not request.phases or len(request.phases) < 2:
+            raise HTTPException(
+                400,
+                "Multi-phase request must have at least 2 phases"
+            )
+
+        try:
+            # 1. Create parent GitHub issue with full content
+            parent_title = f"[Multi-Phase] {request.phases[0].title}"
+            parent_body = f"""# Multi-Phase Request
+
+This is a multi-phase request with {len(request.phases)} phases that will be executed sequentially.
+
+## Overview
+
+{request.nl_input}
+
+## Phases
+
+"""
+            for phase in request.phases:
+                parent_body += f"""
+### Phase {phase.number}: {phase.title}
+
+{phase.content[:200]}...
+
+"""
+                if phase.externalDocs:
+                    parent_body += f"**Referenced Documents:** {', '.join(phase.externalDocs)}\n\n"
+
+            # Create parent issue
+            github_poster = GitHubPoster()
+            parent_issue = GitHubIssue(
+                title=parent_title,
+                body=parent_body,
+                labels=["multi-phase"],
+                classification="feature",  # Default to feature for multi-phase
+                workflow="adw_sdlc_iso",
+                model_set="base"
+            )
+            parent_issue_number = github_poster.post_issue(parent_issue, confirm=False)
+            logger.info(f"[SUCCESS] Created parent issue #{parent_issue_number}")
+
+            # 2. Create child issues and enqueue phases
+            child_issues = []
+            for phase in request.phases:
+                # Create child issue
+                child_title = f"Phase {phase.number}: {phase.title}"
+                child_body = f"""# Phase {phase.number} of {len(request.phases)}
+
+**Parent Issue:** #{parent_issue_number}
+**Execution Order:** {"Executes first" if phase.number == 1 else f"After Phase {phase.number - 1}"}
+
+## Description
+
+{phase.content}
+
+"""
+                if phase.externalDocs:
+                    child_body += f"""
+## Referenced Documents
+
+{chr(10).join(f'- `{doc}`' for doc in phase.externalDocs)}
+
+"""
+
+                child_body += f"""
+---
+
+**Full Context:** See parent issue #{parent_issue_number} for complete multi-phase request context.
+"""
+
+                child_issue = GitHubIssue(
+                    title=child_title,
+                    body=child_body,
+                    labels=[f"phase-{phase.number}", "multi-phase-child"],
+                    classification="feature",
+                    workflow="adw_sdlc_iso",
+                    model_set="base"
+                )
+                child_issue_number = github_poster.post_issue(child_issue, confirm=False)
+                logger.info(f"[SUCCESS] Created child issue #{child_issue_number} for Phase {phase.number}")
+
+                # 3. Enqueue phase
+                depends_on_phase = phase.number - 1 if phase.number > 1 else None
+                queue_id = self.phase_queue_service.enqueue(
+                    parent_issue=parent_issue_number,
+                    phase_number=phase.number,
+                    phase_data={
+                        "title": phase.title,
+                        "content": phase.content,
+                        "externalDocs": phase.externalDocs or []
+                    },
+                    depends_on_phase=depends_on_phase
+                )
+
+                # Update queue with issue number
+                self.phase_queue_service.update_issue_number(queue_id, child_issue_number)
+
+                child_issues.append(ChildIssueInfo(
+                    phase_number=phase.number,
+                    issue_number=child_issue_number,
+                    queue_id=queue_id
+                ))
+
+            # 4. Generate unique request ID (not used for multi-phase, but required)
+            request_id = str(uuid.uuid4())
+
+            logger.info(
+                f"[SUCCESS] Multi-phase request complete: "
+                f"parent #{parent_issue_number}, {len(child_issues)} child issues created"
+            )
+
+            return SubmitRequestResponse(
+                request_id=request_id,
+                is_multi_phase=True,
+                parent_issue_number=parent_issue_number,
+                child_issues=child_issues
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to handle multi-phase request: {str(e)}")
+            logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+            raise HTTPException(500, f"Error processing multi-phase request: {str(e)}")

@@ -6,7 +6,10 @@ import { CostEstimateCard } from './CostEstimateCard';
 import { ConfirmDialog } from './ConfirmDialog';
 import { SystemStatusPanel } from './SystemStatusPanel';
 import { ZteHopperQueueCard } from './ZteHopperQueueCard';
+import { PhasePreview } from './PhasePreview';
 import { useDragAndDrop } from '../hooks/useDragAndDrop';
+import { handleMultipleFiles } from '../utils/fileHandlers';
+import { parsePhases, validatePhases, type PhaseParseResult } from '../utils/phaseParser';
 
 const PROJECT_PATH_STORAGE_KEY = 'tac-webbuilder-project-path';
 const REQUEST_FORM_STATE_STORAGE_KEY = 'tac-webbuilder-request-form-state';
@@ -98,6 +101,8 @@ export function RequestForm() {
   const [healthWarning, setHealthWarning] = useState<string | null>(null);
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
+  const [phasePreview, setPhasePreview] = useState<PhaseParseResult | null>(null);
+  const [showPhasePreview, setShowPhasePreview] = useState(false);
 
   // Ref for debounce timer
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -108,11 +113,20 @@ export function RequestForm() {
   // Initialize drag-and-drop hook
   const { isDragging, error: dragError, isReading, dragHandlers, clearError } = useDragAndDrop({
     onContentReceived: (content) => {
-      // Append content to existing text with separator if there's existing content
-      if (nlInput.trim()) {
-        setNlInput(prev => prev + '\n\n---\n\n' + content);
+      // Parse content for phases
+      const parseResult = parsePhases(content);
+
+      // If multi-phase detected, show preview for confirmation
+      if (parseResult.isMultiPhase && parseResult.phases.length > 1) {
+        setPhasePreview(parseResult);
+        setShowPhasePreview(true);
       } else {
-        setNlInput(content);
+        // Single-phase or no phases: append content normally
+        if (nlInput.trim()) {
+          setNlInput(prev => prev + '\n\n---\n\n' + content);
+        } else {
+          setNlInput(content);
+        }
       }
     },
     onSuccess: (message) => {
@@ -313,19 +327,40 @@ export function RequestForm() {
     clearError();
 
     try {
-      const { handleMultipleFiles } = await import('../utils/fileHandlers');
       const result = await handleMultipleFiles(Array.from(files));
 
       if (result.content === '' && result.processedCount === 0) {
-        setError(
-          result.rejectedFiles.length > 0
-            ? `No valid .md files found. Rejected files: ${result.rejectedFiles.join(', ')}`
-            : 'No valid files to process'
-        );
+        if (result.rejectedFiles.length > 0) {
+          // Show the first error message (most relevant for single file uploads)
+          setError(result.rejectedFiles[0].errorMessage);
+        } else {
+          setError('No valid files to process');
+        }
         return;
       }
 
-      // Append content to existing text with separator if there's existing content
+      // Parse content for phases (only for single file uploads)
+      if (result.processedCount === 1) {
+        const parseResult = parsePhases(result.content);
+
+        // If multi-phase detected, show preview for confirmation
+        if (parseResult.isMultiPhase && parseResult.phases.length > 1) {
+          setPhasePreview(parseResult);
+          setShowPhasePreview(true);
+
+          // Build success message
+          setUploadSuccessMessage(`Multi-phase document detected with ${parseResult.phases.length} phases`);
+          setTimeout(() => setUploadSuccessMessage(null), 3000);
+
+          // Reset file input
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+      }
+
+      // Single-phase or multiple files: append content normally
       if (nlInput.trim()) {
         setNlInput(prev => prev + '\n\n---\n\n' + result.content);
       } else {
@@ -341,7 +376,8 @@ export function RequestForm() {
       }
 
       if (result.rejectedFiles.length > 0) {
-        successMsg += `. Rejected files: ${result.rejectedFiles.join(', ')}`;
+        const rejectedNames = result.rejectedFiles.map(f => f.fileName).join(', ');
+        successMsg += `. Rejected files: ${rejectedNames}`;
       }
 
       setUploadSuccessMessage(successMsg);
@@ -356,11 +392,82 @@ export function RequestForm() {
     }
   };
 
+  const handlePhasePreviewConfirm = async () => {
+    if (!phasePreview) return;
+
+    // Validate phases before proceeding
+    const validation = validatePhases(phasePreview);
+    if (!validation.valid) {
+      setError(`Cannot submit multi-phase document: ${validation.errors.join(', ')}`);
+      setShowPhasePreview(false);
+      setPhasePreview(null);
+      return;
+    }
+
+    // Submit multi-phase request directly to backend
+    try {
+      setIsLoading(true);
+      setError(null);
+      setShowPhasePreview(false);
+
+      // Convert parsed phases to API format
+      const phases = phasePreview.phases.map(phase => ({
+        number: phase.number,
+        title: phase.title,
+        content: phase.content,
+        externalDocs: phase.externalDocs.length > 0 ? phase.externalDocs : undefined
+      }));
+
+      // Submit multi-phase request
+      const response = await submitRequest({
+        nl_input: phasePreview.originalContent,
+        project_path: projectPath || undefined,
+        auto_post: true,  // Auto-post multi-phase requests
+        phases
+      });
+
+      // Handle multi-phase response
+      if (response.is_multi_phase && response.parent_issue_number) {
+        setSuccessMessage(
+          `✅ Multi-phase request created!\n\n` +
+          `📋 Parent Issue: #${response.parent_issue_number}\n` +
+          `🔢 Child Issues: ${response.child_issues?.map(c => `#${c.issue_number}`).join(', ')}\n\n` +
+          `All ${phases.length} phases have been queued for execution.`
+        );
+
+        // Clear form
+        setNlInput('');
+        setPhasePreview(null);
+        clearFormState();
+      } else {
+        setError('Unexpected response format for multi-phase request');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit multi-phase request');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePhasePreviewCancel = () => {
+    setShowPhasePreview(false);
+    setPhasePreview(null);
+    setUploadSuccessMessage('Phase upload cancelled');
+    setTimeout(() => setUploadSuccessMessage(null), 3000);
+  };
+
   return (
     <>
       <div className="max-w-4xl mx-auto">
         <div className="grid grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg shadow p-6 space-y-4">
+          {/* Drag-and-drop zone - entire card */}
+          <div
+            className={`bg-white rounded-lg shadow p-6 space-y-4 relative transition-all ${
+              isDragging ? 'ring-4 ring-primary ring-opacity-50 bg-blue-50' : ''
+            }`}
+            {...dragHandlers}
+            aria-busy={isReading}
+          >
             <h2 className="text-2xl font-bold text-gray-900">
               Create New Request
             </h2>
@@ -373,46 +480,15 @@ export function RequestForm() {
             Describe what you want to build
           </label>
 
-          {/* Drag-and-drop zone */}
-          <div
-            className={`relative ${isDragging ? 'ring-2 ring-primary' : ''}`}
-            {...dragHandlers}
-            aria-busy={isReading}
-          >
-            <textarea
-              id="nl-input"
-              placeholder="Example: Build a REST API for user management with CRUD operations..."
-              value={nlInput}
-              onChange={(e) => setNlInput(e.target.value)}
-              rows={6}
-              className={`w-full p-4 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
-                isDragging ? 'border-primary bg-blue-50' : 'border-gray-300'
-              }`}
-              disabled={isReading}
-            />
-
-            {/* Drop zone overlay */}
-            {isDragging && (
-              <div className="absolute inset-0 flex items-center justify-center bg-blue-50 bg-opacity-90 border-2 border-dashed border-primary rounded-lg pointer-events-none">
-                <div className="text-center">
-                  <svg className="mx-auto h-12 w-12 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  <p className="mt-2 text-sm font-medium text-primary">Drop .md file here</p>
-                </div>
-              </div>
-            )}
-
-            {/* Loading overlay */}
-            {isReading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                  <p className="mt-2 text-sm text-gray-600">Reading file(s)...</p>
-                </div>
-              </div>
-            )}
-          </div>
+          <textarea
+            id="nl-input"
+            placeholder="Example: Build a REST API for user management with CRUD operations..."
+            value={nlInput}
+            onChange={(e) => setNlInput(e.target.value)}
+            rows={6}
+            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+            disabled={isReading}
+          />
 
           {/* File upload button (keyboard accessibility) */}
           <div className="mt-2 flex items-center gap-2">
@@ -435,13 +511,13 @@ export function RequestForm() {
               </svg>
               Upload .md file
             </label>
-            <span className="text-xs text-gray-500">or drag and drop above</span>
+            <span className="text-xs text-gray-500">or drag and drop anywhere</span>
           </div>
 
-          {/* Drag-and-drop error message */}
-          {dragError && (
+          {/* Drag-and-drop and file input error messages */}
+          {(dragError || error) && (
             <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
-              {dragError}
+              {dragError || error}
             </div>
           )}
 
@@ -528,6 +604,29 @@ export function RequestForm() {
             <IssuePreview issue={preview} />
           </div>
         )}
+
+            {/* Drop zone overlay - covers entire card */}
+            {isDragging && (
+              <div className="absolute inset-0 flex items-center justify-center bg-blue-50 bg-opacity-95 border-2 border-dashed border-primary rounded-lg pointer-events-none z-10">
+                <div className="text-center">
+                  <svg className="mx-auto h-16 w-16 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <p className="mt-3 text-lg font-semibold text-primary">Drop .md file anywhere on this card</p>
+                  <p className="mt-1 text-sm text-gray-600">Supports multiple files</p>
+                </div>
+              </div>
+            )}
+
+            {/* Loading overlay - covers entire card */}
+            {isReading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-95 rounded-lg z-10">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-3 text-base font-medium text-gray-700">Reading file(s)...</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <ZteHopperQueueCard />
@@ -539,6 +638,14 @@ export function RequestForm() {
             costEstimate={costEstimate}
             onConfirm={handleConfirm}
             onCancel={handleCancel}
+          />
+        )}
+
+        {showPhasePreview && phasePreview && (
+          <PhasePreview
+            parseResult={phasePreview}
+            onConfirm={handlePhasePreviewConfirm}
+            onCancel={handlePhasePreviewCancel}
           />
         )}
       </div>

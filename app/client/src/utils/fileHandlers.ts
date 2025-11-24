@@ -88,16 +88,24 @@ export function readFileContent(file: File): Promise<string> {
 }
 
 /**
+ * Rejected file information
+ */
+export interface RejectedFileInfo {
+  fileName: string;
+  errorMessage: string;
+}
+
+/**
  * Handles multiple file drops
  * Filters to valid markdown files, reads them in parallel, and concatenates content
  */
 export async function handleMultipleFiles(files: File[]): Promise<{
   content: string;
   processedCount: number;
-  rejectedFiles: string[];
+  rejectedFiles: RejectedFileInfo[];
 }> {
   const validFiles: File[] = [];
-  const rejectedFiles: string[] = [];
+  const rejectedFiles: RejectedFileInfo[] = [];
 
   // Filter files by validation
   for (const file of files) {
@@ -105,7 +113,10 @@ export async function handleMultipleFiles(files: File[]): Promise<{
     if (validation.isValid) {
       validFiles.push(file);
     } else {
-      rejectedFiles.push(file.name);
+      rejectedFiles.push({
+        fileName: file.name,
+        errorMessage: validation.errorMessage || 'Unknown error'
+      });
     }
   }
 
