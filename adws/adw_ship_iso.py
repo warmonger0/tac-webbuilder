@@ -50,6 +50,7 @@ from adw_modules.utils import setup_logger, check_env_vars
 from adw_modules.worktree_ops import validate_worktree
 from adw_modules.data_types import ADWStateData
 from adw_modules.doc_cleanup import cleanup_adw_documentation
+from adw_modules.success_operations import close_issue_on_success
 
 # Agent name constant
 AGENT_SHIPPER = "shipper"
@@ -474,58 +475,13 @@ def main():
 
     logger.info(f"✅ Successfully shipped {branch_name}")
 
-    # Step 6: Close the issue with success comment
-    logger.info(f"Closing issue #{issue_number}...")
-    try:
-        success_comment = f"""🎉 **Successfully Shipped!**
-
-✅ PR merged to main via GitHub API
-✅ Branch `{branch_name}` deployed to production
-✅ All validation checks passed
-
-**Ship Summary:**
-- Validated all state fields
-- Found and merged PR successfully
-- Verified commits landed on main
-- Code is now in production
-
-**Issue Status:** Automatically closing as resolved.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)"""
-
-        result = subprocess.run(
-            ["gh", "issue", "close", issue_number, "--comment", success_comment],
-            capture_output=True,
-            text=True,
-            check=False
-        )
-
-        if result.returncode == 0:
-            logger.info(f"✅ Closed issue #{issue_number} with success comment")
-        else:
-            logger.warning(f"Failed to close issue #{issue_number}: {result.stderr}")
-            # Don't fail the ship workflow if issue closing fails
-            # Post a manual closing reminder instead
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, AGENT_SHIPPER,
-                                   f"⚠️ Could not automatically close issue\n"
-                                   f"Please close manually - ship was successful!")
-            )
-
-    except Exception as e:
-        logger.warning(f"Exception while closing issue: {e}")
-        # Best-effort - don't fail ship if issue closing fails
-
-    # Step 7: Post success message (if issue closing failed, this adds context)
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, AGENT_SHIPPER,
-                           f"🎉 **Successfully shipped!**\n\n"
-                           f"✅ Validated all state fields\n"
-                           f"✅ Found and merged PR via GitHub API\n"
-                           f"✅ Branch `{branch_name}` merged to main\n\n"
-                           f"🚢 Code has been deployed to production!")
+    # Step 6: Close the issue with success comment (using modular success_operations)
+    close_issue_on_success(
+        adw_id=adw_id,
+        issue_number=issue_number,
+        branch_name=branch_name,
+        agent_name=AGENT_SHIPPER,
+        logger=logger
     )
     
     # Save final state
