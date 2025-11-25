@@ -11,7 +11,6 @@ import json
 import logging
 import os
 import time
-from typing import List, Tuple
 
 from core.data_models import (
     CostPrediction,
@@ -66,7 +65,7 @@ class WorkflowService:
         )
         self._last_sync_time = 0
 
-    def get_workflows(self) -> List[Workflow]:
+    def get_workflows(self) -> list[Workflow]:
         """
         Get all active workflows from agents directory
 
@@ -139,7 +138,7 @@ class WorkflowService:
 
         return workflows
 
-    def get_routes(self, app) -> List[Route]:
+    def get_routes(self, app) -> list[Route]:
         """
         Get all API routes from the FastAPI application
 
@@ -203,7 +202,7 @@ class WorkflowService:
 
     def get_workflow_history_with_cache(
         self, filters: WorkflowHistoryFilters | None = None
-    ) -> Tuple[WorkflowHistoryResponse, bool]:
+    ) -> tuple[WorkflowHistoryResponse, bool]:
         """
         Get workflow history data with caching
 

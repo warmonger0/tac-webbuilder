@@ -9,17 +9,14 @@ services, databases, and workflow orchestration where possible.
 """
 
 import asyncio
+import contextlib
 import json
-import os
-import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Generator
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
-
 
 # ============================================================================
 # E2E Test Environment Setup
@@ -94,7 +91,7 @@ def e2e_database(e2e_test_environment):
     # Initialize database with full schema
     from core.workflow_history import init_db
 
-    with patch('core.workflow_history_utils.database.DB_PATH', db_path):
+    with patch('core.workflow_history_utils.database.schema.DB_PATH', db_path):
         init_db()
 
         # Add seed data for realistic testing
@@ -172,7 +169,7 @@ def e2e_database(e2e_test_environment):
         conn.commit()
         conn.close()
 
-    yield db_path
+    return db_path
 
 
 # ============================================================================
@@ -389,7 +386,6 @@ def e2e_test_db_cleanup(e2e_database):
             # Cleanup happens automatically after test
     """
     import sqlite3
-    import time
 
     # Cleanup BEFORE test to ensure clean state
     try:
@@ -403,13 +399,11 @@ def e2e_test_db_cleanup(e2e_database):
         """)
 
         # Also clear adw_locks if the table exists
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("""
                 DELETE FROM adw_locks
                 WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
             """)
-        except sqlite3.OperationalError:
-            pass  # Table might not exist
 
         conn.commit()
         conn.close()
@@ -430,13 +424,11 @@ def e2e_test_db_cleanup(e2e_database):
             WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
         """)
 
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("""
                 DELETE FROM adw_locks
                 WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
             """)
-        except sqlite3.OperationalError:
-            pass
 
         conn.commit()
         conn.close()
@@ -466,7 +458,7 @@ def e2e_test_client(e2e_database, mock_external_services_e2e, e2e_test_db_cleanu
     """
     from fastapi.testclient import TestClient
 
-    with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
+    with patch('core.workflow_history_utils.database.schema.DB_PATH', e2e_database):
         from server import app
 
         with TestClient(app) as client:
@@ -496,7 +488,6 @@ def performance_monitor():
             metrics = performance_monitor.get_metrics()
             assert metrics["workflow_creation"]["duration"] < 5.0
     """
-    import time
 
     class PerformanceMonitor:
         def __init__(self):
@@ -566,7 +557,7 @@ def workflow_execution_harness(e2e_database, adw_test_workspace):
             """Execute a workflow and track results."""
             from core.workflow_history import insert_workflow_history
 
-            with patch('core.workflow_history_utils.database.DB_PATH', self.database):
+            with patch('core.workflow_history_utils.database.schema.DB_PATH', self.database):
                 # Insert workflow
                 row_id = insert_workflow_history(
                     adw_id=workflow_data.get("adw_id", "E2E-EXEC-001"),

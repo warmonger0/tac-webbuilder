@@ -8,6 +8,7 @@ import json
 import logging
 
 from utils.db_connection import get_connection as get_db_connection
+
 from .schema import DB_PATH
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ def get_workflow_by_adw_id(adw_id: str) -> dict | None:
         return None
 
 
-def get_workflow_history(
+def get_workflow_history(  # noqa: C901
     limit: int = 20,
     offset: int = 0,
     status: str | None = None,

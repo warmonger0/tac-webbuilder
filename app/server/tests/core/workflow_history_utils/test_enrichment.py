@@ -20,10 +20,9 @@ Covers edge cases including:
 import json
 import logging
 from datetime import datetime
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import Mock, patch
 
 import pytest
-
 from core.workflow_history_utils.enrichment import (
     enrich_complexity,
     enrich_cost_data,
@@ -38,7 +37,6 @@ from core.workflow_history_utils.enrichment import (
     enrich_workflow,
     enrich_workflow_template,
 )
-
 
 # ============================================================================
 # Test Fixtures

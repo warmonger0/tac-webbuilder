@@ -8,6 +8,7 @@ import json
 import logging
 
 from utils.db_connection import get_connection as get_db_connection
+
 from .schema import DB_PATH
 
 logger = logging.getLogger(__name__)
@@ -80,7 +81,7 @@ def insert_workflow_history(
         ]
 
         # Get existing columns from database to validate fields before inserting
-        cursor.execute(f"PRAGMA table_info(workflow_history)")
+        cursor.execute("PRAGMA table_info(workflow_history)")
         existing_columns = {row["name"] for row in cursor.fetchall()}
 
         # Map field names from code schema to database schema
@@ -102,7 +103,7 @@ def insert_workflow_history(
                         "anomaly_flags", "optimization_recommendations"
                     ]
                     if field in json_fields:
-                        if isinstance(kwargs[field], (dict, list)):
+                        if isinstance(kwargs[field], dict | list):
                             values.append(json.dumps(kwargs[field]))
                         else:
                             values.append(kwargs[field])
@@ -193,7 +194,7 @@ def update_workflow_history(
         cursor = conn.cursor()
 
         # Get existing columns from database to validate fields before updating
-        cursor.execute(f"PRAGMA table_info(workflow_history)")
+        cursor.execute("PRAGMA table_info(workflow_history)")
         existing_columns = {row["name"] for row in cursor.fetchall()}
 
         # Convert dicts and lists to JSON strings
@@ -203,7 +204,7 @@ def update_workflow_history(
             "anomaly_flags", "optimization_recommendations"
         ]
         for field in json_fields:
-            if field in kwargs and isinstance(kwargs[field], (dict, list)):
+            if field in kwargs and isinstance(kwargs[field], dict | list):
                 kwargs[field] = json.dumps(kwargs[field])
 
         # Map field names from code schema to database schema

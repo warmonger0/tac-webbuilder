@@ -19,7 +19,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import route modules
-from routes import data_routes, github_routes, queue_routes, system_routes, websocket_routes, workflow_routes
+from routes import (
+    data_routes,
+    github_routes,
+    queue_routes,
+    system_routes,
+    websocket_routes,
+    workflow_routes,
+)
 from services.background_tasks import BackgroundTaskManager
 from services.github_issue_service import GitHubIssueService
 from services.health_service import HealthService
@@ -182,7 +189,7 @@ def get_adw_state(adw_id: str) -> dict:
         return {}
 
     try:
-        with open(state_path, "r") as f:
+        with open(state_path) as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Error reading ADW state for {adw_id}: {e}")

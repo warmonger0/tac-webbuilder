@@ -12,7 +12,7 @@ class Phase(BaseModel):
     number: int = Field(..., description="Phase number (1, 2, 3, ...)")
     title: str = Field(..., description="Phase title")
     content: str = Field(..., description="Phase content/description")
-    externalDocs: list[str] | None = Field(None, description="External document references")
+    external_docs: list[str] | None = Field(None, description="External document references")
 
 
 class ChildIssueInfo(BaseModel):

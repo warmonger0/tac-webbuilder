@@ -13,13 +13,10 @@ Tests use real database operations with integration_test_db fixture.
 """
 
 import json
-import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
 from core.workflow_history import resync_workflow_cost
 from core.workflow_history_utils.database import (
     get_workflow_by_adw_id,
@@ -45,7 +42,7 @@ class TestWorkflowHistoryIntegration:
         - Sorting by created_at
         """
         # Patch DB_PATH to use test database
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             # Create test workflows
             workflows = [
                 {
@@ -146,7 +143,7 @@ class TestWorkflowHistoryIntegration:
         - Token breakdown calculation
         - Phase-level cost aggregation
         """
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             # Create test workflow without cost data
             adw_id = "TEST-RESYNC-001"
             insert_workflow_history(
@@ -238,7 +235,7 @@ class TestWorkflowHistoryIntegration:
         - Missing workflows handled gracefully
         - Maximum limit enforced (20 workflows)
         """
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             # Insert 5 test workflows
             workflow_ids = []
             for i in range(1, 6):
@@ -304,7 +301,7 @@ class TestWorkflowHistoryIntegration:
         - Anomaly detection
         - Optimization recommendations
         """
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             # Insert workflow with complete data for analytics
             adw_id = "TEST-ANALYTICS-001"
             insert_workflow_history(
@@ -415,7 +412,7 @@ class TestWorkflowHistoryIntegration:
         - Cache efficiency trend
         - Proper grouping by day/week/month
         """
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             # Insert workflows over 30 days
             base_date = datetime.now() - timedelta(days=30)
 
@@ -501,7 +498,7 @@ class TestWorkflowHistoryIntegration:
         - Filtering by template and model
         - Handling missing historical data
         """
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             # Insert historical workflows for prediction
             template = "adw_sdlc_iso"
             model = "claude-sonnet-4-5"
@@ -582,7 +579,7 @@ class TestWorkflowHistoryIntegration:
 
         # First, get baseline count
         response = integration_client.get("/api/workflow-history?limit=100")
-        baseline_count = response.json()["total_count"]
+        response.json()["total_count"]
 
         # Test 1: Get all workflows with analytics
         response = integration_client.get("/api/workflow-history?limit=20&offset=0")
@@ -642,7 +639,7 @@ class TestWorkflowHistoryIntegration:
         - Force resync option
         - Error handling for missing workflows
         """
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             # Insert test workflow
             adw_id = "TEST-RESYNC-API-001"
             insert_workflow_history(
@@ -721,7 +718,7 @@ class TestWorkflowHistoryEdgeCases:
     @pytest.mark.skip(reason="Database schema mismatch: submission_hour column missing (Issue #66)")
     def test_empty_database_queries(self, integration_test_db, integration_client):
         """Test queries against empty database"""
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             # Query empty database
             results, total_count = get_workflow_history(limit=10, offset=0)
             assert len(results) == 0
@@ -736,7 +733,7 @@ class TestWorkflowHistoryEdgeCases:
 
     def test_invalid_workflow_ids(self, integration_test_db, integration_client):
         """Test handling of invalid workflow IDs"""
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             # Get non-existent workflow
             workflow = get_workflow_by_adw_id("INVALID-001")
             assert workflow is None
@@ -748,7 +745,7 @@ class TestWorkflowHistoryEdgeCases:
     @pytest.mark.skip(reason="Database schema mismatch: submission_hour column missing (Issue #66)")
     def test_large_pagination(self, integration_test_db):
         """Test pagination with large offsets"""
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             # Insert 5 workflows
             for i in range(5):
                 insert_workflow_history(
@@ -767,7 +764,7 @@ class TestWorkflowHistoryEdgeCases:
 
     def test_concurrent_workflow_updates(self, integration_test_db):
         """Test concurrent updates to workflow status"""
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             adw_id = "TEST-CONCURRENT-001"
 
             # Insert workflow
@@ -814,7 +811,7 @@ class TestWorkflowHistoryEdgeCases:
 
     def test_json_field_parsing(self, integration_test_db):
         """Test parsing of JSON fields in workflow data"""
-        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
             adw_id = "TEST-JSON-001"
 
             # Insert workflow with JSON fields

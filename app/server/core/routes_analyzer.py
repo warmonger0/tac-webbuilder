@@ -83,7 +83,7 @@ class RoutesAnalyzer:
 
             # Visit all nodes in the module
             for node in tree.body:
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                     # Check for route decorators
                     route_info = self._extract_route_from_decorators(node)
                     if route_info:
@@ -108,23 +108,20 @@ class RoutesAnalyzer:
         """
         for decorator in func_node.decorator_list:
             # Handle @app.get(), @app.post(), etc.
-            if isinstance(decorator, ast.Call):
-                if isinstance(decorator.func, ast.Attribute):
-                    method = decorator.func.attr.upper()
+            if isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Attribute):
+                method = decorator.func.attr.upper()
 
-                    # Check if this is a valid HTTP method
-                    if method in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']:
-                        # Extract the route path (first argument)
-                        if decorator.args:
-                            path = self._extract_string_value(decorator.args[0])
-                            if path:
-                                description = self._extract_docstring(func_node)
-                                return {
-                                    'path': path,
-                                    'method': method,
-                                    'handler': func_node.name,
-                                    'description': description
-                                }
+                # Check if this is a valid HTTP method
+                if method in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] and decorator.args:
+                    path = self._extract_string_value(decorator.args[0])
+                    if path:
+                        description = self._extract_docstring(func_node)
+                        return {
+                            'path': path,
+                            'method': method,
+                            'handler': func_node.name,
+                            'description': description
+                        }
 
         return None
 

@@ -10,19 +10,17 @@ mocked external dependencies (GitHub API, OpenAI/Anthropic APIs).
 """
 
 import asyncio
-import json
 import os
 import sqlite3
 import subprocess
 import tempfile
 import time
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-
 
 # ============================================================================
 # Server Integration Fixtures
@@ -40,7 +38,7 @@ def integration_test_db() -> Generator[Path, None, None]:
     Usage:
         def test_workflow_lifecycle(integration_test_db):
             from core.workflow_history_utils.database import insert_workflow_history
-            with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+            with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
                 row_id = insert_workflow_history(adw_id="TEST-001", ...)
                 assert row_id > 0
     """
@@ -50,7 +48,7 @@ def integration_test_db() -> Generator[Path, None, None]:
     # Initialize database schema
     from core.workflow_history_utils.database import init_db
 
-    with patch('core.workflow_history_utils.database.DB_PATH', temp_db_path):
+    with patch('core.workflow_history_utils.database.schema.DB_PATH', temp_db_path):
         init_db()
 
     yield temp_db_path
@@ -76,7 +74,7 @@ def integration_app(integration_test_db: Path):
             assert response.status_code == 200
     """
     # Patch database path before importing server
-    with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+    with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
         from server import app
         yield app
 
@@ -107,7 +105,7 @@ def integration_client(integration_app) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture
-def db_with_workflows(integration_test_db: Path) -> Generator[Path, None, None]:
+def db_with_workflows(integration_test_db: Path) -> Path:
     """
     Create a test database pre-populated with sample workflow data.
 
@@ -116,7 +114,7 @@ def db_with_workflows(integration_test_db: Path) -> Generator[Path, None, None]:
     Usage:
         def test_workflow_analytics(db_with_workflows):
             from core.workflow_history_utils.database import get_workflow_history
-            with patch('core.workflow_history_utils.database.DB_PATH', db_with_workflows):
+            with patch('core.workflow_history_utils.database.schema.DB_PATH', db_with_workflows):
                 workflows = get_workflow_history(limit=10)
                 assert len(workflows) > 0
     """
@@ -197,7 +195,7 @@ def db_with_workflows(integration_test_db: Path) -> Generator[Path, None, None]:
     conn.commit()
     conn.close()
 
-    yield integration_test_db
+    return integration_test_db
 
 
 # ============================================================================
@@ -385,7 +383,7 @@ def workflow_service(integration_test_db: Path):
     """
     from services.workflow_service import WorkflowService
 
-    with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+    with patch('core.workflow_history_utils.database.schema.DB_PATH', integration_test_db):
         return WorkflowService()
 
 

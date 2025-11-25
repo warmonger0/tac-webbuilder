@@ -10,8 +10,9 @@ These tests validate complete user workflows from start to finish:
 Simulates real user interactions with minimal mocking.
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 
 @pytest.mark.e2e
@@ -30,7 +31,7 @@ class TestWorkflowCreationJourney:
         3. User retrieves workflow details
         """
         # Step 1: Create workflow
-        with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', e2e_database):
             create_response = e2e_test_client.post("/api/workflows/create", json={
                 "nl_input": sample_workflow_data["nl_input"],
                 "issue_number": sample_workflow_data["issue_number"],
@@ -64,7 +65,7 @@ class TestWorkflowAnalyticsJourney:
         2. User filters workflows by status
         3. User views detailed metrics
         """
-        with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', e2e_database):
             # Step 1: Get analytics overview
             analytics_response = e2e_test_client.get("/api/workflows/analytics")
 
@@ -159,7 +160,7 @@ class TestRealtimeUpdatesJourney:
         2. User starts a workflow
         3. User receives status updates in realtime
         """
-        client = full_stack_context["client"]
+        full_stack_context["client"]
         ws_manager = full_stack_context["websocket"]
 
         # Create mock WebSocket client
@@ -255,7 +256,7 @@ class TestMultiWorkflowJourney:
         conn.close()
 
         # View all workflows
-        with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', e2e_database):
             response = e2e_test_client.get("/api/workflows/history")
 
             if response.status_code == 200:
@@ -280,7 +281,7 @@ class TestDataExportJourney:
         2. User chooses export format (CSV, JSON)
         3. User downloads exported data
         """
-        with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
+        with patch('core.workflow_history_utils.database.schema.DB_PATH', e2e_database):
             # Test CSV export (if endpoint exists)
             export_response = e2e_test_client.post("/api/export", json={
                 "format": "csv",

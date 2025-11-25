@@ -5,12 +5,13 @@ This module generates actionable recommendations based on workflow anomalies.
 """
 
 import logging
+
 from .helpers import detect_complexity
 
 logger = logging.getLogger(__name__)
 
 
-def generate_optimization_recommendations(workflow: dict, anomalies: list[dict]) -> list[str]:
+def generate_optimization_recommendations(workflow: dict, anomalies: list[dict]) -> list[str]:  # noqa: C901
     """
     Generate actionable optimization recommendations with emoji prefixes.
 
