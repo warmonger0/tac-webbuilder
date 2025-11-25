@@ -49,7 +49,7 @@ class GitHubIssue(BaseModel):
     labels: list[str] = Field(default_factory=list, description="Issue labels")
     classification: Literal["feature", "bug", "chore"] = Field(..., description="Issue type classification")
     workflow: str = Field(..., description="ADW workflow command (e.g., adw_sdlc_iso)")
-    model_set: Literal["base", "heavy"] = Field(..., description="Model set for ADW workflow")
+    model_set: Literal["lightweight", "base", "heavy"] = Field(..., description="Model set for ADW workflow")
 
 
 class ProjectContext(BaseModel):

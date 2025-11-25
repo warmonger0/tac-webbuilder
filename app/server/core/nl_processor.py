@@ -261,7 +261,7 @@ def suggest_adw_workflow(issue_type: str, complexity: str, characteristics: dict
     Returns:
         Tuple of (workflow, model_set) where:
         - workflow: ADW workflow identifier (e.g., "adw_lightweight_iso")
-        - model_set: "base" or "heavy"
+        - model_set: "lightweight", "base", or "heavy"
     """
     characteristics = characteristics or {}
 
@@ -327,7 +327,7 @@ async def process_request(nl_input: str, project_context: ProjectContext) -> Git
         - labels: List of relevant labels (classification, technical area, framework)
         - classification: "feature", "bug", or "chore"
         - workflow: Recommended ADW workflow identifier
-        - model_set: "base" or "heavy"
+        - model_set: "lightweight", "base", or "heavy"
 
     Raises:
         Exception: If any step of the pipeline fails (intent analysis, requirement
