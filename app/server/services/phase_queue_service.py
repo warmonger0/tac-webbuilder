@@ -325,3 +325,41 @@ class PhaseQueueService:
         except Exception as e:
             logger.error(f"[ERROR] Failed to update status: {str(e)}")
             raise
+
+    def is_paused(self) -> bool:
+        """
+        Check if automatic phase execution is paused.
+
+        Returns:
+            bool: True if paused, False if automatic execution enabled
+
+        Raises:
+            Exception: If database operation fails
+        """
+        try:
+            return self.repository.get_config_value("queue_paused") == "true"
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to check pause state: {str(e)}")
+            raise
+
+    def set_paused(self, paused: bool) -> None:
+        """
+        Set automatic phase execution pause state.
+
+        When paused, workflows will not automatically proceed to the next phase.
+        When resumed, workflows will kick off the next phase on completion.
+
+        Args:
+            paused: True to pause, False to resume
+
+        Raises:
+            Exception: If database operation fails
+        """
+        try:
+            self.repository.set_config_value("queue_paused", "true" if paused else "false")
+            logger.info(f"[CONFIG] Queue {'paused' if paused else 'resumed'}")
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to set pause state: {str(e)}")
+            raise

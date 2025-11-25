@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { getQueueAll, type PhaseQueueItem } from "../api/client";
+import { getQueueAll, getQueueConfig, setQueuePaused, type PhaseQueueItem } from "../api/client";
 import { PhaseQueueList } from "./PhaseQueueCard";
+import { QueuePauseToggle } from "./QueuePauseToggle";
 
 type TabType = "in-progress" | "completed";
 
@@ -9,22 +10,39 @@ export function ZteHopperQueueCard() {
   const [phases, setPhases] = useState<PhaseQueueItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
+  const [configLoading, setConfigLoading] = useState(true);
 
-  // Fetch once on mount only
+  // Fetch queue and config on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const data = await getQueueAll();
-        setPhases(data.phases);
+        const [queueData, configData] = await Promise.all([
+          getQueueAll(),
+          getQueueConfig()
+        ]);
+        setPhases(queueData.phases);
+        setIsPaused(configData.paused);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch queue');
       } finally {
         setLoading(false);
+        setConfigLoading(false);
       }
     };
     fetchData();
   }, []); // Empty deps = run once on mount
+
+  const handleTogglePause = async (paused: boolean) => {
+    try {
+      const response = await setQueuePaused(paused);
+      setIsPaused(response.paused);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update pause state');
+      throw err; // Re-throw to let the toggle component handle it
+    }
+  };
 
   // Filter phases by status and sort high to low (phase 1 at bottom)
   const inProgressPhases = phases
@@ -35,22 +53,33 @@ export function ZteHopperQueueCard() {
     .sort((a, b) => b.phase_number - a.phase_number);
 
   return (
-    <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 flex flex-col h-full">
-      <div className="relative mb-3">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-lg -m-2"></div>
-        <div className="flex items-center justify-between relative z-10">
-          <h2 className="text-xl font-bold text-white">
-            Hopper Queue
-          </h2>
-          <div className="flex items-center gap-3">
-            {phases.length > 0 && (
-              <span className="text-sm text-slate-300">
-                {inProgressPhases.length} in progress • {completedPhases.length} completed
-              </span>
-            )}
+    <div className="relative h-full">
+      {/* Main Queue Card */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 flex flex-col h-full">
+
+        {/* Pause/Play Toggle - Attached to right side, outside card */}
+        <div className="absolute -right-14 top-1/2 -translate-y-1/2">
+          <QueuePauseToggle
+            isPaused={isPaused}
+            onToggle={handleTogglePause}
+            disabled={configLoading || loading}
+          />
+        </div>
+        <div className="relative mb-3">
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-lg -m-2"></div>
+          <div className="flex items-center justify-between relative z-10">
+            <h2 className="text-xl font-bold text-white">
+              Hopper Queue
+            </h2>
+            <div className="flex items-center gap-3">
+              {phases.length > 0 && (
+                <span className="text-sm text-slate-300">
+                  {inProgressPhases.length} in progress • {completedPhases.length} completed
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Tab Navigation */}
       <div className="flex border-b border-slate-600 mb-3" role="tablist">
@@ -146,8 +175,8 @@ export function ZteHopperQueueCard() {
             )}
           </>
         )}
-
       </div>
+    </div>
     </div>
   );
 }

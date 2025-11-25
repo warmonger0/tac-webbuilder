@@ -295,6 +295,21 @@ export async function getQueueByParent(parentIssue: number): Promise<QueueListRe
   return fetchJSON<QueueListResponse>(`${API_BASE}/queue/${parentIssue}`);
 }
 
+export interface QueueConfigResponse {
+  paused: boolean;
+}
+
+export async function getQueueConfig(): Promise<QueueConfigResponse> {
+  return fetchJSON<QueueConfigResponse>(`${API_BASE}/queue/config`);
+}
+
+export async function setQueuePaused(paused: boolean): Promise<QueueConfigResponse> {
+  return fetchJSON<QueueConfigResponse>(`${API_BASE}/queue/config/pause`, {
+    method: 'POST',
+    body: JSON.stringify({ paused }),
+  });
+}
+
 export async function dequeuePhase(queueId: string): Promise<{ success: boolean; message: string }> {
   return fetchJSON<{ success: boolean; message: string }>(`${API_BASE}/queue/${queueId}`, {
     method: 'DELETE'

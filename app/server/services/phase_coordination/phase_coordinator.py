@@ -192,12 +192,25 @@ class PhaseCoordinator:
             f"(issue #{issue_number}, parent #{parent_issue})"
         )
 
-        # Mark phase complete (triggers next phase automatically)
-        next_phase_triggered = self.phase_queue_service.mark_phase_complete(queue_id)
+        # Check if queue is paused
+        is_paused = self.phase_queue_service.is_paused()
 
-        # If next phase was triggered, create its GitHub issue just-in-time
-        if next_phase_triggered and self.github_poster:
-            await self._create_next_phase_issue(parent_issue, phase_number + 1)
+        if is_paused:
+            # Queue is paused - mark phase complete but don't trigger next phase
+            logger.info(
+                f"[PAUSED] Queue is paused. Phase {phase_number} marked complete, "
+                f"but next phase will not auto-trigger"
+            )
+            # Just update status to completed without triggering next phase
+            self.phase_queue_service.update_status(queue_id, "completed")
+            next_phase_triggered = False
+        else:
+            # Queue is running - mark phase complete and trigger next phase automatically
+            next_phase_triggered = self.phase_queue_service.mark_phase_complete(queue_id)
+
+            # If next phase was triggered, create its GitHub issue just-in-time
+            if next_phase_triggered and self.github_poster:
+                await self._create_next_phase_issue(parent_issue, phase_number + 1)
 
         # Broadcast WebSocket event
         await self._broadcast_queue_update(queue_id, "completed", parent_issue)

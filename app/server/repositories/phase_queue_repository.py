@@ -275,3 +275,54 @@ class PhaseQueueRepository:
         except Exception as e:
             logger.error(f"[ERROR] Failed to delete phase: {str(e)}")
             raise
+
+    def get_config_value(self, config_key: str) -> Optional[str]:
+        """
+        Get a configuration value from queue_config table.
+
+        Args:
+            config_key: Configuration key to retrieve
+
+        Returns:
+            Configuration value or None if not found
+        """
+        try:
+            with get_connection(self.db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT config_value FROM queue_config WHERE config_key = ?",
+                    (config_key,)
+                )
+                row = cursor.fetchone()
+                return row[0] if row else None
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to get config value: {str(e)}")
+            raise
+
+    def set_config_value(self, config_key: str, config_value: str) -> None:
+        """
+        Set a configuration value in queue_config table.
+
+        Args:
+            config_key: Configuration key to set
+            config_value: Value to set
+
+        Raises:
+            Exception: If database operation fails
+        """
+        try:
+            with get_connection(self.db_path) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO queue_config (config_key, config_value, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(config_key) DO UPDATE SET
+                        config_value = excluded.config_value,
+                        updated_at = excluded.updated_at
+                    """,
+                    (config_key, config_value, datetime.now().isoformat()),
+                )
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to set config value: {str(e)}")
+            raise

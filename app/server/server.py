@@ -204,6 +204,11 @@ app.include_router(github_routes.router)
 queue_routes.init_queue_routes(phase_queue_service)
 app.include_router(queue_routes.router)
 
+# Initialize webhook routes for workflow completion notifications
+github_poster = GitHubPoster()
+queue_routes.init_webhook_routes(phase_queue_service, github_poster)
+app.include_router(queue_routes.webhook_router)
+
 websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state)
 app.include_router(websocket_routes.router)
 

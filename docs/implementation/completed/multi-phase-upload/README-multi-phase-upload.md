@@ -15,6 +15,7 @@ Allows users to upload markdown files containing multiple phases (Phase 1, Phase
 - Queued with dependency tracking
 - Executed sequentially (Phase N+1 waits for Phase N)
 - Monitored in real-time via UI
+- **NEW:** Manual pause/resume control for automatic phase execution
 
 ---
 
@@ -169,11 +170,18 @@ Allows users to upload markdown files containing multiple phases (Phase 1, Phase
 - `GET /api/queue/{parent_issue}` - Get phases for specific parent
 - `POST /api/queue/enqueue` - Enqueue new phase
 - `DELETE /api/queue/{queue_id}` - Remove phase from queue
+- `GET /api/queue/config` - Get queue pause state (NEW)
+- `POST /api/queue/config/pause` - Set queue pause state (NEW)
 
 ### Request Submission (Enhanced)
 - `POST /api/request` - Submit request (now supports `phases?: Phase[]`)
   - Single-phase: Standard flow (preview → confirm)
   - Multi-phase: Direct submission with auto-post
+
+### Workflow Completion (NEW)
+- `POST /api/workflow-complete` - Webhook for ADW workflow completion notifications
+  - Respects queue pause state
+  - Auto-triggers next phase when queue is active
 
 ---
 
@@ -192,6 +200,15 @@ CREATE TABLE phase_queue (
   created_at TIMESTAMP,
   updated_at TIMESTAMP,
   error_message TEXT
+);
+```
+
+### queue_config Table (NEW)
+```sql
+CREATE TABLE queue_config (
+  config_key TEXT PRIMARY KEY,         -- Configuration key (e.g., 'queue_paused')
+  config_value TEXT NOT NULL,          -- Configuration value ('true'/'false')
+  updated_at TIMESTAMP                 -- Last update timestamp
 );
 ```
 
@@ -410,6 +427,7 @@ Migrations automatically applied on server startup:
 - **Phase 1 Complete:** `PHASE-1-COMPLETE-multi-phase-upload.md`
 - **Phase 2 Complete:** `PHASE-2-COMPLETE-multi-phase-upload.md`
 - **Phase 3 Complete:** `PHASE-3-COMPLETE-multi-phase-upload.md`
+- **Queue Pause Control:** `FEATURE-queue-pause-control.md` (NEW)
 - **Session 4 Prompt:** `CONTINUATION-PROMPT-multi-phase-upload-session-4.md`
 - **Original Issue:** #77
 
