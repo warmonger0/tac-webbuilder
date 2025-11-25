@@ -188,16 +188,36 @@ def check_critical_tests() -> dict[str, Any]:
         if result.returncode != 0:
             # Parse failures from output
             failing_tests = []
-            for line in result.stdout.split('\n'):
-                if 'FAILED' in line:
-                    failing_tests.append(line.strip())
+            output = result.stdout + result.stderr
+
+            # First, try to extract from "short test summary info" section
+            if "FAILED" in output:
+                in_summary = False
+                for line in output.split('\n'):
+                    if 'short test summary info' in line.lower():
+                        in_summary = True
+                        continue
+                    if in_summary and line.startswith('FAILED'):
+                        failing_tests.append(line.strip())
+                    elif in_summary and line.startswith('==='):
+                        break
+
+            # Fallback: count from final summary line (e.g., "3 failed, 6 passed")
+            failure_count = len(failing_tests)
+            if failure_count == 0:
+                # Try to parse from summary line
+                import re
+                match = re.search(r'(\d+)\s+failed', output)
+                if match:
+                    failure_count = int(match.group(1))
+                    failing_tests = [f"Test failures detected (run with -v for details)"]
 
             return {
                 "passed": False,
-                "error": f"Found {len(failing_tests)} critical test failures",
+                "error": f"Found {failure_count} critical test failure{'s' if failure_count != 1 else ''}",
                 "fix": "Run 'uv run pytest tests/ -v' to see details and fix failing tests",
                 "failing_tests": failing_tests[:10],  # Limit to 10
-                "summary": f"{len(failing_tests)} failures"
+                "summary": f"{failure_count} failure{'s' if failure_count != 1 else ''}"
             }
 
         return {

@@ -116,8 +116,17 @@ class PhaseCoordinator:
         2. Mark phase complete/failed
         3. Trigger next phase if applicable
         4. Broadcast WebSocket event
+
+        Also handles just-in-time issue creation for ready phases without issues.
         """
         try:
+            # First, create issues for ready phases that don't have them yet
+            await self._create_missing_issues()
+
+            # Second, auto-start ready phases if queue is not paused
+            if not self.phase_queue_service.is_paused():
+                await self._auto_start_ready_phases()
+
             # Get all running phases from queue
             running_phases = self._get_running_phases()
 
@@ -316,6 +325,132 @@ class PhaseCoordinator:
         except Exception as e:
             logger.error(f"[ERROR] Failed to get ready phases: {str(e)}")
             return []
+
+    async def _create_missing_issues(self):
+        """
+        Create GitHub issues for ready phases that don't have issue numbers yet.
+
+        This handles the case where phases become ready but don't have issues created,
+        such as when the queue was paused or the system was restarted.
+        """
+        if not self.github_poster:
+            return
+
+        try:
+            # Get all ready phases without issue numbers
+            all_phases = self.phase_queue_service.get_all_queued()
+            ready_phases_without_issues = [
+                phase for phase in all_phases
+                if phase.status == "ready" and not phase.issue_number
+            ]
+
+            for phase in ready_phases_without_issues:
+                logger.info(
+                    f"[AUTO-CREATE] Creating issue for ready Phase {phase.phase_number} "
+                    f"(parent #{phase.parent_issue})"
+                )
+                await self._create_next_phase_issue(phase.parent_issue, phase.phase_number)
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to create missing issues: {str(e)}")
+
+    async def _auto_start_ready_phases(self):
+        """
+        Automatically start execution of ready phases that have issue numbers.
+
+        This enables automatic workflow execution when:
+        - Phase status is 'ready'
+        - Phase has a GitHub issue number
+        - Queue is not paused
+        """
+        try:
+            import subprocess
+            import uuid
+            import os
+            from routes.queue_routes import determine_workflow_for_phase
+
+            # Get all ready phases with issue numbers
+            all_phases = self.phase_queue_service.get_all_queued()
+            ready_phases_to_start = [
+                phase for phase in all_phases
+                if phase.status == "ready" and phase.issue_number
+            ]
+
+            for phase in ready_phases_to_start:
+                logger.info(
+                    f"[AUTO-START] Starting Phase {phase.phase_number} "
+                    f"(parent #{phase.parent_issue}, issue #{phase.issue_number})"
+                )
+
+                try:
+                    # Generate ADW ID
+                    adw_id = f"adw-{uuid.uuid4().hex[:8]}"
+
+                    # Determine workflow
+                    workflow, model_set = determine_workflow_for_phase(phase.phase_data)
+
+                    # Build command
+                    # __file__ is in app/server/services/phase_coordination/phase_coordinator.py
+                    # Go up: phase_coordination -> services -> server -> app -> repo_root
+                    services_dir = os.path.dirname(os.path.abspath(__file__))  # services/phase_coordination
+                    services_parent = os.path.dirname(services_dir)  # services
+                    server_dir = os.path.dirname(services_parent)  # app/server
+                    app_dir = os.path.dirname(server_dir)  # app
+                    repo_root = os.path.dirname(app_dir)  # repo root
+
+                    # Validate repo_root exists
+                    if not os.path.exists(repo_root):
+                        logger.error(f"[AUTO-START] Repository root not found: {repo_root}")
+                        continue
+
+                    adws_dir = os.path.join(repo_root, "adws")
+                    workflow_script = os.path.join(adws_dir, f"{workflow}.py")
+
+                    if not os.path.exists(workflow_script):
+                        logger.error(f"[AUTO-START] Workflow script not found: {workflow_script}")
+                        continue
+
+                    cmd = ["uv", "run", workflow_script, str(phase.issue_number), adw_id]
+
+                    logger.info(
+                        f"[AUTO-START] Launching {workflow} for Phase {phase.phase_number} "
+                        f"(issue #{phase.issue_number}, adw_id: {adw_id})"
+                    )
+
+                    # Mark phase as running BEFORE launching subprocess (prevent race condition)
+                    self.phase_queue_service.update_status(phase.queue_id, "running", adw_id=adw_id)
+
+                    # Launch workflow in background
+                    try:
+                        subprocess.Popen(
+                            cmd,
+                            cwd=repo_root,
+                            start_new_session=True,
+                            stdout=subprocess.DEVNULL,  # Don't capture - let it go to parent logs
+                            stderr=subprocess.DEVNULL,
+                        )
+                        logger.info(
+                            f"[AUTO-START] Successfully started Phase {phase.phase_number} "
+                            f"(issue #{phase.issue_number}, adw_id: {adw_id})"
+                        )
+                    except (FileNotFoundError, PermissionError, OSError) as subprocess_error:
+                        # Subprocess failed to launch - revert status back to ready
+                        logger.error(
+                            f"[AUTO-START] Subprocess launch failed for Phase {phase.phase_number}: "
+                            f"{type(subprocess_error).__name__}: {str(subprocess_error)}"
+                        )
+                        self.phase_queue_service.update_status(phase.queue_id, "ready", adw_id=None)
+                        continue
+
+                except Exception as e:
+                    logger.error(
+                        f"[AUTO-START] Failed to start Phase {phase.phase_number}: {str(e)}"
+                    )
+                    import traceback
+                    logger.error(f"Traceback:\n{traceback.format_exc()}")
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to auto-start ready phases: {str(e)}")
 
     async def _create_next_phase_issue(self, parent_issue: int, next_phase_number: int):
         """

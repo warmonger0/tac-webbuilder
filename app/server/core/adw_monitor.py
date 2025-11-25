@@ -21,6 +21,18 @@ _monitor_cache: dict[str, Any] = {
     "ttl_seconds": 5
 }
 
+# Cache for ADW state scanning (5-second TTL)
+_state_scan_cache: dict[str, Any] = {
+    "states": None,
+    "timestamp": None,
+    "ttl_seconds": 5
+}
+
+# Cache for PR detection (60-second TTL - PRs don't change often)
+_pr_detection_cache: dict[int, int | None] = {}
+_pr_cache_timestamp: dict[int, datetime] = {}
+PR_CACHE_TTL_SECONDS = 60
+
 
 def get_agents_directory() -> Path:
     """
@@ -45,13 +57,29 @@ def get_trees_directory() -> Path:
     return project_root / "trees"
 
 
-def scan_adw_states() -> list[dict[str, Any]]:
+def scan_adw_states(use_cache: bool = True) -> list[dict[str, Any]]:
     """
     Scan the agents directory for ADW state files and extract metadata.
+
+    Uses a 5-second cache to reduce file system I/O overhead during frequent polling.
+
+    Args:
+        use_cache: Whether to use cached results (default: True)
 
     Returns:
         List[Dict]: List of workflow state dictionaries with metadata
     """
+    global _state_scan_cache
+
+    # Check cache validity
+    if use_cache and _state_scan_cache["states"] is not None and _state_scan_cache["timestamp"]:
+        cache_age = (datetime.now() - _state_scan_cache["timestamp"]).total_seconds()
+        if cache_age < _state_scan_cache["ttl_seconds"]:
+            logger.debug(f"Returning cached ADW states (age: {cache_age:.1f}s)")
+            return _state_scan_cache["states"]
+
+    # Cache miss or expired - perform actual scan
+    logger.debug("Cache miss - scanning agents directory")
     agents_dir = get_agents_directory()
 
     if not agents_dir.exists():
@@ -89,6 +117,10 @@ def scan_adw_states() -> list[dict[str, Any]]:
             logger.error(f"Error reading state file for {adw_id}: {e}")
             continue
 
+    # Update cache
+    _state_scan_cache["states"] = states
+    _state_scan_cache["timestamp"] = datetime.now()
+
     return states
 
 
@@ -125,6 +157,47 @@ def is_process_running(adw_id: str) -> bool:
     except Exception as e:
         logger.error(f"Error checking process for {adw_id}: {e}")
         return False
+
+
+def batch_check_running_processes(adw_ids: list[str]) -> dict[str, bool]:
+    """
+    Check which workflows have running processes in a single ps call.
+
+    More efficient than calling is_process_running() for each workflow individually.
+
+    Args:
+        adw_ids: List of ADW workflow identifiers
+
+    Returns:
+        dict: Mapping of adw_id to boolean (True if running)
+    """
+    result_map = {adw_id: False for adw_id in adw_ids}
+
+    try:
+        # Run ps aux once for all workflows
+        result = subprocess.run(
+            ["ps", "aux"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        # Check each line once for all adw_ids
+        for line in result.stdout.splitlines():
+            line_lower = line.lower()
+            if "aider" in line_lower:
+                for adw_id in adw_ids:
+                    if adw_id in line:
+                        result_map[adw_id] = True
+
+        return result_map
+
+    except subprocess.TimeoutExpired:
+        logger.warning("Process check timed out for batch operation")
+        return result_map
+    except Exception as e:
+        logger.error(f"Error in batch process check: {e}")
+        return result_map
 
 
 def worktree_exists(adw_id: str) -> bool:
@@ -202,24 +275,27 @@ def determine_status(adw_id: str, state: dict[str, Any]) -> str:
         return "failed"
 
     # Check if GitHub issue is closed (override any other status)
-    issue_number = state.get("issue_number")
-    if issue_number:
-        try:
-            import subprocess
-            result = subprocess.run(
-                ["gh", "issue", "view", str(issue_number), "--json", "state"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode == 0:
-                import json
-                issue_data = json.loads(result.stdout)
-                if issue_data.get("state") == "CLOSED":
-                    return "completed"
-        except Exception:
-            # If we can't check GitHub, continue with other checks
-            pass
+    # NOTE: Disabled for performance - checking GitHub issue state for 20 workflows
+    # takes ~6 seconds (300ms per call). This can be fetched via webhook updates or
+    # stored in the state file when the workflow completes.
+    # issue_number = state.get("issue_number")
+    # if issue_number:
+    #     try:
+    #         import subprocess
+    #         result = subprocess.run(
+    #             ["gh", "issue", "view", str(issue_number), "--json", "state"],
+    #             capture_output=True,
+    #             text=True,
+    #             timeout=5
+    #         )
+    #         if result.returncode == 0:
+    #             import json
+    #             issue_data = json.loads(result.stdout)
+    #             if issue_data.get("state") == "CLOSED":
+    #                 return "completed"
+    #     except Exception:
+    #         # If we can't check GitHub, continue with other checks
+    #         pass
 
     # Check if process is running
     if is_process_running(adw_id):
@@ -394,6 +470,7 @@ def detect_pr_for_issue(issue_number: int | None) -> int | None:
     Detect if a PR has been created for this issue.
 
     Uses GitHub CLI to search for PRs that reference the issue number in their body.
+    Results are cached for 60 seconds to avoid repeated API calls.
 
     Args:
         issue_number: The GitHub issue number
@@ -401,8 +478,19 @@ def detect_pr_for_issue(issue_number: int | None) -> int | None:
     Returns:
         int | None: PR number if found, None otherwise
     """
+    global _pr_detection_cache, _pr_cache_timestamp
+
     if not issue_number:
         return None
+
+    # Check cache
+    if issue_number in _pr_detection_cache:
+        cache_time = _pr_cache_timestamp.get(issue_number)
+        if cache_time:
+            age = (datetime.now() - cache_time).total_seconds()
+            if age < PR_CACHE_TTL_SECONDS:
+                logger.debug(f"Returning cached PR detection for issue #{issue_number}")
+                return _pr_detection_cache[issue_number]
 
     try:
         # Search for PRs that close this issue (case insensitive search)
@@ -425,20 +513,32 @@ def detect_pr_for_issue(issue_number: int | None) -> int | None:
             for pr in prs:
                 body = pr.get("body", "").lower()
                 if re.search(close_keywords, body, re.IGNORECASE):
-                    return pr.get("number")
+                    pr_number = pr.get("number")
+                    # Cache the result
+                    _pr_detection_cache[issue_number] = pr_number
+                    _pr_cache_timestamp[issue_number] = datetime.now()
+                    return pr_number
+
+        # No PR found - cache the None result too
+        _pr_detection_cache[issue_number] = None
+        _pr_cache_timestamp[issue_number] = datetime.now()
 
     except Exception as e:
         logger.debug(f"Could not detect PR for issue #{issue_number}: {e}")
+        # Cache failure as None to avoid repeated failed calls
+        _pr_detection_cache[issue_number] = None
+        _pr_cache_timestamp[issue_number] = datetime.now()
 
     return None
 
 
-def build_workflow_status(state: dict[str, Any]) -> dict[str, Any]:
+def build_workflow_status(state: dict[str, Any], running_processes: dict[str, bool] | None = None) -> dict[str, Any]:
     """
     Build a complete workflow status object from state data.
 
     Args:
         state: The workflow state dictionary
+        running_processes: Optional pre-computed map of adw_id -> is_running
 
     Returns:
         dict: Complete workflow status with all fields
@@ -463,8 +563,16 @@ def build_workflow_status(state: dict[str, Any]) -> dict[str, Any]:
         title = nl_input[:100] if nl_input else ""
 
         # Detect PR for this issue
+        # NOTE: Skipping PR detection on load to improve performance
+        # PR info can be fetched on-demand or via separate endpoint
         issue_number = state.get("issue_number")
-        pr_number = detect_pr_for_issue(issue_number)
+        pr_number = None  # Skip expensive GitHub API call: detect_pr_for_issue(issue_number)
+
+        # Check if process is running (use pre-computed value if available)
+        if running_processes is not None:
+            is_active = running_processes.get(adw_id, False)
+        else:
+            is_active = is_process_running(adw_id)
 
         # Build workflow status object
         workflow_status = {
@@ -486,7 +594,7 @@ def build_workflow_status(state: dict[str, Any]) -> dict[str, Any]:
             "estimated_cost_total": estimated_cost,
             "error_count": error_count,
             "last_error": last_error,
-            "is_process_active": is_process_running(adw_id),
+            "is_process_active": is_active,
             "phases_completed": completed_phases,
             "total_phases": 9,  # Standard SDLC has 9 phases
         }
@@ -540,11 +648,15 @@ def aggregate_adw_monitor_data() -> dict[str, Any]:
     # Scan for ADW states
     states = scan_adw_states()
 
+    # Batch check for running processes (more efficient than individual checks)
+    adw_ids = [state.get("adw_id") for state in states if state.get("adw_id")]
+    running_processes = batch_check_running_processes(adw_ids)
+
     # Build workflow status for each state
     workflows = []
     for state in states:
         try:
-            workflow_status = build_workflow_status(state)
+            workflow_status = build_workflow_status(state, running_processes)
             workflows.append(workflow_status)
         except Exception as e:
             logger.error(f"Error building status for {state.get('adw_id')}: {e}")

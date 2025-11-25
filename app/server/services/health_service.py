@@ -29,6 +29,7 @@ Usage:
         print(f"{service_name}: {health.status}")
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -169,11 +170,11 @@ class HealthService:
 
     async def check_all(self) -> dict[str, ServiceHealth]:
         """
-        Check the health of all system services.
+        Check the health of all system services in parallel.
 
         This method performs health checks on all configured services and returns
         a dictionary mapping service names to their health status. The checks are
-        performed concurrently where possible to minimize total check time.
+        performed concurrently using asyncio.gather() to minimize total check time.
 
         Returns:
             Dictionary mapping service names to ServiceHealth objects. Keys include:
@@ -189,24 +190,64 @@ class HealthService:
             >>> results = await health_service.check_all()
             >>> for service_name, health in results.items():
             ...     print(f"{service_name}: {health.status} - {health.message}")
-            backend_api: unknown - Health check not yet implemented
-            database: unknown - Health check not yet implemented
+            backend_api: healthy - Running on port 8000
+            database: healthy - 15 tables available
             ...
 
         Note:
-            In this initial implementation, all checks return "unknown" status.
-            Actual health check logic will be implemented in subsequent workflows.
+            All checks are executed in parallel for optimal performance.
+            Exceptions are caught per-check to prevent one failure from blocking others.
         """
-        logger.debug("Running health checks for all services")
+        logger.debug("Running parallel health checks for all services")
 
-        return {
-            "backend_api": self.check_backend(),
-            "database": self.check_database(),
-            "webhook": await self.check_webhook(),
-            "cloudflare_tunnel": self.check_cloudflare_tunnel(),
-            "github_webhook": await self.check_github_webhook(),
-            "frontend": await self.check_frontend()
-        }
+        # Run all health checks in parallel using asyncio.gather
+        # return_exceptions=True ensures one failure doesn't stop others
+        results = await asyncio.gather(
+            self._async_check_backend(),
+            self._async_check_database(),
+            self.check_webhook(),
+            self._async_check_cloudflare(),
+            self.check_github_webhook(),
+            self.check_frontend(),
+            return_exceptions=True
+        )
+
+        # Map results to service names
+        service_names = [
+            "backend_api",
+            "database",
+            "webhook",
+            "cloudflare_tunnel",
+            "github_webhook",
+            "frontend"
+        ]
+
+        health_status = {}
+        for name, result in zip(service_names, results):
+            if isinstance(result, Exception):
+                # If a check raised an exception, return error status
+                logger.error(f"Health check failed for {name}: {result}")
+                health_status[name] = ServiceHealth(
+                    name=name.replace("_", " ").title(),
+                    status="error",
+                    message=f"Check failed: {str(result)[:50]}"
+                )
+            else:
+                health_status[name] = result
+
+        return health_status
+
+    async def _async_check_backend(self) -> ServiceHealth:
+        """Async wrapper for check_backend"""
+        return self.check_backend()
+
+    async def _async_check_database(self) -> ServiceHealth:
+        """Async wrapper for check_database"""
+        return self.check_database()
+
+    async def _async_check_cloudflare(self) -> ServiceHealth:
+        """Async wrapper for check_cloudflare_tunnel"""
+        return self.check_cloudflare_tunnel()
 
     def check_backend(self) -> ServiceHealth:
         """Check the health of the Backend API service"""

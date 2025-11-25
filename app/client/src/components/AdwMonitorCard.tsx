@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   getAdwMonitor,
-  getAdwHealth,
   type AdwWorkflowStatus,
   type AdwMonitorSummary,
   type AdwHealthCheckResponse
@@ -17,25 +16,14 @@ export function AdwMonitorCard() {
 
   const pollingState = useReliablePolling<{ workflows: AdwWorkflowStatus[]; summary: AdwMonitorSummary }>({
     fetchFn: getAdwMonitor,
-    onSuccess: async (data) => {
+    onSuccess: (data) => {
       setWorkflows(data.workflows);
       setSummary(data.summary);
       setError(null);
 
-      // Fetch health status for the current (first) workflow
-      if (data.workflows.length > 0) {
-        const currentWorkflow = data.workflows[0];
-        try {
-          const health = await getAdwHealth(currentWorkflow.adw_id);
-          setHealthStatus(health);
-        } catch (healthErr) {
-          console.warn('Failed to fetch health status:', healthErr);
-          // Don't set error state, just skip health display
-          setHealthStatus(null);
-        }
-      } else {
-        setHealthStatus(null);
-      }
+      // Note: Removed cascade health check fetch for performance.
+      // Health checks can be added on-demand via separate UI action if needed.
+      setHealthStatus(null);
     },
     onError: (err) => {
       setError(err.message);
@@ -46,13 +34,8 @@ export function AdwMonitorCard() {
     adaptiveInterval: true,
   });
 
-  // Update polling interval when activity changes
-  useEffect(() => {
-    // Trigger a retry to update interval immediately
-    if (pollingState.isPolling) {
-      pollingState.retry();
-    }
-  }, [summary.running]);
+  // Note: Removed useEffect that forced polling restart on interval changes.
+  // The useReliablePolling hook now handles dynamic intervals internally without restarting.
 
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return 'N/A';
@@ -209,20 +192,68 @@ export function AdwMonitorCard() {
   // Get only the current (first) workflow in the queue
   const currentWorkflow = workflows.length > 0 ? workflows[0] : null;
 
+  // Determine colors based on workflow status
+  const getStatusColors = (status: string) => {
+    switch (status) {
+      case 'failed':
+        return {
+          card: 'shadow-red-500/10',
+          cardGlow: 'from-red-500/5 to-red-500/5',
+          header: 'from-red-500/10 to-red-500/10',
+          icon: 'from-red-500 to-red-600',
+          iconShadow: 'shadow-[0_0_15px_rgba(239,68,68,0.5)]',
+          iconGlow: 'from-red-400/20 to-red-400/20',
+          innerGlow: 'from-red-500/5'
+        };
+      case 'running':
+        return {
+          card: 'shadow-emerald-500/10',
+          cardGlow: 'from-emerald-500/5 to-teal-500/5',
+          header: 'from-emerald-500/10 to-teal-500/10',
+          icon: 'from-emerald-500 to-teal-500',
+          iconShadow: 'shadow-[0_0_15px_rgba(16,185,129,0.5)]',
+          iconGlow: 'from-emerald-400/20 to-teal-400/20',
+          innerGlow: 'from-emerald-500/5'
+        };
+      case 'paused':
+        return {
+          card: 'shadow-yellow-500/10',
+          cardGlow: 'from-yellow-500/5 to-orange-500/5',
+          header: 'from-yellow-500/10 to-orange-500/10',
+          icon: 'from-yellow-500 to-orange-500',
+          iconShadow: 'shadow-[0_0_15px_rgba(234,179,8,0.5)]',
+          iconGlow: 'from-yellow-400/20 to-orange-400/20',
+          innerGlow: 'from-yellow-500/5'
+        };
+      default: // completed, queued, etc.
+        return {
+          card: 'shadow-slate-500/10',
+          cardGlow: 'from-slate-500/5 to-slate-500/5',
+          header: 'from-slate-500/10 to-slate-500/10',
+          icon: 'from-slate-500 to-slate-600',
+          iconShadow: 'shadow-[0_0_15px_rgba(100,116,139,0.5)]',
+          iconGlow: 'from-slate-400/20 to-slate-400/20',
+          innerGlow: 'from-slate-500/5'
+        };
+    }
+  };
+
+  const colors = getStatusColors(currentWorkflow?.status || 'completed');
+
   return (
-    <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl shadow-emerald-500/10 overflow-hidden border border-slate-700 flex-1 flex flex-col relative">
-        {/* Subtle green glow around the card */}
-        <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500/5 to-teal-500/5 rounded-lg blur-sm -z-10"></div>
+    <div className={`bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl ${colors.card} overflow-hidden border border-slate-700 flex-1 flex flex-col relative`}>
+        {/* Subtle status-based glow around the card */}
+        <div className={`absolute -inset-0.5 bg-gradient-to-r ${colors.cardGlow} rounded-lg blur-sm -z-10`}></div>
 
       {/* Header with Gradient */}
       <div className="relative px-4 py-3 border-b border-slate-700/50">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10"></div>
+        <div className={`absolute inset-0 bg-gradient-to-r ${colors.header}`}></div>
         <div className="relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+              <div className={`relative w-8 h-8 bg-gradient-to-r ${colors.icon} rounded-lg flex items-center justify-center ${colors.iconShadow}`}>
                 {/* Icon glow */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400/20 to-teal-400/20 rounded-lg blur-md animate-pulse"></div>
+                <div className={`absolute -inset-1 bg-gradient-to-r ${colors.iconGlow} rounded-lg blur-md animate-pulse`}></div>
                 <svg className="w-5 h-5 text-white relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
                 </svg>
@@ -264,7 +295,7 @@ export function AdwMonitorCard() {
               className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl border border-slate-700/50 shadow-[0_0_15px_rgba(16,185,129,0.1)] overflow-hidden relative"
             >
               {/* Subtle inner glow */}
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none"></div>
+              <div className={`absolute inset-0 bg-gradient-to-br ${colors.innerGlow} to-transparent pointer-events-none`}></div>
                 {/* Header */}
                 <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between relative z-10">
                   <div className="flex items-center gap-3">

@@ -33,6 +33,9 @@ class WorkflowCompletionDetector:
         """
         Get workflow status from workflow_history by issue number.
 
+        Only returns 'completed' or 'failed' if end_time is set (real completion).
+        Ignores placeholder/phantom records with status but no timestamps.
+
         Args:
             issue_number: GitHub issue number
 
@@ -43,7 +46,7 @@ class WorkflowCompletionDetector:
             with get_connection(self.workflow_db_path) as conn:
                 cursor = conn.execute(
                     """
-                    SELECT status FROM workflow_history
+                    SELECT status, end_time FROM workflow_history
                     WHERE issue_number = ?
                     ORDER BY created_at DESC
                     LIMIT 1
@@ -51,7 +54,22 @@ class WorkflowCompletionDetector:
                     (issue_number,)
                 )
                 row = cursor.fetchone()
-                return row["status"] if row else None
+                if not row:
+                    return None
+
+                status = row["status"]
+                end_time = row["end_time"]
+
+                # Only trust 'completed' or 'failed' if end_time is set
+                # This prevents phantom/placeholder records from being treated as real completions
+                if status in ('completed', 'failed') and not end_time:
+                    logger.warning(
+                        f"[PHANTOM] Issue #{issue_number} has status='{status}' but no end_time - "
+                        f"treating as 'running'"
+                    )
+                    return 'running'
+
+                return status
         except Exception as e:
             logger.error(f"[ERROR] Failed to get workflow status for issue #{issue_number}: {str(e)}")
             return None

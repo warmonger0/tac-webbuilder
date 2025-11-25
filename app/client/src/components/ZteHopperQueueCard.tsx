@@ -13,7 +13,7 @@ export function ZteHopperQueueCard() {
   const [isPaused, setIsPaused] = useState(false);
   const [configLoading, setConfigLoading] = useState(true);
 
-  // Fetch queue and config on mount
+  // Fetch queue and config on mount and poll for updates
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -31,8 +31,15 @@ export function ZteHopperQueueCard() {
         setConfigLoading(false);
       }
     };
+
+    // Initial fetch
     fetchData();
-  }, []); // Empty deps = run once on mount
+
+    // Poll every 10 seconds for updates
+    const interval = setInterval(fetchData, 10000);
+
+    return () => clearInterval(interval);
+  }, []); // Empty deps = run once on mount, cleanup on unmount
 
   const handleTogglePause = async (paused: boolean) => {
     try {
@@ -51,6 +58,11 @@ export function ZteHopperQueueCard() {
   const completedPhases = phases
     .filter(p => p.status === 'completed' || p.status === 'failed' || p.status === 'blocked')
     .sort((a, b) => b.phase_number - a.phase_number);
+
+  // Debug logging
+  console.log('[ZteHopperQueue] Total phases:', phases.length);
+  console.log('[ZteHopperQueue] In progress:', inProgressPhases.length, inProgressPhases.map(p => `#${p.phase_number}(${p.status})`));
+  console.log('[ZteHopperQueue] Completed:', completedPhases.length);
 
   return (
     <div className="relative h-full">

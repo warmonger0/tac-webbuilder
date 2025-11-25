@@ -87,6 +87,7 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
   const { phase_number, phase_data, status, issue_number, queue_id, adw_id, pr_number } = queueItem;
   const statusStyle = STATUS_COLORS[status];
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleClick = () => {
     if (issue_number) {
@@ -121,22 +122,18 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
     }
   };
 
+  const toggleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsExpanded(!isExpanded);
+  };
+
   return (
     <div
-      className={`${statusStyle.bg} ${statusStyle.border} border-2 rounded-lg p-3 transition-all hover:shadow-md ${
-        issue_number ? 'cursor-pointer' : ''
-      }`}
-      onClick={handleClick}
-      role={issue_number ? 'button' : 'article'}
-      tabIndex={issue_number ? 0 : undefined}
-      onKeyDown={(e) => {
-        if (issue_number && (e.key === 'Enter' || e.key === ' ')) {
-          handleClick();
-        }
-      }}
+      className={`${statusStyle.bg} ${statusStyle.border} border-2 rounded-lg p-3 transition-all hover:shadow-md`}
+      role="article"
     >
       <div className="flex flex-col gap-2">
-        {/* Top Row: Phase Number, Title, and Status */}
+        {/* Top Row: Phase Number, Title, Status, and Expand Button */}
         <div className="flex items-center justify-between gap-2">
           {/* Left: Phase Number and Title */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -145,15 +142,28 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
               {phase_number}
             </div>
 
-            {/* Title with Issue Number */}
-            <h4 className={`font-semibold ${statusStyle.text} text-sm truncate`}>
+            {/* Title with Issue Number - Clickable to expand/collapse */}
+            <h4
+              className={`font-semibold ${statusStyle.text} text-sm truncate cursor-pointer hover:underline`}
+              onClick={toggleExpand}
+            >
               {phase_data.title || `Phase ${phase_number}`} {statusStyle.icon}{' '}
               {issue_number && `#${issue_number}`}
             </h4>
           </div>
 
-          {/* Right: Execute Button (if ready) or Status Badge */}
-          {status === 'ready' ? (
+          {/* Right: Expand/Collapse, Execute Button, or Status Badge */}
+          <div className="flex items-center gap-2">
+            {/* Expand/Collapse Button */}
+            <button
+              onClick={toggleExpand}
+              className="text-gray-600 hover:text-gray-900 transition-colors"
+              title={isExpanded ? "Collapse details" : "Expand details"}
+            >
+              {isExpanded ? '▼' : '▶'}
+            </button>
+
+            {status === 'ready' ? (
             <button
               onClick={handleExecute}
               disabled={isExecuting}
@@ -173,16 +183,20 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
               )}
             </button>
           ) : (
-            <span className={`${statusStyle.badge} text-white text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1 flex-shrink-0`}>
-              <span>{statusStyle.icon}</span>
-              <span>{statusStyle.label}</span>
-            </span>
-          )}
+              <span className={`${statusStyle.badge} text-white text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1 flex-shrink-0`}>
+                <span>{statusStyle.icon}</span>
+                <span>{statusStyle.label}</span>
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Issue and PR Badges Row */}
-        {(issue_number || pr_number) && (
-          <div className="flex items-center gap-2 ml-11">
+        {/* Expandable Section */}
+        {isExpanded && (
+          <>
+            {/* Issue and PR Badges Row */}
+            {(issue_number || pr_number) && (
+              <div className="flex items-center gap-2 ml-11">
             {issue_number && (
               <button
                 onClick={handleClick}
@@ -203,14 +217,16 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
                 <span>#{pr_number}</span>
               </button>
             )}
-          </div>
+              </div>
+            )}
+
+            {/* Show workflow state for any phase with an ADW ID (real-time display) */}
+            {adw_id && (
+              <WorkflowStateDisplay adwId={adw_id} />
+            )}
+          </>
         )}
       </div>
-
-      {/* Show workflow state for any phase with an ADW ID (real-time display) */}
-      {adw_id && (
-        <WorkflowStateDisplay adwId={adw_id} />
-      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { getSystemStatus, redeliverGitHubWebhook, restartCloudflare, startWebhookService } from '../api/client';
 import type { ServiceHealth, SystemStatusResponse } from '../types';
 import { useReliablePolling } from '../hooks/useReliablePolling';
@@ -141,13 +141,17 @@ export function SystemStatusPanel() {
     }
   };
 
-  const renderServiceCard = (key: string, service: ServiceHealth) => {
-    const hasAction = key === 'webhook' || key === 'cloudflare_tunnel' || key === 'github_webhook';
-    const isActionDisabled = service.status === 'healthy' && key !== 'github_webhook';
+  // Memoized service card component to prevent unnecessary re-renders
+  const ServiceCard = React.memo(({ serviceKey, service, onAction }: {
+    serviceKey: string;
+    service: ServiceHealth;
+    onAction: (action: string) => void;
+  }) => {
+    const hasAction = serviceKey === 'webhook' || serviceKey === 'cloudflare_tunnel' || serviceKey === 'github_webhook';
+    const isActionDisabled = service.status === 'healthy' && serviceKey !== 'github_webhook';
 
     return (
       <div
-        key={key}
         className={`p-3 rounded-lg border ${getStatusColor(service.status)}`}
       >
         <div className="flex items-start justify-between mb-2">
@@ -176,9 +180,9 @@ export function SystemStatusPanel() {
 
         {hasAction && (
           <div className="mt-3 pt-2 border-t border-current border-opacity-20">
-            {key === 'webhook' && (
+            {serviceKey === 'webhook' && (
               <button
-                onClick={handleStartWebhook}
+                onClick={() => onAction('webhook')}
                 disabled={actionLoading === 'webhook' || isActionDisabled}
                 className={`w-full px-3 py-1.5 rounded text-xs font-medium transition-all shadow ${
                   isActionDisabled
@@ -189,18 +193,18 @@ export function SystemStatusPanel() {
                 {actionLoading === 'webhook' ? 'Starting...' : 'Start Service'}
               </button>
             )}
-            {key === 'cloudflare_tunnel' && (
+            {serviceKey === 'cloudflare_tunnel' && (
               <button
-                onClick={handleRestartCloudflare}
+                onClick={() => onAction('cloudflare')}
                 disabled={actionLoading === 'cloudflare'}
                 className="w-full px-3 py-1.5 rounded text-xs font-medium bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:from-blue-700 hover:to-cyan-700 disabled:from-slate-600 disabled:to-slate-600 transition-all shadow"
               >
                 {actionLoading === 'cloudflare' ? 'Restarting...' : 'Restart Tunnel'}
               </button>
             )}
-            {key === 'github_webhook' && (
+            {serviceKey === 'github_webhook' && (
               <button
-                onClick={handleRedeliverWebhook}
+                onClick={() => onAction('github-webhook')}
                 disabled={actionLoading === 'github-webhook'}
                 className="w-full px-3 py-1.5 rounded text-xs font-medium bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 disabled:from-slate-600 disabled:to-slate-600 transition-all shadow"
               >
@@ -215,6 +219,24 @@ export function SystemStatusPanel() {
         )}
       </div>
     );
+  }, (prevProps, nextProps) => {
+    // Only re-render if service status, message, or details changed
+    return (
+      prevProps.service.status === nextProps.service.status &&
+      prevProps.service.message === nextProps.service.message &&
+      JSON.stringify(prevProps.service.details) === JSON.stringify(nextProps.service.details) &&
+      prevProps.service.uptime_human === nextProps.service.uptime_human
+    );
+  });
+
+  const handleServiceAction = (action: string) => {
+    if (action === 'webhook') {
+      handleStartWebhook();
+    } else if (action === 'cloudflare') {
+      handleRestartCloudflare();
+    } else if (action === 'github-webhook') {
+      handleRedeliverWebhook();
+    }
   };
 
   // Define service order (swapping frontend and cloudflare_tunnel)
@@ -288,7 +310,14 @@ export function SystemStatusPanel() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {serviceOrder.map((key) => {
                 const service = status.services[key];
-                return service ? renderServiceCard(key, service) : null;
+                return service ? (
+                  <ServiceCard
+                    key={key}
+                    serviceKey={key}
+                    service={service}
+                    onAction={handleServiceAction}
+                  />
+                ) : null;
               })}
             </div>
           </>

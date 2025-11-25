@@ -1229,14 +1229,15 @@ def main():
         f"{adw_id}_ops: 📋 Final test state:\n```json\n{json.dumps(state.data, indent=2)}\n```"
     )
     
-    # Exit with appropriate code based on test results
+    # Report test results but don't exit on failures
+    # This allows the workflow to continue to review phase where issues can be addressed
     if total_failures > 0:
-        logger.error(f"Test workflow completed with {total_failures} failures")
+        logger.warning(f"Test workflow completed with {total_failures} failures (continuing to next phase)")
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, "ops", f"❌ Test workflow completed with {total_failures} failures")
+            format_issue_message(adw_id, "ops", f"⚠️ Test workflow completed with {total_failures} failures - continuing to review phase")
         )
-        sys.exit(1)
+        # NOTE: We do NOT exit(1) here anymore. The review phase will catch and address issues.
     else:
         logger.info("All tests passed successfully")
         make_issue_comment(

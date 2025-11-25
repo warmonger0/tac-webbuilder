@@ -197,8 +197,9 @@ export function useReliablePolling<T>({
       return;
     }
 
-    // Add random stagger delay (0-10 seconds) to prevent thundering herd
-    const staggerDelay = Math.random() * 10000;
+    // Add random stagger delay (0-2 seconds) to prevent thundering herd
+    // while maintaining responsive initial load
+    const staggerDelay = Math.random() * 2000;
     const timeoutId = setTimeout(() => {
       // Initial fetch
       fetch();

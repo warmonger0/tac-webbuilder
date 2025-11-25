@@ -8,12 +8,17 @@ import { SystemStatusPanel } from './SystemStatusPanel';
 import { ZteHopperQueueCard } from './ZteHopperQueueCard';
 import { AdwMonitorCard } from './AdwMonitorCard';
 import { useDragAndDrop } from '../hooks/useDragAndDrop';
+import { useStaggeredLoad } from '../hooks/useStaggeredLoad';
 import { parsePhases } from '../utils/phaseParser';
 import { FileUploadSection } from './request-form/FileUploadSection';
 import { PhaseDetectionHandler } from './request-form/PhaseDetectionHandler';
 import { saveFormState, loadFormState, clearFormState, PROJECT_PATH_STORAGE_KEY } from './request-form/utils/formStorage';
 
 export function RequestForm() {
+  // Stagger panel loading to prevent initial load slowdown
+  const showAdwMonitor = useStaggeredLoad(100);  // Load ADW monitor after 100ms
+  const showHopperQueue = useStaggeredLoad(400); // Load hopper queue after 400ms
+
   // Form state
   const [nlInput, setNlInput] = useState('');
   const [projectPath, setProjectPath] = useState('');
@@ -388,7 +393,13 @@ export function RequestForm() {
 
           {/* Right Column - Hopper Queue */}
           <div className="lg:col-span-1">
-            <ZteHopperQueueCard />
+            {showHopperQueue ? (
+              <ZteHopperQueueCard />
+            ) : (
+              <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 flex items-center justify-center min-h-[200px]">
+                <div className="text-slate-500 text-xs animate-pulse">●</div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -401,7 +412,13 @@ export function RequestForm() {
 
           {/* Current Workflow */}
           <div className="lg:col-span-1 flex">
-            <AdwMonitorCard />
+            {showAdwMonitor ? (
+              <AdwMonitorCard />
+            ) : (
+              <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 flex items-center justify-center min-h-[200px]">
+                <div className="text-slate-500 text-xs animate-pulse">●</div>
+              </div>
+            )}
           </div>
         </div>
       </div>

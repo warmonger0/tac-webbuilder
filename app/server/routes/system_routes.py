@@ -19,6 +19,16 @@ logger = logging.getLogger(__name__)
 # Router will be created with dependencies injected from server.py
 router = APIRouter(prefix="", tags=["System"])
 
+# Cache for system status (TTL: 10 seconds)
+_system_status_cache = None
+_system_status_cache_time = None
+SYSTEM_STATUS_CACHE_TTL = 10  # seconds
+
+# Cache for ADW monitor (TTL: 5 seconds)
+_adw_monitor_cache = None
+_adw_monitor_cache_time = None
+ADW_MONITOR_CACHE_TTL = 5  # seconds
+
 
 def init_system_routes(health_service, service_controller, app_start_time):
     """
@@ -58,9 +68,31 @@ def init_system_routes(health_service, service_controller, app_start_time):
 
     @router.get("/api/system-status", response_model=SystemStatusResponse)
     async def get_system_status() -> SystemStatusResponse:
-        """Comprehensive system health check - delegates to HealthService"""
+        """
+        Comprehensive system health check - delegates to HealthService.
+
+        This endpoint uses a 10-second cache to prevent excessive health checks.
+        """
+        global _system_status_cache, _system_status_cache_time
+
+        # Check if cache is valid
+        now = datetime.now()
+        if _system_status_cache and _system_status_cache_time:
+            cache_age = (now - _system_status_cache_time).total_seconds()
+            if cache_age < SYSTEM_STATUS_CACHE_TTL:
+                logger.debug(f"Returning cached system status (age: {cache_age:.1f}s)")
+                return _system_status_cache
+
+        # Cache miss or expired - fetch fresh data
+        logger.debug("Cache miss - fetching fresh system status")
         status_data = await health_service.get_system_status()
-        return SystemStatusResponse(**status_data)
+        response = SystemStatusResponse(**status_data)
+
+        # Update cache
+        _system_status_cache = response
+        _system_status_cache_time = now
+
+        return response
 
     @router.get("/api/adw-monitor", response_model=AdwMonitorResponse)
     async def get_adw_monitor_status() -> AdwMonitorResponse:
@@ -75,12 +107,31 @@ def init_system_routes(health_service, service_controller, app_start_time):
         - Cost tracking
 
         Returns comprehensive status for monitoring active, paused, and recent workflows.
+
+        This endpoint uses a 5-second cache to reduce file system overhead.
         """
+        global _adw_monitor_cache, _adw_monitor_cache_time
         from core.adw_monitor import aggregate_adw_monitor_data
 
+        # Check if cache is valid
+        now = datetime.now()
+        if _adw_monitor_cache and _adw_monitor_cache_time:
+            cache_age = (now - _adw_monitor_cache_time).total_seconds()
+            if cache_age < ADW_MONITOR_CACHE_TTL:
+                logger.debug(f"Returning cached ADW monitor data (age: {cache_age:.1f}s)")
+                return _adw_monitor_cache
+
+        # Cache miss or expired - fetch fresh data
+        logger.debug("Cache miss - fetching fresh ADW monitor data")
         try:
             monitor_data = aggregate_adw_monitor_data()
-            return AdwMonitorResponse(**monitor_data)
+            response = AdwMonitorResponse(**monitor_data)
+
+            # Update cache
+            _adw_monitor_cache = response
+            _adw_monitor_cache_time = now
+
+            return response
         except Exception as e:
             logger.error(f"Error getting ADW monitor status: {e}")
             # Return empty response on error

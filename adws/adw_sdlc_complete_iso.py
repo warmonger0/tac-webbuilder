@@ -158,13 +158,6 @@ def main():
             error_details="Plan phase failed. Check planning logs for errors.",
             logger=logger
         )
-        try:
-            make_issue_comment(
-                issue_number,
-                        # Cleanup handles commenting
-            )
-                # Cleanup handles commenting
-                    # Cleanup handles commenting
         sys.exit(1)
 
     # ========================================
