@@ -121,11 +121,18 @@ export interface SubmitRequestData {
   phases?: Phase[];  // NEW: multi-phase data
 }
 
+export interface PredictedPattern {
+  pattern: string;
+  confidence: number;
+  reasoning: string;
+}
+
 export interface SubmitRequestResponse {
   request_id: string;
   is_multi_phase?: boolean;  // NEW
   parent_issue_number?: number;  // NEW
   child_issues?: ChildIssueInfo[];  // NEW
+  predicted_patterns?: PredictedPattern[];  // NEW: Pattern predictions
 }
 
 export interface ConfirmResponse {

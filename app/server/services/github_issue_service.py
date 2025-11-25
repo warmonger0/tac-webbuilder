@@ -37,7 +37,9 @@ from core.project_detector import detect_project_context
 from core.nl_processor import process_request
 from core.github_poster import GitHubPoster
 from core.cost_estimate_storage import save_cost_estimate
+from core.pattern_predictor import predict_patterns_from_input, store_predicted_patterns
 from services.multi_phase_issue_handler import MultiPhaseIssueHandler
+from utils.db_connection import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -159,18 +161,48 @@ class GitHubIssueService:
         # Generate unique request ID
         request_id = str(uuid.uuid4())
 
-        # Store in pending requests WITH cost estimate
+        # NEW: Predict patterns from input
+        predicted_patterns = []
+        try:
+            predicted_patterns = predict_patterns_from_input(
+                nl_input=request.nl_input,
+                project_path=request.project_path
+            )
+
+            # Store predictions linked to request_id
+            if predicted_patterns:
+                db_conn = get_connection()
+                store_predicted_patterns(
+                    request_id=request_id,
+                    predictions=predicted_patterns,
+                    db_connection=db_conn
+                )
+                db_conn.close()
+
+                logger.info(
+                    f"[Request {request_id}] Predicted {len(predicted_patterns)} patterns: "
+                    f"{[p['pattern'] for p in predicted_patterns]}"
+                )
+        except Exception as e:
+            # Don't fail request if pattern prediction fails
+            logger.error(f"[Request {request_id}] Pattern prediction failed: {e}")
+
+        # Store in pending requests WITH cost estimate and predicted patterns
         self.pending_requests[request_id] = {
             'issue': github_issue,
             'project_context': project_context,
-            'cost_estimate': cost_estimate
+            'cost_estimate': cost_estimate,
+            'predicted_patterns': predicted_patterns
         }
 
         logger.info(
             f"[SUCCESS] Request processed with cost estimate: {cost_estimate['level']} "
             f"(${cost_estimate['min_cost']:.2f}-${cost_estimate['max_cost']:.2f})"
         )
-        return SubmitRequestResponse(request_id=request_id)
+        return SubmitRequestResponse(
+            request_id=request_id,
+            predicted_patterns=predicted_patterns if predicted_patterns else None
+        )
 
     def _generate_cost_estimate(self, github_issue: GitHubIssue) -> dict:
         """

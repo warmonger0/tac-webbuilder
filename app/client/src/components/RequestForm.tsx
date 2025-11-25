@@ -198,6 +198,16 @@ export function RequestForm() {
 
       setRequestId(response.request_id);
 
+      // Show predicted patterns if available
+      if (response.predicted_patterns && response.predicted_patterns.length > 0) {
+        const patterns = response.predicted_patterns.map(p => p.pattern).join(', ');
+        setSuccessMessage(
+          `✅ Request submitted! Detected patterns: ${patterns}`
+        );
+        // Clear after 5 seconds
+        setTimeout(() => setSuccessMessage(null), 5000);
+      }
+
       // Fetch both preview and cost estimate in parallel
       const [previewData, costData] = await Promise.all([
         getPreview(response.request_id),
