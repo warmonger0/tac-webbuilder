@@ -84,6 +84,7 @@ class SubmitRequestResponse(BaseModel):
     is_multi_phase: bool | None = Field(None, description="Whether this is a multi-phase request")
     parent_issue_number: int | None = Field(None, description="Parent issue number (for multi-phase)")
     child_issues: list["ChildIssueInfo"] | None = Field(None, description="Child issue info (for multi-phase)")  # Forward ref
+    predicted_patterns: list[dict[str, Any]] | None = Field(None, description="Predicted operation patterns from input (Phase 2)")
 
 
 class ConfirmResponse(BaseModel):

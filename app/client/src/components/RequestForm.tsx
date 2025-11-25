@@ -193,6 +193,14 @@ export function RequestForm() {
 
       setRequestId(response.request_id);
 
+      // Display predicted patterns if any were detected (Phase 2 feature)
+      if (response.predicted_patterns && response.predicted_patterns.length > 0) {
+        const patternNames = response.predicted_patterns.map(p => p.pattern).join(', ');
+        setSuccessMessage(
+          `Request submitted! Detected patterns: ${patternNames}`
+        );
+      }
+
       // Fetch both preview and cost estimate in parallel
       const [previewData, costData] = await Promise.all([
         getPreview(response.request_id),

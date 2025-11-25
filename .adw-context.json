@@ -1,16 +1,9 @@
 {
-  "adw_id": "e7341a50",
-  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/e7341a50",
-  "created_at": "2025-11-21T12:52:45.651078",
+  "adw_id": "adw-31a25dc5",
+  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/adw-31a25dc5",
+  "created_at": "2025-11-25T06:51:41.191360",
   "changed_files": [
     ".adw-context.json",
-    ".mcp.json",
-    "app/client/src/utils/fileHandlers.ts",
-    "app/client/src/hooks/useDragAndDrop.ts",
-    "app/client/src/components/RequestForm.tsx",
-    "app/client/src/utils/__tests__/fileHandlers.test.ts",
-    "app/client/src/hooks/__tests__/useDragAndDrop.test.ts",
-    "app/client/src/components/__tests__/RequestForm.test.tsx",
-    ".claude/commands/e2e/test_drag_drop_md_upload.md"
+    ".mcp.json"
   ]
 }

@@ -126,6 +126,11 @@ export interface SubmitRequestResponse {
   is_multi_phase?: boolean;  // NEW
   parent_issue_number?: number;  // NEW
   child_issues?: ChildIssueInfo[];  // NEW
+  predicted_patterns?: Array<{
+    pattern: string;
+    confidence: number;
+    reasoning: string;
+  }>;  // Phase 2: Pattern predictions
 }
 
 export interface ConfirmResponse {
