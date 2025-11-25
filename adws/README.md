@@ -2,6 +2,21 @@
 
 ADW automates software development using isolated git worktrees. The `_iso` suffix stands for "isolated" - these workflows run in separate git worktrees, enabling multiple agents to run at the same time in their own respective directories. Each workflow gets its own complete copy of the repository with dedicated ports and filesystem isolation.
 
+## 🛡️ Robustness System
+
+The ADW system includes comprehensive safeguards to ensure reliable execution:
+
+✅ **Pre-flight Checks** - Prevents bad launches (git state, ports, tests, disk, Python env)
+✅ **Automatic Cleanup** - Closes PRs and cleans resources on workflow failures
+✅ **Automatic Issue Closing** - Closes issues on successful ship
+
+**For complete details, see [`docs/ADW_ROBUSTNESS_SYSTEM.md`](../docs/ADW_ROBUSTNESS_SYSTEM.md)**
+
+**Quick tips:**
+- Ensure main branch is clean before launching (most common blocker)
+- Failed workflows automatically close their PRs - no manual cleanup needed
+- Successful workflows automatically close issues - no manual closing needed
+
 ## Key Concepts
 
 ### Isolated Execution

@@ -1,5 +1,56 @@
 # ADW Workflow Best Practices
 
+> **Note:** For comprehensive documentation on the ADW Robustness System (pre-flight checks, automatic cleanup, issue closing), see [`ADW_ROBUSTNESS_SYSTEM.md`](./ADW_ROBUSTNESS_SYSTEM.md).
+
+## Quick Links
+
+- **Robustness System:** [`ADW_ROBUSTNESS_SYSTEM.md`](./ADW_ROBUSTNESS_SYSTEM.md) - Pre-flight checks, cleanup, issue closing
+- **Failure Analysis:** [`ADW_FAILURE_ANALYSIS_AND_FIX_PROTOCOL.md`](./ADW_FAILURE_ANALYSIS_AND_FIX_PROTOCOL.md) - Troubleshooting guide
+- **Completion Guide:** [`ADW_COMPLETION_GUIDE.md`](./ADW_COMPLETION_GUIDE.md) - Manual completion steps
+
+---
+
+## Robustness System Overview
+
+The ADW system now includes automatic safeguards to prevent and handle failures:
+
+### Pre-flight Checks (Preventive)
+
+Before launching workflows, the system checks:
+
+✅ **Git State** (BLOCKING) - Prevents worktree pollution
+⚠️ **Port Availability** - Warns if ports in use
+⚠️ **Test Status** - Warns about test failures
+⚠️ **Disk Space** - Warns if low on space
+⚠️ **Python Environment** - Verifies dependencies
+
+**How to use:**
+- Check the PreflightCheckPanel in the dashboard before launching
+- Ensure main branch is clean (most common blocker)
+- Address warnings to improve success rate
+
+### Automatic Cleanup (Corrective)
+
+When workflows fail, automatic cleanup:
+
+✅ Finds and closes associated PR
+✅ Posts failure summary to issue
+✅ Marks workflow as failed
+
+**No manual intervention needed** - the system handles everything.
+
+### Automatic Issue Closing (Success)
+
+When workflows succeed, automatic issue closing:
+
+✅ Closes issue with success comment
+✅ Posts ship summary
+✅ Marks workflow as complete
+
+**No manual issue closing needed** - happens automatically after Ship phase.
+
+---
+
 ## Worktree Management
 
 ### Understanding Worktree Base Commits
@@ -159,3 +210,56 @@ cat agents/<adw-id>/adw_state.json | grep validation_timestamp
 uv run adws/adw_validate_iso.py <issue-number> <adw-id>
 uv run adws/adw_build_iso.py <issue-number> <adw-id>
 ```
+
+### Robustness System Issues
+
+#### Pre-flight Check Blocks Launch
+
+**Symptom**: Cannot launch workflow, git state check fails
+
+**Diagnosis**: Main branch has uncommitted changes
+```bash
+git status
+```
+
+**Solution**: Commit or stash changes
+```bash
+# Option 1: Commit
+git add .
+git commit -m "Your message"
+
+# Option 2: Stash
+git stash
+
+# Then retry workflow
+```
+
+#### PR Not Closed After Failure
+
+**Symptom**: Workflow failed but PR still open
+
+**Diagnosis**: Check cleanup logs
+```bash
+cat agents/<adw-id>/<phase>/raw_output.jsonl | grep cleanup
+```
+
+**Solution**: Manually close PR if cleanup failed
+```bash
+gh pr close <pr-number> --comment "Manually closing after workflow failure"
+```
+
+See [`ADW_ROBUSTNESS_SYSTEM.md`](./ADW_ROBUSTNESS_SYSTEM.md) for complete troubleshooting guide.
+
+---
+
+## Related Documentation
+
+- **[ADW Robustness System](./ADW_ROBUSTNESS_SYSTEM.md)** - Complete guide to pre-flight checks, cleanup, and issue closing
+- **[ADW Failure Analysis](./ADW_FAILURE_ANALYSIS_AND_FIX_PROTOCOL.md)** - Detailed failure analysis and fix protocol
+- **[ADW Completion Guide](./ADW_COMPLETION_GUIDE.md)** - Manual workflow completion steps
+- **[ADW Workflows README](../adws/README.md)** - Workflow selection and usage guide
+
+---
+
+**Last Updated:** 2025-11-25
+**Version:** 2.0 (with Robustness System integration)
