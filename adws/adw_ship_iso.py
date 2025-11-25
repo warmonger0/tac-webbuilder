@@ -14,13 +14,18 @@ Workflow:
 2. Validate ALL state fields are populated (not None)
 3. Find PR for the feature branch
 4. Merge PR via GitHub API (gh pr merge --squash)
-5. Post success message to issue
+5. Verify merge actually landed on main (phantom merge detection)
+6. Close issue with success comment
+7. Post success message to issue
 
 This workflow uses GitHub's PR merge API which automatically:
-- Closes linked issues
 - Handles merge conflicts
 - Supports squash/merge strategies
 - Doesn't require clean working directory
+
+After successful merge and verification, this workflow:
+- Automatically closes the associated issue
+- Posts a success comment explaining the closure
 
 This workflow REQUIRES that all previous workflows have been run and that
 every field in ADWState has a value. This is our final approval step.
@@ -469,7 +474,50 @@ def main():
 
     logger.info(f"✅ Successfully shipped {branch_name}")
 
-    # Step 6: Post success message
+    # Step 6: Close the issue with success comment
+    logger.info(f"Closing issue #{issue_number}...")
+    try:
+        success_comment = f"""🎉 **Successfully Shipped!**
+
+✅ PR merged to main via GitHub API
+✅ Branch `{branch_name}` deployed to production
+✅ All validation checks passed
+
+**Ship Summary:**
+- Validated all state fields
+- Found and merged PR successfully
+- Verified commits landed on main
+- Code is now in production
+
+**Issue Status:** Automatically closing as resolved.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)"""
+
+        result = subprocess.run(
+            ["gh", "issue", "close", issue_number, "--comment", success_comment],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if result.returncode == 0:
+            logger.info(f"✅ Closed issue #{issue_number} with success comment")
+        else:
+            logger.warning(f"Failed to close issue #{issue_number}: {result.stderr}")
+            # Don't fail the ship workflow if issue closing fails
+            # Post a manual closing reminder instead
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_SHIPPER,
+                                   f"⚠️ Could not automatically close issue\n"
+                                   f"Please close manually - ship was successful!")
+            )
+
+    except Exception as e:
+        logger.warning(f"Exception while closing issue: {e}")
+        # Best-effort - don't fail ship if issue closing fails
+
+    # Step 7: Post success message (if issue closing failed, this adds context)
     make_issue_comment(
         issue_number,
         format_issue_message(adw_id, AGENT_SHIPPER,
