@@ -17,7 +17,7 @@ export function TabBar({ activeTab, onChange }: TabBarProps) {
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}
-          className={`px-4 py-2 font-medium transition-colors ${
+          className={`px-4 py-1.5 font-medium text-sm transition-colors ${
             activeTab === tab.id
               ? 'text-primary border-b-2 border-primary'
               : 'text-gray-600 hover:text-gray-900'

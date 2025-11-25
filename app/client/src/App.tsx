@@ -30,11 +30,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white border-b border-gray-200">
-          <div className="container mx-auto px-4 py-6 text-center">
-            <h1 className="text-3xl font-bold text-gray-900">
+          <div className="container mx-auto px-4 py-2 text-center">
+            <h1 className="text-xl font-bold text-gray-900">
               tac-webbuilder
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-gray-600 text-xs">
               Build web apps with natural language
             </p>
           </div>
@@ -48,7 +48,7 @@ function App() {
 
         <div className="visual-separator" />
 
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 py-4">
           {activeTab === 'request' && <RequestForm />}
           {activeTab === 'workflows' && <WorkflowDashboard />}
           {activeTab === 'history' && <WorkflowHistoryView />}

@@ -318,6 +318,7 @@ export async function executePhase(queueId: string): Promise<ExecutePhaseRespons
 export interface AdwWorkflowStatus {
   adw_id: string;
   issue_number: number | null;
+  pr_number: number | null;
   issue_class: string;
   title: string;
   status: 'running' | 'completed' | 'failed' | 'paused' | 'queued';
@@ -355,6 +356,61 @@ export async function getAdwMonitor(): Promise<AdwMonitorResponse> {
   return fetchJSON<AdwMonitorResponse>(`${API_BASE}/adw-monitor`);
 }
 
+// ADW Health Check Types
+export interface PortHealthCheck {
+  status: 'ok' | 'warning' | 'critical';
+  backend_port: number | null;
+  frontend_port: number | null;
+  available: boolean;
+  in_use: boolean;
+  conflicts: any[];
+  warnings: string[];
+}
+
+export interface WorktreeHealthCheck {
+  status: 'ok' | 'warning' | 'critical';
+  path: string | null;
+  exists: boolean;
+  clean: boolean;
+  uncommitted_files: string[];
+  git_registered: boolean;
+  warnings: string[];
+}
+
+export interface StateFileHealthCheck {
+  status: 'ok' | 'warning' | 'critical';
+  path: string;
+  exists: boolean;
+  valid: boolean;
+  last_modified: string | null;
+  age_seconds: number | null;
+  warnings: string[];
+}
+
+export interface ProcessHealthCheck {
+  status: 'ok' | 'warning' | 'critical';
+  active: boolean;
+  processes: any[];
+  warnings: string[];
+}
+
+export interface AdwHealthCheckResponse {
+  adw_id: string;
+  overall_health: 'ok' | 'warning' | 'critical';
+  checks: {
+    ports: PortHealthCheck;
+    worktree: WorktreeHealthCheck;
+    state_file: StateFileHealthCheck;
+    process: ProcessHealthCheck;
+  };
+  warnings: string[];
+  checked_at: string;
+}
+
+export async function getAdwHealth(adwId: string): Promise<AdwHealthCheckResponse> {
+  return fetchJSON<AdwHealthCheckResponse>(`${API_BASE}/adw-monitor/${adwId}/health`);
+}
+
 // Export as namespace object for compatibility with existing code
 export const api = {
   submitRequest,
@@ -379,4 +435,5 @@ export const api = {
   dequeuePhase,
   executePhase,
   getAdwMonitor,
+  getAdwHealth,
 };

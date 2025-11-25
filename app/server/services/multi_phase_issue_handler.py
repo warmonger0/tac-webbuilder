@@ -41,9 +41,10 @@ class MultiPhaseIssueHandler:
         Handle multi-phase request by creating sequential issues and enqueueing phases.
 
         Workflow:
-        1. Create Phase 1 issue (ready to execute immediately)
-        2. Enqueue Phase 2+ without issues (created just-in-time)
-        3. Phase 1 issue includes workflow command to auto-trigger
+        1. Validate request structure (BEFORE creating any issues)
+        2. Create Phase 1 issue (ready to execute immediately)
+        3. Enqueue Phase 2+ without issues (created just-in-time)
+        4. Phase 1 issue includes workflow command to auto-trigger
 
         Args:
             request: SubmitRequestData with phases populated
@@ -54,6 +55,7 @@ class MultiPhaseIssueHandler:
         Raises:
             HTTPException: If validation fails or GitHub posting fails
         """
+        # Pre-flight validation (BEFORE creating any GitHub issues)
         if not self.phase_queue_service:
             raise HTTPException(
                 500,
@@ -65,6 +67,24 @@ class MultiPhaseIssueHandler:
                 400,
                 "Multi-phase request must have at least 2 phases"
             )
+
+        # Validate all phases have required fields
+        for phase in request.phases:
+            if not phase.title or not phase.content:
+                raise HTTPException(
+                    400,
+                    f"Phase {phase.number} missing required fields (title or content)"
+                )
+
+        # Validate phase numbering is sequential
+        expected_number = 1
+        for phase in sorted(request.phases, key=lambda p: p.number):
+            if phase.number != expected_number:
+                raise HTTPException(
+                    400,
+                    f"Phase numbering must be sequential. Expected {expected_number}, got {phase.number}"
+                )
+            expected_number += 1
 
         try:
             # Create Phase 1 issue and enqueue all phases

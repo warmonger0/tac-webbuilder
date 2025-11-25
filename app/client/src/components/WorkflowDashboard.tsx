@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import type { WorkflowTemplateDisplay } from '../types';
+import { PreflightCheckPanel } from './PreflightCheckPanel';
 
 export function WorkflowDashboard() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['workflowCatalog'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:8000/api/workflow-catalog');
+      const response = await fetch('/api/workflow-catalog');
       if (!response.ok) {
         throw new Error('Failed to fetch workflow catalog');
       }
@@ -34,6 +35,9 @@ export function WorkflowDashboard() {
 
   return (
     <div>
+      {/* Pre-flight Health Checks */}
+      <PreflightCheckPanel />
+
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">

@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { getWebhookStatus } from '../api/client';
+import { useReliablePolling } from '../hooks/useReliablePolling';
+import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 
 interface WebhookStatus {
   status: 'healthy' | 'degraded' | 'error' | 'unknown';
@@ -28,35 +30,26 @@ interface WebhookStatus {
 
 export function WebhookStatusPanel() {
   const [status, setStatus] = useState<WebhookStatus>({ status: 'unknown' });
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  const fetchStatus = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const data = await getWebhookStatus();
+  const pollingState = useReliablePolling<WebhookStatus>({
+    fetchFn: getWebhookStatus,
+    onSuccess: (data) => {
       setStatus(data);
-      setLastChecked(new Date());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch workflow status');
+      setError(null);
+    },
+    onError: (err) => {
+      setError(err.message);
       setStatus({ status: 'error' });
-    } finally {
-      setIsLoading(false);
-    }
+    },
+    enabled: true,
+    interval: 30000,
+    adaptiveInterval: true,
+  });
+
+  const fetchStatus = () => {
+    pollingState.retry();
   };
-
-  useEffect(() => {
-    // Fetch on mount
-    fetchStatus();
-
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchStatus, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -102,13 +95,23 @@ export function WebhookStatusPanel() {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900">Workflow Status</h2>
-          <button
-            onClick={fetchStatus}
-            disabled={isLoading}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-          >
-            {isLoading ? 'Checking...' : 'Refresh'}
-          </button>
+          <div className="flex items-center gap-3">
+            <ConnectionStatusIndicator
+              isConnected={pollingState.isPolling}
+              connectionQuality={pollingState.connectionQuality}
+              lastUpdated={pollingState.lastUpdated}
+              consecutiveErrors={pollingState.consecutiveErrors}
+              onRetry={pollingState.retry}
+              variant="compact"
+            />
+            <button
+              onClick={fetchStatus}
+              disabled={!pollingState.isPolling}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -201,11 +204,6 @@ export function WebhookStatusPanel() {
           </div>
         )}
 
-        {lastChecked && (
-          <div className="mt-4 text-xs text-gray-500 text-center">
-            Last checked: {lastChecked.toLocaleTimeString()}
-          </div>
-        )}
       </div>
     </div>
   );

@@ -354,13 +354,31 @@ def main():
         issue_number, format_issue_message(adw_id, "ops", "✅ Isolated planning phase completed")
     )
 
-    # Save final state
+    # Mark workflow as completed with end time
+    from datetime import datetime
+    state.update(
+        status="completed",
+        end_time=datetime.now().isoformat()
+    )
     state.save("adw_plan_iso")
-    
+    logger.info("✅ Planning workflow marked as completed in state")
+
     # Post final state summary to issue
     make_issue_comment(
         issue_number,
         f"{adw_id}_ops: 📋 Final planning state:\n```json\n{json.dumps(state.data, indent=2)}\n```"
+    )
+
+    # Inform user about next steps
+    make_issue_comment(
+        issue_number,
+        f"{adw_id}_ops: ℹ️ **Planning workflow complete**\n\n"
+        "This workflow (`adw_plan_iso`) only creates an implementation plan and PR.\n\n"
+        "**To continue with full implementation:**\n"
+        f"```bash\n"
+        f"uv run adws/adw_sdlc_complete_iso.py {issue_number} {adw_id}\n"
+        f"```\n\n"
+        "This will execute all remaining phases: validate → build → lint → test → review → doc → ship → cleanup"
     )
 
 

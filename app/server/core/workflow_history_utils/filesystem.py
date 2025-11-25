@@ -81,7 +81,7 @@ def scan_agents_directory() -> list[dict]:
                 "github_url": state_data.get("github_url"),
                 "workflow_template": state_data.get("workflow_template", state_data.get("workflow")),
                 "model_used": state_data.get("model_used", state_data.get("model")),
-                "status": state_data.get("status", "unknown"),
+                "status": state_data.get("status") or "pending",  # Use 'or' to handle None/null values
                 "start_time": state_data.get("start_time"),
                 "current_phase": state_data.get("current_phase"),
                 "worktree_path": str(adw_dir),
@@ -91,7 +91,7 @@ def scan_agents_directory() -> list[dict]:
 
             # Infer status if not explicitly set or if still showing as "running"
             # This makes status detection more dynamic and reality-based
-            if workflow["status"] in ("unknown", "running"):
+            if workflow["status"] in ("pending", "running"):
                 # Check if there's an error file first
                 error_file = adw_dir / "error.log"
                 if error_file.exists():

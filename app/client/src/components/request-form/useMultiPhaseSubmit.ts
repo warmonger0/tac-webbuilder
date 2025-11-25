@@ -38,11 +38,16 @@ export function useMultiPhaseSubmit({
       });
 
       // Handle multi-phase response
-      if (response.is_multi_phase && response.parent_issue_number) {
+      console.log('[DEBUG] Multi-phase response:', JSON.stringify(response, null, 2));
+      if (response.is_multi_phase && response.child_issues && response.child_issues.length > 0) {
+        // Filter issues that have been created (issue_number is not null)
+        const createdIssues = response.child_issues.filter(c => c.issue_number !== null);
+        const queuedPhases = response.child_issues.filter(c => c.issue_number === null);
+
         const successMessage =
           `✅ Multi-phase request created!\n\n` +
-          `📋 Parent Issue: #${response.parent_issue_number}\n` +
-          `🔢 Child Issues: ${response.child_issues?.map(c => `#${c.issue_number}`).join(', ')}\n\n` +
+          `🚀 Phase 1 Issue: ${createdIssues.length > 0 ? `#${createdIssues[0].issue_number}` : 'Creating...'}\n` +
+          `⏳ Queued Phases: ${queuedPhases.length} (will be created just-in-time)\n\n` +
           `All ${phases.length} phases have been queued for execution.`;
 
         onSuccess(successMessage);

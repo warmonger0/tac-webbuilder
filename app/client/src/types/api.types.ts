@@ -110,7 +110,7 @@ export interface Phase {
 
 export interface ChildIssueInfo {
   phase_number: number;
-  issue_number: number;
+  issue_number: number | null;  // null for queued phases (created just-in-time)
   queue_id: string;
 }
 

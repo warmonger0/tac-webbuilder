@@ -86,6 +86,17 @@ def main():
     adw_id = ensure_adw_id(issue_number, adw_id)
     print(f"Using ADW ID: {adw_id}")
 
+    # Update state to show full SDLC workflow is active
+    from adw_modules.state import ADWState
+    logger = setup_logger(adw_id, "adw_sdlc_complete_iso")
+    state = ADWState.load(adw_id, logger)
+    state.update(
+        workflow_template="adw_sdlc_complete_iso",
+        status="running"
+    )
+    state.save("adw_sdlc_complete_iso")
+    logger.info("✅ Updated state to show full SDLC workflow active")
+
     # Post initial message
     try:
         make_issue_comment(

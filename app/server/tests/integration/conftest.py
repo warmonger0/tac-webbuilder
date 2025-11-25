@@ -30,7 +30,7 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def integration_test_db() -> Generator[Path, None, None]:
+def integration_test_db(monkeypatch) -> Generator[Path, None, None]:
     """
     Create a temporary database for integration tests with full schema.
 
@@ -40,18 +40,27 @@ def integration_test_db() -> Generator[Path, None, None]:
     Usage:
         def test_workflow_lifecycle(integration_test_db):
             from core.workflow_history_utils.database import insert_workflow_history
-            with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
-                row_id = insert_workflow_history(adw_id="TEST-001", ...)
-                assert row_id > 0
+            # No need to patch - fixture already handles it
+            row_id = insert_workflow_history(adw_id="TEST-001", ...)
+            assert row_id > 0
     """
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         temp_db_path = Path(f.name)
 
+    # Use monkeypatch to replace DB_PATH in all modules
+    import core.workflow_history_utils.database.schema as schema_module
+    import core.workflow_history_utils.database.mutations as mutations_module
+    import core.workflow_history_utils.database.queries as queries_module
+    import core.workflow_history_utils.database.analytics as analytics_module
+
+    monkeypatch.setattr(schema_module, 'DB_PATH', temp_db_path)
+    monkeypatch.setattr(mutations_module, 'DB_PATH', temp_db_path)
+    monkeypatch.setattr(queries_module, 'DB_PATH', temp_db_path)
+    monkeypatch.setattr(analytics_module, 'DB_PATH', temp_db_path)
+
     # Initialize database schema
     from core.workflow_history_utils.database import init_db
-
-    with patch('core.workflow_history_utils.database.DB_PATH', temp_db_path):
-        init_db()
+    init_db()
 
     yield temp_db_path
 

@@ -271,7 +271,7 @@ class TestPhaseProgress:
         agents_dir.mkdir()
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            phase, progress = calculate_phase_progress("nonexistent", {})
+            phase, progress, phase_names = calculate_phase_progress("nonexistent", {})
             assert phase is None
             assert progress == 0.0
 
@@ -284,7 +284,7 @@ class TestPhaseProgress:
         adw_dir.mkdir()
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            phase, progress = calculate_phase_progress("abc123", {})
+            phase, progress, phase_names = calculate_phase_progress("abc123", {})
             assert phase is None
             assert progress == 0.0
 
@@ -301,9 +301,9 @@ class TestPhaseProgress:
         (adw_dir / "build_phase").mkdir()
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            phase, progress = calculate_phase_progress("abc123", {})
-            # 2 phases out of 8 = 25%
-            assert progress == 25.0
+            phase, progress, phase_names = calculate_phase_progress("abc123", {})
+            # 2 phases out of 9 = 22.2%
+            assert progress == 22.2
 
     def test_calculate_phase_progress_current_phase(self, tmp_path):
         """Test progress with current phase"""
@@ -319,7 +319,7 @@ class TestPhaseProgress:
         state = {"current_phase": "build"}
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            phase, progress = calculate_phase_progress("abc123", state)
+            phase, progress, phase_names = calculate_phase_progress("abc123", state)
             assert phase == "build"
             # 1 phase completed (12.5%) + 0.5 * 12.5% for current phase = 18.75%
             # But we round to 1 decimal place

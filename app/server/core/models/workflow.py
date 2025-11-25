@@ -216,7 +216,8 @@ class CostPrediction(BaseModel):
 class AdwWorkflowStatus(BaseModel):
     """Status of a single ADW workflow for monitoring"""
     adw_id: str = Field(..., description="ADW workflow identifier")
-    issue_number: int | None = Field(None, description="GitHub issue number")
+    issue_number: int | None = Field(None, description="GitHub issue number (parent issue)")
+    pr_number: int | None = Field(None, description="Pull request number created for this issue")
     issue_class: str = Field("", description="Issue classification (/bug, /feature, etc.)")
     title: str = Field("", description="Workflow title (truncated nl_input)")
     status: Literal["running", "completed", "failed", "paused", "queued"] = Field(..., description="Current workflow status")
@@ -244,3 +245,54 @@ class AdwMonitorSummary(BaseModel):
     completed: int = Field(0, description="Number of completed workflows")
     failed: int = Field(0, description="Number of failed workflows")
     paused: int = Field(0, description="Number of paused workflows")
+
+
+# ADW Health Check Models
+class PortHealthCheck(BaseModel):
+    """Health check for port allocation"""
+    status: Literal["ok", "warning", "critical"] = Field(..., description="Health status")
+    backend_port: int | None = Field(None, description="Backend port number")
+    frontend_port: int | None = Field(None, description="Frontend port number")
+    available: bool = Field(True, description="Whether ports are available")
+    in_use: bool = Field(False, description="Whether ports are currently in use")
+    conflicts: list[dict[str, Any]] = Field(default_factory=list, description="List of port conflicts")
+    warnings: list[str] = Field(default_factory=list, description="Warning messages")
+
+
+class WorktreeHealthCheck(BaseModel):
+    """Health check for worktree status"""
+    status: Literal["ok", "warning", "critical"] = Field(..., description="Health status")
+    path: str | None = Field(None, description="Worktree directory path")
+    exists: bool = Field(False, description="Whether worktree directory exists")
+    clean: bool = Field(True, description="Whether worktree has no uncommitted changes")
+    uncommitted_files: list[str] = Field(default_factory=list, description="List of uncommitted files")
+    git_registered: bool = Field(False, description="Whether git knows about this worktree")
+    warnings: list[str] = Field(default_factory=list, description="Warning messages")
+
+
+class StateFileHealthCheck(BaseModel):
+    """Health check for state file validity"""
+    status: Literal["ok", "warning", "critical"] = Field(..., description="Health status")
+    path: str = Field(..., description="State file path")
+    exists: bool = Field(False, description="Whether state file exists")
+    valid: bool = Field(False, description="Whether state file is valid JSON")
+    last_modified: str | None = Field(None, description="Last modification time (ISO format)")
+    age_seconds: int | None = Field(None, description="Age of state file in seconds")
+    warnings: list[str] = Field(default_factory=list, description="Warning messages")
+
+
+class ProcessHealthCheck(BaseModel):
+    """Health check for running processes"""
+    status: Literal["ok", "warning", "critical"] = Field(..., description="Health status")
+    active: bool = Field(False, description="Whether any processes are running")
+    processes: list[dict[str, Any]] = Field(default_factory=list, description="List of running processes")
+    warnings: list[str] = Field(default_factory=list, description="Warning messages")
+
+
+class AdwHealthCheckResponse(BaseModel):
+    """Complete health check response for an ADW workflow"""
+    adw_id: str = Field(..., description="ADW workflow identifier")
+    overall_health: Literal["ok", "warning", "critical"] = Field(..., description="Overall health status")
+    checks: dict[str, Any] = Field(..., description="Individual health checks (ports, worktree, state_file, process)")
+    warnings: list[str] = Field(default_factory=list, description="All warning messages")
+    checked_at: str = Field(..., description="Timestamp of health check (ISO format)")

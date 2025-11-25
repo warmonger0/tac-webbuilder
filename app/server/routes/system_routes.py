@@ -5,11 +5,13 @@ import logging
 from datetime import datetime
 
 from core.data_models import (
+    AdwHealthCheckResponse,
     AdwMonitorResponse,
     HealthCheckResponse,
     SystemStatusResponse,
 )
-from fastapi import APIRouter
+from core.preflight_checks import run_preflight_checks
+from fastapi import APIRouter, Query
 from utils.db_connection import get_connection
 
 logger = logging.getLogger(__name__)
@@ -88,6 +90,62 @@ def init_system_routes(health_service, service_controller, app_start_time):
                 last_updated=datetime.now().isoformat()
             )
 
+    @router.get("/api/adw-monitor/{adw_id}/health", response_model=AdwHealthCheckResponse)
+    async def get_adw_health(adw_id: str) -> AdwHealthCheckResponse:
+        """
+        Get comprehensive health check for a specific ADW workflow.
+
+        Performs health checks on:
+        - Port allocation and conflicts
+        - Worktree state and git status
+        - State file validity and freshness
+        - Process status and resource usage
+
+        Returns detailed health information with warnings and recommendations.
+        """
+        from core.adw_monitor import scan_adw_states
+        from core.health_checks import get_overall_health
+
+        try:
+            # Find the state for this ADW
+            states = scan_adw_states()
+            state = next((s for s in states if s.get("adw_id") == adw_id), None)
+
+            if not state:
+                # Return critical health if state not found
+                return AdwHealthCheckResponse(
+                    adw_id=adw_id,
+                    overall_health="critical",
+                    checks={
+                        "ports": {"status": "critical", "warnings": ["ADW state not found"]},
+                        "worktree": {"status": "critical", "warnings": ["ADW state not found"]},
+                        "state_file": {"status": "critical", "warnings": ["ADW state not found"]},
+                        "process": {"status": "critical", "warnings": ["ADW state not found"]}
+                    },
+                    warnings=["ADW state not found - workflow may not exist"],
+                    checked_at=datetime.now().isoformat()
+                )
+
+            # Run comprehensive health checks
+            health_result = get_overall_health(adw_id, state)
+            return AdwHealthCheckResponse(**health_result)
+
+        except Exception as e:
+            logger.error(f"Error getting health check for {adw_id}: {e}")
+            # Return error response
+            return AdwHealthCheckResponse(
+                adw_id=adw_id,
+                overall_health="critical",
+                checks={
+                    "ports": {"status": "critical", "warnings": [f"Health check failed: {str(e)}"]},
+                    "worktree": {"status": "critical", "warnings": [f"Health check failed: {str(e)}"]},
+                    "state_file": {"status": "critical", "warnings": [f"Health check failed: {str(e)}"]},
+                    "process": {"status": "critical", "warnings": [f"Health check failed: {str(e)}"]}
+                },
+                warnings=[f"Health check failed: {str(e)}"],
+                checked_at=datetime.now().isoformat()
+            )
+
     @router.post("/api/services/webhook/start")
     async def start_webhook_service() -> dict:
         """Start the webhook service - delegates to ServiceController"""
@@ -107,3 +165,40 @@ def init_system_routes(health_service, service_controller, app_start_time):
     async def redeliver_github_webhook() -> dict:
         """Redeliver GitHub webhook - delegates to ServiceController"""
         return service_controller.redeliver_github_webhook()
+
+    @router.get("/api/preflight-checks")
+    async def run_preflight_health_checks(skip_tests: bool = Query(False)) -> dict:
+        """
+        Run pre-flight checks before launching ADW workflows.
+
+        Checks:
+        - Critical test failures (PhaseCoordinator, ADW Monitor, Database)
+        - Port availability (9100-9114, 9200-9214)
+        - Git repository state (uncommitted changes)
+        - Disk space (minimum 1GB free)
+        - Python environment (uv availability)
+
+        Args:
+            skip_tests: Skip the test suite check (for faster checks)
+
+        Returns:
+            Pre-flight check results with pass/fail status and detailed diagnostics
+        """
+        try:
+            result = run_preflight_checks(skip_tests=skip_tests)
+            status = "✅ PASSED" if result["passed"] else "❌ FAILED"
+            logger.info(f"Pre-flight checks: {status} ({result['total_duration_ms']}ms)")
+            return result
+        except Exception as e:
+            logger.error(f"Pre-flight check error: {str(e)}")
+            return {
+                "passed": False,
+                "blocking_failures": [{
+                    "check": "System Error",
+                    "error": str(e),
+                    "fix": "Check logs for details"
+                }],
+                "warnings": [],
+                "checks_run": [],
+                "total_duration_ms": 0
+            }

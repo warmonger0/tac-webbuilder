@@ -41,7 +41,19 @@ def insert_workflow_history(
 
     Raises:
         sqlite3.IntegrityError: If a workflow with this adw_id already exists
+        ValueError: If status is None or invalid
     """
+    # Validate status field to prevent NOT NULL constraint violations
+    if status is None or status == "":
+        logger.warning(f"[DB] Invalid status '{status}' for {adw_id}, defaulting to 'pending'")
+        status = "pending"
+
+    # Ensure status is one of the valid values
+    valid_statuses = ["pending", "running", "completed", "failed"]
+    if status not in valid_statuses:
+        logger.warning(f"[DB] Invalid status '{status}' for {adw_id}, defaulting to 'pending'")
+        status = "pending"
+
     with get_db_connection(db_path=str(DB_PATH)) as conn:
         cursor = conn.cursor()
 

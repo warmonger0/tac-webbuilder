@@ -73,7 +73,7 @@ Write tests.
 # Phase One - Setup
 Initial setup work.
 
-### Phase: Configuration
+## Phase: Configuration
 Configure the system.
 
 ## Phase 3
@@ -262,6 +262,33 @@ Actual content here
       expect(result.phases[2].number).toBe(3);
       expect(result.phases[3].number).toBe(4);
       expect(result.phases[4].number).toBe(5);
+    });
+
+    it('should NOT match subsection headers (### or deeper)', () => {
+      // Regression test for bug where "### Phase 1 Complete When:" was matched as a phase
+      const markdown = `
+## Phase 1: Foundation
+Build the foundation.
+
+### Phase 1 Complete When:
+- ✅ Foundation complete
+- ✅ Tests pass
+
+## Phase 2: Implementation
+Implement features.
+
+### Phase 2 Complete When:
+- ✅ Features implemented
+- ✅ Tests pass
+      `;
+
+      const result = parsePhases(markdown);
+      expect(result.isMultiPhase).toBe(true);
+      expect(result.phases).toHaveLength(2); // Should only detect 2 phases, not 4
+      expect(result.phases[0].number).toBe(1);
+      expect(result.phases[0].title).toBe('Foundation');
+      expect(result.phases[1].number).toBe(2);
+      expect(result.phases[1].title).toBe('Implementation');
     });
 
     it('should handle mixed numeric and word patterns', () => {

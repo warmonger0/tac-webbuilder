@@ -7,13 +7,16 @@
 import type { ParsedPhase } from './phaseParser';
 
 /**
- * Flexible phase header patterns:
+ * Phase header patterns (matches only top-level phases, not subsections):
  * - ## Phase 1: Title
  * - # Phase One - Title
- * - ### Phase: Setup
+ * - ## Phase: Setup
  * - ## Phase 2
+ *
+ * NOTE: Only matches # or ## (not ###, ####, etc.) to avoid matching
+ * subsection headers like "### Phase 1 Complete When:"
  */
-export const PHASE_HEADER_REGEX = /^(#{1,6})\s+Phase\s*[:\-]?\s*(\d+|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten)?(?:[:\-]\s*)?(.*)$/im;
+export const PHASE_HEADER_REGEX = /^(#{1,2})\s+Phase\s*[:\-]?\s*(\d+|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten)?(?:[:\-]\s*)?(.*)$/im;
 
 /**
  * Extract external document references (e.g., "see ARCHITECTURE.md", "refer to docs/SETUP.md")

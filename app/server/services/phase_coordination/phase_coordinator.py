@@ -398,3 +398,31 @@ class PhaseCoordinator:
                 f"[ERROR] Failed to create just-in-time issue for Phase "
                 f"{next_phase_number}: {str(e)}"
             )
+
+    def _get_workflow_status(self, issue_number: int) -> Optional[str]:
+        """
+        Get workflow status from workflow_history by issue number.
+
+        Wrapper method for backwards compatibility with tests.
+
+        Args:
+            issue_number: GitHub issue number
+
+        Returns:
+            'completed', 'failed', 'running', 'pending', or None if not found
+        """
+        return self.detector.get_workflow_status(issue_number)
+
+    def _get_workflow_error(self, issue_number: int) -> Optional[str]:
+        """
+        Get error message from workflow_history.
+
+        Wrapper method for backwards compatibility with tests.
+
+        Args:
+            issue_number: GitHub issue number
+
+        Returns:
+            Error message string or None
+        """
+        return self.detector.get_workflow_error(issue_number)

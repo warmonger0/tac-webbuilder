@@ -18,5 +18,5 @@ class Phase(BaseModel):
 class ChildIssueInfo(BaseModel):
     """Information about a created child issue"""
     phase_number: int = Field(..., description="Phase number")
-    issue_number: int = Field(..., description="GitHub issue number")
+    issue_number: int | None = Field(None, description="GitHub issue number (None for queued phases)")
     queue_id: str = Field(..., description="Queue ID for this phase")

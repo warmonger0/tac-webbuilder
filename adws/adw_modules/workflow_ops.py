@@ -326,7 +326,22 @@ def classify_issue(
     issue: GitHubIssue, adw_id: str, logger: logging.Logger
 ) -> Tuple[Optional[IssueClassSlashCommand], Optional[str]]:
     """Classify GitHub issue and return appropriate slash command.
-    Returns (command, error_message) tuple."""
+    Returns (command, error_message) tuple.
+
+    Classification is cached in state to ensure determinism across workflow phases.
+    """
+
+    # Check if classification is already cached in state
+    try:
+        state = ADWState.load(adw_id, logger)
+        cached_classification = state.get("issue_class")
+
+        if cached_classification:
+            logger.info(f"Using cached classification: {cached_classification}")
+            return cached_classification, None
+    except Exception as e:
+        logger.debug(f"Could not load state for classification cache check: {e}")
+        # Continue with classification if state loading fails
 
     # Use the classify_issue slash command template with minimal payload
     # Only include the essential fields: number, title, body

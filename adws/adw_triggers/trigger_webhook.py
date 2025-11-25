@@ -113,28 +113,48 @@ def can_launch_workflow(workflow: str, issue_number: int, provided_adw_id: Optio
     Returns:
         (can_launch, error_message)
     """
-    # 1. Check API quota
+    # 1. Run critical test checks (fast, < 30s)
+    try:
+        from core.preflight_checks import check_critical_tests
+        test_result = check_critical_tests()
+        if not test_result["passed"]:
+            failing_count = len(test_result.get("failing_tests", []))
+            return False, f"Critical test failures detected ({failing_count} tests failing). Fix tests before launching workflows."
+    except Exception as e:
+        # Don't block on test check errors, just log
+        print(f"⚠️ Warning: Failed to run critical test check: {e}")
+
+    # 2. Check API quota
     log_quota_warning()
     can_proceed, quota_error = can_start_adw()
     if not can_proceed:
         return False, f"API quota unavailable: {quota_error}"
 
-    # 2. Check concurrency locks (only for new workflows)
+    # 3. Check concurrency locks (only for new workflows)
     if not provided_adw_id:
         # This check is done in the main flow, so we skip here
         pass
 
-    # 3. Check disk space
+    # 4. Check git state (CRITICAL - prevents worktree pollution)
+    try:
+        from core.preflight_checks import check_git_state
+        git_result = check_git_state()
+        if not git_result["passed"]:
+            return False, f"Repository has uncommitted changes ({git_result['summary']}). Commit or stash changes before launching workflows to prevent worktree pollution."
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to check git state: {e}")
+
+    # 5. Check disk space
     disk_usage = get_disk_usage()
     if disk_usage > 0.95:
         return False, f"Disk space critical (>95% used: {disk_usage*100:.1f}%)"
 
-    # 4. Check worktree availability
+    # 6. Check worktree availability
     worktree_count = count_active_worktrees()
     if worktree_count >= 15:
         return False, f"Max worktrees reached ({worktree_count}/15)"
 
-    # 5. Validate workflow exists
+    # 7. Validate workflow exists
     if workflow not in AVAILABLE_ADW_WORKFLOWS:
         return False, f"Unknown workflow: {workflow}"
 

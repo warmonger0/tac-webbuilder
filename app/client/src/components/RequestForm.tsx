@@ -262,24 +262,28 @@ export function RequestForm() {
 
   return (
     <>
-      <div className="max-w-4xl mx-auto">
-        <div className="grid grid-cols-2 gap-6">
-          {/* Drag-and-drop zone - entire card */}
+      <div className="max-w-7xl mx-auto px-4">
+        {/* First Row: Create New Request & Hopper Queue */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 items-stretch">
+          {/* Left Column - Create New Request */}
           <div
-            className={`bg-white rounded-lg shadow p-6 space-y-4 relative transition-all ${
-              isDragging ? 'ring-4 ring-primary ring-opacity-50 bg-blue-50' : ''
+            className={`lg:col-span-2 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 space-y-3 relative transition-all flex flex-col ${
+              isDragging ? 'ring-4 ring-emerald-500 ring-opacity-50' : ''
             }`}
             {...dragHandlers}
             aria-busy={isReading || phaseHandler.isSubmitting}
           >
-            <h2 className="text-2xl font-bold text-gray-900">
-              Create New Request
-            </h2>
+            <div className="relative mb-1">
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-lg -m-2"></div>
+              <h2 className="text-xl font-bold text-white relative z-10">
+                Create New Request
+              </h2>
+            </div>
 
             <div>
               <label
                 htmlFor="nl-input"
-                className="block text-sm font-medium text-gray-700 mb-2"
+                className="block text-sm font-medium text-slate-300 mb-2"
               >
                 Describe what you want to build
               </label>
@@ -289,8 +293,8 @@ export function RequestForm() {
                 placeholder="Example: Build a REST API for user management with CRUD operations..."
                 value={nlInput}
                 onChange={(e) => setNlInput(e.target.value)}
-                rows={6}
-                className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                rows={4}
+                className="w-full p-3 bg-slate-800 border border-slate-600 text-white placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                 disabled={isReading}
               />
 
@@ -308,7 +312,7 @@ export function RequestForm() {
             <div>
               <label
                 htmlFor="project-path"
-                className="block text-sm font-medium text-gray-700 mb-2"
+                className="block text-sm font-medium text-slate-300 mb-2"
               >
                 Project path (optional)
               </label>
@@ -318,7 +322,7 @@ export function RequestForm() {
                 placeholder="/Users/username/projects/my-app"
                 value={projectPath}
                 onChange={(e) => setProjectPath(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full p-3 bg-slate-800 border border-slate-600 text-white placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
             </div>
 
@@ -328,33 +332,33 @@ export function RequestForm() {
                 type="checkbox"
                 checked={autoPost}
                 onChange={(e) => setAutoPost(e.target.checked)}
-                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                className="h-4 w-4 text-emerald-500 focus:ring-emerald-500 border-slate-600 rounded bg-slate-800"
               />
-              <label htmlFor="auto-post" className="ml-2 text-sm text-gray-700">
+              <label htmlFor="auto-post" className="ml-2 text-sm text-slate-300">
                 Auto-post to GitHub (skip confirmation)
               </label>
             </div>
 
             {storageWarning && (
-              <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-200 text-yellow-800">
+              <div className="p-4 border rounded-lg bg-yellow-900/20 border-yellow-500/50 text-yellow-200">
                 {storageWarning}
               </div>
             )}
 
             {healthWarning && (
-              <div className={`p-4 border rounded-lg ${systemHealthy ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+              <div className={`p-4 border rounded-lg ${systemHealthy ? 'bg-yellow-900/20 border-yellow-500/50 text-yellow-200' : 'bg-red-900/20 border-red-500/50 text-red-200'}`}>
                 {healthWarning}
               </div>
             )}
 
             {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+              <div className="p-4 bg-red-900/20 border border-red-500/50 rounded-lg text-red-200">
                 {error}
               </div>
             )}
 
             {successMessage && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
+              <div className="p-4 bg-emerald-900/20 border border-emerald-500/50 rounded-lg text-emerald-200">
                 {successMessage}
               </div>
             )}
@@ -362,14 +366,14 @@ export function RequestForm() {
             <button
               onClick={handleSubmit}
               disabled={isLoading || phaseHandler.isSubmitting}
-              className="w-full bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-3 px-6 rounded-lg font-medium hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg"
             >
               {isLoading ? 'Processing...' : 'Generate Issue'}
             </button>
 
             {preview && !showConfirm && !autoPost && (
               <div className="mt-6 space-y-6">
-                <h3 className="text-xl font-bold">Preview</h3>
+                <h3 className="text-xl font-bold text-white">Preview</h3>
 
                 {/* Cost Estimate Card - Displayed FIRST for visibility */}
                 {costEstimate && (
@@ -382,27 +386,36 @@ export function RequestForm() {
             )}
           </div>
 
-          <ZteHopperQueueCard />
+          {/* Right Column - Hopper Queue */}
+          <div className="lg:col-span-1">
+            <ZteHopperQueueCard />
+          </div>
         </div>
 
-        {showConfirm && preview && (
-          <ConfirmDialog
-            issue={preview}
-            costEstimate={costEstimate}
-            onConfirm={handleConfirm}
-            onCancel={handleCancel}
-          />
-        )}
+        {/* Second Row: System Status & Current Workflow */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+          {/* System Status */}
+          <div className="lg:col-span-2 flex">
+            <SystemStatusPanel />
+          </div>
 
-        {phaseHandler.modal}
+          {/* Current Workflow */}
+          <div className="lg:col-span-1 flex">
+            <AdwMonitorCard />
+          </div>
+        </div>
       </div>
 
-      {/* ADW Monitor Section */}
-      <div className="max-w-4xl mx-auto mt-8">
-        <AdwMonitorCard />
-      </div>
+      {showConfirm && preview && (
+        <ConfirmDialog
+          issue={preview}
+          costEstimate={costEstimate}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        />
+      )}
 
-      <SystemStatusPanel />
+      {phaseHandler.modal}
     </>
   );
 }

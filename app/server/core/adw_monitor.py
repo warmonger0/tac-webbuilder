@@ -180,7 +180,7 @@ def determine_status(adw_id: str, state: dict[str, Any]) -> str:
 
     Status logic:
     - running: Process is actively running
-    - completed: Workflow marked as completed in state
+    - completed: Workflow marked as completed in state OR GitHub issue is closed
     - failed: Workflow marked as failed in state
     - paused: Worktree exists, no process, no activity >10 minutes
     - queued: State exists but workflow not started
@@ -193,13 +193,33 @@ def determine_status(adw_id: str, state: dict[str, Any]) -> str:
         str: One of: running, completed, failed, paused, queued
     """
     # Check explicit status from state file first
-    state_status = state.get("status", "").lower()
+    state_status = (state.get("status") or "").lower()
 
     if state_status == "completed":
         return "completed"
 
     if state_status == "failed":
         return "failed"
+
+    # Check if GitHub issue is closed (override any other status)
+    issue_number = state.get("issue_number")
+    if issue_number:
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["gh", "issue", "view", str(issue_number), "--json", "state"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                import json
+                issue_data = json.loads(result.stdout)
+                if issue_data.get("state") == "CLOSED":
+                    return "completed"
+        except Exception:
+            # If we can't check GitHub, continue with other checks
+            pass
 
     # Check if process is running
     if is_process_running(adw_id):
@@ -222,7 +242,7 @@ def determine_status(adw_id: str, state: dict[str, Any]) -> str:
     return "queued"
 
 
-def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | None, float]:
+def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | None, float, list[str]]:
     """
     Calculate the current phase and overall progress percentage.
 
@@ -234,24 +254,24 @@ def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | 
         state: The workflow state dictionary
 
     Returns:
-        tuple: (current_phase, progress_percentage)
+        tuple: (current_phase, progress_percentage, completed_phases_list)
     """
-    # Standard SDLC phases
-    phases = ["plan", "build", "lint", "test", "review", "doc", "ship", "cleanup"]
+    # Standard SDLC phases (9 total)
+    phases = ["plan", "validate", "build", "lint", "test", "review", "doc", "ship", "cleanup"]
     total_phases = len(phases)
 
     agents_dir = get_agents_directory()
     adw_dir = agents_dir / adw_id
 
     if not adw_dir.exists():
-        return None, 0.0
+        return None, 0.0, []
 
     # Get list of subdirectories in the agent directory
     try:
         subdirs = [d.name.lower() for d in adw_dir.iterdir() if d.is_dir()]
     except Exception as e:
         logger.error(f"Error reading agent directory for {adw_id}: {e}")
-        return None, 0.0
+        return None, 0.0, []
 
     # Count completed phases (directories that match phase names)
     completed_phases = []
@@ -274,7 +294,7 @@ def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | 
     # Cap at 100%
     progress = min(base_progress, 100.0)
 
-    return current_phase, round(progress, 1)
+    return current_phase, round(progress, 1), completed_phases
 
 
 def extract_cost_data(state: dict[str, Any]) -> tuple[float | None, float | None]:
@@ -336,6 +356,56 @@ def extract_error_info(adw_id: str, state: dict[str, Any]) -> tuple[int, str | N
     return error_count, last_error
 
 
+def detect_pr_for_issue(issue_number: int | None) -> int | None:
+    """
+    Detect if a PR has been created for this issue.
+
+    Uses GitHub CLI to search for PRs that reference the issue number in their body.
+
+    Args:
+        issue_number: The GitHub issue number
+
+    Returns:
+        int | None: PR number if found, None otherwise
+    """
+    if not issue_number:
+        return None
+
+    try:
+        # Search for PRs that close this issue
+        result = subprocess.run(
+            ["gh", "pr", "list", "--search", f"Closes #{issue_number}", "--json", "number", "--limit", "1"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            import json
+            prs = json.loads(result.stdout)
+            if prs and len(prs) > 0:
+                return prs[0].get("number")
+
+        # Also try alternative format: "closes #issue"
+        result = subprocess.run(
+            ["gh", "pr", "list", "--search", f"closes #{issue_number}", "--json", "number", "--limit", "1"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            import json
+            prs = json.loads(result.stdout)
+            if prs and len(prs) > 0:
+                return prs[0].get("number")
+
+    except Exception as e:
+        logger.debug(f"Could not detect PR for issue #{issue_number}: {e}")
+
+    return None
+
+
 def build_workflow_status(state: dict[str, Any]) -> dict[str, Any]:
     """
     Build a complete workflow status object from state data.
@@ -348,43 +418,79 @@ def build_workflow_status(state: dict[str, Any]) -> dict[str, Any]:
     """
     adw_id = state.get("adw_id", "unknown")
 
-    # Determine status
-    status = determine_status(adw_id, state)
+    try:
+        # Determine status
+        status = determine_status(adw_id, state)
 
-    # Calculate phase progress
-    current_phase, progress = calculate_phase_progress(adw_id, state)
+        # Calculate phase progress
+        current_phase, progress, completed_phases = calculate_phase_progress(adw_id, state)
 
-    # Extract costs
-    current_cost, estimated_cost = extract_cost_data(state)
+        # Extract costs
+        current_cost, estimated_cost = extract_cost_data(state)
 
-    # Extract error info
-    error_count, last_error = extract_error_info(adw_id, state)
+        # Extract error info
+        error_count, last_error = extract_error_info(adw_id, state)
 
-    # Build workflow status object
-    workflow_status = {
-        "adw_id": adw_id,
-        "issue_number": state.get("issue_number"),
-        "issue_class": state.get("issue_class") or state.get("classification") or "",
-        "title": state.get("nl_input", "")[:100],  # Truncate to 100 chars
-        "status": status,
-        "current_phase": current_phase,
-        "phase_progress": progress,
-        "workflow_template": state.get("workflow_template", state.get("workflow", "")),
-        "start_time": state.get("start_time"),
-        "end_time": state.get("end_time"),
-        "duration_seconds": state.get("duration_seconds"),
-        "github_url": state.get("github_url"),
-        "worktree_path": state.get("worktree_path"),
-        "current_cost": current_cost,
-        "estimated_cost_total": estimated_cost,
-        "error_count": error_count,
-        "last_error": last_error,
-        "is_process_active": is_process_running(adw_id),
-        "phases_completed": [],  # Could be enhanced to list phase names
-        "total_phases": 8,  # Standard SDLC has 8 phases
-    }
+        # Safely extract title, handling None values
+        nl_input = state.get("nl_input")
+        title = nl_input[:100] if nl_input else ""
 
-    return workflow_status
+        # Detect PR for this issue
+        issue_number = state.get("issue_number")
+        pr_number = detect_pr_for_issue(issue_number)
+
+        # Build workflow status object
+        workflow_status = {
+            "adw_id": adw_id,
+            "issue_number": issue_number,
+            "pr_number": pr_number,
+            "issue_class": state.get("issue_class") or state.get("classification") or "",
+            "title": title,
+            "status": status,
+            "current_phase": current_phase,
+            "phase_progress": progress,
+            "workflow_template": state.get("workflow_template") or state.get("workflow") or "",
+            "start_time": state.get("start_time"),
+            "end_time": state.get("end_time"),
+            "duration_seconds": state.get("duration_seconds"),
+            "github_url": state.get("github_url"),
+            "worktree_path": state.get("worktree_path"),
+            "current_cost": current_cost,
+            "estimated_cost_total": estimated_cost,
+            "error_count": error_count,
+            "last_error": last_error,
+            "is_process_active": is_process_running(adw_id),
+            "phases_completed": completed_phases,
+            "total_phases": 9,  # Standard SDLC has 9 phases
+        }
+
+        return workflow_status
+    except TypeError as e:
+        logger.error(f"TypeError building status for {adw_id}: {e}. State keys: {list(state.keys())}")
+        # Return minimal valid workflow status
+        return {
+            "adw_id": adw_id,
+            "issue_number": None,
+            "pr_number": None,
+            "issue_class": "",
+            "title": "",
+            "status": "unknown",
+            "current_phase": None,
+            "phase_progress": 0.0,
+            "workflow_template": "",
+            "start_time": None,
+            "end_time": None,
+            "duration_seconds": None,
+            "github_url": None,
+            "worktree_path": None,
+            "current_cost": None,
+            "estimated_cost_total": None,
+            "error_count": 0,
+            "last_error": f"Error building status: {str(e)}",
+            "is_process_active": False,
+            "phases_completed": [],
+            "total_phases": 9,
+        }
 
 
 def aggregate_adw_monitor_data() -> dict[str, Any]:

@@ -51,11 +51,15 @@ from .responses import (
     WorkflowHistoryResponse,
 )
 from .workflow import (
+    AdwHealthCheckResponse,
     AdwMonitorSummary,
     AdwWorkflowStatus,
     CostData,
     CostPrediction,
     PhaseCost,
+    PortHealthCheck,
+    ProcessHealthCheck,
+    StateFileHealthCheck,
     TokenBreakdown,
     TrendDataPoint,
     Workflow,
@@ -66,6 +70,7 @@ from .workflow import (
     WorkflowHistoryTokenBreakdown,
     WorkflowTemplate,
     WorkflowTrends,
+    WorktreeHealthCheck,
 )
 
 __all__ = [
@@ -108,12 +113,16 @@ __all__ = [
     "WorkflowCatalogResponse",
     "WorkflowHistoryResponse",
     # Workflow models
+    "AdwHealthCheckResponse",
     "AdwMonitorResponse",
     "AdwMonitorSummary",
     "AdwWorkflowStatus",
     "CostData",
     "CostPrediction",
     "PhaseCost",
+    "PortHealthCheck",
+    "ProcessHealthCheck",
+    "StateFileHealthCheck",
     "TokenBreakdown",
     "TrendDataPoint",
     "Workflow",
@@ -124,4 +133,5 @@ __all__ = [
     "WorkflowHistoryTokenBreakdown",
     "WorkflowTemplate",
     "WorkflowTrends",
+    "WorktreeHealthCheck",
 ]
