@@ -1,16 +1,158 @@
 {
-  "adw_id": "e7341a50",
-  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/e7341a50",
-  "created_at": "2025-11-21T12:52:45.651078",
+  "adw_id": "ccc93560",
+  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/ccc93560",
+  "created_at": "2025-11-25T00:25:56.281361",
+  "branch_name": "feature-issue-91-adw-ccc93560-verify-pattern-collection",
   "changed_files": [
-    ".adw-context.json",
-    ".mcp.json",
-    "app/client/src/utils/fileHandlers.ts",
-    "app/client/src/hooks/useDragAndDrop.ts",
-    "app/client/src/components/RequestForm.tsx",
-    "app/client/src/utils/__tests__/fileHandlers.test.ts",
-    "app/client/src/hooks/__tests__/useDragAndDrop.test.ts",
-    "app/client/src/components/__tests__/RequestForm.test.tsx",
-    ".claude/commands/e2e/test_drag_drop_md_upload.md"
-  ]
+    ".mcp.json"
+  ],
+  "commits": [
+    {
+      "sha": "57a7203",
+      "message": "sdlc_planner: feature: add phase 1: verify existing post-workflow"
+    }
+  ],
+  "plan_file": "specs/issue-91-adw-ccc93560-sdlc_planner-phase-1-verify-existing-post-workflow-pattern-coll.md",
+  "issue": {
+    "number": 91,
+    "title": "Phase 1: Verify Existing Post-Workflow Pattern Collection",
+    "body": "# Phase 1 of 13\n\n**Execution Order:** Executes first\n\n## Description\n\n**Status:** \u2705 Already Implemented, Needs Testing\n**Effort:** 1-2 hours\n**Risk:** Low\n\n### Objectives\n- Verify pattern detection works on completed workflows\n- Confirm database schema is functional\n- Establish baseline for pattern quality\n\n### Tasks\n\n#### 1.1 Database Verification\n```sql\n-- Check tables exist\nSELECT name FROM sqlite_master WHERE type='table' AND name IN ('operation_patterns', 'pattern_occurrences', 'tool_calls');\n\n-- Check for existing patterns\nSELECT * FROM operation_patterns LIMIT 10;\n\n-- Check pattern-workflow linkage\nSELECT * FROM pattern_occurrences LIMIT 10;\n```\n\n**Acceptance Criteria:**\n- All 3 tables exist\n- Can query without errors\n\n#### 1.2 Manual Pattern Detection Test\nCreate test script: `app/server/tests/manual/test_existing_pattern_detection.py`\n\n```python\n\"\"\"\nManual test to verify pattern detection on existing workflows.\nRun: cd app/server && uv run python tests/manual/test_existing_pattern_detection.py\n\"\"\"\nimport sqlite3\nfrom core.pattern_detector import detect_patterns_in_workflow\nfrom core.pattern_persistence import record_pattern_occurrence\n\n# Connect to database\nconn = sqlite3.connect('data/workflow_history.db')\n\n# Get a completed workflow\ncursor = conn.cursor()\ncursor.execute(\"\"\"\n    SELECT * FROM workflow_history\n    WHERE status = 'completed'\n    AND nl_input IS NOT NULL\n    LIMIT 1\n\"\"\")\n\nworkflow = dict(zip([col[0] for col in cursor.description], cursor.fetchone()))\n\n# Detect patterns\npatterns = detect_patterns_in_workflow(workflow)\nprint(f\"\u2705 Detected {len(patterns)} patterns:\")\nfor p in patterns:\n    print(f\"  - {p}\")\n\n# Record patterns\nfor pattern in patterns:\n    pattern_id, is_new = record_pattern_occurrence(pattern, workflow, conn)\n    status = \"NEW\" if is_new else \"EXISTING\"\n    print(f\"  [{status}] Pattern ID: {pattern_id}\")\n\nconn.commit()\nconn.close()\n```\n\n**Acceptance Criteria:**\n- Script detects at least 1 pattern from completed workflow\n- Patterns are saved to database\n- Re-running script shows patterns as \"EXISTING\"\n\n#### 1.3 Query Pattern Statistics\nCreate query script: `app/server/tests/manual/query_pattern_stats.py`\n\n```python\n\"\"\"\nQuery and display pattern statistics.\n\"\"\"\nimport sqlite3\nimport json\n\nconn = sqlite3.connect('data/workflow_history.db')\ncursor = conn.cursor()\n\n# Get top 10 patterns by occurrence\ncursor.execute(\"\"\"\n    SELECT\n        pattern_signature,\n        pattern_type,\n        occurrence_count,\n        automation_status,\n        confidence_score\n    FROM operation_patterns\n    ORDER BY occurrence_count DESC\n    LIMIT 10\n\"\"\")\n\nprint(\"\\n\ud83d\udcca Top 10 Patterns:\\n\")\nfor row in cursor.fetchall():\n    sig, type_, count, status, confidence = row\n    print(f\"{sig:40} | Count: {count:3} | Status: {status:15} | Confidence: {confidence:.2f}\")\n\n# Get pattern characteristics\ncursor.execute(\"\"\"\n    SELECT pattern_signature, characteristics\n    FROM operation_patterns\n    WHERE characteristics IS NOT NULL\n    LIMIT 3\n\"\"\")\n\nprint(\"\\n\ud83d\udd0d Sample Pattern Characteristics:\\n\")\nfor sig, chars in cursor.fetchall():\n    print(f\"Pattern: {sig}\")\n    print(f\"  {json.loads(chars)}\\n\")\n\nconn.close()\n```\n\n**Acceptance Criteria:**\n- Can see patterns ranked by occurrence\n- Characteristics JSON is valid and meaningful\n\n### Deliverables\n- \u2705 Verified database schema functional\n- \u2705 Manual test script demonstrates pattern detection works\n- \u2705 Query script shows pattern statistics\n- \ud83d\udcc4 Document findings in `docs/pattern_recognition/PHASE_1_VERIFICATION.md`\n\n### Success Metrics\n- At least 1 pattern detected from test workflow\n- Pattern persists across multiple runs\n- Characteristics include duration, cost, tool usage\n\n---\n\n\n---\n\n**Workflow:** adw_plan_iso with base model\n",
+    "state": "OPEN",
+    "author": {
+      "id": "MDQ6VXNlcjExNTk1NTE3",
+      "login": "warmonger0",
+      "name": "",
+      "is_bot": false
+    },
+    "assignees": [],
+    "labels": [
+      {
+        "id": "LA_kwDOQT8ln88AAAACQqGRGQ",
+        "name": "multi-phase",
+        "color": "ededed",
+        "description": ""
+      },
+      {
+        "id": "LA_kwDOQT8ln88AAAACQqGSOQ",
+        "name": "phase-1",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "milestone": null,
+    "comments": [
+      {
+        "id": "IC_kwDOQT8ln87VC4ZE",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] \ud83e\udd16 ADW Webhook: Detected `adw_plan_iso` workflow request\n\nStarting workflow with ID: `ccc93560`\nWorkflow: `adw_plan_iso` \ud83c\udfd7\ufe0f\nModel Set: `base` \u2699\ufe0f\nReason: New issue with adw_plan_iso workflow\n\nLogs will be available at: `agents/ccc93560/adw_plan_iso/`",
+        "createdAt": "2025-11-25T08:21:51Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87VC4b9",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] ccc93560_ops: \u2705 Starting isolated planning phase",
+        "createdAt": "2025-11-25T08:21:53Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87VC4df",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] ccc93560_ops: \ud83d\udd0d Using state\n```json\n{\n  \"adw_id\": \"ccc93560\",\n  \"issue_number\": \"91\",\n  \"branch_name\": null,\n  \"plan_file\": null,\n  \"issue_class\": null,\n  \"worktree_path\": null,\n  \"backend_port\": 9109,\n  \"frontend_port\": 9209,\n  \"model_set\": \"base\",\n  \"all_adws\": [\n    \"adw_plan_iso\"\n  ],\n  \"estimated_cost_total\": null,\n  \"estimated_cost_breakdown\": null,\n  \"status\": \"running\",\n  \"workflow_template\": \"adw_plan_iso\",\n  \"model_used\": \"sonnet\",\n  \"start_time\": \"2025-11-25T00:21:50.254958\",\n  \"nl_input\": \"#+Phase+1+of+13\\n\\n**Execution+Order:**+Executes+first\\n\\n##+Description\\n\\n**Status:**+\\u2705+Already+Implemented,+Needs+Testing\\n**Effort:**+1-2+hours\\n**Risk:**+Low\\n\\n###+Objectives\\n-+Verify+pattern+detection+works+on+completed+workflows\\n-+Confirm+database+schema+is+functional\\n-+Establish+baseline+for+pattern+quality\\n\\n###+Tasks\\n\\n####+1.1+Database+Verification\\n```sql\\n--+Check+tables+exist\\nSELECT+name+FROM+sqlite_master+WHERE+type='table'+AND+name+IN+('operation_patterns',+'pattern_occurrences',+'tool_calls'\",\n  \"github_url\": \"https://github.com/warmonger0/tac-webbuilder/issues/91\"\n}\n```",
+        "createdAt": "2025-11-25T08:21:54Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87VC4mO",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] ccc93560_ops: \u2705 Issue classified as: /feature",
+        "createdAt": "2025-11-25T08:22:02Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87VC4xF",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] ccc93560_ops: \u2705 Working in isolated worktree: /Users/Warmonger0/tac/tac-webbuilder/trees/ccc93560\n\ud83d\udd0c Ports - Backend: 9109, Frontend: 9209",
+        "createdAt": "2025-11-25T08:22:16Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87VC4yH",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] ccc93560_sdlc_planner: \u2705 Building implementation plan in isolated environment",
+        "createdAt": "2025-11-25T08:22:17Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87VC89J",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] ccc93560_sdlc_planner: \u2705 Implementation plan created",
+        "createdAt": "2025-11-25T08:25:51Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87VC8-R",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] ccc93560_ops: \u2705 Plan file validated in worktree: specs/issue-91-adw-ccc93560-sdlc_planner-phase-1-verify-existing-post-workflow-pattern-coll.md",
+        "createdAt": "2025-11-25T08:25:52Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87VC8_L",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] ccc93560_sdlc_planner: \u2705 Plan committed",
+        "createdAt": "2025-11-25T08:25:53Z",
+        "updatedAt": null
+      }
+    ],
+    "createdAt": "2025-11-25T08:21:46Z",
+    "updatedAt": "2025-11-25T08:25:53Z",
+    "closedAt": null,
+    "url": "https://github.com/warmonger0/tac-webbuilder/issues/91"
+  }
 }
