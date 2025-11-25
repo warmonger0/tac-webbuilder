@@ -130,4 +130,25 @@ def init_db():
             cursor.execute("ALTER TABLE workflow_history ADD COLUMN gh_issue_state TEXT")
             conn.commit()
 
+        # Migration: Fix phantom records (completed/failed without end_time)
+        # Note: We can't add CHECK constraint to existing table in SQLite,
+        # but we can fix existing data and rely on application-level validation
+        cursor.execute("""
+            SELECT adw_id, status, end_time
+            FROM workflow_history
+            WHERE status IN ('completed', 'failed') AND end_time IS NULL
+        """)
+        phantom_records = cursor.fetchall()
+
+        if phantom_records:
+            logger.warning(
+                f"[DB] Found {len(phantom_records)} phantom records with completed/failed "
+                f"status but no end_time. These should be investigated."
+            )
+            for record in phantom_records:
+                logger.warning(
+                    f"[DB] Phantom record: adw_id={record['adw_id']}, "
+                    f"status={record['status']}, end_time={record['end_time']}"
+                )
+
         logger.info(f"[DB] Workflow history database initialized at {DB_PATH}")

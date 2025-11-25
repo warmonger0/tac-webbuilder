@@ -6,6 +6,7 @@ This module provides all write operations for the workflow history system.
 
 import json
 import logging
+import traceback
 
 from utils.db_connection import get_connection as get_db_connection
 from .schema import DB_PATH
@@ -128,6 +129,16 @@ def insert_workflow_history(
 
         query = f"INSERT INTO workflow_history ({fields_str}) VALUES ({placeholders})"
 
+        # PHANTOM DETECTION: Log stack trace if status is completed/failed without end_time
+        end_time_value = kwargs.get("end_time") if "end_time" in kwargs else None
+        if status in ["completed", "failed"] and end_time_value is None:
+            stack_trace = "".join(traceback.format_stack())
+            logger.error(
+                f"[PHANTOM CREATION] Attempting to insert workflow_history with status='{status}' "
+                f"but end_time=None for ADW {adw_id}\n"
+                f"Stack trace:\n{stack_trace}"
+            )
+
         cursor.execute(query, values)
         row_id = cursor.lastrowid
 
@@ -244,6 +255,16 @@ def update_workflow_history(
             SET {", ".join(set_clauses)}
             WHERE adw_id = ?
         """
+
+        # PHANTOM DETECTION: Log stack trace if updating to completed/failed without end_time
+        if "status" in mapped_kwargs and mapped_kwargs["status"] in ["completed", "failed"]:
+            if "end_time" not in mapped_kwargs or mapped_kwargs["end_time"] is None:
+                stack_trace = "".join(traceback.format_stack())
+                logger.error(
+                    f"[PHANTOM UPDATE] Attempting to update workflow_history to status='{mapped_kwargs['status']}' "
+                    f"without end_time for ADW {adw_id}\n"
+                    f"Stack trace:\n{stack_trace}"
+                )
 
         values = list(mapped_kwargs.values()) + [adw_id]
         cursor.execute(query, values)

@@ -7,6 +7,7 @@ from the agents directory.
 
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,7 @@ def scan_agents_directory() -> list[dict]:
                 "model_used": state_data.get("model_used", state_data.get("model")),
                 "status": state_data.get("status") or "pending",  # Use 'or' to handle None/null values
                 "start_time": state_data.get("start_time"),
+                "end_time": state_data.get("end_time"),  # Include end_time from state
                 "current_phase": state_data.get("current_phase"),
                 "worktree_path": str(adw_dir),
                 "backend_port": state_data.get("backend_port"),
@@ -96,6 +98,10 @@ def scan_agents_directory() -> list[dict]:
                 error_file = adw_dir / "error.log"
                 if error_file.exists():
                     workflow["status"] = "failed"
+                    # Set end_time to error file modification time if not already set
+                    if not workflow.get("end_time"):
+                        error_mtime = error_file.stat().st_mtime
+                        workflow["end_time"] = datetime.fromtimestamp(error_mtime).isoformat()
                     logger.debug(f"[SCAN] Workflow {adw_id} failed (error.log exists)")
                 else:
                     # Check for completion indicators based on ADW lifecycle
@@ -112,6 +118,10 @@ def scan_agents_directory() -> list[dict]:
                         branch_name = state_data.get("branch_name")
                         if plan_file and branch_name:
                             workflow["status"] = "completed"
+                            # Set end_time to state file modification time if not already set
+                            if not workflow.get("end_time"):
+                                state_mtime = state_file.stat().st_mtime
+                                workflow["end_time"] = datetime.fromtimestamp(state_mtime).isoformat()
                             logger.debug(f"[SCAN] Workflow {adw_id} completed (3+ phases, has plan & branch)")
                         else:
                             # Has phases but missing key artifacts - might be in progress
@@ -120,6 +130,10 @@ def scan_agents_directory() -> list[dict]:
                     elif len(completed_phases) == 1 and state_data.get("plan_file") is None:
                         # Only has planning phase and no plan file created - likely failed early
                         workflow["status"] = "failed"
+                        # Set end_time to state file modification time if not already set
+                        if not workflow.get("end_time"):
+                            state_mtime = state_file.stat().st_mtime
+                            workflow["end_time"] = datetime.fromtimestamp(state_mtime).isoformat()
                         logger.debug(f"[SCAN] Workflow {adw_id} failed (only 1 phase, no plan file)")
                     else:
                         # In progress or unknown state
