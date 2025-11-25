@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { getRoutes, getWorkflowHistory, listWorkflows } from '../api/client';
 import type { HistoryAnalytics, Route, WorkflowExecution, WorkflowHistoryItem } from '../types';
 import { useReliableWebSocket } from './useReliableWebSocket';
+import { config } from '../config';
 
 interface WorkflowsWebSocketMessage {
   type: 'workflows_update';
@@ -16,9 +17,7 @@ interface RoutesWebSocketMessage {
 export function useWorkflowsWebSocket() {
   const [workflows, setWorkflows] = useState<WorkflowExecution[]>([]);
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.hostname;
-  const wsUrl = `${protocol}//${host}:8000/ws/workflows`;
+  const wsUrl = config.websocket.getWebSocketUrl(config.websocket.ENDPOINTS.WORKFLOWS);
 
   const connectionState = useReliableWebSocket<WorkflowExecution[], WorkflowsWebSocketMessage>({
     url: wsUrl,
@@ -50,9 +49,7 @@ export function useWorkflowsWebSocket() {
 export function useRoutesWebSocket() {
   const [routes, setRoutes] = useState<Route[]>([]);
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.hostname;
-  const wsUrl = `${protocol}//${host}:8000/ws/routes`;
+  const wsUrl = config.websocket.getWebSocketUrl(config.websocket.ENDPOINTS.ROUTES);
 
   const connectionState = useReliableWebSocket<{ routes: Route[] }, RoutesWebSocketMessage>({
     url: wsUrl,
@@ -95,9 +92,7 @@ export function useWorkflowHistoryWebSocket() {
   const [totalCount, setTotalCount] = useState(0);
   const [analytics, setAnalytics] = useState<HistoryAnalytics | null>(null);
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.hostname;
-  const wsUrl = `${protocol}//${host}:8000/ws/workflow-history`;
+  const wsUrl = config.websocket.getWebSocketUrl(config.websocket.ENDPOINTS.WORKFLOW_HISTORY);
 
   const connectionState = useReliableWebSocket<
     {
@@ -166,9 +161,9 @@ interface ADWStateWebSocketMessage {
 export function useADWStateWebSocket(adwId: string | null) {
   const [state, setState] = useState<ADWStateWebSocketMessage['data'] | null>(null);
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.hostname;
-  const wsUrl = adwId ? `${protocol}//${host}:8000/ws/adw-state/${adwId}` : '';
+  const wsUrl = adwId
+    ? config.websocket.getWebSocketUrl(config.websocket.ENDPOINTS.ADW_STATE, { adwId })
+    : '';
 
   const connectionState = useReliableWebSocket<
     ADWStateWebSocketMessage['data'],

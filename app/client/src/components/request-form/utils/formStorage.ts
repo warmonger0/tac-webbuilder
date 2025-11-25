@@ -1,8 +1,9 @@
 import type { RequestFormPersistedState } from '../../../types';
+import { config } from '../../../config';
 
-const REQUEST_FORM_STATE_STORAGE_KEY = 'tac-webbuilder-request-form-state';
-const REQUEST_FORM_STATE_VERSION = 1;
-export const PROJECT_PATH_STORAGE_KEY = 'tac-webbuilder-project-path';
+const REQUEST_FORM_STATE_STORAGE_KEY = config.storage.REQUEST_FORM_STATE_KEY;
+const REQUEST_FORM_STATE_VERSION = config.storage.REQUEST_FORM_STATE_VERSION;
+export const PROJECT_PATH_STORAGE_KEY = config.storage.PROJECT_PATH_KEY;
 
 /**
  * Save form state to localStorage

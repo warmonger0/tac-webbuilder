@@ -16,13 +16,13 @@ import type { ParsedPhase } from './phaseParser';
  * NOTE: Only matches # or ## (not ###, ####, etc.) to avoid matching
  * subsection headers like "### Phase 1 Complete When:"
  */
-export const PHASE_HEADER_REGEX = /^(#{1,2})\s+Phase\s*[:\-]?\s*(\d+|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten)?(?:[:\-]\s*)?(.*)$/im;
+export const PHASE_HEADER_REGEX = /^(#{1,2})\s+Phase\s*[:-]?\s*(\d+|One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten)?(?:[:-]\s*)?(.*)$/im;
 
 /**
  * Extract external document references (e.g., "see ARCHITECTURE.md", "refer to docs/SETUP.md")
  * Matches: "see FILE.md", "refer to docs/FILE.md", "reference the FILE.md", etc.
  */
-export const EXTERNAL_DOC_REGEX = /(?:see|refer to|reference|referenced in|mentioned in|from)(?:\s+the)?\s+([a-zA-Z0-9_\-\/\.]+\.md)/gi;
+export const EXTERNAL_DOC_REGEX = /(?:see|refer to|reference|referenced in|mentioned in|from)(?:\s+the)?\s+([a-zA-Z0-9_\-/.]+\.md)/gi;
 
 /**
  * Word-to-number mapping for phase numbers

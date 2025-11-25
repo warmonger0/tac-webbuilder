@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { config } from '../config';
 
 interface ReliableWebSocketOptions<T, M = any> {
   url: string;
@@ -33,9 +34,9 @@ export function useReliableWebSocket<T, M = any>({
   queryFn,
   onMessage,
   enabled = true,
-  pollingInterval = 3000,
-  maxReconnectDelay = 30000,
-  maxReconnectAttempts = 10,
+  pollingInterval = config.websocket.POLLING_INTERVAL,
+  maxReconnectDelay = config.websocket.MAX_RECONNECT_DELAY,
+  maxReconnectAttempts = config.websocket.MAX_RECONNECT_ATTEMPTS,
 }: ReliableWebSocketOptions<T, M>) {
   const [state, setState] = useState<ConnectionState>({
     isConnected: false,

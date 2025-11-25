@@ -17,8 +17,9 @@ import type {
   WorkflowHistoryItem,
   WorkflowHistoryResponse,
 } from '../types';
+import { config } from '../config';
 
-const API_BASE = '/api';
+const API_BASE = config.api.BASE_PATH;
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -209,7 +210,7 @@ export async function exportTable(tableName: string): Promise<void> {
 export async function getWebhookStatus(): Promise<any> {
   // Try to fetch from webhook service directly
   try {
-    const response = await fetch('http://localhost:8001/webhook-status');
+    const response = await fetch(config.api.WEBHOOK_URL);
     if (response.ok) {
       return response.json();
     }

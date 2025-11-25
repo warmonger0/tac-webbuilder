@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { executePhase } from '../api/client';
 import { WorkflowStateDisplay } from './WorkflowStateDisplay';
+import { config } from '../config';
 
 export interface PhaseQueueItem {
   queue_id: string;
@@ -91,14 +92,14 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
 
   const handleClick = () => {
     if (issue_number) {
-      window.open(`https://github.com/warmonger0/tac-webbuilder/issues/${issue_number}`, '_blank');
+      window.open(config.github.getIssueUrl(issue_number), '_blank');
     }
   };
 
   const handlePRClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (pr_number) {
-      window.open(`https://github.com/warmonger0/tac-webbuilder/pull/${pr_number}`, '_blank');
+      window.open(config.github.getPullRequestUrl(pr_number), '_blank');
     }
   };
 

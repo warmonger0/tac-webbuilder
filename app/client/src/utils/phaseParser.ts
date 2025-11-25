@@ -61,7 +61,7 @@ export function parsePhases(markdownContent: string): PhaseParseResult {
       const phaseNumberText = match[2]; // Could be number or word
       // Clean title: remove leading colons/dashes and trim
       const rawTitle = match[3]?.trim() || '';
-      const title = rawTitle.replace(/^[:\-]\s*/, '').trim() || `Phase ${phasePosition}`;
+      const title = rawTitle.replace(/^[:-]\s*/, '').trim() || `Phase ${phasePosition}`;
       const phaseNumber = parsePhaseNumber(phaseNumberText, phasePosition);
 
       currentPhase = {

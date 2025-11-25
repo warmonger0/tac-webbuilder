@@ -5,9 +5,10 @@ import { RequestForm } from './components/RequestForm';
 import { WorkflowDashboard } from './components/WorkflowDashboard';
 import { WorkflowHistoryView } from './components/WorkflowHistoryView';
 import { RoutesView } from './components/RoutesView';
+import { config } from './config';
 
 const queryClient = new QueryClient();
-const ACTIVE_TAB_STORAGE_KEY = 'tac-webbuilder-active-tab';
+const ACTIVE_TAB_STORAGE_KEY = config.storage.ACTIVE_TAB_KEY;
 
 function App() {
   const [activeTab, setActiveTab] = useState<
@@ -32,10 +33,10 @@ function App() {
         <header className="bg-white border-b border-gray-200">
           <div className="container mx-auto px-4 py-2 text-center">
             <h1 className="text-xl font-bold text-gray-900">
-              tac-webbuilder
+              {config.app.NAME}
             </h1>
             <p className="text-gray-600 text-xs">
-              Build web apps with natural language
+              {config.app.TAGLINE}
             </p>
           </div>
         </header>
