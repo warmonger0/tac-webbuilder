@@ -42,6 +42,8 @@ from adw_modules.workflow_ops import ensure_adw_id, format_issue_message, trigge
 from adw_modules.github import make_issue_comment
 from adw_modules.cleanup_operations import cleanup_shipped_issue
 from adw_modules.utils import setup_logger
+from adw_modules.failure_cleanup import cleanup_failed_workflow
+from adw_modules.state import ADWState
 
 
 def main():
@@ -142,13 +144,27 @@ def main():
     plan = subprocess.run(plan_cmd)
     if plan.returncode != 0:
         print("❌ Plan phase failed")
+        # Load state to get branch name
+        logger = setup_logger(adw_id, "sdlc_cleanup")
+        state = ADWState.load(adw_id, logger)
+        branch_name = state.get("branch_name") if state else None
+
+        # Clean up failed workflow
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=branch_name,
+            phase_name="Plan",
+            error_details="Plan phase failed. Check planning logs for errors.",
+            logger=logger
+        )
         try:
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "ops", "❌ SDLC aborted - Plan phase failed")
+                        # Cleanup handles commenting
             )
-        except:
-            pass
+                # Cleanup handles commenting
+                    # Cleanup handles commenting
         sys.exit(1)
 
     # ========================================
@@ -190,13 +206,20 @@ def main():
     build = subprocess.run(build_cmd)
     if build.returncode != 0:
         print("❌ Build phase failed")
-        try:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", "❌ SDLC aborted - Build phase failed")
-            )
-        except:
-            pass
+        # Load state to get branch name
+        logger = setup_logger(adw_id, "sdlc_cleanup")
+        state = ADWState.load(adw_id, logger)
+        branch_name = state.get("branch_name") if state else None
+
+        # Clean up failed workflow
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=branch_name,
+            phase_name="Build",
+            error_details="Build phase failed. Check build logs for TypeScript/compilation errors.",
+            logger=logger
+        )
         sys.exit(1)
 
     # ========================================
@@ -219,14 +242,20 @@ def main():
     lint = subprocess.run(lint_cmd)
     if lint.returncode != 0:
         print("❌ Lint phase failed")
-        try:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", "❌ SDLC aborted - Lint phase failed\n\n"
-                "Please fix linting errors before proceeding.")
-            )
-        except:
-            pass
+        # Load state to get branch name
+        logger = setup_logger(adw_id, "sdlc_cleanup")
+        state = ADWState.load(adw_id, logger)
+        branch_name = state.get("branch_name") if state else None
+
+        # Clean up failed workflow
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=branch_name,
+            phase_name="Lint",
+            error_details="Lint phase failed. Fix linting errors before proceeding.",
+            logger=logger
+        )
         sys.exit(1)
 
     # ========================================
@@ -250,14 +279,20 @@ def main():
     test = subprocess.run(test_cmd)
     if test.returncode != 0:
         print("❌ Test phase failed")
-        try:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", "❌ SDLC aborted - Test phase failed\n\n"
-                "Please fix failing tests before proceeding.")
-            )
-        except:
-            pass
+        # Load state to get branch name
+        logger = setup_logger(adw_id, "sdlc_cleanup")
+        state = ADWState.load(adw_id, logger)
+        branch_name = state.get("branch_name") if state else None
+
+        # Clean up failed workflow
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=branch_name,
+            phase_name="Test",
+            error_details="Test phase failed. Review test output and fix failing tests before proceeding.",
+            logger=logger
+        )
         sys.exit(1)
 
     # ========================================
@@ -280,14 +315,20 @@ def main():
     review = subprocess.run(review_cmd)
     if review.returncode != 0:
         print("❌ Review phase failed")
-        try:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", "❌ SDLC aborted - Review phase failed\n\n"
-                "Please address review issues before proceeding.")
-            )
-        except:
-            pass
+        # Load state to get branch name
+        logger = setup_logger(adw_id, "sdlc_cleanup")
+        state = ADWState.load(adw_id, logger)
+        branch_name = state.get("branch_name") if state else None
+
+        # Clean up failed workflow
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=branch_name,
+            phase_name="Review",
+            error_details="Review phase failed. Address review issues before proceeding.",
+            logger=logger
+        )
         sys.exit(1)
 
     # ========================================
@@ -333,14 +374,20 @@ def main():
     ship = subprocess.run(ship_cmd)
     if ship.returncode != 0:
         print("❌ Ship phase failed")
-        try:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", "❌ SDLC incomplete - Ship phase failed\n\n"
-                "Manual review and merge may be required.")
-            )
-        except:
-            pass
+        # Load state to get branch name
+        logger = setup_logger(adw_id, "sdlc_cleanup")
+        state = ADWState.load(adw_id, logger)
+        branch_name = state.get("branch_name") if state else None
+
+        # Clean up failed workflow (but keep PR open - manual review may help)
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=None,  # Don't close PR on ship failure - manual review may be needed
+            phase_name="Ship",
+            error_details="Ship phase failed. Manual review and merge may be required. PR remains open for manual handling.",
+            logger=logger
+        )
         sys.exit(1)
 
     # ========================================
