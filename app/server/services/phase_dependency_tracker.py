@@ -6,7 +6,6 @@ Manages phase completion triggering and failure blocking.
 """
 
 import logging
-from typing import List, Optional
 
 from repositories.phase_queue_repository import PhaseQueueRepository
 
@@ -25,7 +24,7 @@ class PhaseDependencyTracker:
         """
         self.repository = repository
 
-    def trigger_next_phase(self, completed_queue_id: str) -> Optional[str]:
+    def trigger_next_phase(self, completed_queue_id: str) -> str | None:
         """
         Mark phase as completed and trigger next phase in sequence.
 
@@ -75,7 +74,7 @@ class PhaseDependencyTracker:
 
         return None
 
-    def block_dependent_phases(self, failed_queue_id: str, error_message: str) -> List[str]:
+    def block_dependent_phases(self, failed_queue_id: str, error_message: str) -> list[str]:
         """
         Mark phase as failed and block all dependent phases.
 

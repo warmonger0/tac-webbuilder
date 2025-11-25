@@ -63,10 +63,6 @@ class ProjectContext(BaseModel):
     has_git: bool = Field(default=False, description="Whether project has git initialized")
 
 
-# Multi-Phase Models (imported from queue.py)
-from .queue import ChildIssueInfo, Phase  # noqa: E402
-
-
 # Cost Estimation Models
 class CostEstimate(BaseModel):
     """Cost estimate for a workflow execution"""

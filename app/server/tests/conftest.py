@@ -15,15 +15,13 @@ Fixtures provided:
 
 import os
 import sqlite3
-import sys
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-
 
 # ============================================================================
 # Pytest Configuration
@@ -260,7 +258,7 @@ def mock_anthropic_api_key():
 
 
 @pytest.fixture
-def cleanup_test_data(temp_directory: Path) -> Generator[Path, None, None]:
+def cleanup_test_data(temp_directory: Path) -> Path:
     """
     Provide a temporary directory and ensure cleanup after test.
 
@@ -272,7 +270,7 @@ def cleanup_test_data(temp_directory: Path) -> Generator[Path, None, None]:
             test_file.write_text("test data")
             # File automatically cleaned up after test
     """
-    yield temp_directory
+    return temp_directory
 
     # Cleanup is handled by temp_directory fixture
 
@@ -527,7 +525,7 @@ def init_workflow_history_schema(temp_db_connection: sqlite3.Connection):
 
     temp_db_connection.commit()
 
-    yield temp_db_connection
+    return temp_db_connection
 
 
 # ============================================================================

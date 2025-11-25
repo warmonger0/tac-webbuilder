@@ -5,6 +5,7 @@ All API request models for the tac-webbuilder application.
 """
 
 from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -83,4 +84,5 @@ class ResyncRequest(BaseModel):
 
 # Forward references - imported at end to avoid circular imports
 from .queue import Phase  # noqa: E402
+
 SubmitRequestData.model_rebuild()

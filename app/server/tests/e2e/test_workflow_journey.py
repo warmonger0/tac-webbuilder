@@ -10,8 +10,9 @@ These tests validate complete user workflows from start to finish:
 Simulates real user interactions with minimal mocking.
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 
 @pytest.mark.e2e
@@ -159,7 +160,7 @@ class TestRealtimeUpdatesJourney:
         2. User starts a workflow
         3. User receives status updates in realtime
         """
-        client = full_stack_context["client"]
+        full_stack_context["client"]
         ws_manager = full_stack_context["websocket"]
 
         # Create mock WebSocket client

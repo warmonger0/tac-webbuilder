@@ -13,10 +13,9 @@ Run from app/server/ directory:
     cd app/server && uv run python tests/manual/query_pattern_stats.py
 """
 
-import sys
 import sqlite3
+import sys
 from pathlib import Path
-from datetime import datetime
 
 
 def main():

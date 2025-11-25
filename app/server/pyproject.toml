@@ -77,6 +77,20 @@ markers = [
     "websocket: marks tests that use WebSocket",
 ]
 
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Ignore certain rules that are too strict or not applicable
+ignore = [
+    "PT011",  # pytest.raises without match parameter
+    "C901",   # function is too complex
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can have more flexibility with style
+"tests/**/*.py" = ["SIM117", "SIM105", "SIM102"]
+
 [dependency-groups]
 dev = [
     "pytest-asyncio>=1.3.0",

@@ -15,14 +15,11 @@ import os
 import sqlite3
 import tempfile
 from datetime import datetime
-from typing import Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
-
 from services.phase_coordinator import PhaseCoordinator
 from services.phase_queue_service import PhaseQueueService
-
 
 # ============================================================================
 # Fixtures
@@ -117,7 +114,7 @@ def add_workflow(
     workflow_db_path: str,
     issue_number: int,
     status: str = "running",
-    error_message: Optional[str] = None
+    error_message: str | None = None
 ):
     """Add a workflow to workflow_history"""
     conn = sqlite3.connect(workflow_db_path)
@@ -600,7 +597,7 @@ def test_get_ready_phases(phase_coordinator, phase_queue_service):
         depends_on_phase=None,
     )
 
-    queued_id = phase_queue_service.enqueue(
+    phase_queue_service.enqueue(
         parent_issue=1200,
         phase_number=2,
         phase_data={"title": "Queued Phase", "content": "Test"},

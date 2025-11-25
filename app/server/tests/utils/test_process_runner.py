@@ -14,10 +14,10 @@ Tests verify:
 """
 
 import subprocess
-from unittest.mock import patch, MagicMock
-import pytest
-from utils.process_runner import ProcessRunner, ProcessResult
+from unittest.mock import MagicMock, patch
 
+import pytest
+from utils.process_runner import ProcessResult, ProcessRunner
 
 # ============================================================================
 # Fixtures for mocking subprocess

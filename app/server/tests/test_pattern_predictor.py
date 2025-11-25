@@ -6,12 +6,9 @@ of predicted patterns in the database.
 """
 
 import sqlite3
-from pathlib import Path
 
 import pytest
-
 from core.pattern_predictor import predict_patterns_from_input, store_predicted_patterns
-
 
 # ============================================================================
 # Tests for predict_patterns_from_input
@@ -192,7 +189,7 @@ def init_pattern_schema(temp_db_connection: sqlite3.Connection):
     """)
 
     temp_db_connection.commit()
-    yield temp_db_connection
+    return temp_db_connection
 
 
 @pytest.mark.unit
