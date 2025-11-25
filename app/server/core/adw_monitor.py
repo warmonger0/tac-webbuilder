@@ -550,11 +550,29 @@ def aggregate_adw_monitor_data() -> dict[str, Any]:
             logger.error(f"Error building status for {state.get('adw_id')}: {e}")
             continue
 
-    # Sort by start time (most recent first)
-    workflows.sort(
-        key=lambda w: w.get("start_time") or "",
-        reverse=True
-    )
+    # Sort workflows by priority:
+    # 1. Running workflows first
+    # 2. Paused workflows second
+    # 3. Then by most recent start time
+    # 4. For same status, prioritize higher progress
+    def sort_key(w):
+        status = w.get("status", "")
+        start_time = w.get("start_time") or ""
+        progress = w.get("phase_progress", 0.0)
+
+        # Priority order: running > paused > failed > completed > others
+        priority = {
+            "running": 0,
+            "paused": 1,
+            "failed": 2,
+            "completed": 3,
+        }.get(status, 4)
+
+        # Return tuple: (priority, -progress, -time_length) for sorting
+        # Negative progress so higher progress comes first within same status
+        return (priority, -progress, -len(start_time))
+
+    workflows.sort(key=sort_key)
 
     # Calculate summary statistics
     summary = {
