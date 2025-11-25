@@ -347,7 +347,8 @@ Automatically close issues when workflows successfully ship to main, completing 
 
 ### Location
 
-- **Core Logic:** `adws/adw_ship_iso.py` (lines 472-518)
+- **Core Module:** `adws/adw_modules/success_operations.py`
+- **Integration:** `adws/adw_ship_iso.py:478-485`
 
 ### When It Triggers
 
@@ -360,45 +361,66 @@ Issue closing triggers after successful PR merge verification in the Ship phase:
 
 ### Implementation
 
+The implementation follows a modular pattern matching `failure_cleanup.py`:
+
+**Core Module (`adws/adw_modules/success_operations.py`):**
+
 ```python
-# adws/adw_ship_iso.py (after successful merge)
+def close_issue_on_success(
+    adw_id: str,
+    issue_number: str,
+    branch_name: str,
+    agent_name: str,
+    logger: logging.Logger
+) -> Tuple[bool, Optional[str]]:
+    """Close issue after successful workflow completion.
 
-logger.info(f"Closing issue #{issue_number}...")
-try:
-    success_comment = f"""🎉 **Successfully Shipped!**
+    This function:
+    1. Closes issue with success comment
+    2. Posts success summary
+    3. Handles errors gracefully (best-effort)
+    """
+    # Format success comment
+    success_comment = format_success_comment(branch_name)
 
-✅ PR merged to main via GitHub API
-✅ Branch `{branch_name}` deployed to production
-✅ All validation checks passed
-
-**Ship Summary:**
-- Validated all state fields
-- Found and merged PR successfully
-- Verified commits landed on main
-- Code is now in production
-
-**Issue Status:** Automatically closing as resolved.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)"""
-
+    # Close issue with comment
     result = subprocess.run(
         ["gh", "issue", "close", issue_number, "--comment", success_comment],
-        capture_output=True,
-        text=True,
-        check=False
+        capture_output=True, text=True, check=False
     )
 
     if result.returncode == 0:
         logger.info(f"✅ Closed issue #{issue_number}")
+        post_success_summary(adw_id, issue_number, branch_name, agent_name)
+        return True, None
     else:
-        # Graceful degradation
         logger.warning(f"Failed to close issue: {result.stderr}")
-        make_issue_comment(
-            issue_number,
-            "⚠️ Could not automatically close issue. "
-            "Please close manually - ship was successful!"
-        )
+        post_manual_close_reminder(adw_id, issue_number, agent_name)
+        return False, result.stderr
 ```
+
+**Integration in Ship Workflow:**
+
+```python
+# adws/adw_ship_iso.py (after successful merge)
+from adw_modules.success_operations import close_issue_on_success
+
+# Step 6: Close the issue with success comment
+close_issue_on_success(
+    adw_id=adw_id,
+    issue_number=issue_number,
+    branch_name=branch_name,
+    agent_name=AGENT_SHIPPER,
+    logger=logger
+)
+```
+
+**Benefits of Modular Design:**
+- ✅ Single-purpose functions
+- ✅ Reusable across all workflows
+- ✅ Testable independently
+- ✅ Consistent with `failure_cleanup.py` pattern
+- ✅ Easy to maintain and extend
 
 ### Error Handling
 
@@ -899,10 +921,12 @@ cat agents/test-adw-id/ship/raw_output.jsonl | grep "Closing issue"
 
 | Component | Location |
 |-----------|----------|
-| Core logic | `adws/adw_ship_iso.py:472-518` |
-| Success comment template | `adws/adw_ship_iso.py:480-494` |
-| Error handling | `adws/adw_ship_iso.py:500-514` |
-| Docstring | `adws/adw_ship_iso.py:6-32` |
+| Core module | `adws/adw_modules/success_operations.py` |
+| Main function | `adws/adw_modules/success_operations.py:18` |
+| Comment formatter | `adws/adw_modules/success_operations.py:67` |
+| Success summary | `adws/adw_modules/success_operations.py:87` |
+| Manual reminder | `adws/adw_modules/success_operations.py:108` |
+| Integration | `adws/adw_ship_iso.py:478-485` |
 
 ---
 
