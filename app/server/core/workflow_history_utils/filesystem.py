@@ -89,9 +89,9 @@ def scan_agents_directory() -> list[dict]:
                 "frontend_port": state_data.get("frontend_port"),
             }
 
-            # Infer status if not explicitly set or if still showing as "running"
+            # Infer status if not explicitly set or if still showing as "running" or "unknown"
             # This makes status detection more dynamic and reality-based
-            if workflow["status"] in ("pending", "running"):
+            if workflow["status"] in ("pending", "running", "unknown"):
                 # Check if there's an error file first
                 error_file = adw_dir / "error.log"
                 if error_file.exists():

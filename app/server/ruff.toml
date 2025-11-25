@@ -1,0 +1,11 @@
+# Ruff configuration
+[lint]
+# Ignore less critical style and complexity rules
+ignore = [
+    "C901",    # Function is too complex - requires refactoring, not linting fixes
+    "SIM102",  # Use a single if statement - style preference
+    "SIM105",  # Use contextlib.suppress - style preference
+    "SIM115",  # Use context handler for opening files - style preference
+    "SIM117",  # Use a single with statement - style preference
+    "PT011",   # pytest.raises is too broad - test quality, not critical
+]

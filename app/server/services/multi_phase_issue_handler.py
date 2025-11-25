@@ -7,17 +7,10 @@ Separates multi-phase workflow logic from the main GitHub issue service.
 
 import logging
 import uuid
-from typing import List
 
-from fastapi import HTTPException
-
-from core.data_models import (
-    GitHubIssue,
-    SubmitRequestData,
-    SubmitRequestResponse,
-    ChildIssueInfo
-)
+from core.data_models import ChildIssueInfo, GitHubIssue, SubmitRequestData, SubmitRequestResponse
 from core.github_poster import GitHubPoster
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -109,12 +102,12 @@ class MultiPhaseIssueHandler:
             raise
         except Exception as e:
             logger.error(f"[ERROR] Failed to handle multi-phase request: {str(e)}")
-            raise HTTPException(500, f"Error processing multi-phase request: {str(e)}")
+            raise HTTPException(500, f"Error processing multi-phase request: {str(e)}") from e
 
     async def _create_phase_issues_and_enqueue(
         self,
         request: SubmitRequestData
-    ) -> List[ChildIssueInfo]:
+    ) -> list[ChildIssueInfo]:
         """
         Create Phase 1 issue and enqueue all phases.
 
@@ -143,7 +136,7 @@ class MultiPhaseIssueHandler:
                 phase_data={
                     "title": phase.title,
                     "content": phase.content,
-                    "externalDocs": phase.externalDocs or [],
+                    "externalDocs": phase.external_docs or [],
                     "total_phases": len(request.phases)  # Store for just-in-time creation
                 },
                 depends_on_phase=depends_on_phase
@@ -199,16 +192,16 @@ class MultiPhaseIssueHandler:
 {phase.content}
 
 """
-        if phase.externalDocs:
+        if phase.external_docs:
             phase_body += f"""
 ## Referenced Documents
 
-{chr(10).join(f'- `{doc}`' for doc in phase.externalDocs)}
+{chr(10).join(f'- `{doc}`' for doc in phase.external_docs)}
 
 """
 
         # Add workflow command to trigger ADW automatically
-        phase_body += f"""
+        phase_body += """
 ---
 
 **Workflow:** adw_plan_iso with base model

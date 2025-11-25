@@ -12,12 +12,10 @@ Tests cover:
 """
 
 import json
-import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import Mock, patch
 
-import pytest
 from core.adw_monitor import (
     aggregate_adw_monitor_data,
     build_workflow_status,
@@ -296,9 +294,9 @@ class TestPhaseProgress:
         adw_dir = agents_dir / "abc123"
         adw_dir.mkdir()
 
-        # Create phase directories
-        (adw_dir / "plan_phase").mkdir()
-        (adw_dir / "build_phase").mkdir()
+        # Create phase directories with adw_ prefix
+        (adw_dir / "adw_plan_phase").mkdir()
+        (adw_dir / "adw_build_phase").mkdir()
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
             phase, progress, phase_names = calculate_phase_progress("abc123", {})
@@ -313,15 +311,15 @@ class TestPhaseProgress:
         adw_dir = agents_dir / "abc123"
         adw_dir.mkdir()
 
-        # Create one completed phase
-        (adw_dir / "plan_phase").mkdir()
+        # Create one completed phase with adw_ prefix
+        (adw_dir / "adw_plan_phase").mkdir()
 
         state = {"current_phase": "build"}
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
             phase, progress, phase_names = calculate_phase_progress("abc123", state)
             assert phase == "build"
-            # 1 phase completed (12.5%) + 0.5 * 12.5% for current phase = 18.75%
+            # 1 phase completed (11.1%) + 0.5 * 11.1% for current phase = 16.65%
             # But we round to 1 decimal place
             assert progress > 12.5  # Should include partial progress
 

@@ -12,8 +12,8 @@ Run from app/server/ directory:
     cd app/server && uv run python tests/manual/test_existing_pattern_detection.py
 """
 
-import sys
 import sqlite3
+import sys
 from pathlib import Path
 
 # Add app/server to Python path so we can import core modules
@@ -63,7 +63,7 @@ def main():
     # Convert Row to dictionary
     workflow = dict(workflow_row)
 
-    print(f"✅ Found workflow:")
+    print("✅ Found workflow:")
     print(f"   - Workflow ID: {workflow.get('workflow_id', 'N/A')}")
     print(f"   - ADW ID: {workflow.get('adw_id', 'N/A')}")
     print(f"   - NL Input: {workflow.get('nl_input', 'N/A')[:80]}...")
@@ -88,7 +88,7 @@ def main():
 
     # Extract characteristics
     characteristics = extract_pattern_characteristics(workflow)
-    print(f"📊 Pattern Characteristics:")
+    print("📊 Pattern Characteristics:")
     print(f"   - Input Length: {characteristics.get('input_length', 0)} chars")
     print(f"   - Keywords: {', '.join(characteristics.get('keywords', []))}")
     print(f"   - Files Mentioned: {', '.join(characteristics.get('files_mentioned', []))}")
