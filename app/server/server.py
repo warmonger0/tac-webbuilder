@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import route modules
-from routes import data_routes, github_routes, queue_routes, system_routes, websocket_routes, workflow_routes
+from routes import data_routes, github_routes, pattern_routes, queue_routes, system_routes, websocket_routes, workflow_routes
 from services.background_tasks import BackgroundTaskManager
 from services.github_issue_service import GitHubIssueService
 from services.health_service import HealthService
@@ -194,6 +194,9 @@ data_routes.router and app.include_router(data_routes.router)
 
 workflow_routes.init_workflow_routes(workflow_service, get_routes_data, get_workflow_history_data)
 app.include_router(workflow_routes.router)
+
+# Pattern learning routes (no dependency injection needed)
+app.include_router(pattern_routes.router)
 
 system_routes.init_system_routes(health_service, service_controller, app_start_time)
 app.include_router(system_routes.router)

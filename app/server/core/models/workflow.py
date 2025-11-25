@@ -296,3 +296,69 @@ class AdwHealthCheckResponse(BaseModel):
     checks: dict[str, Any] = Field(..., description="Individual health checks (ports, worktree, state_file, process)")
     warnings: list[str] = Field(default_factory=list, description="All warning messages")
     checked_at: str = Field(..., description="Timestamp of health check (ISO format)")
+
+
+# Pattern Learning Models
+class PatternStatisticsItem(BaseModel):
+    """Individual pattern with all relevant fields"""
+    id: int = Field(..., description="Pattern database ID")
+    pattern_signature: str = Field(..., description="Unique pattern identifier")
+    pattern_type: str = Field(..., description="Type of operation pattern")
+    automation_status: Literal["detected", "candidate", "approved", "implemented", "active", "deprecated"] = Field(..., description="Automation lifecycle status")
+    confidence_score: float = Field(..., description="Confidence score (0.0-100.0)")
+    occurrence_count: int = Field(..., description="Number of times pattern detected")
+    first_detected: str | None = Field(None, description="First detection timestamp (ISO format)")
+    last_seen: str | None = Field(None, description="Last seen timestamp (ISO format)")
+    avg_tokens_with_llm: int = Field(0, description="Average tokens using LLM")
+    avg_cost_with_llm: float = Field(0.0, description="Average cost using LLM (USD)")
+    avg_tokens_with_tool: int = Field(0, description="Average tokens using specialized tool")
+    avg_cost_with_tool: float = Field(0.0, description="Average cost using specialized tool (USD)")
+    potential_monthly_savings: float = Field(0.0, description="Potential monthly cost savings (USD)")
+    tool_name: str | None = Field(None, description="Associated automation tool name")
+    typical_input_pattern: str | None = Field(None, description="Common input characteristics")
+    typical_operations: str | None = Field(None, description="Typical operations (JSON)")
+    typical_files_accessed: str | None = Field(None, description="Typical file patterns (JSON)")
+
+
+class PatternDistribution(BaseModel):
+    """Aggregated pattern distribution data"""
+    by_automation_status: dict[str, int] = Field(default_factory=dict, description="Pattern count by automation status")
+    by_pattern_type: dict[str, int] = Field(default_factory=dict, description="Pattern count by pattern type")
+    by_confidence_range: dict[str, int] = Field(default_factory=dict, description="Pattern count by confidence range (0-25%, 25-50%, 50-75%, 75-100%)")
+
+
+class PatternTrendDataPoint(BaseModel):
+    """Single data point for trend visualization"""
+    date: str = Field(..., description="Date (YYYY-MM-DD)")
+    detected_count: int = Field(0, description="Patterns detected on this date")
+    automated_count: int = Field(0, description="Patterns automated by this date (cumulative)")
+    automation_rate: float = Field(0.0, description="Automation rate percentage (0-100)")
+
+
+class PatternTrend(BaseModel):
+    """Time-series trend data for pattern discovery and automation"""
+    trend_data: list[PatternTrendDataPoint] = Field(default_factory=list, description="Trend data points over time")
+    period_days: int = Field(30, description="Number of days in trend period")
+
+
+class PatternStatisticsSummary(BaseModel):
+    """High-level pattern statistics summary"""
+    total_patterns: int = Field(0, description="Total number of patterns detected")
+    automated_patterns: int = Field(0, description="Number of automated patterns (implemented or active)")
+    avg_confidence_score: float = Field(0.0, description="Average confidence score across all patterns")
+    total_potential_monthly_savings: float = Field(0.0, description="Total potential monthly savings (USD)")
+    total_potential_annual_savings: float = Field(0.0, description="Total potential annual savings (USD)")
+    automation_rate: float = Field(0.0, description="Automation rate percentage (0-100)")
+    high_confidence_patterns: int = Field(0, description="Patterns with confidence >= 75%")
+    recent_discoveries: int = Field(0, description="Patterns discovered in last 7 days")
+
+
+class PatternStatisticsResponse(BaseModel):
+    """Complete pattern statistics response"""
+    summary: PatternStatisticsSummary = Field(..., description="High-level summary statistics")
+    distribution: PatternDistribution = Field(..., description="Distribution aggregates")
+    top_patterns: list[PatternStatisticsItem] = Field(default_factory=list, description="Top patterns by occurrence or savings")
+    recent_discoveries: list[PatternStatisticsItem] = Field(default_factory=list, description="Recently discovered patterns")
+    trending_patterns: list[PatternStatisticsItem] = Field(default_factory=list, description="Trending patterns (increasing occurrence)")
+    trend: PatternTrend = Field(..., description="Time-series trend data")
+    error: str | None = Field(None, description="Error message if query partially failed")

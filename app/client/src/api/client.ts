@@ -7,6 +7,8 @@ import type {
   GitHubIssue,
   HistoryFilters,
   HistoryItem,
+  PatternFilters,
+  PatternStatisticsResponse,
   QueryRequest,
   QueryResponse,
   RandomQueryResponse,
@@ -426,6 +428,31 @@ export async function getAdwHealth(adwId: string): Promise<AdwHealthCheckRespons
   return fetchJSON<AdwHealthCheckResponse>(`${API_BASE}/adw-monitor/${adwId}/health`);
 }
 
+/**
+ * Fetch pattern learning statistics with optional filters
+ */
+export async function getPatternStatistics(
+  filters?: PatternFilters
+): Promise<PatternStatisticsResponse> {
+  const params = new URLSearchParams();
+
+  if (filters) {
+    if (filters.limit !== undefined) params.append('limit', filters.limit.toString());
+    if (filters.offset !== undefined) params.append('offset', filters.offset.toString());
+    if (filters.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters.filter_by_status) params.append('filter_by_status', filters.filter_by_status);
+    if (filters.filter_by_type) params.append('filter_by_type', filters.filter_by_type);
+    if (filters.trending_only !== undefined) params.append('trending_only', filters.trending_only.toString());
+    if (filters.trend_days !== undefined) params.append('trend_days', filters.trend_days.toString());
+  }
+
+  const url = params.toString()
+    ? `${API_BASE}/patterns/statistics?${params.toString()}`
+    : `${API_BASE}/patterns/statistics`;
+
+  return fetchJSON<PatternStatisticsResponse>(url);
+}
+
 // Export as namespace object for compatibility with existing code
 export const api = {
   submitRequest,
@@ -451,4 +478,5 @@ export const api = {
   executePhase,
   getAdwMonitor,
   getAdwHealth,
+  getPatternStatistics,
 };

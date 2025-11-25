@@ -364,3 +364,75 @@ export interface RequestFormPersistedState {
   autoPost: boolean;
   timestamp: string;
 }
+
+// Pattern Learning Types
+export type AutomationStatus = "detected" | "candidate" | "approved" | "implemented" | "active" | "deprecated";
+
+export interface PatternStatisticsItem {
+  id: number;
+  pattern_signature: string;
+  pattern_type: string;
+  automation_status: AutomationStatus;
+  confidence_score: number;
+  occurrence_count: number;
+  first_detected: string | null;
+  last_seen: string | null;
+  avg_tokens_with_llm: number;
+  avg_cost_with_llm: number;
+  avg_tokens_with_tool: number;
+  avg_cost_with_tool: number;
+  potential_monthly_savings: number;
+  tool_name: string | null;
+  typical_input_pattern: string | null;
+  typical_operations: string | null;
+  typical_files_accessed: string | null;
+}
+
+export interface PatternDistribution {
+  by_automation_status: Record<string, number>;
+  by_pattern_type: Record<string, number>;
+  by_confidence_range: Record<string, number>;
+}
+
+export interface PatternTrendDataPoint {
+  date: string;
+  detected_count: number;
+  automated_count: number;
+  automation_rate: number;
+}
+
+export interface PatternTrend {
+  trend_data: PatternTrendDataPoint[];
+  period_days: number;
+}
+
+export interface PatternStatisticsSummary {
+  total_patterns: number;
+  automated_patterns: number;
+  avg_confidence_score: number;
+  total_potential_monthly_savings: number;
+  total_potential_annual_savings: number;
+  automation_rate: number;
+  high_confidence_patterns: number;
+  recent_discoveries: number;
+}
+
+export interface PatternStatisticsResponse {
+  summary: PatternStatisticsSummary;
+  distribution: PatternDistribution;
+  top_patterns: PatternStatisticsItem[];
+  recent_discoveries: PatternStatisticsItem[];
+  trending_patterns: PatternStatisticsItem[];
+  trend: PatternTrend;
+  error: string | null;
+}
+
+export interface PatternFilters {
+  limit?: number;
+  offset?: number;
+  sort_by?: "occurrence_count" | "confidence_score" | "potential_monthly_savings";
+  filter_by_status?: string;
+  filter_by_type?: string;
+  trending_only?: boolean;
+  trend_days?: number;
+}

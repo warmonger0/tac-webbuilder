@@ -4,6 +4,7 @@ import { TabBar } from './components/TabBar';
 import { RequestForm } from './components/RequestForm';
 import { WorkflowDashboard } from './components/WorkflowDashboard';
 import { WorkflowHistoryView } from './components/WorkflowHistoryView';
+import { PatternLearningDashboard } from './components/PatternLearningDashboard';
 import { RoutesView } from './components/RoutesView';
 
 const queryClient = new QueryClient();
@@ -11,12 +12,12 @@ const ACTIVE_TAB_STORAGE_KEY = 'tac-webbuilder-active-tab';
 
 function App() {
   const [activeTab, setActiveTab] = useState<
-    'request' | 'workflows' | 'history' | 'routes'
+    'request' | 'workflows' | 'history' | 'patterns' | 'routes'
   >(() => {
     // Load active tab from localStorage on mount
     const savedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-    if (savedTab && ['request', 'workflows', 'history', 'routes'].includes(savedTab)) {
-      return savedTab as 'request' | 'workflows' | 'history' | 'routes';
+    if (savedTab && ['request', 'workflows', 'history', 'patterns', 'routes'].includes(savedTab)) {
+      return savedTab as 'request' | 'workflows' | 'history' | 'patterns' | 'routes';
     }
     return 'request';
   });
@@ -52,6 +53,7 @@ function App() {
           {activeTab === 'request' && <RequestForm />}
           {activeTab === 'workflows' && <WorkflowDashboard />}
           {activeTab === 'history' && <WorkflowHistoryView />}
+          {activeTab === 'patterns' && <PatternLearningDashboard />}
           {activeTab === 'routes' && <RoutesView />}
         </main>
       </div>

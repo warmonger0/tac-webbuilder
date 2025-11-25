@@ -1,6 +1,6 @@
 interface TabBarProps {
-  activeTab: 'request' | 'workflows' | 'history' | 'routes';
-  onChange: (tab: 'request' | 'workflows' | 'history' | 'routes') => void;
+  activeTab: 'request' | 'workflows' | 'history' | 'patterns' | 'routes';
+  onChange: (tab: 'request' | 'workflows' | 'history' | 'patterns' | 'routes') => void;
 }
 
 export function TabBar({ activeTab, onChange }: TabBarProps) {
@@ -8,6 +8,7 @@ export function TabBar({ activeTab, onChange }: TabBarProps) {
     { id: 'request' as const, label: 'New Request' },
     { id: 'workflows' as const, label: 'Workflows' },
     { id: 'history' as const, label: 'History' },
+    { id: 'patterns' as const, label: 'Patterns' },
     { id: 'routes' as const, label: 'API Routes' },
   ];
 
