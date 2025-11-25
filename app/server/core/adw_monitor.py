@@ -275,16 +275,49 @@ def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | 
 
     # Count completed phases (directories that match phase names)
     completed_phases = []
+    phase_dirs = {}  # Track which directories correspond to which phases
+
     for phase in phases:
         # Check if any subdirectory contains this phase name
-        if any(phase in subdir for subdir in subdirs):
+        matching_dirs = [subdir for subdir in subdirs if phase in subdir and subdir.startswith('adw_')]
+        if matching_dirs:
             completed_phases.append(phase)
+            phase_dirs[phase] = matching_dirs
 
     # Calculate base progress
     base_progress = (len(completed_phases) / total_phases) * 100
 
-    # Get current phase from state
+    # Determine current phase - check state first, then infer from directories
     current_phase = state.get("current_phase")
+
+    # If no current_phase in state, infer from most recently modified phase directory
+    if not current_phase and phase_dirs:
+        try:
+            # Find the most recently modified phase directory
+            most_recent_phase = None
+            most_recent_time = 0
+
+            for phase, dirs in phase_dirs.items():
+                for dir_name in dirs:
+                    dir_path = adw_dir / dir_name
+                    if dir_path.exists():
+                        mtime = dir_path.stat().st_mtime
+                        if mtime > most_recent_time:
+                            most_recent_time = mtime
+                            most_recent_phase = phase
+
+            # If workflow is not completed, the most recent phase is current
+            workflow_status = state.get("status", "").lower()
+            if workflow_status in ["running", "paused"] and most_recent_phase:
+                # Check if there's a next phase (not completed yet)
+                next_phase_index = phases.index(most_recent_phase) + 1
+                if next_phase_index < len(phases):
+                    current_phase = phases[next_phase_index]
+                else:
+                    # Last phase is current
+                    current_phase = most_recent_phase
+        except Exception as e:
+            logger.debug(f"Could not infer current phase for {adw_id}: {e}")
 
     # If we have a current phase that's not in completed phases,
     # add partial progress (50% of one phase)
@@ -372,9 +405,10 @@ def detect_pr_for_issue(issue_number: int | None) -> int | None:
         return None
 
     try:
-        # Search for PRs that close this issue
+        # Search for PRs that close this issue (case insensitive search)
+        # GitHub search supports: "closes", "Closes", "fix", "fixes", "resolve", "resolves"
         result = subprocess.run(
-            ["gh", "pr", "list", "--search", f"Closes #{issue_number}", "--json", "number", "--limit", "1"],
+            ["gh", "pr", "list", "--search", f"#{issue_number} in:body", "--json", "number,body", "--limit", "10"],
             capture_output=True,
             text=True,
             timeout=5
@@ -382,23 +416,16 @@ def detect_pr_for_issue(issue_number: int | None) -> int | None:
 
         if result.returncode == 0 and result.stdout.strip():
             import json
+            import re
             prs = json.loads(result.stdout)
-            if prs and len(prs) > 0:
-                return prs[0].get("number")
 
-        # Also try alternative format: "closes #issue"
-        result = subprocess.run(
-            ["gh", "pr", "list", "--search", f"closes #{issue_number}", "--json", "number", "--limit", "1"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+            # Keywords that indicate a PR closes an issue
+            close_keywords = r'\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#' + str(issue_number)
 
-        if result.returncode == 0 and result.stdout.strip():
-            import json
-            prs = json.loads(result.stdout)
-            if prs and len(prs) > 0:
-                return prs[0].get("number")
+            for pr in prs:
+                body = pr.get("body", "").lower()
+                if re.search(close_keywords, body, re.IGNORECASE):
+                    return pr.get("number")
 
     except Exception as e:
         logger.debug(f"Could not detect PR for issue #{issue_number}: {e}")
