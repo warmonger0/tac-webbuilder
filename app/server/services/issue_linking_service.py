@@ -6,7 +6,6 @@ Provides reusable methods for creating issue body text that includes references 
 """
 
 import logging
-from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,7 @@ class IssueLinkingService:
         return f"**Parent Issue:** #{parent_issue_number}"
 
     @staticmethod
-    def format_child_references(child_issue_numbers: List[int]) -> str:
+    def format_child_references(child_issue_numbers: list[int]) -> str:
         """
         Format child issue references for inclusion in parent issue.
 

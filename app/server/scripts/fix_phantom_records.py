@@ -12,14 +12,13 @@ Run with: uv run python scripts/fix_phantom_records.py [--dry-run]
 import argparse
 import logging
 import sys
-from datetime import datetime
 from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.db_connection import get_connection as get_db_connection
 from core.workflow_history_utils.database import DB_PATH
+from utils.db_connection import get_connection as get_db_connection
 
 logging.basicConfig(
     level=logging.INFO,

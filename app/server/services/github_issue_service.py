@@ -15,7 +15,6 @@ import sys
 import traceback
 import uuid
 from datetime import datetime
-from typing import Dict
 
 import httpx
 from fastapi import HTTPException
@@ -24,22 +23,22 @@ from fastapi import HTTPException
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'adws'))
 from adw_modules.complexity_analyzer import analyze_issue_complexity
 from adw_modules.data_types import GitHubIssue as ADWGitHubIssue
-
+from core.cost_estimate_storage import save_cost_estimate
 from core.data_models import (
+    ConfirmResponse,
+    CostEstimate,
     GitHubIssue,
+    ProjectContext,
     SubmitRequestData,
     SubmitRequestResponse,
-    CostEstimate,
-    ConfirmResponse,
-    ProjectContext,
 )
-from core.project_detector import detect_project_context
-from core.nl_processor import process_request
 from core.github_poster import GitHubPoster
-from core.cost_estimate_storage import save_cost_estimate
+from core.nl_processor import process_request
 from core.pattern_predictor import predict_patterns_from_input, store_predicted_patterns
-from services.multi_phase_issue_handler import MultiPhaseIssueHandler
+from core.project_detector import detect_project_context
 from utils.db_connection import get_connection
+
+from services.multi_phase_issue_handler import MultiPhaseIssueHandler
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +72,7 @@ class GitHubIssueService:
         """
         self.webhook_trigger_url = webhook_trigger_url or os.environ.get("WEBHOOK_TRIGGER_URL", "http://localhost:8001")
         self.github_repo = github_repo or os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder")
-        self.pending_requests: Dict[str, dict] = {}
+        self.pending_requests: dict[str, dict] = {}
         self.phase_queue_service = phase_queue_service
 
         # Initialize multi-phase handler
@@ -125,7 +124,7 @@ class GitHubIssueService:
         except Exception as e:
             logger.error(f"[ERROR] Failed to process NL request: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error processing request: {str(e)}")
+            raise HTTPException(500, f"Error processing request: {str(e)}") from e
 
     async def _handle_single_phase_request(self, request: SubmitRequestData) -> SubmitRequestResponse:
         """
@@ -272,7 +271,7 @@ class GitHubIssueService:
         except Exception as e:
             logger.error(f"[ERROR] Failed to get preview: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error retrieving preview: {str(e)}")
+            raise HTTPException(500, f"Error retrieving preview: {str(e)}") from e
 
     async def get_cost_estimate(self, request_id: str) -> CostEstimate:
         """
@@ -303,7 +302,7 @@ class GitHubIssueService:
         except Exception as e:
             logger.error(f"[ERROR] Failed to get cost estimate: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error retrieving cost estimate: {str(e)}")
+            raise HTTPException(500, f"Error retrieving cost estimate: {str(e)}") from e
 
     async def check_webhook_trigger_health(self) -> dict:
         """
@@ -335,20 +334,20 @@ class GitHubIssueService:
 
                 return health_data
 
-        except httpx.TimeoutException:
+        except httpx.TimeoutException as e:
             logger.error(f"[ERROR] Webhook trigger health check timed out at {health_endpoint}")
             raise HTTPException(
                 503,
                 "ADW webhook trigger is not responding (timeout). "
                 "Please start the trigger service: cd adws && uv run adw_triggers/trigger_webhook.py"
-            )
-        except httpx.ConnectError:
+            ) from e
+        except httpx.ConnectError as e:
             logger.error(f"[ERROR] Cannot connect to webhook trigger at {health_endpoint}")
             raise HTTPException(
                 503,
                 "ADW webhook trigger is offline. "
                 "Please start the trigger service: cd adws && uv run adw_triggers/trigger_webhook.py"
-            )
+            ) from e
         except HTTPException:
             raise
         except Exception as e:
@@ -356,7 +355,7 @@ class GitHubIssueService:
             raise HTTPException(
                 503,
                 f"Failed to verify ADW webhook trigger status: {str(e)}"
-            )
+            ) from e
 
     async def confirm_and_post_issue(self, request_id: str) -> ConfirmResponse:
         """
@@ -421,4 +420,4 @@ class GitHubIssueService:
         except Exception as e:
             logger.error(f"[ERROR] Failed to post issue: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error posting issue: {str(e)}")
+            raise HTTPException(500, f"Error posting issue: {str(e)}") from e

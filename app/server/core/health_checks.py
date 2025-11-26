@@ -10,12 +10,11 @@ Provides comprehensive health monitoring for:
 
 import json
 import logging
-import os
 import socket
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -219,10 +218,10 @@ def check_state_file_health(adw_id: str) -> dict[str, Any]:
     # Get file modification time
     try:
         stat = state_file_path.stat()
-        last_modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+        last_modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
         checks["last_modified"] = last_modified.isoformat()
 
-        age_seconds = (datetime.now(timezone.utc) - last_modified).total_seconds()
+        age_seconds = (datetime.now(UTC) - last_modified).total_seconds()
         checks["age_seconds"] = int(age_seconds)
 
         # Warn if state hasn't been updated in 10 minutes
@@ -235,7 +234,7 @@ def check_state_file_health(adw_id: str) -> dict[str, Any]:
 
     # Try to parse JSON
     try:
-        with open(state_file_path, 'r', encoding='utf-8') as f:
+        with open(state_file_path, encoding='utf-8') as f:
             state_data = json.load(f)
 
         checks["valid"] = True
@@ -368,7 +367,7 @@ def get_overall_health(adw_id: str, state: dict[str, Any]) -> dict[str, Any]:
             "process": process_health
         },
         "warnings": all_warnings,
-        "checked_at": datetime.now(timezone.utc).isoformat()
+        "checked_at": datetime.now(UTC).isoformat()
     }
 
 
@@ -409,7 +408,7 @@ def is_port_available(port: int) -> bool:
             s.settimeout(1)
             s.bind(('localhost', port))
             return True
-    except (socket.error, OSError):
+    except OSError:
         return False
 
 
@@ -448,7 +447,7 @@ def find_port_conflicts(adw_id: str, backend_port: int, frontend_port: int) -> l
             continue
 
         try:
-            with open(state_file, 'r', encoding='utf-8') as f:
+            with open(state_file, encoding='utf-8') as f:
                 other_state = json.load(f)
 
             other_backend = other_state.get("backend_port")
@@ -507,7 +506,7 @@ def get_system_port_health() -> dict[str, Any]:
             continue
 
         try:
-            with open(state_file, 'r', encoding='utf-8') as f:
+            with open(state_file, encoding='utf-8') as f:
                 state = json.load(f)
 
             backend_port = state.get("backend_port")

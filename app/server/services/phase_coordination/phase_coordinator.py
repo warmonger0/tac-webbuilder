@@ -13,12 +13,13 @@ Responsibilities:
 """
 
 import asyncio
+import contextlib
 import logging
 from datetime import datetime
-from typing import Optional
+
+from utils.db_connection import get_connection
 
 from services.phase_queue_service import PhaseQueueService
-from utils.db_connection import get_connection
 
 from .phase_github_notifier import PhaseGitHubNotifier
 from .workflow_completion_detector import WorkflowCompletionDetector
@@ -58,7 +59,7 @@ class PhaseCoordinator:
         self.websocket_manager = websocket_manager
         self.github_poster = github_poster
         self._is_running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
         self._processed_workflows = set()  # Track processed workflow IDs
 
         # Initialize helper components
@@ -88,10 +89,8 @@ class PhaseCoordinator:
         self._is_running = False
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
         logger.info("[STOP] PhaseCoordinator background task stopped")
 
     async def _poll_loop(self):
@@ -235,7 +234,7 @@ class PhaseCoordinator:
         phase_number: int,
         issue_number: int,
         parent_issue: int,
-        error_msg: Optional[str]
+        error_msg: str | None
     ):
         """
         Handle failed phase.
@@ -364,9 +363,10 @@ class PhaseCoordinator:
         - Queue is not paused
         """
         try:
+            import os
             import subprocess
             import uuid
-            import os
+
             from routes.queue_routes import determine_workflow_for_phase
 
             # Get all ready phases with issue numbers
@@ -514,7 +514,7 @@ class PhaseCoordinator:
 """
 
             # Add workflow command to trigger ADW automatically
-            phase_body += f"""
+            phase_body += """
 ---
 
 **Workflow:** adw_plan_iso with base model
@@ -547,7 +547,7 @@ class PhaseCoordinator:
                 f"{next_phase_number}: {str(e)}"
             )
 
-    def _get_workflow_status(self, issue_number: int) -> Optional[str]:
+    def _get_workflow_status(self, issue_number: int) -> str | None:
         """
         Get workflow status from workflow_history by issue number.
 
@@ -561,7 +561,7 @@ class PhaseCoordinator:
         """
         return self.detector.get_workflow_status(issue_number)
 
-    def _get_workflow_error(self, issue_number: int) -> Optional[str]:
+    def _get_workflow_error(self, issue_number: int) -> str | None:
         """
         Get error message from workflow_history.
 

@@ -77,6 +77,10 @@ markers = [
     "websocket: marks tests that use WebSocket",
 ]
 
+[tool.ruff]
+# Ignore complexity warnings - these should be addressed in a separate refactoring effort
+lint.ignore = ["C901"]
+
 [dependency-groups]
 dev = [
     "pytest-asyncio>=1.3.0",

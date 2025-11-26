@@ -301,17 +301,17 @@ def calculate_split_savings(complexity: str, num_splits: int) -> float:
         Estimated dollar savings
     """
     # Base workflow costs (from workflow_analytics data)
-    BASE_COSTS = {
+    base_costs = {
         "simple": 0.30,
         "medium": 0.60,
         "complex": 1.50
     }
 
     # Overhead per workflow (account for splitting overhead)
-    WORKFLOW_OVERHEAD = 0.10
+    workflow_overhead = 0.10
 
     # Calculate monolithic cost
-    monolithic_cost = BASE_COSTS.get(complexity, 0.60)
+    monolithic_cost = base_costs.get(complexity, 0.60)
 
     # Calculate split cost
     # When splitting complex → multiple simpler tasks
@@ -321,7 +321,7 @@ def calculate_split_savings(complexity: str, num_splits: int) -> float:
         # Already simple, splitting adds overhead
         return -0.20  # Negative savings = cost increase
 
-    per_split_cost = BASE_COSTS[split_complexity] + WORKFLOW_OVERHEAD
+    per_split_cost = base_costs[split_complexity] + workflow_overhead
     total_split_cost = per_split_cost * num_splits
 
     # Calculate savings
