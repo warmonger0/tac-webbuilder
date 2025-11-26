@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { PatternPrediction, SimilarWorkflowSummary } from '@/types/api.types';
+import { useState, useEffect } from 'react';
+import { PatternPrediction, SimilarWorkflowSummary } from '../../types/api.types';
 import PatternBadge from './PatternBadge';
 import SimilarWorkflowCard from './SimilarWorkflowCard';
 

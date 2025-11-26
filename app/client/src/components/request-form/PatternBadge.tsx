@@ -1,11 +1,10 @@
-import React from 'react';
-import { PatternPrediction } from '@/types/api.types';
+import { PatternPrediction } from '../../types/api.types';
 import {
   formatPatternSignature,
   formatConfidence,
   getConfidenceColor,
   getConfidenceLabel,
-} from '@/utils/patternFormatters';
+} from '../../utils/patternFormatters';
 
 interface PatternBadgeProps {
   prediction: PatternPrediction;

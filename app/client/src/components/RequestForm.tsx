@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { confirmAndPost, getCostEstimate, getPreview, getSystemStatus, submitRequest } from '../api/client';
+import { confirmAndPost, getCostEstimate, getPreview, getSystemStatus, submitRequest, predictPatterns } from '../api/client';
 import type { CostEstimate, GitHubIssue, ServiceHealth } from '../types';
+import type { PatternPrediction, SimilarWorkflowSummary } from '../types/api.types';
 import { IssuePreview } from './IssuePreview';
 import { CostEstimateCard } from './CostEstimateCard';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -12,6 +13,8 @@ import { useStaggeredLoad } from '../hooks/useStaggeredLoad';
 import { parsePhases } from '../utils/phaseParser';
 import { FileUploadSection } from './request-form/FileUploadSection';
 import { PhaseDetectionHandler } from './request-form/PhaseDetectionHandler';
+import PatternInsightsPanel from './request-form/PatternInsightsPanel';
+import { debounce } from '../utils/debounce';
 import { saveFormState, loadFormState, clearFormState, PROJECT_PATH_STORAGE_KEY } from './request-form/utils/formStorage';
 
 export function RequestForm() {
@@ -39,6 +42,13 @@ export function RequestForm() {
   // System health state
   const [systemHealthy, setSystemHealthy] = useState(true);
   const [healthWarning, setHealthWarning] = useState<string | null>(null);
+
+  // Pattern prediction state
+  const [patternPredictions, setPatternPredictions] = useState<PatternPrediction[]>([]);
+  const [similarWorkflows, setSimilarWorkflows] = useState<SimilarWorkflowSummary[]>([]);
+  const [recommendations, setRecommendations] = useState<string[]>([]);
+  const [isPredicting, setIsPredicting] = useState(false);
+  const [predictionError, setPredictionError] = useState<string | null>(null);
 
   // Ref for debounce timer
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -80,6 +90,44 @@ export function RequestForm() {
       clearFormState();
     }
   });
+
+  // Pattern prediction fetcher
+  const fetchPatternPredictions = async (input: string) => {
+    setIsPredicting(true);
+    setPredictionError(null);
+
+    try {
+      const response = await predictPatterns(input, projectPath || undefined);
+      setPatternPredictions(response.predictions || []);
+      setSimilarWorkflows(response.similar_workflows || []);
+      setRecommendations(response.recommendations || []);
+    } catch (err) {
+      setPredictionError(err instanceof Error ? err.message : 'Failed to fetch pattern predictions');
+      setPatternPredictions([]);
+      setSimilarWorkflows([]);
+      setRecommendations([]);
+    } finally {
+      setIsPredicting(false);
+    }
+  };
+
+  // Debounced version with 500ms delay
+  const debouncedFetchPatterns = useRef(debounce(fetchPatternPredictions, 500)).current;
+
+  // Trigger pattern prediction when nlInput changes
+  useEffect(() => {
+    const trimmedInput = nlInput.trim();
+
+    if (trimmedInput.length >= 10) {
+      debouncedFetchPatterns(nlInput);
+    } else {
+      // Clear predictions if input is too short
+      setPatternPredictions([]);
+      setSimilarWorkflows([]);
+      setRecommendations([]);
+      setPredictionError(null);
+    }
+  }, [nlInput, debouncedFetchPatterns]);
 
   // Load form state from localStorage on mount
   useEffect(() => {
@@ -312,6 +360,16 @@ export function RequestForm() {
                 className="w-full p-3 bg-slate-800 border border-slate-600 text-white placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                 disabled={isReading}
               />
+
+              <div className="mb-4">
+                <PatternInsightsPanel
+                  predictions={patternPredictions}
+                  similarWorkflows={similarWorkflows}
+                  recommendations={recommendations}
+                  isLoading={isPredicting}
+                  error={predictionError}
+                />
+              </div>
 
               <FileUploadSection
                 onContentReceived={handleContentReceived}

@@ -1,5 +1,4 @@
-import React from 'react';
-import { SimilarWorkflowSummary } from '@/types/api.types';
+import { SimilarWorkflowSummary } from '../../types/api.types';
 
 interface SimilarWorkflowCardProps {
   workflow: SimilarWorkflowSummary;
