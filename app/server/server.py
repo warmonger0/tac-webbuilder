@@ -19,7 +19,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import route modules
-from routes import data_routes, github_routes, issue_completion_routes, queue_routes, system_routes, websocket_routes, workflow_routes
+from routes import (
+    data_routes,
+    github_routes,
+    issue_completion_routes,
+    queue_routes,
+    system_routes,
+    websocket_routes,
+    workflow_routes,
+)
 from services.background_tasks import BackgroundTaskManager
 from services.github_issue_service import GitHubIssueService
 from services.health_service import HealthService
@@ -129,6 +137,8 @@ background_task_manager = BackgroundTaskManager(
     workflow_watch_interval=10.0,
     routes_watch_interval=10.0,
     history_watch_interval=10.0,
+    adw_monitor_watch_interval=10.0,
+    adw_monitor_data_func=lambda: get_adw_monitor_data(),
 )
 # Set app reference for routes introspection (done after app is created above)
 background_task_manager.set_app(app)
@@ -182,11 +192,21 @@ def get_adw_state(adw_id: str) -> dict:
         return {}
 
     try:
-        with open(state_path, "r") as f:
+        with open(state_path) as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Error reading ADW state for {adw_id}: {e}")
         return {}
+
+def get_adw_monitor_data() -> dict:
+    """
+    Get aggregated ADW monitor data for all workflows.
+
+    Returns:
+        dict: Monitor response with summary and workflow list
+    """
+    from core.adw_monitor import aggregate_adw_monitor_data
+    return aggregate_adw_monitor_data()
 
 # ROUTER REGISTRATION
 # Initialize route modules with service dependencies and register routers
@@ -212,7 +232,7 @@ github_poster = GitHubPoster()
 queue_routes.init_webhook_routes(phase_queue_service, github_poster)
 app.include_router(queue_routes.webhook_router)
 
-websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state)
+websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state, get_adw_monitor_data)
 app.include_router(websocket_routes.router)
 
 if __name__ == "__main__":

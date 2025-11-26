@@ -146,11 +146,19 @@ bun run test:ui            # Run tests with UI
 ### Health & Monitoring
 - `GET /api/health` - Basic health check
 - `GET /api/system-status` - **NEW:** Comprehensive system health monitoring for all critical services
+- `GET /api/adw-monitor` - **NEW (Phase 3):** Real-time ADW workflow monitoring with status aggregation
 
 ### Workflow Management
 - `GET /api/workflows` - List active workflows
 - `GET /api/workflow-history` - Get workflow execution history
 - `GET /api/routes` - List all registered API routes
+
+### WebSocket Endpoints
+- `ws://localhost:8000/ws/workflows` - Real-time workflow updates
+- `ws://localhost:8000/ws/routes` - Real-time route updates
+- `ws://localhost:8000/ws/workflow-history` - Real-time workflow history updates
+- `ws://localhost:8000/ws/adw-state/{adw_id}` - Real-time ADW state updates for specific workflow
+- `ws://localhost:8000/ws/adw-monitor` - **NEW (Phase 3):** Real-time ADW monitor updates for all workflows
 
 ## Security
 

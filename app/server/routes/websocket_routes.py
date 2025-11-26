@@ -12,11 +12,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["WebSockets"])
 
 
-def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func, get_workflow_history_data_func, get_adw_state_func):
+def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func, get_workflow_history_data_func, get_adw_state_func, get_adw_monitor_data_func=None):
     """
     Initialize WebSocket routes with service dependencies.
 
     This function is called from server.py to inject service dependencies.
+
+    Args:
+        manager: WebSocket connection manager
+        get_workflows_data_func: Function to get workflows data
+        get_routes_data_func: Function to get routes data
+        get_workflow_history_data_func: Function to get workflow history data
+        get_adw_state_func: Function to get ADW state for a specific ID
+        get_adw_monitor_data_func: Optional function to get ADW monitor aggregated data
     """
 
     @router.websocket("/ws/workflows")
@@ -121,5 +129,33 @@ def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func
                     break
         except Exception as e:
             logger.error(f"[WS] Error in ADW state WebSocket connection: {e}")
+        finally:
+            manager.disconnect(websocket)
+
+    @router.websocket("/ws/adw-monitor")
+    async def websocket_adw_monitor(websocket: WebSocket) -> None:
+        """WebSocket endpoint for real-time ADW monitor updates (all workflows)"""
+        await manager.connect(websocket)
+
+        try:
+            # Send initial monitor data if function provided
+            if get_adw_monitor_data_func:
+                monitor_data = get_adw_monitor_data_func()
+                await websocket.send_json({
+                    "type": "adw_monitor_update",
+                    "data": monitor_data
+                })
+            else:
+                logger.warning("[WS] ADW monitor data function not provided")
+
+            # Keep connection alive and handle incoming messages
+            while True:
+                try:
+                    # Wait for any client messages (ping/pong, etc.)
+                    await websocket.receive_text()
+                except WebSocketDisconnect:
+                    break
+        except Exception as e:
+            logger.error(f"[WS] Error in ADW monitor WebSocket connection: {e}")
         finally:
             manager.disconnect(websocket)
