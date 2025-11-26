@@ -8,12 +8,13 @@ This document tracks critical bug fixes and improvements made to the tac-webbuil
 
 ## Summary Statistics
 
-**Total Issues Fixed:** 9 (8 bugs + 1 performance optimization)
+**Total Issues Fixed:** 10 (8 bugs + 1 performance + 1 security)
 **Lines of Code Changed:** +3,874 / -2,389
 **Dead Code Removed:** 1,831 lines
 **Documentation Added:** 3,481 lines
 **Performance Improvements:** 3 database indexes (100x speedup)
-**Commits:** 4 commits (e063700, fd7090f, 710538d, c56dd99)
+**Security Improvements:** Input validation (7 validation rules + 18 tests)
+**Commits:** 4 commits (e063700, fd7090f, 710538d, c56dd99) + 1 pending
 
 ---
 
@@ -491,6 +492,109 @@ During this task, the database was reinitialized and migrations 006-013 were app
 
 ---
 
+## Session 4: Security & Data Integrity - Input Validation
+
+**Commit:** (pending) - "feat: Add input validation to queue enqueue endpoint"
+**Time:** November 25, 2025 (Post-performance optimization)
+
+### Security Improvement: Input Validation Added (1)
+
+#### Queue Enqueue Request Validation 🛡️
+**Severity:** MEDIUM (Security & Data Integrity)
+**File:** `app/server/routes/queue_routes.py:106-167`
+**Issue:** No validation for request data allowing invalid entries into phase queue
+**Impact:** Invalid data could cause workflow failures, database corruption, or security issues
+
+**Validations Added:**
+
+**Field-Level Constraints:**
+```python
+parent_issue: int = Field(ge=0)           # >= 0 (0 valid for hopper workflows)
+phase_number: int = Field(ge=1, le=20)    # 1-20 (phases start at 1)
+depends_on_phase: Optional[int] = Field(ge=1)  # >= 1 if specified
+priority: Optional[int] = Field(default=50, ge=10, le=90)  # 10-90 range
+```
+
+**Custom Validators:**
+```python
+@field_validator('phase_data')
+def validate_phase_data(cls, v: dict) -> dict:
+    """Validate phase_data contains required fields."""
+    required_fields = ['workflow_type', 'adw_id']
+    # Ensures both fields present, non-empty strings
+
+@field_validator('depends_on_phase')
+def validate_depends_on_phase(cls, v: Optional[int], info) -> Optional[int]:
+    """Ensure depends_on_phase < phase_number."""
+    # Prevents circular dependencies and invalid ordering
+```
+
+**What Gets Rejected:**
+1. ❌ Negative parent_issue values
+2. ❌ phase_number < 1 or > 20
+3. ❌ Missing workflow_type or adw_id in phase_data
+4. ❌ Empty strings in required fields
+5. ❌ Non-string types in phase_data fields
+6. ❌ depends_on_phase >= phase_number (invalid dependency)
+7. ❌ Priority outside 10-90 range
+
+**Test Coverage:**
+- **18 test cases** covering all validation scenarios
+- Valid requests (standard, hopper, with dependencies)
+- Invalid boundary conditions
+- Missing required fields
+- Type validation
+- Dependency ordering logic
+
+**Test Results:**
+```
+18 passed in 0.13s
+```
+
+**Example Valid Request:**
+```json
+{
+  "parent_issue": 114,
+  "phase_number": 2,
+  "depends_on_phase": 1,
+  "phase_data": {
+    "workflow_type": "adw_sdlc_complete_iso",
+    "adw_id": "adw_12345"
+  }
+}
+```
+
+**Example Invalid Request (Returns 422):**
+```json
+{
+  "parent_issue": -1,  // ❌ Negative
+  "phase_number": 0,   // ❌ Must be >= 1
+  "phase_data": {
+    "adw_id": "test"   // ❌ Missing workflow_type
+  }
+}
+```
+
+**Security Impact:**
+- Prevents negative issue numbers from entering system
+- Validates phase ordering to ensure logical dependencies
+- Enforces required workflow data before database insertion
+- Type safety for all phase_data fields
+- Clear 422 error messages for invalid requests
+
+**Data Integrity Impact:**
+- Rejects malformed requests at API boundary
+- Prevents invalid queue entries
+- Ensures all required data present for workflow execution
+- Validates dependency ordering before database write
+
+**Files Changed:**
+- **Modified:** `app/server/routes/queue_routes.py` (validation added)
+- **New:** `app/server/tests/routes/__init__.py`
+- **New:** `app/server/tests/routes/test_queue_routes.py` (18 test cases)
+
+---
+
 ## Next Steps
 
 ### Immediate (When Queue Unpaused)
@@ -501,8 +605,8 @@ During this task, the database was reinitialized and migrations 006-013 were app
 
 ### Short-term (This Week)
 1. ✅ ~~Add database indexes~~ (COMPLETED - Session 3)
-2. Fix N+1 queries in queue_routes.py (NEXT)
-3. Add input validation (Pydantic validators)
+2. ✅ ~~Add input validation~~ (COMPLETED - Session 4)
+3. Fix N+1 queries in queue_routes.py (NEXT)
 4. Add code coverage enforcement to ADW
 5. Refactor `queue_routes.py` (650 lines → extract services)
 6. Replace 31 `any` types in frontend
