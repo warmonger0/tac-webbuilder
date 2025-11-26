@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { confirmAndPost, getCostEstimate, getPreview, getSystemStatus, submitRequest } from '../api/client';
-import type { CostEstimate, GitHubIssue, ServiceHealth } from '../types';
+import type { CostEstimate, GitHubIssue, PredictedPattern, ServiceHealth } from '../types';
 import { IssuePreview } from './IssuePreview';
 import { CostEstimateCard } from './CostEstimateCard';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -35,6 +35,7 @@ export function RequestForm() {
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [predictedPatterns, setPredictedPatterns] = useState<PredictedPattern[] | null>(null);
 
   // System health state
   const [systemHealthy, setSystemHealthy] = useState(true);
@@ -198,8 +199,9 @@ export function RequestForm() {
 
       setRequestId(response.request_id);
 
-      // Show predicted patterns if available
+      // Store predicted patterns for display
       if (response.predicted_patterns && response.predicted_patterns.length > 0) {
+        setPredictedPatterns(response.predicted_patterns);
         const patterns = response.predicted_patterns.map(p => p.pattern).join(', ');
         setSuccessMessage(
           `✅ Request submitted! Detected patterns: ${patterns}`
@@ -225,6 +227,7 @@ export function RequestForm() {
         setNlInput('');
         setPreview(null);
         setCostEstimate(null);
+        setPredictedPatterns(null);
         clearFormState();
       } else {
         setShowConfirm(true);
@@ -252,6 +255,7 @@ export function RequestForm() {
       setCostEstimate(null);
       setNlInput('');
       setRequestId(null);
+      setPredictedPatterns(null);
       clearFormState();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -265,6 +269,7 @@ export function RequestForm() {
     setPreview(null);
     setCostEstimate(null);
     setRequestId(null);
+    setPredictedPatterns(null);
   };
 
   const handleContentReceived = (content: string) => {
@@ -389,6 +394,27 @@ export function RequestForm() {
             {preview && !showConfirm && !autoPost && (
               <div className="mt-6 space-y-6">
                 <h3 className="text-xl font-bold text-white">Preview</h3>
+
+                {/* Predicted Patterns Display */}
+                {predictedPatterns && predictedPatterns.length > 0 && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                    <h4 className="text-sm font-medium text-emerald-300 mb-2">
+                      🎯 Detected Patterns
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {predictedPatterns.map((pred, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="px-2 py-1 bg-emerald-500/20 text-emerald-300 text-xs rounded-md border border-emerald-500/30">
+                            {pred.pattern}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {(pred.confidence * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Cost Estimate Card - Displayed FIRST for visibility */}
                 {costEstimate && (
