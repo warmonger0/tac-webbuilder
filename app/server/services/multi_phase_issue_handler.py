@@ -133,7 +133,8 @@ class MultiPhaseIssueHandler:
         """
         child_issues = []
 
-        for phase in request.phases:
+        # IMPORTANT: Process phases in sequential order (1, 2, 3, ...)
+        for phase in sorted(request.phases, key=lambda p: p.number):
             depends_on_phase = phase.number - 1 if phase.number > 1 else None
 
             # Enqueue phase first (without issue number for Phase 2+)

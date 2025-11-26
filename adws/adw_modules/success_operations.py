@@ -5,16 +5,53 @@ This module provides functions to handle successful workflow completion:
 - Close associated issues with success comments
 - Post success summaries
 - Mark workflows as complete
+- Update queue status to "completed"
 
 Mirrors the structure of failure_cleanup.py for consistency.
 """
 
 import logging
 import subprocess
+import requests
 from typing import Optional, Tuple
 
 from .github import make_issue_comment
 from .workflow_ops import format_issue_message
+
+# Backend API configuration
+BACKEND_URL = "http://localhost:8000"
+
+
+def complete_queue_for_issue(issue_number: str, logger: logging.Logger) -> Tuple[bool, Optional[str]]:
+    """Update queue status to 'completed' for all phases of an issue.
+
+    Args:
+        issue_number: GitHub issue number
+        logger: Logger instance
+
+    Returns:
+        Tuple of (success, error_message)
+    """
+    try:
+        logger.info(f"Updating queue status to 'completed' for issue #{issue_number}...")
+
+        response = requests.post(
+            f"{BACKEND_URL}/api/issue/{issue_number}/complete",
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            logger.info(f"✅ Queue status updated to 'completed' for issue #{issue_number}")
+            return True, None
+        else:
+            error_msg = f"Failed to update queue: {response.status_code} - {response.text}"
+            logger.warning(error_msg)
+            return False, error_msg
+
+    except Exception as e:
+        error_msg = f"Exception while updating queue: {e}"
+        logger.warning(error_msg)
+        return False, error_msg
 
 
 def close_issue_on_success(
@@ -27,9 +64,10 @@ def close_issue_on_success(
     """Close issue after successful workflow completion.
 
     This function:
-    1. Closes issue with success comment
-    2. Posts success summary
-    3. Handles errors gracefully (best-effort)
+    1. Updates queue status to "completed"
+    2. Closes issue with success comment
+    3. Posts success summary
+    4. Handles errors gracefully (best-effort)
 
     Args:
         adw_id: ADW workflow ID
@@ -41,13 +79,18 @@ def close_issue_on_success(
     Returns:
         Tuple of (success, error_message)
     """
-    logger.info(f"Closing issue #{issue_number} after successful ship...")
+    logger.info(f"Completing issue #{issue_number} after successful ship...")
+
+    # Step 1: Update queue status to "completed"
+    queue_success, queue_error = complete_queue_for_issue(issue_number, logger)
+    if not queue_success:
+        logger.warning(f"Queue update failed but continuing with issue close: {queue_error}")
 
     try:
-        # Format success comment
+        # Step 2: Format success comment
         success_comment = format_success_comment(branch_name)
 
-        # Close issue with comment
+        # Step 3: Close issue with comment
         result = subprocess.run(
             ["gh", "issue", "close", issue_number, "--comment", success_comment],
             capture_output=True,
