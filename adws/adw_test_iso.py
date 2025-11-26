@@ -7,19 +7,30 @@
 ADW Test Iso - AI Developer Workflow for agentic testing in isolated worktrees
 
 Usage:
-  uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e] [--no-external]
+  uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e] [--no-external] [--skip-coverage] [--coverage-threshold N]
 
 Workflow:
 1. Load state and validate worktree exists
 2. Run application test suite in worktree (optionally via external tools)
 3. **NEW (Issue #74):** Automatically retry and resolve test failures with fallback
-4. Report results to issue
-5. Create commit with test results in worktree
-6. Push and update PR
+4. **NEW:** Enforce code coverage thresholds based on issue type
+5. Report results to issue
+6. Create commit with test results in worktree
+7. Push and update PR
 
 Options:
   --skip-e2e: Skip E2E tests
   --no-external: Disable external test tools (uses inline execution, higher token usage)
+  --skip-coverage: Skip coverage enforcement (debugging)
+  --coverage-threshold N: Override coverage threshold percentage
+
+Coverage Enforcement:
+- LIGHTWEIGHT issues: 0% (no requirement)
+- STANDARD issues: 70% minimum coverage (blocks if lower)
+- COMPLEX issues: 80% minimum coverage (blocks if lower)
+- Posts GitHub comment with coverage details
+- Updates ADW state with coverage metrics
+- Blocks merge with sys.exit(1) if coverage < threshold
 
 Resolution Loop (Issue #74):
 - Infrastructure failures: Retries with fallback to inline mode (max 4 attempts)
@@ -812,6 +823,36 @@ def resolve_failed_e2e_tests(
     return resolved_count, unresolved_count
 
 
+def get_issue_type(issue_number: str, logger: logging.Logger) -> str:
+    """
+    Determine issue type from GitHub labels.
+
+    Returns:
+        "LIGHTWEIGHT", "STANDARD", or "COMPLEX"
+    """
+    try:
+        # Use gh CLI to get issue labels
+        result = subprocess.run(
+            ["gh", "issue", "view", str(issue_number), "--json", "labels"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        labels_data = json.loads(result.stdout)
+        labels = [label["name"].lower() for label in labels_data.get("labels", [])]
+
+        # Check for issue type labels
+        if "lightweight" in labels:
+            return "LIGHTWEIGHT"
+        elif "complex" in labels:
+            return "COMPLEX"
+        else:
+            return "STANDARD"  # Default
+    except Exception as e:
+        logger.warning(f"Could not determine issue type: {e}")
+        return "STANDARD"  # Safe default
+
+
 def run_e2e_tests_with_resolution(
     adw_id: str,
     issue_number: str,
@@ -937,23 +978,47 @@ def main():
 
     # Check for flags in args
     skip_e2e = "--skip-e2e" in sys.argv
+    skip_coverage = "--skip-coverage" in sys.argv
     # External tools are DEFAULT (opt-out with --no-external)
     use_external = "--no-external" not in sys.argv
+
+    # Check for coverage threshold override
+    coverage_threshold_override = None
+    for i, arg in enumerate(sys.argv):
+        if arg == "--coverage-threshold" and i + 1 < len(sys.argv):
+            try:
+                coverage_threshold_override = int(sys.argv[i + 1])
+            except ValueError:
+                print(f"Error: Invalid coverage threshold value: {sys.argv[i + 1]}")
+                sys.exit(1)
+            break
 
     # Remove flags from args if present
     if skip_e2e:
         sys.argv.remove("--skip-e2e")
+    if skip_coverage:
+        sys.argv.remove("--skip-coverage")
     if use_external:
         pass  # Keep for backwards compatibility
     if "--no-external" in sys.argv:
         sys.argv.remove("--no-external")
+    if coverage_threshold_override is not None:
+        # Remove --coverage-threshold and its value
+        threshold_idx = sys.argv.index("--coverage-threshold")
+        sys.argv.pop(threshold_idx)  # Remove flag
+        sys.argv.pop(threshold_idx)  # Remove value
 
     # Parse command line args
     # INTENTIONAL: adw-id is REQUIRED - we need it to find the worktree
     if len(sys.argv) < 3:
-        print("Usage: uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e] [--no-external]")
+        print("Usage: uv run adw_test_iso.py <issue-number> <adw-id> [--skip-e2e] [--no-external] [--skip-coverage] [--coverage-threshold N]")
         print("\nError: adw-id is required to locate the worktree")
         print("Run adw_plan_iso.py or adw_patch_iso.py first to create the worktree")
+        print("\nOptions:")
+        print("  --skip-e2e: Skip E2E tests")
+        print("  --no-external: Disable external test tools (uses inline execution)")
+        print("  --skip-coverage: Skip coverage enforcement (debugging)")
+        print("  --coverage-threshold N: Override coverage threshold percentage")
         sys.exit(1)
     
     issue_number = sys.argv[1]
@@ -983,7 +1048,7 @@ def main():
     
     # Set up logger with ADW ID from command line
     logger = setup_logger(adw_id, "adw_test_iso")
-    logger.info(f"ADW Test Iso starting - ID: {adw_id}, Issue: {issue_number}, Skip E2E: {skip_e2e}, Use External: {use_external}")
+    logger.info(f"ADW Test Iso starting - ID: {adw_id}, Issue: {issue_number}, Skip E2E: {skip_e2e}, Use External: {use_external}, Skip Coverage: {skip_coverage}, Coverage Threshold Override: {coverage_threshold_override}")
 
     # Validate environment
     check_env_vars(logger)
@@ -1148,14 +1213,177 @@ def main():
     post_comprehensive_test_summary(
         issue_number, adw_id, test_results, e2e_results, logger
     )
-    
+
+    # ==========================
+    # COVERAGE ENFORCEMENT
+    # ==========================
+    if not skip_coverage:
+        logger.info("\n=== Coverage Enforcement Check ===")
+
+        # Determine issue type from GitHub labels
+        issue_type = get_issue_type(issue_number, logger)
+        logger.info(f"[COVERAGE] Issue type: {issue_type}")
+
+        # Determine coverage threshold based on issue type
+        if coverage_threshold_override is not None:
+            coverage_threshold = coverage_threshold_override
+            logger.info(f"[COVERAGE] Using override threshold: {coverage_threshold}%")
+        elif issue_type == "LIGHTWEIGHT":
+            coverage_threshold = 0  # No requirement
+        elif issue_type == "STANDARD":
+            coverage_threshold = 70
+        elif issue_type == "COMPLEX":
+            coverage_threshold = 80
+        else:
+            coverage_threshold = 70  # Safe default (STANDARD)
+
+        logger.info(f"[COVERAGE] Required threshold: {coverage_threshold}%")
+
+        # Extract coverage data from test results
+        coverage_percentage = None
+        coverage_data = None
+
+        # Check external test results first (if used)
+        if use_external and "external_test_results" in state.data:
+            external_results = state.data.get("external_test_results", {})
+            coverage_data = external_results.get("coverage")
+            if coverage_data:
+                coverage_percentage = coverage_data.get("percentage", 0.0)
+                logger.info(f"[COVERAGE] Found coverage in external test results: {coverage_percentage:.1f}%")
+
+        # If no external coverage, check inline test results (not typical but possible)
+        # Note: inline test_results is a List[TestResult] which doesn't have coverage
+        # Coverage would be in the test_response object, but that's not directly accessible here
+
+        # Reload state to check if coverage was saved by test runner
+        if coverage_percentage is None:
+            reloaded_state = ADWState.load(adw_id)
+            if reloaded_state:
+                # Check if coverage data exists in state
+                external_results = reloaded_state.get("external_test_results", {})
+                coverage_data = external_results.get("coverage")
+                if coverage_data:
+                    coverage_percentage = coverage_data.get("percentage", 0.0)
+                    logger.info(f"[COVERAGE] Found coverage in reloaded state: {coverage_percentage:.1f}%")
+
+        # Enforce coverage threshold
+        if coverage_threshold > 0:
+            if coverage_percentage is None:
+                # No coverage data available but threshold is required
+                logger.error("[COVERAGE] Coverage data not available, but threshold is required")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id,
+                        "ops",
+                        f"❌ **Coverage check failed**\n\n"
+                        f"Coverage data not available, but {issue_type} issues require {coverage_threshold}% coverage.\n\n"
+                        f"Please ensure tests are running with coverage collection enabled."
+                    )
+                )
+                state.data["coverage_check"] = "failed"
+                state.data["coverage_error"] = "Coverage data not available"
+                state.save("adw_test_iso")
+                sys.exit(1)
+
+            elif coverage_percentage < coverage_threshold:
+                # Coverage is below threshold - BLOCK
+                missing_coverage = coverage_threshold - coverage_percentage
+                logger.error(f"[COVERAGE] ❌ Coverage check failed: {coverage_percentage:.1f}% < {coverage_threshold}%")
+
+                # Post detailed comment to GitHub issue
+                comment = f"❌ **Coverage check failed**\n\n"
+                comment += f"**Issue Type:** {issue_type}\n"
+                comment += f"**Current Coverage:** {coverage_percentage:.1f}%\n"
+                comment += f"**Required Coverage:** {coverage_threshold}%\n"
+                comment += f"**Missing Coverage:** {missing_coverage:.1f}%\n\n"
+                comment += f"Please add tests to increase coverage before merging.\n\n"
+
+                # Add details about uncovered files if available
+                if coverage_data and coverage_data.get("missing_files"):
+                    missing_files = coverage_data.get("missing_files", [])
+                    if missing_files:
+                        comment += f"**Files with 0% coverage ({len(missing_files)}):**\n"
+                        for file_path in missing_files[:5]:  # Limit to first 5
+                            comment += f"- `{file_path}`\n"
+                        if len(missing_files) > 5:
+                            comment += f"- ... and {len(missing_files) - 5} more\n"
+
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "ops", comment)
+                )
+
+                # Update state with coverage failure
+                state.data["coverage_check"] = "failed"
+                state.data["coverage_percentage"] = coverage_percentage
+                state.data["coverage_threshold"] = coverage_threshold
+                state.data["coverage_missing"] = missing_coverage
+                if coverage_data:
+                    state.data["coverage_lines_covered"] = coverage_data.get("lines_covered", 0)
+                    state.data["coverage_lines_total"] = coverage_data.get("lines_total", 0)
+                state.save("adw_test_iso")
+
+                # Exit with error to block workflow
+                logger.error(f"[EXIT] Blocking merge due to insufficient coverage")
+                sys.exit(1)
+            else:
+                # Coverage passed - CONTINUE
+                logger.info(f"[COVERAGE] ✅ Coverage check passed: {coverage_percentage:.1f}% >= {coverage_threshold}%")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id,
+                        "ops",
+                        f"✅ **Coverage check passed**\n\n"
+                        f"**Coverage:** {coverage_percentage:.1f}%\n"
+                        f"**Required:** {coverage_threshold}%\n"
+                        f"**Issue Type:** {issue_type}"
+                    )
+                )
+                state.data["coverage_check"] = "passed"
+                state.data["coverage_percentage"] = coverage_percentage
+                state.data["coverage_threshold"] = coverage_threshold
+                if coverage_data:
+                    state.data["coverage_lines_covered"] = coverage_data.get("lines_covered", 0)
+                    state.data["coverage_lines_total"] = coverage_data.get("lines_total", 0)
+                state.save("adw_test_iso")
+        else:
+            # No threshold required (LIGHTWEIGHT or threshold override = 0)
+            logger.info(f"[COVERAGE] No coverage requirement for {issue_type} issues")
+            if coverage_percentage is not None:
+                logger.info(f"[COVERAGE] Current coverage: {coverage_percentage:.1f}% (advisory only)")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id,
+                        "ops",
+                        f"ℹ️ **Coverage (Advisory)**\n\n"
+                        f"**Coverage:** {coverage_percentage:.1f}%\n"
+                        f"**Issue Type:** {issue_type} (no requirement)"
+                    )
+                )
+                state.data["coverage_check"] = "passed"
+                state.data["coverage_percentage"] = coverage_percentage
+                state.data["coverage_threshold"] = 0
+                if coverage_data:
+                    state.data["coverage_lines_covered"] = coverage_data.get("lines_covered", 0)
+                    state.data["coverage_lines_total"] = coverage_data.get("lines_total", 0)
+                state.save("adw_test_iso")
+    else:
+        logger.info("[COVERAGE] Coverage check skipped (--skip-coverage)")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", "⚠️ Coverage check skipped (--skip-coverage flag)")
+        )
+
     # Check if we should exit due to test failures
     total_failures = failed_count + (e2e_failed if not skip_e2e and e2e_results else 0)
     if total_failures > 0:
         logger.warning(f"Tests completed with {total_failures} failures - continuing to commit results")
         # Note: We don't exit here anymore, we commit the results regardless
         # This is different from the old workflow which would exit(1) on failures
-    
+
     # Get repo information
     try:
         github_repo_url = get_repo_url()
