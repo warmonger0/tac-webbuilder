@@ -484,7 +484,7 @@ def init_webhook_routes(phase_queue_service, github_poster):
                 response.message += ". Queue is paused, next phase not triggered"
                 return response
 
-            # Find next phase
+            # Find next phase within SAME parent issue first
             if not request.parent_issue or not request.phase_number:
                 logger.warning("[WEBHOOK] Cannot trigger next phase: missing parent_issue or phase_number")
                 return response
@@ -497,10 +497,27 @@ def init_webhook_routes(phase_queue_service, github_poster):
                     next_phase = phase
                     break
 
+            # If no next phase in current parent, check for other ready Phase 1s (cross-parent)
             if not next_phase:
-                logger.info(f"[WEBHOOK] No next phase found for parent #{request.parent_issue}, phase {request.phase_number}")
-                response.message += ". No next phase to trigger"
-                return response
+                logger.info(
+                    f"[WEBHOOK] No next phase in parent #{request.parent_issue}. "
+                    "Checking hopper for other ready Phase 1s..."
+                )
+
+                # Use HopperSorter for deterministic cross-parent ordering
+                from services.hopper_sorter import HopperSorter
+                sorter = HopperSorter()
+                next_phase = sorter.get_next_phase_1()
+
+                if next_phase:
+                    logger.info(
+                        f"[WEBHOOK] Hopper selected next parent: #{next_phase.parent_issue} "
+                        f"(priority={next_phase.priority}, position={next_phase.queue_position})"
+                    )
+                else:
+                    logger.info("[WEBHOOK] Hopper empty - no more Phase 1s to start")
+                    response.message += ". No more phases in queue"
+                    return response
 
             logger.info(
                 f"[WEBHOOK] Found next phase: {next_phase.phase_number} "

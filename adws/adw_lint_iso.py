@@ -293,14 +293,14 @@ def main():
     )
 
     # Exit with appropriate code based on lint results
-    # Note: We exit 0 even with lint errors if auto-fix was attempted
-    # This allows the workflow to continue to tests
+    # Exit 0 if lint passed or if auto-fix was successful
+    # Exit 1 if lint errors detected to prevent merging code with style issues
     if lint_success or (fix_mode and use_external):
         sys.exit(0)
     else:
-        logger.warning("Lint errors detected - consider fixing before proceeding")
-        # Exit 0 anyway to allow workflow to continue (linting is advisory)
-        sys.exit(0)
+        logger.error("Lint errors detected - blocking workflow to prevent style issues in production")
+        # Exit 1 to block workflow when lint errors are present
+        sys.exit(1)
 
 
 if __name__ == "__main__":

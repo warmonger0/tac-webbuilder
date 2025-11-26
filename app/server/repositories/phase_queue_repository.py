@@ -32,6 +32,11 @@ class PhaseQueueRepository:
         """
         Insert a phase into the database.
 
+        Automatically sets:
+        - queue_position (based on ROWID for FIFO ordering)
+        - priority (from item, default 50)
+        - ready_timestamp (if status is 'ready')
+
         Args:
             item: PhaseQueueItem to insert
 
@@ -40,13 +45,18 @@ class PhaseQueueRepository:
         """
         try:
             with get_connection(self.db_path) as conn:
+                # Get next queue_position (max + 1)
+                cursor = conn.execute("SELECT COALESCE(MAX(queue_position), 0) + 1 FROM phase_queue")
+                next_position = cursor.fetchone()[0]
+
                 conn.execute(
                     """
                     INSERT INTO phase_queue (
                         queue_id, parent_issue, phase_number, status,
-                        depends_on_phase, phase_data, created_at, updated_at
+                        depends_on_phase, phase_data, created_at, updated_at,
+                        priority, queue_position, ready_timestamp
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         item.queue_id,
@@ -57,6 +67,9 @@ class PhaseQueueRepository:
                         json.dumps(item.phase_data),
                         item.created_at,
                         item.updated_at,
+                        getattr(item, 'priority', 50),  # Default to normal priority
+                        next_position,
+                        item.created_at if item.status == 'ready' else None,
                     ),
                 )
         except Exception as e:
@@ -166,6 +179,10 @@ class PhaseQueueRepository:
         """
         Update phase status and optionally set ADW ID.
 
+        Also sets timestamps:
+        - ready_timestamp when transitioning to 'ready'
+        - started_timestamp when transitioning to 'running'
+
         Args:
             queue_id: Queue ID to update
             status: New status
@@ -176,24 +193,29 @@ class PhaseQueueRepository:
         """
         try:
             with get_connection(self.db_path) as conn:
+                # Build dynamic SQL based on status transitions
+                updates = ["status = ?", "updated_at = ?"]
+                params = [status, datetime.now().isoformat()]
+
                 if adw_id is not None:
-                    cursor = conn.execute(
-                        """
-                        UPDATE phase_queue
-                        SET status = ?, adw_id = ?, updated_at = ?
-                        WHERE queue_id = ?
-                        """,
-                        (status, adw_id, datetime.now().isoformat(), queue_id),
-                    )
-                else:
-                    cursor = conn.execute(
-                        """
-                        UPDATE phase_queue
-                        SET status = ?, updated_at = ?
-                        WHERE queue_id = ?
-                        """,
-                        (status, datetime.now().isoformat(), queue_id),
-                    )
+                    updates.append("adw_id = ?")
+                    params.append(adw_id)
+
+                if status == "ready":
+                    updates.append("ready_timestamp = datetime('now')")
+                elif status == "running":
+                    updates.append("started_timestamp = datetime('now')")
+
+                params.append(queue_id)
+
+                cursor = conn.execute(
+                    f"""
+                    UPDATE phase_queue
+                    SET {', '.join(updates)}
+                    WHERE queue_id = ?
+                    """,
+                    tuple(params),
+                )
                 return cursor.rowcount > 0
 
         except Exception as e:
