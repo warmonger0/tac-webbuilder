@@ -203,6 +203,18 @@
     - Modifying workflow_analytics.py or workflow_history.py
     - Adding new recommendation categories or anomaly types
 
+### Pattern Detection & Prediction Features
+- `app_docs/feature-adw-dd4189aa-submission-time-pattern-detection.md` - Real-time pattern prediction, submission-time insights, pattern confidence scoring, similar workflow detection, optimization recommendations
+  - Conditions:
+    - Working with pattern prediction or pattern detection systems
+    - Implementing real-time prediction features in RequestForm
+    - Modifying pattern_routes.py or pattern prediction logic
+    - Working with PatternInsightsPanel, PatternBadge, or SimilarWorkflowCard components
+    - Troubleshooting debounced API calls in frontend
+    - Adding new pattern-based recommendations or insights
+    - Understanding similarity scoring for workflow history
+    - Implementing confidence-based UI components
+
 ### Routes & Validation Features
 - `app_docs/feature-04a76d25-validation-optimization-routes-viz.md` - API routes visualization, AST parsing, routes_analyzer.py, Routes tab UI
 - `app_docs/feature-4fc73599-api-routes-display.md` - Dynamic API routes introspection, /api/routes endpoint, route display functionality, FastAPI route discovery
