@@ -1,16 +1,30 @@
 {
   "adw_id": "adw-831e1e88",
   "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/adw-831e1e88",
-  "created_at": "2025-11-25T19:42:37.077494",
+  "created_at": "2025-11-25T19:46:54.198088",
+  "spec_file": "/Users/Warmonger0/tac/tac-webbuilder/trees/adw-831e1e88/specs/issue-110-adw-adw-831e1e88-sdlc_planner-phase-3-polish-integration.md",
   "changed_files": [
     ".adw-context.json",
     ".claude/commands/e2e/test_adw_monitor_phase3.md",
     ".mcp.json",
+    ".playwright-mcp/01_initial_app_load.png",
+    ".playwright-mcp/02_adw_monitor_card_loading.png",
+    ".playwright-mcp/02_adw_monitor_card_no_workflows.png",
+    ".playwright-mcp/03_websocket_connection_error.png",
     "README.md",
     "app/client/src/components/AdwMonitorCard.tsx",
+    "app/client/src/components/AdwMonitorErrorBoundary.tsx",
     "app/client/src/components/ConnectionStatusIndicator.tsx",
+    "app/client/src/components/LoadingSkeleton.tsx",
+    "app/client/src/components/PhaseNode.tsx",
     "app/client/src/components/RequestForm.tsx",
+    "app/client/src/components/WorkflowPipelineView.tsx",
+    "app/client/src/components/WorkflowStatusBadge.tsx",
+    "app/client/src/components/__tests__/AdwMonitorCard.phase3.test.tsx",
+    "app/client/src/hooks/useProgressInterpolation.ts",
+    "app/client/src/hooks/useReducedMotion.ts",
     "app/client/src/hooks/useReliableWebSocket.ts",
+    "app/client/src/utils/formatters.ts",
     "app/server/core/adw_monitor.py",
     "app/server/core/data_models.py",
     "app/server/core/github_poster.py",
@@ -74,6 +88,7 @@
     "app/server/tests/e2e/test_workflow_journey.py",
     "app/server/tests/integration/conftest.py",
     "app/server/tests/integration/test_adw_monitor_endpoint.py",
+    "app/server/tests/integration/test_adw_monitor_websocket.py",
     "app/server/tests/integration/test_api_contracts.py",
     "app/server/tests/integration/test_database_operations.py",
     "app/server/tests/integration/test_file_query_pipeline.py",
@@ -82,18 +97,495 @@
     "app/server/tests/manual/batch_process_patterns.py",
     "app/server/tests/manual/query_pattern_stats.py",
     "app/server/tests/manual/test_existing_pattern_detection.py",
+    "app/server/tests/performance/__init__.py",
+    "app/server/tests/performance/test_adw_monitor_performance.py",
     "app/server/tests/regression/__init__.py",
     "app/server/tests/regression/conftest.py",
     "app/server/tests/regression/test_regression_suite.py",
     "app/server/tests/services/test_health_service.py",
     "app/server/tests/services/test_phase_coordinator.py",
     "app/server/tests/services/test_phase_queue_service.py",
+    "app/server/tests/services/test_websocket_adw_monitor.py",
     "app/server/tests/test_workflow_analytics.py",
     "app/server/tests/test_workflow_history.py",
     "app/server/tests/utils/test_process_runner.py",
     "app/server/utils/llm_client.py",
     "app/server/utils/process_runner.py",
     "app/server/uv.lock",
-    "docs/adw_monitor_phase3.md"
-  ]
+    "docs/adw_monitor_phase3.md",
+    "specs/patch/patch-adw-831e1e88-accessibility-enhancements.md",
+    "specs/patch/patch-adw-831e1e88-animation-system.md",
+    "specs/patch/patch-adw-831e1e88-comprehensive-test-suite.md",
+    "specs/patch/patch-adw-831e1e88-enhanced-error-handling.md",
+    "specs/patch/patch-adw-831e1e88-refactor-adw-monitor-card.md",
+    "specs/patch/patch-adw-831e1e88-websocket-integration.md",
+    "specs/patch/patch-adw-831e1e88-websocket-url-fix.md"
+  ],
+  "changed_files_stats": {
+    ".adw-context.json": {
+      "additions": 92,
+      "deletions": 9
+    },
+    ".claude/commands/e2e/test_adw_monitor_phase3.md": {
+      "additions": 247,
+      "deletions": 0
+    },
+    ".mcp.json": {
+      "additions": 1,
+      "deletions": 1
+    },
+    ".playwright-mcp/01_initial_app_load.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    ".playwright-mcp/02_adw_monitor_card_loading.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    ".playwright-mcp/02_adw_monitor_card_no_workflows.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    ".playwright-mcp/03_websocket_connection_error.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    "README.md": {
+      "additions": 8,
+      "deletions": 0
+    },
+    "app/client/src/components/AdwMonitorCard.tsx": {
+      "additions": 142,
+      "deletions": 668
+    },
+    "app/client/src/components/AdwMonitorErrorBoundary.tsx": {
+      "additions": 125,
+      "deletions": 0
+    },
+    "app/client/src/components/ConnectionStatusIndicator.tsx": {
+      "additions": 62,
+      "deletions": 7
+    },
+    "app/client/src/components/LoadingSkeleton.tsx": {
+      "additions": 99,
+      "deletions": 0
+    },
+    "app/client/src/components/PhaseNode.tsx": {
+      "additions": 230,
+      "deletions": 0
+    },
+    "app/client/src/components/RequestForm.tsx": {
+      "additions": 4,
+      "deletions": 1
+    },
+    "app/client/src/components/WorkflowPipelineView.tsx": {
+      "additions": 435,
+      "deletions": 0
+    },
+    "app/client/src/components/WorkflowStatusBadge.tsx": {
+      "additions": 62,
+      "deletions": 0
+    },
+    "app/client/src/components/__tests__/AdwMonitorCard.phase3.test.tsx": {
+      "additions": 518,
+      "deletions": 0
+    },
+    "app/client/src/hooks/useProgressInterpolation.ts": {
+      "additions": 68,
+      "deletions": 0
+    },
+    "app/client/src/hooks/useReducedMotion.ts": {
+      "additions": 36,
+      "deletions": 0
+    },
+    "app/client/src/hooks/useReliableWebSocket.ts": {
+      "additions": 41,
+      "deletions": 2
+    },
+    "app/client/src/utils/formatters.ts": {
+      "additions": 24,
+      "deletions": 0
+    },
+    "app/server/core/adw_monitor.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/core/data_models.py": {
+      "additions": 27,
+      "deletions": 27
+    },
+    "app/server/core/github_poster.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/core/health_checks.py": {
+      "additions": 9,
+      "deletions": 10
+    },
+    "app/server/core/llm_processor.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/models/__init__.py": {
+      "additions": 5,
+      "deletions": 3
+    },
+    "app/server/core/models/domain.py": {
+      "additions": 0,
+      "deletions": 1
+    },
+    "app/server/core/models/requests.py": {
+      "additions": 2,
+      "deletions": 0
+    },
+    "app/server/core/models/responses.py": {
+      "additions": 2,
+      "deletions": 1
+    },
+    "app/server/core/preflight_checks.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/core/routes_analyzer.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/core/workflow_analytics/__init__.py": {
+      "additions": 8,
+      "deletions": 9
+    },
+    "app/server/core/workflow_analytics/recommendations.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/workflow_analytics/scoring/__init__.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/core/workflow_analytics/scoring/cost_efficiency_scorer.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/workflow_analytics/similarity.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/workflow_history.py": {
+      "additions": 6,
+      "deletions": 6
+    },
+    "app/server/core/workflow_history_utils/database/__init__.py": {
+      "additions": 6,
+      "deletions": 5
+    },
+    "app/server/core/workflow_history_utils/database/analytics.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/workflow_history_utils/database/mutations.py": {
+      "additions": 5,
+      "deletions": 4
+    },
+    "app/server/core/workflow_history_utils/database/queries.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/workflow_history_utils/database_old.py": {
+      "additions": 4,
+      "deletions": 4
+    },
+    "app/server/core/workflow_history_utils/enrichment.py": {
+      "additions": 4,
+      "deletions": 6
+    },
+    "app/server/core/workflow_history_utils/github_client.py": {
+      "additions": 1,
+      "deletions": 2
+    },
+    "app/server/core/workflow_history_utils/metrics.py": {
+      "additions": 0,
+      "deletions": 1
+    },
+    "app/server/core/workflow_history_utils/models.py": {
+      "additions": 8,
+      "deletions": 9
+    },
+    "app/server/core/workflow_history_utils/sync_manager.py": {
+      "additions": 4,
+      "deletions": 3
+    },
+    "app/server/models/phase_queue_item.py": {
+      "additions": 10,
+      "deletions": 10
+    },
+    "app/server/pyproject.toml": {
+      "additions": 17,
+      "deletions": 0
+    },
+    "app/server/pytest.ini": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/repositories/phase_queue_repository.py": {
+      "additions": 5,
+      "deletions": 6
+    },
+    "app/server/routes/issue_completion_routes.py": {
+      "additions": 5,
+      "deletions": 7
+    },
+    "app/server/routes/queue_routes.py": {
+      "additions": 5,
+      "deletions": 6
+    },
+    "app/server/routes/websocket_routes.py": {
+      "additions": 37,
+      "deletions": 1
+    },
+    "app/server/scripts/fix_phantom_records.py": {
+      "additions": 1,
+      "deletions": 2
+    },
+    "app/server/server.py": {
+      "additions": 23,
+      "deletions": 3
+    },
+    "app/server/services/background_tasks.py": {
+      "additions": 62,
+      "deletions": 0
+    },
+    "app/server/services/github_issue_service.py": {
+      "additions": 9,
+      "deletions": 10
+    },
+    "app/server/services/health_service.py": {
+      "additions": 2,
+      "deletions": 2
+    },
+    "app/server/services/issue_linking_service.py": {
+      "additions": 1,
+      "deletions": 2
+    },
+    "app/server/services/multi_phase_issue_handler.py": {
+      "additions": 4,
+      "deletions": 11
+    },
+    "app/server/services/phase_coordination/phase_coordinator.py": {
+      "additions": 11,
+      "deletions": 11
+    },
+    "app/server/services/phase_coordination/phase_github_notifier.py": {
+      "additions": 4,
+      "deletions": 4
+    },
+    "app/server/services/phase_coordination/workflow_completion_detector.py": {
+      "additions": 2,
+      "deletions": 3
+    },
+    "app/server/services/phase_dependency_tracker.py": {
+      "additions": 2,
+      "deletions": 3
+    },
+    "app/server/services/phase_queue_service.py": {
+      "additions": 10,
+      "deletions": 9
+    },
+    "app/server/services/websocket_manager.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/services/workflow_service.py": {
+      "additions": 3,
+      "deletions": 4
+    },
+    "app/server/tests/conftest.py": {
+      "additions": 23,
+      "deletions": 6
+    },
+    "app/server/tests/core/test_adw_monitor.py": {
+      "additions": 1,
+      "deletions": 3
+    },
+    "app/server/tests/core/test_llm_processor.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/tests/core/workflow_history_utils/test_database.py": {
+      "additions": 4,
+      "deletions": 7
+    },
+    "app/server/tests/core/workflow_history_utils/test_enrichment.py": {
+      "additions": 1,
+      "deletions": 3
+    },
+    "app/server/tests/core/workflow_history_utils/test_filesystem.py": {
+      "additions": 1,
+      "deletions": 2
+    },
+    "app/server/tests/core/workflow_history_utils/test_github_client.py": {
+      "additions": 2,
+      "deletions": 2
+    },
+    "app/server/tests/core/workflow_history_utils/test_metrics.py": {
+      "additions": 1,
+      "deletions": 3
+    },
+    "app/server/tests/core/workflow_history_utils/test_models.py": {
+      "additions": 7,
+      "deletions": 8
+    },
+    "app/server/tests/e2e/conftest.py": {
+      "additions": 4,
+      "deletions": 11
+    },
+    "app/server/tests/e2e/test_github_issue_flow.py": {
+      "additions": 12,
+      "deletions": 14
+    },
+    "app/server/tests/e2e/test_multi_phase_execution.py": {
+      "additions": 24,
+      "deletions": 13
+    },
+    "app/server/tests/e2e/test_workflow_journey.py": {
+      "additions": 3,
+      "deletions": 2
+    },
+    "app/server/tests/integration/conftest.py": {
+      "additions": 5,
+      "deletions": 7
+    },
+    "app/server/tests/integration/test_adw_monitor_endpoint.py": {
+      "additions": 0,
+      "deletions": 3
+    },
+    "app/server/tests/integration/test_adw_monitor_websocket.py": {
+      "additions": 409,
+      "deletions": 0
+    },
+    "app/server/tests/integration/test_api_contracts.py": {
+      "additions": 3,
+      "deletions": 3
+    },
+    "app/server/tests/integration/test_database_operations.py": {
+      "additions": 13,
+      "deletions": 18
+    },
+    "app/server/tests/integration/test_file_query_pipeline.py": {
+      "additions": 24,
+      "deletions": 10
+    },
+    "app/server/tests/integration/test_server_startup.py": {
+      "additions": 2,
+      "deletions": 3
+    },
+    "app/server/tests/integration/test_workflow_history_integration.py": {
+      "additions": 1,
+      "deletions": 4
+    },
+    "app/server/tests/manual/batch_process_patterns.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/tests/manual/query_pattern_stats.py": {
+      "additions": 1,
+      "deletions": 2
+    },
+    "app/server/tests/manual/test_existing_pattern_detection.py": {
+      "additions": 3,
+      "deletions": 3
+    },
+    "app/server/tests/performance/__init__.py": {
+      "additions": 10,
+      "deletions": 0
+    },
+    "app/server/tests/performance/test_adw_monitor_performance.py": {
+      "additions": 457,
+      "deletions": 0
+    },
+    "app/server/tests/regression/__init__.py": {
+      "additions": 1,
+      "deletions": 5
+    },
+    "app/server/tests/regression/conftest.py": {
+      "additions": 3,
+      "deletions": 2
+    },
+    "app/server/tests/regression/test_regression_suite.py": {
+      "additions": 4,
+      "deletions": 6
+    },
+    "app/server/tests/services/test_health_service.py": {
+      "additions": 2,
+      "deletions": 2
+    },
+    "app/server/tests/services/test_phase_coordinator.py": {
+      "additions": 18,
+      "deletions": 8
+    },
+    "app/server/tests/services/test_phase_queue_service.py": {
+      "additions": 7,
+      "deletions": 10
+    },
+    "app/server/tests/services/test_websocket_adw_monitor.py": {
+      "additions": 367,
+      "deletions": 0
+    },
+    "app/server/tests/test_workflow_analytics.py": {
+      "additions": 4,
+      "deletions": 4
+    },
+    "app/server/tests/test_workflow_history.py": {
+      "additions": 2,
+      "deletions": 2
+    },
+    "app/server/tests/utils/test_process_runner.py": {
+      "additions": 3,
+      "deletions": 3
+    },
+    "app/server/utils/llm_client.py": {
+      "additions": 1,
+      "deletions": 4
+    },
+    "app/server/utils/process_runner.py": {
+      "additions": 6,
+      "deletions": 7
+    },
+    "app/server/uv.lock": {
+      "additions": 30,
+      "deletions": 0
+    },
+    "docs/adw_monitor_phase3.md": {
+      "additions": 581,
+      "deletions": 0
+    },
+    "specs/patch/patch-adw-831e1e88-accessibility-enhancements.md": {
+      "additions": 101,
+      "deletions": 0
+    },
+    "specs/patch/patch-adw-831e1e88-animation-system.md": {
+      "additions": 118,
+      "deletions": 0
+    },
+    "specs/patch/patch-adw-831e1e88-comprehensive-test-suite.md": {
+      "additions": 145,
+      "deletions": 0
+    },
+    "specs/patch/patch-adw-831e1e88-enhanced-error-handling.md": {
+      "additions": 125,
+      "deletions": 0
+    },
+    "specs/patch/patch-adw-831e1e88-refactor-adw-monitor-card.md": {
+      "additions": 109,
+      "deletions": 0
+    },
+    "specs/patch/patch-adw-831e1e88-websocket-integration.md": {
+      "additions": 89,
+      "deletions": 0
+    },
+    "specs/patch/patch-adw-831e1e88-websocket-url-fix.md": {
+      "additions": 46,
+      "deletions": 0
+    }
+  },
+  "documentation_screenshots_dir": "/Users/Warmonger0/tac/tac-webbuilder/trees/adw-831e1e88/agents/adw-831e1e88/reviewer/review_img"
 }

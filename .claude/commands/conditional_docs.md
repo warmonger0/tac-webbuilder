@@ -193,6 +193,18 @@
     - Working with app/server/core/adw_monitor.py
     - Troubleshooting workflow status detection or progress calculation
     - Implementing real-time monitoring features or caching strategies
+- `app_docs/feature-adw-831e1e88-phase3-polish-integration.md` - Phase 3 ADW Monitor enhancements: WebSocket real-time updates, animation system, performance optimizations, error handling, comprehensive test suite
+  - Conditions:
+    - Working with WebSocket implementation for ADW monitoring
+    - Implementing real-time push notifications or background state watchers
+    - Working with frontend components: WorkflowPipelineView, PhaseNode, LoadingSkeleton, AdwMonitorErrorBoundary
+    - Implementing animations with accessibility support (useProgressInterpolation, useReducedMotion)
+    - Troubleshooting WebSocket connection issues or reconnection logic
+    - Understanding exponential backoff reconnection strategy
+    - Working with app/client/src/hooks/useReliableWebSocket.ts
+    - Optimizing API response times or caching strategies
+    - Adding performance benchmarks or tests
+    - Understanding component decomposition patterns (668-line to 142-line refactor)
 
 ### Analytics & Insights Features
 - `app_docs/feature-a7c948e2-insights-recommendations.md` - Phase 3D anomaly detection, optimization recommendations, workflow analytics insights, complexity detection, statistical thresholds
