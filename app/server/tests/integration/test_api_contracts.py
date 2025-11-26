@@ -10,9 +10,9 @@ These tests validate that API endpoints:
 Uses real FastAPI app with test database and mocked external APIs.
 """
 
-import pytest
 from unittest.mock import patch
-from fastapi.testclient import TestClient
+
+import pytest
 
 
 @pytest.mark.integration
@@ -81,7 +81,7 @@ class TestDatabaseEndpoints:
 
         if response.status_code == 200:
             data = response.json()
-            assert isinstance(data, dict) or isinstance(data, list)
+            assert isinstance(data, dict | list)
 
     @pytest.mark.parametrize("invalid_query", [
         "DROP TABLE users",

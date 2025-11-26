@@ -210,7 +210,7 @@ def check_critical_tests() -> dict[str, Any]:
                 match = re.search(r'(\d+)\s+failed', output)
                 if match:
                     failure_count = int(match.group(1))
-                    failing_tests = [f"Test failures detected (run with -v for details)"]
+                    failing_tests = ["Test failures detected (run with -v for details)"]
 
             return {
                 "passed": False,

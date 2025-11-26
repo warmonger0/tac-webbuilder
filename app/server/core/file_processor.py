@@ -99,7 +99,7 @@ def convert_csv_to_sqlite(csv_content: bytes, table_name: str, db_path: str = "d
         }
 
     except Exception as e:
-        raise Exception(f"Error converting CSV to SQLite: {str(e)}")
+        raise Exception(f"Error converting CSV to SQLite: {str(e)}") from e
 
 def convert_json_to_sqlite(json_content: bytes, table_name: str, db_path: str = "db/database.db") -> dict[str, Any]:
     """
@@ -171,7 +171,7 @@ def convert_json_to_sqlite(json_content: bytes, table_name: str, db_path: str = 
         }
 
     except Exception as e:
-        raise Exception(f"Error converting JSON to SQLite: {str(e)}")
+        raise Exception(f"Error converting JSON to SQLite: {str(e)}") from e
 
 def flatten_json_object(obj: Any, prefix: str = "") -> dict[str, Any]:
     """
@@ -226,9 +226,9 @@ def discover_jsonl_fields(jsonl_content: bytes) -> set[str]:
                 flattened = flatten_json_object(json_obj)
                 all_fields.update(flattened.keys())
             except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON on line {line_num}: {str(e)}")
+                raise ValueError(f"Invalid JSON on line {line_num}: {str(e)}") from None
     except UnicodeDecodeError:
-        raise ValueError("File is not valid UTF-8 encoded text")
+        raise ValueError("File is not valid UTF-8 encoded text") from None
 
     return all_fields
 
@@ -274,7 +274,7 @@ def convert_jsonl_to_sqlite(jsonl_content: bytes, table_name: str, db_path: str 
 
                 records.append(record)
             except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON on line {line_num}: {str(e)}")
+                raise ValueError(f"Invalid JSON on line {line_num}: {str(e)}") from None
 
         if not records:
             raise ValueError("No valid records found in JSONL file")
@@ -331,4 +331,4 @@ def convert_jsonl_to_sqlite(jsonl_content: bytes, table_name: str, db_path: str 
         }
 
     except Exception as e:
-        raise Exception(f"Error converting JSONL to SQLite: {str(e)}")
+        raise Exception(f"Error converting JSONL to SQLite: {str(e)}") from e

@@ -6,12 +6,9 @@ Tests phase queue management, dependency tracking, and sequential execution coor
 
 import os
 import tempfile
-import uuid
-from datetime import datetime
 
 import pytest
-
-from services.phase_queue_service import PhaseQueueService, PhaseQueueItem
+from services.phase_queue_service import PhaseQueueService
 
 
 @pytest.fixture
@@ -80,7 +77,7 @@ def test_enqueue_multiple_phases(service):
     parent_issue = 456
 
     # Enqueue Phase 1
-    queue_id_1 = service.enqueue(
+    service.enqueue(
         parent_issue=parent_issue,
         phase_number=1,
         phase_data={"title": "Phase 1", "content": "First phase"},
@@ -88,7 +85,7 @@ def test_enqueue_multiple_phases(service):
     )
 
     # Enqueue Phase 2
-    queue_id_2 = service.enqueue(
+    service.enqueue(
         parent_issue=parent_issue,
         phase_number=2,
         phase_data={"title": "Phase 2", "content": "Second phase"},
@@ -96,7 +93,7 @@ def test_enqueue_multiple_phases(service):
     )
 
     # Enqueue Phase 3
-    queue_id_3 = service.enqueue(
+    service.enqueue(
         parent_issue=parent_issue,
         phase_number=3,
         phase_data={"title": "Phase 3", "content": "Third phase"},
@@ -122,7 +119,7 @@ def test_mark_phase_complete_triggers_next(service):
     # Enqueue 3 phases
     queue_id_1 = service.enqueue(parent_issue, 1, {"title": "P1", "content": "..."}, None)
     queue_id_2 = service.enqueue(parent_issue, 2, {"title": "P2", "content": "..."}, 1)
-    queue_id_3 = service.enqueue(parent_issue, 3, {"title": "P3", "content": "..."}, 2)
+    service.enqueue(parent_issue, 3, {"title": "P3", "content": "..."}, 2)
 
     # Initially: Phase 1 ready, Phase 2 and 3 queued
     items = service.get_queue_by_parent(parent_issue)
@@ -155,8 +152,8 @@ def test_mark_phase_failed_blocks_dependents(service):
 
     # Enqueue 3 phases
     queue_id_1 = service.enqueue(parent_issue, 1, {"title": "P1", "content": "..."}, None)
-    queue_id_2 = service.enqueue(parent_issue, 2, {"title": "P2", "content": "..."}, 1)
-    queue_id_3 = service.enqueue(parent_issue, 3, {"title": "P3", "content": "..."}, 2)
+    service.enqueue(parent_issue, 2, {"title": "P2", "content": "..."}, 1)
+    service.enqueue(parent_issue, 3, {"title": "P3", "content": "..."}, 2)
 
     # Mark Phase 1 as failed
     blocked_ids = service.mark_phase_failed(queue_id_1, "Tests failed")

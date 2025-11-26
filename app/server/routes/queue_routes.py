@@ -4,11 +4,10 @@ Queue management endpoints for multi-phase workflow tracking.
 import logging
 import os
 import subprocess
-from typing import List
 
+from core.nl_processor import suggest_adw_workflow
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from core.nl_processor import suggest_adw_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +98,7 @@ class PhaseQueueItemResponse(BaseModel):
 
 class QueueListResponse(BaseModel):
     """Response model for queue list"""
-    phases: List[PhaseQueueItemResponse] = Field(..., description="List of queued phases")
+    phases: list[PhaseQueueItemResponse] = Field(..., description="List of queued phases")
     total: int = Field(..., description="Total number of phases")
 
 
@@ -163,7 +162,7 @@ class SetQueuePausedRequest(BaseModel):
     paused: bool = Field(..., description="True to pause automatic execution, False to resume")
 
 
-def init_queue_routes(phase_queue_service):
+def init_queue_routes(phase_queue_service):  # noqa: C901
     """
     Initialize queue routes with service dependencies.
 
@@ -187,7 +186,7 @@ def init_queue_routes(phase_queue_service):
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to get queued phases: {str(e)}")
-            raise HTTPException(500, f"Error retrieving queue: {str(e)}")
+            raise HTTPException(500, f"Error retrieving queue: {str(e)}") from e
 
     @router.get("/config", response_model=QueueConfigResponse)
     async def get_queue_config() -> QueueConfigResponse:
@@ -203,7 +202,7 @@ def init_queue_routes(phase_queue_service):
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to get queue config: {str(e)}")
-            raise HTTPException(500, f"Error retrieving queue config: {str(e)}")
+            raise HTTPException(500, f"Error retrieving queue config: {str(e)}") from e
 
     @router.post("/config/pause", response_model=QueueConfigResponse)
     async def set_queue_paused(request: SetQueuePausedRequest) -> QueueConfigResponse:
@@ -226,7 +225,7 @@ def init_queue_routes(phase_queue_service):
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to set queue paused state: {str(e)}")
-            raise HTTPException(500, f"Error setting queue config: {str(e)}")
+            raise HTTPException(500, f"Error setting queue config: {str(e)}") from e
 
     @router.get("/{parent_issue}", response_model=QueueListResponse)
     async def get_queue_by_parent(parent_issue: int) -> QueueListResponse:
@@ -249,7 +248,7 @@ def init_queue_routes(phase_queue_service):
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to get phases for issue #{parent_issue}: {str(e)}")
-            raise HTTPException(500, f"Error retrieving phases: {str(e)}")
+            raise HTTPException(500, f"Error retrieving phases: {str(e)}") from e
 
     @router.post("/enqueue", response_model=EnqueueResponse)
     async def enqueue_phase(request: EnqueueRequest) -> EnqueueResponse:
@@ -276,7 +275,7 @@ def init_queue_routes(phase_queue_service):
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to enqueue phase: {str(e)}")
-            raise HTTPException(500, f"Error enqueueing phase: {str(e)}")
+            raise HTTPException(500, f"Error enqueueing phase: {str(e)}") from e
 
     @router.delete("/{queue_id}", response_model=DequeueResponse)
     async def dequeue_phase(queue_id: str) -> DequeueResponse:
@@ -303,7 +302,7 @@ def init_queue_routes(phase_queue_service):
             raise
         except Exception as e:
             logger.error(f"[ERROR] Failed to dequeue phase: {str(e)}")
-            raise HTTPException(500, f"Error dequeueing phase: {str(e)}")
+            raise HTTPException(500, f"Error dequeueing phase: {str(e)}") from e
 
     @router.post("/{queue_id}/execute", response_model=ExecutePhaseResponse)
     async def execute_phase(queue_id: str) -> ExecutePhaseResponse:
@@ -373,7 +372,7 @@ def init_queue_routes(phase_queue_service):
             )
 
             # Launch workflow in background
-            process = subprocess.Popen(
+            subprocess.Popen(
                 cmd,
                 cwd=repo_root,
                 start_new_session=True,
@@ -402,7 +401,7 @@ def init_queue_routes(phase_queue_service):
             logger.error(f"[ERROR] Failed to execute phase: {str(e)}")
             import traceback
             logger.error(f"Traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error executing phase: {str(e)}")
+            raise HTTPException(500, f"Error executing phase: {str(e)}") from e
 
     return router
 
@@ -585,7 +584,7 @@ def init_webhook_routes(phase_queue_service, github_poster):
 
             if not os.path.exists(workflow_script):
                 logger.error(f"[WEBHOOK] Workflow script not found: {workflow_script}")
-                response.message += f". Next phase ready but workflow script not found"
+                response.message += ". Next phase ready but workflow script not found"
                 return response
 
             cmd = ["uv", "run", workflow_script, str(next_phase.issue_number), adw_id]
@@ -596,7 +595,7 @@ def init_webhook_routes(phase_queue_service, github_poster):
             )
 
             # Launch workflow in background
-            process = subprocess.Popen(
+            subprocess.Popen(
                 cmd,
                 cwd=repo_root,
                 start_new_session=True,
@@ -628,6 +627,6 @@ def init_webhook_routes(phase_queue_service, github_poster):
             logger.error(f"[WEBHOOK] Error processing workflow completion: {str(e)}")
             import traceback
             logger.error(f"Traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error processing workflow completion: {str(e)}")
+            raise HTTPException(500, f"Error processing workflow completion: {str(e)}") from e
 
     return webhook_router

@@ -162,7 +162,7 @@ def detect_framework(path: Path) -> str | None:
     return None
 
 
-def detect_backend(path: Path) -> str | None:
+def detect_backend(path: Path) -> str | None:  # noqa: C901
     """
     Detect backend framework.
 

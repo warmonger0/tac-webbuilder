@@ -9,6 +9,7 @@ from utils.llm_client to eliminate code duplication.
 from typing import Any
 
 from utils.llm_client import SQLGenerationClient
+
 from core.data_models import QueryRequest
 
 

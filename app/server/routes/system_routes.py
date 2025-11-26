@@ -30,7 +30,7 @@ _adw_monitor_cache_time = None
 ADW_MONITOR_CACHE_TTL = 5  # seconds
 
 
-def init_system_routes(health_service, service_controller, app_start_time):
+def init_system_routes(health_service, service_controller, app_start_time):  # noqa: C901
     """
     Initialize system routes with service dependencies.
 

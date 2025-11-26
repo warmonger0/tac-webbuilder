@@ -5,9 +5,9 @@ GitHub CLI integration for posting issues.
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
+from utils.process_runner import ProcessRunner
 
 from core.data_models import GitHubIssue
-from utils.process_runner import ProcessRunner
 
 
 class GitHubPoster:
@@ -112,7 +112,7 @@ class GitHubPoster:
             return issue_number
 
         except Exception as e:
-            raise RuntimeError(f"Failed to post issue to GitHub: {str(e)}")
+            raise RuntimeError(f"Failed to post issue to GitHub: {str(e)}") from e
 
     def _ensure_labels_exist(self, labels: list):
         """
@@ -247,4 +247,4 @@ class GitHubPoster:
             return json.loads(result)
 
         except Exception as e:
-            raise RuntimeError(f"Failed to get repository info: {str(e)}")
+            raise RuntimeError(f"Failed to get repository info: {str(e)}") from e

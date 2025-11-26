@@ -12,8 +12,8 @@ Run from app/server/ directory:
     cd app/server && uv run python tests/manual/batch_process_patterns.py
 """
 
-import sys
 import sqlite3
+import sys
 from pathlib import Path
 
 # Add app/server to Python path

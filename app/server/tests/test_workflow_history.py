@@ -44,10 +44,10 @@ def temp_db(monkeypatch):
 
     # Use monkeypatch to replace DB_PATH in all modules that import it
     # This works better than patch() because it happens before module-level code runs
-    import core.workflow_history_utils.database.schema as schema_module
+    import core.workflow_history_utils.database.analytics as analytics_module
     import core.workflow_history_utils.database.mutations as mutations_module
     import core.workflow_history_utils.database.queries as queries_module
-    import core.workflow_history_utils.database.analytics as analytics_module
+    import core.workflow_history_utils.database.schema as schema_module
 
     monkeypatch.setattr(schema_module, 'DB_PATH', temp_db_path)
     monkeypatch.setattr(mutations_module, 'DB_PATH', temp_db_path)
@@ -327,10 +327,10 @@ def test_scan_agents_directory_with_workflows(temp_db):
                 return agents_dir.parent
             return self
 
-        with patch.object(Path, 'parent', agents_dir.parent):
-            with patch('core.workflow_history_utils.filesystem.Path.__truediv__', return_value=agents_dir):
-                workflows = scan_agents_directory()
-                assert len(workflows) > 0 or isinstance(workflows, list)
+        with patch.object(Path, 'parent', agents_dir.parent), \
+             patch('core.workflow_history_utils.filesystem.Path.__truediv__', return_value=agents_dir):
+            workflows = scan_agents_directory()
+            assert len(workflows) > 0 or isinstance(workflows, list)
 
 
 def test_sync_workflow_history(temp_db):
@@ -346,15 +346,15 @@ def test_sync_workflow_history(temp_db):
         }
     ]
 
-    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows):
-        with patch('core.workflow_history_utils.enrichment.read_cost_history', side_effect=Exception("No cost data")):
-            synced = sync_workflow_history()
-            assert synced >= 0  # Should sync at least 0 workflows
+    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows), \
+         patch('core.workflow_history_utils.enrichment.read_cost_history', side_effect=Exception("No cost data")):
+        synced = sync_workflow_history()
+        assert synced >= 0  # Should sync at least 0 workflows
 
-            # Verify the workflow was inserted
-            workflow = get_workflow_by_adw_id("sync-test-1")
-            if workflow:
-                assert workflow["adw_id"] == "sync-test-1"
+        # Verify the workflow was inserted
+        workflow = get_workflow_by_adw_id("sync-test-1")
+        if workflow:
+            assert workflow["adw_id"] == "sync-test-1"
 
 
 def test_invalid_sort_field(temp_db):
@@ -457,10 +457,10 @@ def test_cost_sync_completed_workflow_updates_final_cost(temp_db):
         total_tokens=85000
     )
 
-    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows):
-        with patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
-            synced = sync_workflow_history()
-            assert synced >= 1
+    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows), \
+         patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
+        synced = sync_workflow_history()
+        assert synced >= 1
 
     # Verify final cost was updated
     workflow = get_workflow_by_adw_id("cost-test-1")
@@ -519,10 +519,10 @@ def test_cost_sync_running_workflow_progressive_updates(temp_db):
         total_tokens=40000
     )
 
-    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows):
-        with patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
-            synced = sync_workflow_history()
-            assert synced >= 1
+    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows), \
+         patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
+        synced = sync_workflow_history()
+        assert synced >= 1
 
     # Verify cost was updated to higher value
     workflow = get_workflow_by_adw_id("cost-test-2")
@@ -557,9 +557,9 @@ def test_cost_sync_running_workflow_prevents_decreases(temp_db):
         "total_tokens": 15000
     }]
 
-    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows):
-        with patch('core.workflow_history_utils.enrichment.read_cost_history', side_effect=Exception("No cost")):
-            sync_workflow_history()
+    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows), \
+         patch('core.workflow_history_utils.enrichment.read_cost_history', side_effect=Exception("No cost")):
+        sync_workflow_history()
 
     # Verify cost was NOT decreased
     workflow = get_workflow_by_adw_id("cost-test-3")
@@ -617,10 +617,10 @@ def test_cost_sync_failed_workflow_updates_final_cost(temp_db):
         total_tokens=45000
     )
 
-    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows):
-        with patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
-            synced = sync_workflow_history()
-            assert synced >= 1
+    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows), \
+         patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
+        synced = sync_workflow_history()
+        assert synced >= 1
 
     # Verify final cost was updated for failed workflow
     workflow = get_workflow_by_adw_id("cost-test-4")
@@ -679,10 +679,10 @@ def test_cost_sync_logging(temp_db, caplog):
         total_tokens=50000
     )
 
-    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows):
-        with patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
-            with caplog.at_level(logging.INFO):
-                synced = sync_workflow_history()
+    with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', return_value=mock_workflows), \
+         patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data), \
+         caplog.at_level(logging.INFO):
+        synced = sync_workflow_history()
 
     # Verify logging occurred - check that cost update was logged
     # Look for the log message pattern: "Cost update for cost-test-5 (completed)"

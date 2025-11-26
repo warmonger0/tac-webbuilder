@@ -74,7 +74,7 @@ Return ONLY the JSON object, no explanations."""
         return json.loads(result_text.strip())
 
     except Exception as e:
-        raise Exception(f"Error analyzing intent with Anthropic: {str(e)}")
+        raise Exception(f"Error analyzing intent with Anthropic: {str(e)}") from e
 
 
 def extract_requirements(nl_input: str, intent: dict) -> list[str]:
@@ -140,7 +140,7 @@ Return ONLY the JSON array, no explanations."""
         return json.loads(result_text.strip())
 
     except Exception as e:
-        raise Exception(f"Error extracting requirements with Anthropic: {str(e)}")
+        raise Exception(f"Error extracting requirements with Anthropic: {str(e)}") from e
 
 
 def classify_issue_type(intent: dict) -> str:
@@ -459,4 +459,4 @@ async def process_request(nl_input: str, project_context: ProjectContext) -> Git
         )
 
     except Exception as e:
-        raise Exception(f"Error processing NL request: {str(e)}")
+        raise Exception(f"Error processing NL request: {str(e)}") from e

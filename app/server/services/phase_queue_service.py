@@ -8,10 +8,11 @@ Orchestrates between repository (database) and dependency tracker (business logi
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from models.phase_queue_item import PhaseQueueItem
 from repositories.phase_queue_repository import PhaseQueueRepository
+
 from services.phase_dependency_tracker import PhaseDependencyTracker
 
 logger = logging.getLogger(__name__)
@@ -28,8 +29,8 @@ class PhaseQueueService:
 
     def __init__(
         self,
-        repository: Optional[PhaseQueueRepository] = None,
-        dependency_tracker: Optional[PhaseDependencyTracker] = None,
+        repository: PhaseQueueRepository | None = None,
+        dependency_tracker: PhaseDependencyTracker | None = None,
         db_path: str = "db/database.db"
     ):
         """
@@ -48,8 +49,8 @@ class PhaseQueueService:
         self,
         parent_issue: int,
         phase_number: int,
-        phase_data: Dict[str, Any],
-        depends_on_phase: Optional[int] = None,
+        phase_data: dict[str, Any],
+        depends_on_phase: int | None = None,
     ) -> str:
         """
         Enqueue a phase for execution.
@@ -119,7 +120,7 @@ class PhaseQueueService:
             logger.error(f"[ERROR] Failed to dequeue phase: {str(e)}")
             raise
 
-    def get_next_ready(self) -> Optional[PhaseQueueItem]:
+    def get_next_ready(self) -> PhaseQueueItem | None:
         """
         Get the next phase that is ready for execution.
 
@@ -197,7 +198,7 @@ class PhaseQueueService:
             logger.error(f"[ERROR] Failed to mark phase blocked: {str(e)}")
             raise
 
-    def mark_phase_failed(self, queue_id: str, error_message: str) -> List[str]:
+    def mark_phase_failed(self, queue_id: str, error_message: str) -> list[str]:
         """
         Mark a phase as failed and block all dependent phases.
 
@@ -222,7 +223,7 @@ class PhaseQueueService:
             logger.error(f"[ERROR] Failed to mark phase failed: {str(e)}")
             raise
 
-    def get_queue_by_parent(self, parent_issue: int) -> List[PhaseQueueItem]:
+    def get_queue_by_parent(self, parent_issue: int) -> list[PhaseQueueItem]:
         """
         Get all phases for a parent issue.
 
@@ -244,7 +245,7 @@ class PhaseQueueService:
             logger.error(f"[ERROR] Failed to get queue by parent: {str(e)}")
             raise
 
-    def get_all_queued(self) -> List[PhaseQueueItem]:
+    def get_all_queued(self) -> list[PhaseQueueItem]:
         """
         Get all phases in the queue (all statuses).
 

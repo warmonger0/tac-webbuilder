@@ -9,6 +9,7 @@ import logging
 import traceback
 
 from utils.db_connection import get_connection as get_db_connection
+
 from .schema import DB_PATH
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,7 @@ def insert_workflow_history(
         ]
 
         # Get existing columns from database to validate fields before inserting
-        cursor.execute(f"PRAGMA table_info(workflow_history)")
+        cursor.execute("PRAGMA table_info(workflow_history)")
         existing_columns = {row["name"] for row in cursor.fetchall()}
 
         # Map field names from code schema to database schema
@@ -115,7 +116,7 @@ def insert_workflow_history(
                         "anomaly_flags", "optimization_recommendations"
                     ]
                     if field in json_fields:
-                        if isinstance(kwargs[field], (dict, list)):
+                        if isinstance(kwargs[field], dict | list):
                             values.append(json.dumps(kwargs[field]))
                         else:
                             values.append(kwargs[field])
@@ -216,7 +217,7 @@ def update_workflow_history(
         cursor = conn.cursor()
 
         # Get existing columns from database to validate fields before updating
-        cursor.execute(f"PRAGMA table_info(workflow_history)")
+        cursor.execute("PRAGMA table_info(workflow_history)")
         existing_columns = {row["name"] for row in cursor.fetchall()}
 
         # Convert dicts and lists to JSON strings
@@ -226,7 +227,7 @@ def update_workflow_history(
             "anomaly_flags", "optimization_recommendations"
         ]
         for field in json_fields:
-            if field in kwargs and isinstance(kwargs[field], (dict, list)):
+            if field in kwargs and isinstance(kwargs[field], dict | list):
                 kwargs[field] = json.dumps(kwargs[field])
 
         # Map field names from code schema to database schema
@@ -257,14 +258,14 @@ def update_workflow_history(
         """
 
         # PHANTOM DETECTION: Log stack trace if updating to completed/failed without end_time
-        if "status" in mapped_kwargs and mapped_kwargs["status"] in ["completed", "failed"]:
-            if "end_time" not in mapped_kwargs or mapped_kwargs["end_time"] is None:
-                stack_trace = "".join(traceback.format_stack())
-                logger.error(
-                    f"[PHANTOM UPDATE] Attempting to update workflow_history to status='{mapped_kwargs['status']}' "
-                    f"without end_time for ADW {adw_id}\n"
-                    f"Stack trace:\n{stack_trace}"
-                )
+        if ("status" in mapped_kwargs and mapped_kwargs["status"] in ["completed", "failed"] and
+            ("end_time" not in mapped_kwargs or mapped_kwargs["end_time"] is None)):
+            stack_trace = "".join(traceback.format_stack())
+            logger.error(
+                f"[PHANTOM UPDATE] Attempting to update workflow_history to status='{mapped_kwargs['status']}' "
+                f"without end_time for ADW {adw_id}\n"
+                f"Stack trace:\n{stack_trace}"
+            )
 
         values = list(mapped_kwargs.values()) + [adw_id]
         cursor.execute(query, values)

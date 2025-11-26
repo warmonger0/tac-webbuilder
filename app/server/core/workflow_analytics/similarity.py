@@ -6,6 +6,7 @@ This module provides functions for calculating text similarity and finding simil
 
 import logging
 from typing import Union
+
 from .helpers import detect_complexity
 
 logger = logging.getLogger(__name__)

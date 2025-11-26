@@ -64,7 +64,6 @@ class ProjectContext(BaseModel):
 
 
 # Multi-Phase Models (imported from queue.py)
-from .queue import ChildIssueInfo, Phase  # noqa: E402
 
 
 # Cost Estimation Models

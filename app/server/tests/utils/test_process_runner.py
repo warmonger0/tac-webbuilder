@@ -14,10 +14,10 @@ Tests verify:
 """
 
 import subprocess
-from unittest.mock import patch, MagicMock
-import pytest
-from utils.process_runner import ProcessRunner, ProcessResult
+from unittest.mock import MagicMock, patch
 
+import pytest
+from utils.process_runner import ProcessResult, ProcessRunner
 
 # ============================================================================
 # Fixtures for mocking subprocess
@@ -352,20 +352,17 @@ class TestProcessRunnerRun:
         - check=True is passed to subprocess.run
         - CalledProcessError is raised and handled
         """
-        with patch("subprocess.run", side_effect=mock_subprocess_failure):
-            # The actual subprocess.run with check=True raises CalledProcessError
-            # but ProcessRunner catches it
-            with patch("subprocess.run") as mock:
-                error = subprocess.CalledProcessError(
-                    returncode=1,
-                    cmd="failing"
-                )
-                error.stdout = ""
-                error.stderr = ""
-                mock.side_effect = error
+        with patch("subprocess.run") as mock:
+            error = subprocess.CalledProcessError(
+                returncode=1,
+                cmd="failing"
+            )
+            error.stdout = ""
+            error.stderr = ""
+            mock.side_effect = error
 
-                result = ProcessRunner.run(["failing"], check=True)
-                assert result.success is False
+            result = ProcessRunner.run(["failing"], check=True)
+            assert result.success is False
 
     def test_run_text_parameter(self, mock_subprocess_success):
         """
@@ -409,14 +406,14 @@ class TestProcessRunnerRun:
         - log_command=True triggers debug logging
         - Command is logged before execution
         """
-        with patch("subprocess.run", return_value=mock_subprocess_success):
-            with patch("utils.process_runner.logger") as mock_logger:
-                ProcessRunner.run(["echo", "hello"], log_command=True)
+        with patch("subprocess.run", return_value=mock_subprocess_success), \
+             patch("utils.process_runner.logger") as mock_logger:
+            ProcessRunner.run(["echo", "hello"], log_command=True)
 
-                # Should have logged the command
-                assert mock_logger.debug.called
-                logged_message = mock_logger.debug.call_args[0][0]
-                assert "echo hello" in logged_message
+            # Should have logged the command
+            assert mock_logger.debug.called
+            logged_message = mock_logger.debug.call_args[0][0]
+            assert "echo hello" in logged_message
 
     def test_run_with_log_command_false(self, mock_subprocess_success):
         """
@@ -426,16 +423,16 @@ class TestProcessRunnerRun:
         - log_command=False is default
         - Debug logging is not called for normal execution
         """
-        with patch("subprocess.run", return_value=mock_subprocess_success):
-            with patch("utils.process_runner.logger") as mock_logger:
-                ProcessRunner.run(["echo", "hello"], log_command=False)
+        with patch("subprocess.run", return_value=mock_subprocess_success), \
+             patch("utils.process_runner.logger") as mock_logger:
+            ProcessRunner.run(["echo", "hello"], log_command=False)
 
-                # Should not have logged in debug (but timeout/error logs are separate)
-                # Check that debug was not called for normal execution
-                if mock_logger.debug.called:
-                    # If debug was called, it should not be for this execution
-                    for call in mock_logger.debug.call_args_list:
-                        assert "Executing" not in str(call)
+            # Should not have logged in debug (but timeout/error logs are separate)
+            # Check that debug was not called for normal execution
+            if mock_logger.debug.called:
+                # If debug was called, it should not be for this execution
+                for call in mock_logger.debug.call_args_list:
+                    assert "Executing" not in str(call)
 
     def test_run_logs_timeout(self):
         """
@@ -450,14 +447,14 @@ class TestProcessRunnerRun:
             timeout=5
         )
 
-        with patch("subprocess.run", side_effect=timeout_exception):
-            with patch("utils.process_runner.logger") as mock_logger:
-                ProcessRunner.run(["sleep", "60"], timeout=5, log_command=True)
+        with patch("subprocess.run", side_effect=timeout_exception), \
+             patch("utils.process_runner.logger") as mock_logger:
+            ProcessRunner.run(["sleep", "60"], timeout=5, log_command=True)
 
-                # Should have logged the timeout
-                assert mock_logger.warning.called
-                logged_message = mock_logger.warning.call_args[0][0]
-                assert "timed out" in logged_message.lower()
+            # Should have logged the timeout
+            assert mock_logger.warning.called
+            logged_message = mock_logger.warning.call_args[0][0]
+            assert "timed out" in logged_message.lower()
 
     def test_run_logs_error(self):
         """
@@ -474,14 +471,14 @@ class TestProcessRunnerRun:
         error.stdout = ""
         error.stderr = ""
 
-        with patch("subprocess.run", side_effect=error):
-            with patch("utils.process_runner.logger") as mock_logger:
-                ProcessRunner.run(["failing"], check=True, log_command=True)
+        with patch("subprocess.run", side_effect=error), \
+             patch("utils.process_runner.logger") as mock_logger:
+            ProcessRunner.run(["failing"], check=True, log_command=True)
 
-                # Should have logged the error
-                assert mock_logger.error.called
-                logged_message = mock_logger.error.call_args[0][0]
-                assert "failed" in logged_message.lower()
+            # Should have logged the error
+            assert mock_logger.error.called
+            logged_message = mock_logger.error.call_args[0][0]
+            assert "failed" in logged_message.lower()
 
     def test_run_empty_command_list(self):
         """
@@ -1041,18 +1038,18 @@ class TestProcessRunnerIntegration:
         mock_result.stdout = "success output"
         mock_result.stderr = ""
 
-        with patch("subprocess.run", return_value=mock_result):
-            with patch("utils.process_runner.logger"):
-                result = ProcessRunner.run(
-                    ["python", "-m", "pytest"],
-                    timeout=30,
-                    capture_output=True,
-                    text=True,
-                    log_command=True
-                )
+        with patch("subprocess.run", return_value=mock_result), \
+             patch("utils.process_runner.logger"):
+            result = ProcessRunner.run(
+                ["python", "-m", "pytest"],
+                timeout=30,
+                capture_output=True,
+                text=True,
+                log_command=True
+            )
 
-                assert result.success is True
-                assert result.command == "python -m pytest"
+            assert result.success is True
+            assert result.command == "python -m pytest"
 
     def test_full_failure_flow(self):
         """
@@ -1068,15 +1065,15 @@ class TestProcessRunnerIntegration:
         mock_result.stdout = ""
         mock_result.stderr = "failure details"
 
-        with patch("subprocess.run", return_value=mock_result):
-            with patch("utils.process_runner.logger"):
-                result = ProcessRunner.run(
-                    ["failing_command"],
-                    log_command=True
-                )
+        with patch("subprocess.run", return_value=mock_result), \
+             patch("utils.process_runner.logger"):
+            result = ProcessRunner.run(
+                ["failing_command"],
+                log_command=True
+            )
 
-                assert result.success is False
-                assert result.returncode == 1
+            assert result.success is False
+            assert result.returncode == 1
 
     def test_wrapper_methods_consistency(self):
         """

@@ -7,7 +7,6 @@ categorizing errors, and estimating workflow complexity.
 
 import logging
 from datetime import datetime
-from typing import Dict, Optional
 
 from core.data_models import CostData
 

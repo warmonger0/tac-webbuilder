@@ -728,7 +728,7 @@ def detect_anomalies(workflow: dict, historical_data: list[dict]) -> list[dict]:
         return []
 
 
-def generate_optimization_recommendations(workflow: dict, anomalies: list[dict]) -> list[str]:
+def generate_optimization_recommendations(workflow: dict, anomalies: list[dict]) -> list[str]:  # noqa: C901
     """
     Generate actionable optimization recommendations with emoji prefixes.
 

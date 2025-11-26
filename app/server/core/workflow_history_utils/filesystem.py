@@ -13,7 +13,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def scan_agents_directory() -> list[dict]:
+def scan_agents_directory() -> list[dict]:  # noqa: C901
     """
     Scan the agents directory for workflow state files and extract metadata.
 
