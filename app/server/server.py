@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import route modules
-from routes import data_routes, github_routes, queue_routes, system_routes, websocket_routes, workflow_routes
+from routes import data_routes, github_routes, issue_completion_routes, queue_routes, system_routes, websocket_routes, workflow_routes
 from services.background_tasks import BackgroundTaskManager
 from services.github_issue_service import GitHubIssueService
 from services.health_service import HealthService
@@ -203,6 +203,9 @@ app.include_router(github_routes.router)
 
 queue_routes.init_queue_routes(phase_queue_service)
 app.include_router(queue_routes.router)
+
+# Initialize issue completion routes
+app.include_router(issue_completion_routes.router)
 
 # Initialize webhook routes for workflow completion notifications
 github_poster = GitHubPoster()
