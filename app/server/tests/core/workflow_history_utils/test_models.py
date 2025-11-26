@@ -4,14 +4,13 @@ Unit tests for workflow_history.models module.
 Tests type definitions, enums, and dataclasses.
 """
 
-import pytest
 from core.workflow_history_utils.models import (
-    WorkflowStatus,
-    ErrorCategory,
-    ComplexityLevel,
-    WorkflowFilter,
-    DEFAULT_SCORING_VERSION,
     BOTTLENECK_THRESHOLD,
+    DEFAULT_SCORING_VERSION,
+    ComplexityLevel,
+    ErrorCategory,
+    WorkflowFilter,
+    WorkflowStatus,
 )
 
 
@@ -118,10 +117,10 @@ class TestConstants:
     def test_complexity_thresholds(self):
         """Verify complexity threshold constants."""
         from core.workflow_history_utils.models import (
-            LOW_COMPLEXITY_STEPS,
-            LOW_COMPLEXITY_DURATION,
-            HIGH_COMPLEXITY_STEPS,
             HIGH_COMPLEXITY_DURATION,
+            HIGH_COMPLEXITY_STEPS,
+            LOW_COMPLEXITY_DURATION,
+            LOW_COMPLEXITY_STEPS,
         )
         assert LOW_COMPLEXITY_STEPS == 5
         assert LOW_COMPLEXITY_DURATION == 60

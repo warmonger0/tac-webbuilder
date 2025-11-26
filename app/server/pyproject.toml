@@ -109,3 +109,14 @@ integration = [
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.1",
 ]
+
+[tool.ruff.lint]
+# Ignore specific rules that would require extensive refactoring
+ignore = [
+    "B904",   # Exception chaining - requires adding 'from err' or 'from None' to all raises
+    "N806",   # Variable naming in functions - uppercase constants in function scope
+    "N815",   # Variable naming in classes - mixedCase variables (e.g., externalDocs for OpenAPI)
+    "SIM102", # Nested if statements - code simplification
+    "SIM117", # Nested with statements - test code simplification
+    "C901",   # Function complexity - would require significant refactoring
+]

@@ -209,10 +209,7 @@ class LLMClient:
             The model's response as a string.
         """
         # Combine system message with prompt if provided
-        if system_message:
-            full_prompt = f"{system_message}\n\n{prompt}"
-        else:
-            full_prompt = prompt
+        full_prompt = f"{system_message}\n\n{prompt}" if system_message else prompt
 
         response = self._client.messages.create(
             model=self.anthropic_model,

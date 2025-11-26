@@ -5,7 +5,6 @@ Detects workflow status and errors from workflow_history database.
 """
 
 import logging
-from typing import Optional
 
 from utils.db_connection import get_connection
 
@@ -29,7 +28,7 @@ class WorkflowCompletionDetector:
         """
         self.workflow_db_path = workflow_db_path
 
-    def get_workflow_status(self, issue_number: int) -> Optional[str]:
+    def get_workflow_status(self, issue_number: int) -> str | None:
         """
         Get workflow status from workflow_history by issue number.
 
@@ -74,7 +73,7 @@ class WorkflowCompletionDetector:
             logger.error(f"[ERROR] Failed to get workflow status for issue #{issue_number}: {str(e)}")
             return None
 
-    def get_workflow_error(self, issue_number: int) -> Optional[str]:
+    def get_workflow_error(self, issue_number: int) -> str | None:
         """
         Get error message from workflow_history.
 

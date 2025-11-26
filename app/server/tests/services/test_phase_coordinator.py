@@ -15,14 +15,11 @@ import os
 import sqlite3
 import tempfile
 from datetime import datetime
-from typing import Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
-
 from services.phase_coordinator import PhaseCoordinator
 from services.phase_queue_service import PhaseQueueService
-
 
 # ============================================================================
 # Fixtures
@@ -50,6 +47,14 @@ def temp_phase_db():
                 error_message TEXT
             )
         """)
+        # Create queue_config table for pause state management
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS queue_config (
+                config_key TEXT PRIMARY KEY,
+                config_value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         conn.commit()
         conn.close()
 
@@ -70,6 +75,8 @@ def temp_workflow_db():
                 issue_number INTEGER,
                 status TEXT CHECK(status IN ('pending', 'running', 'completed', 'failed')) DEFAULT 'pending',
                 error_message TEXT,
+                start_time TEXT,
+                end_time TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 phase_number INTEGER,
@@ -117,23 +124,26 @@ def add_workflow(
     workflow_db_path: str,
     issue_number: int,
     status: str = "running",
-    error_message: Optional[str] = None
+    error_message: str | None = None
 ):
     """Add a workflow to workflow_history"""
     conn = sqlite3.connect(workflow_db_path)
+    # Set end_time for completed/failed workflows (required for phantom record detection)
+    end_time = datetime.now().isoformat() if status in ('completed', 'failed') else None
     conn.execute(
         """
         INSERT INTO workflow_history (
-            workflow_id, issue_number, status, error_message,
+            workflow_id, issue_number, status, error_message, end_time,
             created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
             f"wf-{issue_number}",
             issue_number,
             status,
             error_message,
+            end_time,
             datetime.now().isoformat(),
             datetime.now().isoformat(),
         ),
@@ -600,7 +610,7 @@ def test_get_ready_phases(phase_coordinator, phase_queue_service):
         depends_on_phase=None,
     )
 
-    queued_id = phase_queue_service.enqueue(
+    phase_queue_service.enqueue(
         parent_issue=1200,
         phase_number=2,
         phase_data={"title": "Queued Phase", "content": "Test"},

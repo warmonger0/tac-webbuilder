@@ -8,7 +8,6 @@ Separates database access from business logic (Repository Pattern).
 import json
 import logging
 from datetime import datetime
-from typing import List, Optional
 
 from models.phase_queue_item import PhaseQueueItem
 from utils.db_connection import get_connection
@@ -63,7 +62,7 @@ class PhaseQueueRepository:
             logger.error(f"[ERROR] Failed to insert phase: {str(e)}")
             raise
 
-    def find_by_id(self, queue_id: str) -> Optional[PhaseQueueItem]:
+    def find_by_id(self, queue_id: str) -> PhaseQueueItem | None:
         """
         Find a phase by queue_id.
 
@@ -87,7 +86,7 @@ class PhaseQueueRepository:
             logger.error(f"[ERROR] Failed to find phase by ID: {str(e)}")
             raise
 
-    def find_by_parent(self, parent_issue: int) -> List[PhaseQueueItem]:
+    def find_by_parent(self, parent_issue: int) -> list[PhaseQueueItem]:
         """
         Find all phases for a parent issue.
 
@@ -115,7 +114,7 @@ class PhaseQueueRepository:
             logger.error(f"[ERROR] Failed to find phases by parent: {str(e)}")
             raise
 
-    def find_ready_phases(self) -> List[PhaseQueueItem]:
+    def find_ready_phases(self) -> list[PhaseQueueItem]:
         """
         Find all phases that are ready for execution.
 
@@ -139,7 +138,7 @@ class PhaseQueueRepository:
             logger.error(f"[ERROR] Failed to find ready phases: {str(e)}")
             raise
 
-    def find_all(self) -> List[PhaseQueueItem]:
+    def find_all(self) -> list[PhaseQueueItem]:
         """
         Find all phases in the queue.
 
@@ -276,7 +275,7 @@ class PhaseQueueRepository:
             logger.error(f"[ERROR] Failed to delete phase: {str(e)}")
             raise
 
-    def get_config_value(self, config_key: str) -> Optional[str]:
+    def get_config_value(self, config_key: str) -> str | None:
         """
         Get a configuration value from queue_config table.
 

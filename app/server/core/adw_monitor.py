@@ -171,7 +171,7 @@ def batch_check_running_processes(adw_ids: list[str]) -> dict[str, bool]:
     Returns:
         dict: Mapping of adw_id to boolean (True if running)
     """
-    result_map = {adw_id: False for adw_id in adw_ids}
+    result_map = dict.fromkeys(adw_ids, False)
 
     try:
         # Run ps aux once for all workflows

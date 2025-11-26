@@ -10,19 +10,15 @@ Tests the complete flow of multi-phase workflow execution including:
 """
 
 import asyncio
-import json
 import os
 import sqlite3
 import tempfile
 from datetime import datetime
-from typing import Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock
 
 import pytest
-
 from services.phase_coordinator import PhaseCoordinator
-from services.phase_queue_service import PhaseQueueService, PhaseQueueItem
-
+from services.phase_queue_service import PhaseQueueService
 
 # ============================================================================
 # Fixtures
@@ -51,6 +47,14 @@ def temp_phase_db():
                 error_message TEXT
             )
         """)
+        # Create queue_config table for pause state management
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS queue_config (
+                config_key TEXT PRIMARY KEY,
+                config_value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         conn.commit()
         conn.close()
 
@@ -72,6 +76,8 @@ def temp_workflow_db():
                 issue_number INTEGER,
                 status TEXT CHECK(status IN ('pending', 'running', 'completed', 'failed')) DEFAULT 'pending',
                 error_message TEXT,
+                start_time TEXT,
+                end_time TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 phase_number INTEGER,
@@ -120,8 +126,8 @@ def create_workflow_entry(
     workflow_db_path: str,
     issue_number: int,
     status: str = "running",
-    error_message: Optional[str] = None,
-    phase_number: Optional[int] = None,
+    error_message: str | None = None,
+    phase_number: int | None = None,
     is_multi_phase: bool = True
 ):
     """
@@ -136,19 +142,22 @@ def create_workflow_entry(
         is_multi_phase: Whether this is a multi-phase workflow
     """
     conn = sqlite3.connect(workflow_db_path)
+    # Set end_time for completed/failed workflows (required for phantom record detection)
+    end_time = datetime.now().isoformat() if status in ('completed', 'failed') else None
     conn.execute(
         """
         INSERT INTO workflow_history (
-            workflow_id, issue_number, status, error_message,
+            workflow_id, issue_number, status, error_message, end_time,
             phase_number, is_multi_phase, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             f"wf-{issue_number}",
             issue_number,
             status,
             error_message,
+            end_time,
             phase_number,
             1 if is_multi_phase else 0,
             datetime.now().isoformat(),
@@ -163,7 +172,7 @@ def update_workflow_status(
     workflow_db_path: str,
     issue_number: int,
     status: str,
-    error_message: Optional[str] = None
+    error_message: str | None = None
 ):
     """
     Helper to update workflow status.
@@ -175,13 +184,15 @@ def update_workflow_status(
         error_message: Error message (for failed status)
     """
     conn = sqlite3.connect(workflow_db_path)
+    # Set end_time for completed/failed workflows (required for phantom record detection)
+    end_time = datetime.now().isoformat() if status in ('completed', 'failed') else None
     conn.execute(
         """
         UPDATE workflow_history
-        SET status = ?, error_message = ?, updated_at = ?
+        SET status = ?, error_message = ?, end_time = ?, updated_at = ?
         WHERE issue_number = ?
         """,
-        (status, error_message, datetime.now().isoformat(), issue_number),
+        (status, error_message, end_time, datetime.now().isoformat(), issue_number),
     )
     conn.commit()
     conn.close()

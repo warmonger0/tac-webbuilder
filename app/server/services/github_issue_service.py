@@ -15,7 +15,6 @@ import sys
 import traceback
 import uuid
 from datetime import datetime
-from typing import Dict
 
 import httpx
 from fastapi import HTTPException
@@ -24,22 +23,22 @@ from fastapi import HTTPException
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'adws'))
 from adw_modules.complexity_analyzer import analyze_issue_complexity
 from adw_modules.data_types import GitHubIssue as ADWGitHubIssue
-
+from core.cost_estimate_storage import save_cost_estimate
 from core.data_models import (
+    ConfirmResponse,
+    CostEstimate,
     GitHubIssue,
+    ProjectContext,
     SubmitRequestData,
     SubmitRequestResponse,
-    CostEstimate,
-    ConfirmResponse,
-    ProjectContext,
 )
-from core.project_detector import detect_project_context
-from core.nl_processor import process_request
 from core.github_poster import GitHubPoster
-from core.cost_estimate_storage import save_cost_estimate
+from core.nl_processor import process_request
 from core.pattern_predictor import predict_patterns_from_input, store_predicted_patterns
-from services.multi_phase_issue_handler import MultiPhaseIssueHandler
+from core.project_detector import detect_project_context
 from utils.db_connection import get_connection
+
+from services.multi_phase_issue_handler import MultiPhaseIssueHandler
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +72,7 @@ class GitHubIssueService:
         """
         self.webhook_trigger_url = webhook_trigger_url or os.environ.get("WEBHOOK_TRIGGER_URL", "http://localhost:8001")
         self.github_repo = github_repo or os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder")
-        self.pending_requests: Dict[str, dict] = {}
+        self.pending_requests: dict[str, dict] = {}
         self.phase_queue_service = phase_queue_service
 
         # Initialize multi-phase handler

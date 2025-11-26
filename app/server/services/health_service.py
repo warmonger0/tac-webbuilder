@@ -223,7 +223,7 @@ class HealthService:
         ]
 
         health_status = {}
-        for name, result in zip(service_names, results):
+        for name, result in zip(service_names, results, strict=False):
             if isinstance(result, Exception):
                 # If a check raised an exception, return error status
                 logger.error(f"Health check failed for {name}: {result}")
@@ -393,7 +393,7 @@ class HealthService:
             else:
                 # Fallback: try to access webhook endpoint
                 try:
-                    with urllib.request.urlopen("https://webhook.directmyagent.com/health", timeout=3) as response:
+                    with urllib.request.urlopen("https://webhook.directmyagent.com/health", timeout=3):
                         return ServiceHealth(
                             name="GitHub Webhook",
                             status="healthy",

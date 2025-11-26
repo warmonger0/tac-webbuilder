@@ -6,14 +6,13 @@ issue state and other metadata.
 """
 
 import logging
-from typing import Optional
 
 from utils.process_runner import ProcessRunner
 
 logger = logging.getLogger(__name__)
 
 
-def fetch_github_issue_state(issue_number: int) -> Optional[str]:
+def fetch_github_issue_state(issue_number: int) -> str | None:
     """
     Fetch the current state of a GitHub issue using gh CLI.
 

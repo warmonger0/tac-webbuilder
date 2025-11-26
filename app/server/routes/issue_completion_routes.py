@@ -9,11 +9,9 @@ Handles automatic completion of issues:
 
 import logging
 import subprocess
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-
 from services.phase_queue_service import PhaseQueueService
 from utils.db_connection import get_connection
 
@@ -27,9 +25,9 @@ phase_queue_service = PhaseQueueService()
 
 class IssueCompletionRequest(BaseModel):
     issue_number: int = Field(..., description="GitHub issue number")
-    phase_number: Optional[int] = Field(None, description="Phase number (if multi-phase)")
-    commit_sha: Optional[str] = Field(None, description="Git commit SHA")
-    close_message: Optional[str] = Field(None, description="Custom close message")
+    phase_number: int | None = Field(None, description="Phase number (if multi-phase)")
+    commit_sha: str | None = Field(None, description="Git commit SHA")
+    close_message: str | None = Field(None, description="Custom close message")
 
 
 class IssueCompletionResponse(BaseModel):
@@ -108,12 +106,12 @@ async def complete_issue(issue_number: int, request: IssueCompletionRequest) -> 
 
         # Step 2: Close GitHub issue
         try:
-            close_msg = request.close_message or f"✅ Completed and merged"
+            close_msg = request.close_message or "✅ Completed and merged"
             if request.commit_sha:
                 close_msg += f"\n\nCommit: {request.commit_sha}"
 
             # Use gh CLI to close the issue
-            result = subprocess.run(
+            subprocess.run(
                 [
                     "gh", "issue", "close", str(issue_number),
                     "--repo", "warmonger0/tac-webbuilder",
