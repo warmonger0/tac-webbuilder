@@ -6,6 +6,70 @@
 
 ---
 
+## Recent Updates (Post-Assessment)
+
+### ✅ Hopper Workflow - 5 Critical Bugs Fixed (November 25, 2025)
+
+**Issue:** Multi-phase hopper workflow failed to trigger subsequent phases after Phase 1 completion.
+
+**Root Cause:** Multiple integration issues between completion endpoint, dependency tracker, and queue service.
+
+#### Bug #1: Wrong Query Field (CRITICAL) ⚠️
+**Location:** `app/server/routes/issue_completion_routes.py:71-83`
+- **Problem:** Queried `WHERE parent_issue = ?` instead of `WHERE issue_number = ?`
+- **Impact:** Hopper workflows use `parent_issue=0`, so query returned 0 entries
+- **Fix:** Changed to query by `issue_number` field
+- **Result:** Issue #114 now correctly found when completing Phase 1
+
+#### Bug #2: Bypassed Dependency Tracker (CRITICAL) ⚠️
+**Location:** `app/server/routes/issue_completion_routes.py:89-101`
+- **Problem:** Directly updated DB with `UPDATE phase_queue SET status='completed'`
+- **Impact:** `PhaseDependencyTracker.trigger_next_phase()` never called, Phase 2 stayed "pending"
+- **Fix:** Now calls `phase_queue_service.mark_phase_complete(queue_id)` which properly triggers next phase
+- **Result:** Phase 2 marked "ready" when Phase 1 completes
+
+#### Bug #3: Missing Request Body (HIGH) ⚠️
+**Location:** `adws/adw_modules/success_operations.py:38-41`
+- **Problem:** POST request sent no JSON body
+- **Impact:** FastAPI returned `422 "Field required"` error
+- **Fix:** Added `json={"issue_number": int(issue_number)}` to request
+- **Result:** Completion endpoint now receives required data
+
+#### Bug #4: Context Manager Misuse (HIGH) ⚠️
+**Location:** `app/server/routes/issue_completion_routes.py:62-87`
+- **Problem:** Used `get_connection()` directly instead of with `with` statement
+- **Impact:** Runtime error: `'_GeneratorContextManager' object has no attribute 'cursor'`
+- **Fix:** Wrapped in `with get_connection() as db_conn:`
+- **Result:** Database connection properly managed
+
+#### Bug #5: Missing Dependency (MEDIUM) ⚠️
+**Location:** `adws/adw_ship_iso.py:1-4`
+- **Problem:** Imported `requests` but didn't declare in dependencies
+- **Impact:** `ModuleNotFoundError` when running ship workflow
+- **Fix:** Added `"requests"` to script dependencies
+- **Result:** Ship workflow can complete successfully
+
+#### Commits
+- **fd7090f** - Main hopper workflow fixes (Bugs #1-4)
+- **710538d** - Coverage and documentation updates
+
+#### Documentation Added
+- `docs/architecture/HOPPER_WORKFLOW.md` (600+ lines)
+  - Architecture diagrams
+  - Complete workflow state machine
+  - All 5 bug fixes with before/after code
+  - Database schema
+  - API endpoints
+  - Monitoring and troubleshooting guide
+
+#### Impact
+- **Multi-phase workflows:** Now fully functional
+- **Hopper orchestration:** Phases 2-4 properly triggered after Phase 1
+- **System reliability:** Context managers prevent connection leaks
+- **Integration quality:** Dependency tracker properly invoked
+
+---
+
 ## Executive Summary
 
 The tac-webbuilder codebase is a **well-architected, modern system** with strong foundations in type safety, documentation, and innovative autonomous workflow capabilities. The system demonstrates excellent architectural patterns with clear separation of concerns across frontend, backend, and ADW (Automated Development Workflow) layers.
