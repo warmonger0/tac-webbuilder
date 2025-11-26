@@ -376,13 +376,8 @@ def init_queue_routes(phase_queue_service):
             Execution status and details
         """
         try:
-            # Get phase from queue
-            items = phase_queue_service.get_all_queued()
-            phase = None
-            for item in items:
-                if item.queue_id == queue_id:
-                    phase = item
-                    break
+            # Get phase from queue - Direct query (O(1) with index)
+            phase = phase_queue_service.repository.find_by_id(queue_id)
 
             if not phase:
                 raise HTTPException(404, f"Queue ID {queue_id} not found")
