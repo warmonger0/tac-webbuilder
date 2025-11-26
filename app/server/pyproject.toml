@@ -42,6 +42,8 @@ test = [
     "pytest-xdist>=3.6.0",
     # Better assertion introspection
     "pytest-clarity>=1.0.0",
+    # Performance benchmarking
+    "pytest-benchmark>=4.0.0",
 ]
 
 integration = [
@@ -55,6 +57,7 @@ integration = [
     "coverage>=7.6.0",
     "pytest-xdist>=3.6.0",
     "pytest-clarity>=1.0.0",
+    "pytest-benchmark>=4.0.0",
     # E2E and integration specific
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.1",
@@ -75,6 +78,7 @@ markers = [
     "integration: marks tests as integration tests",
     "e2e: marks tests as end-to-end tests",
     "websocket: marks tests that use WebSocket",
+    "performance: marks tests as performance benchmarks (deselect with '-m \"not performance\"')",
 ]
 
 [dependency-groups]
@@ -94,6 +98,7 @@ test = [
     "coverage>=7.6.0",
     "pytest-xdist>=3.6.0",
     "pytest-clarity>=1.0.0",
+    "pytest-benchmark>=4.0.0",
 ]
 
 integration = [
@@ -106,6 +111,7 @@ integration = [
     "coverage>=7.6.0",
     "pytest-xdist>=3.6.0",
     "pytest-clarity>=1.0.0",
+    "pytest-benchmark>=4.0.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.1",
 ]

@@ -7,6 +7,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { SystemStatusPanel } from './SystemStatusPanel';
 import { ZteHopperQueueCard } from './ZteHopperQueueCard';
 import { AdwMonitorCard } from './AdwMonitorCard';
+import { AdwMonitorErrorBoundary } from './AdwMonitorErrorBoundary';
 import { useDragAndDrop } from '../hooks/useDragAndDrop';
 import { useStaggeredLoad } from '../hooks/useStaggeredLoad';
 import { parsePhases } from '../utils/phaseParser';
@@ -423,7 +424,9 @@ export function RequestForm() {
           {/* Current Workflow */}
           <div className="lg:col-span-1 flex">
             {showAdwMonitor ? (
-              <AdwMonitorCard />
+              <AdwMonitorErrorBoundary>
+                <AdwMonitorCard />
+              </AdwMonitorErrorBoundary>
             ) : (
               <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 flex items-center justify-center min-h-[200px]">
                 <div className="text-slate-500 text-xs animate-pulse">●</div>

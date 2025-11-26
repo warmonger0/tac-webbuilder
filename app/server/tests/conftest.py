@@ -195,6 +195,25 @@ def test_client_with_db(temp_test_db: str) -> Generator[TestClient, None, None]:
             yield client
 
 
+@pytest.fixture
+def integration_client() -> Generator[TestClient, None, None]:
+    """
+    Create a TestClient for integration tests.
+
+    This fixture provides a TestClient with full app functionality
+    for integration and performance testing.
+
+    Usage:
+        def test_integration_endpoint(integration_client):
+            response = integration_client.get("/api/adw-monitor")
+            assert response.status_code == 200
+    """
+    from server import app
+
+    with TestClient(app) as client:
+        yield client
+
+
 # ============================================================================
 # Environment Variable Fixtures
 # ============================================================================

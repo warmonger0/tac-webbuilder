@@ -17,6 +17,7 @@ interface ConnectionState {
   connectionQuality: 'excellent' | 'good' | 'poor' | 'disconnected';
   lastUpdated: Date | null;
   reconnectAttempts: number;
+  retry: () => void;
 }
 
 /**
@@ -42,6 +43,7 @@ export function useReliableWebSocket<T, M = any>({
     connectionQuality: 'disconnected',
     lastUpdated: null,
     reconnectAttempts: 0,
+    retry: () => {}, // Placeholder, will be set below
   });
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -150,12 +152,13 @@ export function useReliableWebSocket<T, M = any>({
         lastMessageTimeRef.current = Date.now();
         messageCountRef.current = 0;
 
-        setState({
+        setState((prev) => ({
+          ...prev,
           isConnected: true,
           connectionQuality: 'excellent',
           lastUpdated: new Date(),
           reconnectAttempts: 0,
-        });
+        }));
       };
 
       ws.onmessage = (event) => {
@@ -219,6 +222,42 @@ export function useReliableWebSocket<T, M = any>({
     }
   }, [url, enabled, getReconnectDelay, updateConnectionQuality, maxReconnectAttempts]);
 
+  // Manual retry function - resets reconnect attempts and immediately attempts connection
+  const retry = useCallback(() => {
+    console.log(`[WS] Manual retry triggered for ${url}`);
+
+    // Clear any pending reconnection timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = undefined;
+    }
+
+    // Close existing connection if any
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    // Reset reconnect attempts counter
+    reconnectAttemptsRef.current = 0;
+
+    // Update state to reflect reset
+    setState((prev) => ({
+      ...prev,
+      reconnectAttempts: 0,
+    }));
+
+    // Immediately attempt to connect
+    connect();
+  }, [url, connect]);
+
+  // Update state with retry function whenever it changes
+  useEffect(() => {
+    setState((prev) => ({
+      ...prev,
+      retry,
+    }));
+  }, [retry]);
 
   // Handle visibility change
   useEffect(() => {
