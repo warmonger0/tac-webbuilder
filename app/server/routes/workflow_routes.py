@@ -42,7 +42,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
     This function is called from server.py to inject service dependencies.
     """
 
-    @router.get("/api/workflows", response_model=list[Workflow])
+    @router.get("/workflows", response_model=list[Workflow])
     async def get_workflows() -> list[Workflow]:
         """Get all active ADW workflows (REST endpoint for fallback)"""
         try:
@@ -54,7 +54,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
             return []
 
-    @router.get("/api/routes", response_model=RoutesResponse)
+    @router.get("/routes", response_model=RoutesResponse)
     async def get_routes() -> RoutesResponse:
         """Get all registered FastAPI routes (REST endpoint for fallback)"""
         try:
@@ -68,7 +68,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
             # Return empty routes list on error
             return RoutesResponse(routes=[], total=0)
 
-    @router.get("/api/workflows/{adw_id}/costs", response_model=CostResponse)
+    @router.get("/workflows/{adw_id}/costs", response_model=CostResponse)
     async def get_workflow_costs(adw_id: str) -> CostResponse:
         """
         Get cost data for a specific ADW workflow.
@@ -92,7 +92,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
             return CostResponse(error=f"Failed to retrieve cost data: {str(e)}")
 
-    @router.get("/api/workflow-history", response_model=WorkflowHistoryResponse)
+    @router.get("/workflow-history", response_model=WorkflowHistoryResponse)
     async def get_workflow_history_endpoint(
         limit: int = 20,
         offset: int = 0,
@@ -132,7 +132,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
                 analytics=WorkflowHistoryAnalytics()
             )
 
-    @router.post("/api/workflow-history/resync", response_model=ResyncResponse)
+    @router.post("/workflow-history/resync", response_model=ResyncResponse)
     async def resync_workflow_history(
         adw_id: str | None = None,
         force: bool = False
@@ -201,7 +201,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
                 message="Resync failed"
             )
 
-    @router.post("/api/workflows/batch", response_model=list[WorkflowHistoryItem])
+    @router.post("/workflows/batch", response_model=list[WorkflowHistoryItem])
     async def get_workflows_batch(workflow_ids: list[str]) -> list[WorkflowHistoryItem]:
         """
         Fetch multiple workflows by ADW IDs in a single request.
@@ -259,7 +259,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
             logger.error(f"[BATCH] Error fetching workflows: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/api/workflow-analytics/{adw_id}", response_model=WorkflowAnalyticsDetail)
+    @router.get("/workflow-analytics/{adw_id}", response_model=WorkflowAnalyticsDetail)
     async def get_workflow_analytics(adw_id: str) -> WorkflowAnalyticsDetail:
         """Get advanced analytics for a specific workflow"""
         try:
@@ -313,7 +313,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Failed to retrieve analytics: {str(e)}")
 
-    @router.get("/api/workflow-trends", response_model=WorkflowTrends)
+    @router.get("/workflow-trends", response_model=WorkflowTrends)
     async def get_workflow_trends(days: int = 30, group_by: str = "day") -> WorkflowTrends:
         """Get trend data over time - delegates to WorkflowService"""
         try:
@@ -325,7 +325,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Failed to retrieve trends: {str(e)}")
 
-    @router.get("/api/cost-predictions", response_model=CostPrediction)
+    @router.get("/cost-predictions", response_model=CostPrediction)
     async def predict_workflow_cost(classification: str, complexity: str, model: str) -> CostPrediction:
         """Predict workflow cost - delegates to WorkflowService"""
         try:
@@ -341,7 +341,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Failed to predict cost: {str(e)}")
 
-    @router.get("/api/workflow-catalog", response_model=WorkflowCatalogResponse)
+    @router.get("/workflow-catalog", response_model=WorkflowCatalogResponse)
     async def get_workflow_catalog() -> WorkflowCatalogResponse:
         """Get workflow catalog - delegates to WorkflowService"""
         try:

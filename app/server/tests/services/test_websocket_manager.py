@@ -253,7 +253,7 @@ class TestConnectionManager:
     def test_state_tracking_can_be_set(self, connection_manager):
         """Test that state tracking attributes can be set."""
         workflow_state = {"status": "running", "progress": 50}
-        routes_state = {"routes": ["/api/test"]}
+        routes_state = {"routes": ["/api/v1/test"]}
         history_state = {"entries": []}
 
         connection_manager.last_workflow_state = workflow_state

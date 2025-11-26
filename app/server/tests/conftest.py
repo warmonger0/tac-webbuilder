@@ -152,11 +152,11 @@ def test_client() -> Generator[TestClient, None, None]:
 
     Usage:
         def test_api_endpoint(test_client):
-            response = test_client.get("/api/health")
+            response = test_client.get("/api/v1/health")
             assert response.status_code == 200
 
         def test_post_endpoint(test_client):
-            response = test_client.post("/api/submit", json={"query": "test"})
+            response = test_client.post("/api/v1/submit", json={"query": "test"})
             assert response.status_code == 200
 
     Note: The server module is imported within the fixture to avoid
@@ -179,7 +179,7 @@ def test_client_with_db(temp_test_db: str) -> Generator[TestClient, None, None]:
 
     Usage:
         def test_database_endpoint(test_client_with_db):
-            response = test_client_with_db.post("/api/workflow/create", json={...})
+            response = test_client_with_db.post("/api/v1/workflow/create", json={...})
             assert response.status_code == 200
     """
     from server import app

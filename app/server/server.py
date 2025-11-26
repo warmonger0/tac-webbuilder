@@ -188,32 +188,46 @@ def get_adw_state(adw_id: str) -> dict:
         logger.error(f"Error reading ADW state for {adw_id}: {e}")
         return {}
 
+# API VERSION ENDPOINT
+# This endpoint is not versioned to allow clients to discover available API versions
+@app.get("/api/version")
+def get_api_version():
+    """Get API version information."""
+    return {
+        "version": "1.0.0",
+        "current": "v1",
+        "supported_versions": ["v1"],
+        "deprecated_versions": [],
+        "docs_url": "/docs"
+    }
+
 # ROUTER REGISTRATION
 # Initialize route modules with service dependencies and register routers
-data_routes.router and app.include_router(data_routes.router)
+# All routes are versioned under /api/v1
+data_routes.router and app.include_router(data_routes.router, prefix="/api/v1")
 
 workflow_routes.init_workflow_routes(workflow_service, get_routes_data, get_workflow_history_data)
-app.include_router(workflow_routes.router)
+app.include_router(workflow_routes.router, prefix="/api/v1")
 
 system_routes.init_system_routes(health_service, service_controller, app_start_time)
-app.include_router(system_routes.router)
+app.include_router(system_routes.router, prefix="/api/v1")
 
 github_routes.init_github_routes(github_issue_service)
-app.include_router(github_routes.router)
+app.include_router(github_routes.router, prefix="/api/v1")
 
 queue_routes.init_queue_routes(phase_queue_service)
-app.include_router(queue_routes.router)
+app.include_router(queue_routes.router, prefix="/api/v1")
 
 # Initialize issue completion routes
-app.include_router(issue_completion_routes.router)
+app.include_router(issue_completion_routes.router, prefix="/api/v1")
 
 # Initialize webhook routes for workflow completion notifications
 github_poster = GitHubPoster()
 queue_routes.init_webhook_routes(phase_queue_service, github_poster)
-app.include_router(queue_routes.webhook_router)
+app.include_router(queue_routes.webhook_router, prefix="/api/v1")
 
 websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state)
-app.include_router(websocket_routes.router)
+app.include_router(websocket_routes.router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn

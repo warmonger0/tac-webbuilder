@@ -27,13 +27,13 @@ class TestAdwMonitorEndpoint:
 
     def test_adw_monitor_endpoint_exists(self, integration_client):
         """Verify /api/adw-monitor endpoint is available."""
-        response = integration_client.get("/api/adw-monitor")
+        response = integration_client.get("/api/v1/adw-monitor")
         # Should return 200 even with no workflows
         assert response.status_code == 200
 
     def test_adw_monitor_response_structure(self, integration_client):
         """Verify response has required fields."""
-        response = integration_client.get("/api/adw-monitor")
+        response = integration_client.get("/api/v1/adw-monitor")
         assert response.status_code == 200
 
         data = response.json()
@@ -60,7 +60,7 @@ class TestAdwMonitorEndpoint:
         agents_dir.mkdir()
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            response = integration_client.get("/api/adw-monitor")
+            response = integration_client.get("/api/v1/adw-monitor")
             assert response.status_code == 200
 
             data = response.json()
@@ -95,7 +95,7 @@ class TestAdwMonitorEndpoint:
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir), \
              patch('core.adw_monitor.is_process_running', return_value=True):
-            response = integration_client.get("/api/adw-monitor")
+            response = integration_client.get("/api/v1/adw-monitor")
             assert response.status_code == 200
 
             data = response.json()
@@ -130,7 +130,7 @@ class TestAdwMonitorEndpoint:
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir), \
              patch('core.adw_monitor.is_process_running', return_value=False):
-            response = integration_client.get("/api/adw-monitor")
+            response = integration_client.get("/api/v1/adw-monitor")
             assert response.status_code == 200
 
             data = response.json()
@@ -160,7 +160,7 @@ class TestAdwMonitorEndpoint:
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir), \
              patch('core.adw_monitor.is_process_running', return_value=False):
-            response = integration_client.get("/api/adw-monitor")
+            response = integration_client.get("/api/v1/adw-monitor")
             assert response.status_code == 200
 
             data = response.json()
@@ -191,7 +191,7 @@ class TestAdwMonitorEndpoint:
         state_file.write_text("{ invalid json }")
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            response = integration_client.get("/api/adw-monitor")
+            response = integration_client.get("/api/v1/adw-monitor")
             # Should still return 200, just skip the corrupt workflow
             assert response.status_code == 200
 
@@ -224,7 +224,7 @@ class TestAdwMonitorEndpoint:
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir), \
              patch('core.adw_monitor.is_process_running', return_value=False):
-            response = integration_client.get("/api/adw-monitor")
+            response = integration_client.get("/api/v1/adw-monitor")
             assert response.status_code == 200
 
             data = response.json()
@@ -259,7 +259,7 @@ class TestAdwMonitorEndpoint:
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir), \
              patch('core.adw_monitor.is_process_running', return_value=False):
-            response = integration_client.get("/api/adw-monitor")
+            response = integration_client.get("/api/v1/adw-monitor")
             assert response.status_code == 200
 
             data = response.json()
@@ -293,7 +293,7 @@ class TestAdwMonitorEndpoint:
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir), \
              patch('core.adw_monitor.is_process_running', return_value=False):
-            response = integration_client.get("/api/adw-monitor")
+            response = integration_client.get("/api/v1/adw-monitor")
             assert response.status_code == 200
 
             data = response.json()
@@ -332,7 +332,7 @@ class TestAdwMonitorEndpoint:
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir), \
              patch('core.adw_monitor.is_process_running', return_value=False):
-            response = integration_client.get("/api/adw-monitor")
+            response = integration_client.get("/api/v1/adw-monitor")
             assert response.status_code == 200
 
             data = response.json()
@@ -346,7 +346,7 @@ class TestAdwMonitorEndpoint:
         """Test that endpoint handles internal errors gracefully."""
         # Simulate an error by patching the aggregation function
         with patch('core.adw_monitor.aggregate_adw_monitor_data', side_effect=Exception("Test error")):
-            response = integration_client.get("/api/adw-monitor")
+            response = integration_client.get("/api/v1/adw-monitor")
 
             # Should still return 200 with empty response
             assert response.status_code == 200
@@ -361,7 +361,7 @@ class TestAdwMonitorEndpoint:
         agents_dir.mkdir()
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            response = integration_client.get("/api/adw-monitor")
+            response = integration_client.get("/api/v1/adw-monitor")
             assert response.status_code == 200
 
             data = response.json()
@@ -385,12 +385,12 @@ class TestAdwMonitorCaching:
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
             # First request
-            response1 = integration_client.get("/api/adw-monitor")
+            response1 = integration_client.get("/api/v1/adw-monitor")
             data1 = response1.json()
             timestamp1 = data1["last_updated"]
 
             # Second request immediately after
-            response2 = integration_client.get("/api/adw-monitor")
+            response2 = integration_client.get("/api/v1/adw-monitor")
             data2 = response2.json()
             timestamp2 = data2["last_updated"]
 

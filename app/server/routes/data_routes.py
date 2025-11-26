@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["Data Operations"])
 
 
-@router.post("/api/upload", response_model=FileUploadResponse)
+@router.post("/upload", response_model=FileUploadResponse)
 async def upload_file(file: UploadFile = File(...)) -> FileUploadResponse:
     """Upload and convert .json, .jsonl or .csv file to SQLite table"""
     try:
@@ -84,7 +84,7 @@ async def upload_file(file: UploadFile = File(...)) -> FileUploadResponse:
         )
 
 
-@router.post("/api/query", response_model=QueryResponse)
+@router.post("/query", response_model=QueryResponse)
 async def process_natural_language_query(request: QueryRequest) -> QueryResponse:
     """Process natural language query and return SQL results"""
     try:
@@ -124,7 +124,7 @@ async def process_natural_language_query(request: QueryRequest) -> QueryResponse
         )
 
 
-@router.get("/api/schema", response_model=DatabaseSchemaResponse)
+@router.get("/schema", response_model=DatabaseSchemaResponse)
 async def get_database_schema_endpoint() -> DatabaseSchemaResponse:
     """Get current database schema and table information"""
     try:
@@ -164,7 +164,7 @@ async def get_database_schema_endpoint() -> DatabaseSchemaResponse:
         )
 
 
-@router.post("/api/insights", response_model=InsightsResponse)
+@router.post("/insights", response_model=InsightsResponse)
 async def generate_insights_endpoint(request: InsightsRequest) -> InsightsResponse:
     """Generate statistical insights for table columns"""
     try:
@@ -187,7 +187,7 @@ async def generate_insights_endpoint(request: InsightsRequest) -> InsightsRespon
         )
 
 
-@router.get("/api/generate-random-query", response_model=RandomQueryResponse)
+@router.get("/generate-random-query", response_model=RandomQueryResponse)
 async def generate_random_query_endpoint() -> RandomQueryResponse:
     """Generate a random natural language query based on database schema"""
     try:
@@ -216,7 +216,7 @@ async def generate_random_query_endpoint() -> RandomQueryResponse:
         )
 
 
-@router.delete("/api/table/{table_name}")
+@router.delete("/table/{table_name}")
 async def delete_table(table_name: str) -> dict:
     """Delete a table from the database"""
     try:
@@ -250,7 +250,7 @@ async def delete_table(table_name: str) -> dict:
         raise HTTPException(500, f"Error deleting table: {str(e)}")
 
 
-@router.post("/api/export/table")
+@router.post("/export/table")
 async def export_table(request: ExportRequest) -> Response:
     """Export a table as CSV file"""
     try:
@@ -282,7 +282,7 @@ async def export_table(request: ExportRequest) -> Response:
         raise HTTPException(500, f"Error exporting table: {str(e)}")
 
 
-@router.post("/api/export/query")
+@router.post("/export/query")
 async def export_query_results(request: QueryExportRequest) -> Response:
     """Export query results as CSV file"""
     try:

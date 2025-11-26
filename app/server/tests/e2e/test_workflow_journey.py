@@ -31,7 +31,7 @@ class TestWorkflowCreationJourney:
         """
         # Step 1: Create workflow
         with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
-            create_response = e2e_test_client.post("/api/workflows/create", json={
+            create_response = e2e_test_client.post("/api/v1/workflows/create", json={
                 "nl_input": sample_workflow_data["nl_input"],
                 "issue_number": sample_workflow_data["issue_number"],
             })
@@ -43,11 +43,11 @@ class TestWorkflowCreationJourney:
             assert create_response.status_code in [200, 201]
 
             # Step 2: Check workflow status
-            status_response = e2e_test_client.get("/api/workflows/status")
+            status_response = e2e_test_client.get("/api/v1/workflows/status")
             assert status_response.status_code == 200
 
             # Step 3: Get workflow history
-            history_response = e2e_test_client.get("/api/workflows/history")
+            history_response = e2e_test_client.get("/api/v1/workflows/history")
             assert history_response.status_code == 200
 
 
@@ -66,7 +66,7 @@ class TestWorkflowAnalyticsJourney:
         """
         with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
             # Step 1: Get analytics overview
-            analytics_response = e2e_test_client.get("/api/workflows/analytics")
+            analytics_response = e2e_test_client.get("/api/v1/workflows/analytics")
 
             if analytics_response.status_code == 404:
                 pytest.skip("Analytics endpoint not implemented yet")
@@ -75,7 +75,7 @@ class TestWorkflowAnalyticsJourney:
 
             # Step 2: Get history with filters
             filtered_response = e2e_test_client.get(
-                "/api/workflows/history",
+                "/api/v1/workflows/history",
                 params={"status": "completed"}
             )
             assert filtered_response.status_code == 200
@@ -98,7 +98,7 @@ class TestDatabaseQueryJourney:
         4. User views results
         """
         # Step 1: Submit natural language query
-        query_response = e2e_test_client.post("/api/query", json={
+        query_response = e2e_test_client.post("/api/v1/query", json={
             "nl_query": "Show me all completed workflows from the last week",
             "table": "workflow_history",
             "provider": "anthropic",
@@ -198,7 +198,7 @@ class TestErrorRecoveryJourney:
         3. User corrects data and resubmits
         """
         # Step 1: Submit invalid data
-        invalid_response = e2e_test_client.post("/api/workflows/create", json={
+        invalid_response = e2e_test_client.post("/api/v1/workflows/create", json={
             # Missing required fields
         })
 
@@ -256,7 +256,7 @@ class TestMultiWorkflowJourney:
 
         # View all workflows
         with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
-            response = e2e_test_client.get("/api/workflows/history")
+            response = e2e_test_client.get("/api/v1/workflows/history")
 
             if response.status_code == 200:
                 data = response.json()
@@ -282,7 +282,7 @@ class TestDataExportJourney:
         """
         with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
             # Test CSV export (if endpoint exists)
-            export_response = e2e_test_client.post("/api/export", json={
+            export_response = e2e_test_client.post("/api/v1/export", json={
                 "format": "csv",
                 "filters": {"status": "completed"},
             })
@@ -309,11 +309,11 @@ class TestSystemHealthMonitoring:
         3. User identifies any issues
         """
         # Step 1: Check health
-        health_response = e2e_test_client.get("/api/health")
+        health_response = e2e_test_client.get("/api/v1/health")
         response_validator.validate_health_response(health_response)
 
         # Step 2: Get detailed status
-        status_response = e2e_test_client.get("/api/status")
+        status_response = e2e_test_client.get("/api/v1/status")
 
         if status_response.status_code == 200:
             data = status_response.json()

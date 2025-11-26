@@ -201,7 +201,7 @@ class TestCompleteGitHubIssueFlow:
         """
         # Step 1: Submit natural language request
         nl_input = "Create a user authentication system with email and password login"
-        submit_response = e2e_test_client.post("/api/request", json={
+        submit_response = e2e_test_client.post("/api/v1/request", json={
             "nl_input": nl_input,
             "project_path": None,
             "auto_post": False
@@ -217,7 +217,7 @@ class TestCompleteGitHubIssueFlow:
         assert len(request_id) > 0  # Should be UUID
 
         # Step 2: Retrieve issue preview
-        preview_response = e2e_test_client.get(f"/api/preview/{request_id}")
+        preview_response = e2e_test_client.get(f"/api/v1/preview/{request_id}")
 
         assert preview_response.status_code == 200, f"Preview failed: {preview_response.text}"
         preview_data = preview_response.json()
@@ -238,7 +238,7 @@ class TestCompleteGitHubIssueFlow:
         assert preview_data["model_set"] in ["base", "heavy"]
 
         # Step 3: Retrieve cost estimate
-        cost_response = e2e_test_client.get(f"/api/preview/{request_id}/cost")
+        cost_response = e2e_test_client.get(f"/api/v1/preview/{request_id}/cost")
 
         assert cost_response.status_code == 200, f"Cost estimate failed: {cost_response.text}"
         cost_data = cost_response.json()
@@ -259,7 +259,7 @@ class TestCompleteGitHubIssueFlow:
         assert len(cost_data["reasoning"]) > 0
 
         # Step 4: Confirm and post to GitHub
-        confirm_response = e2e_test_client.post(f"/api/confirm/{request_id}")
+        confirm_response = e2e_test_client.post(f"/api/v1/confirm/{request_id}")
 
         assert confirm_response.status_code == 200, f"Confirm failed: {confirm_response.text}"
         confirm_data = confirm_response.json()
@@ -283,7 +283,7 @@ class TestCompleteGitHubIssueFlow:
         assert save_call_kwargs["level"] == cost_data["level"]
 
         # Step 5: Verify request is cleaned up (should 404 on next attempt)
-        preview_after_confirm = e2e_test_client.get(f"/api/preview/{request_id}")
+        preview_after_confirm = e2e_test_client.get(f"/api/v1/preview/{request_id}")
         assert preview_after_confirm.status_code == 404
 
     def test_invalid_nl_input_handling(
@@ -310,7 +310,7 @@ class TestCompleteGitHubIssueFlow:
         - No state corruption
         """
         # Test 1: Empty natural language input
-        empty_response = e2e_test_client.post("/api/request", json={
+        empty_response = e2e_test_client.post("/api/v1/request", json={
             "nl_input": "",
             "auto_post": False
         })
@@ -323,7 +323,7 @@ class TestCompleteGitHubIssueFlow:
             assert "request_id" in data  # Successfully processed (via mock)
 
         # Test 2: Missing required field
-        missing_field_response = e2e_test_client.post("/api/request", json={
+        missing_field_response = e2e_test_client.post("/api/v1/request", json={
             "auto_post": False
             # Missing nl_input
         })
@@ -331,7 +331,7 @@ class TestCompleteGitHubIssueFlow:
         assert missing_field_response.status_code == 422, "Missing field should return 422"
 
         # Test 3: Whitespace-only input
-        whitespace_response = e2e_test_client.post("/api/request", json={
+        whitespace_response = e2e_test_client.post("/api/v1/request", json={
             "nl_input": "   \n\t  ",
             "auto_post": False
         })
@@ -342,7 +342,7 @@ class TestCompleteGitHubIssueFlow:
 
         # Test 4: Extremely long input (edge case)
         long_input = "Create a feature " * 1000  # Very long input
-        long_response = e2e_test_client.post("/api/request", json={
+        long_response = e2e_test_client.post("/api/v1/request", json={
             "nl_input": long_input,
             "auto_post": False
         })
@@ -375,7 +375,7 @@ class TestCompleteGitHubIssueFlow:
         """
         # Test 1: Non-existent but valid UUID
         fake_uuid = "00000000-0000-0000-0000-000000000000"
-        preview_response = e2e_test_client.get(f"/api/preview/{fake_uuid}")
+        preview_response = e2e_test_client.get(f"/api/v1/preview/{fake_uuid}")
 
         assert preview_response.status_code == 404
         error_data = preview_response.json()
@@ -383,18 +383,18 @@ class TestCompleteGitHubIssueFlow:
         assert "not found" in error_data["detail"].lower()
 
         # Test 2: Non-existent UUID for cost estimate
-        cost_response = e2e_test_client.get(f"/api/preview/{fake_uuid}/cost")
+        cost_response = e2e_test_client.get(f"/api/v1/preview/{fake_uuid}/cost")
 
         assert cost_response.status_code == 404
 
         # Test 3: Non-existent UUID for confirmation
-        confirm_response = e2e_test_client.post(f"/api/confirm/{fake_uuid}")
+        confirm_response = e2e_test_client.post(f"/api/v1/confirm/{fake_uuid}")
 
         assert confirm_response.status_code == 404
 
         # Test 4: Invalid UUID format
         invalid_uuid = "not-a-valid-uuid"
-        invalid_preview_response = e2e_test_client.get(f"/api/preview/{invalid_uuid}")
+        invalid_preview_response = e2e_test_client.get(f"/api/v1/preview/{invalid_uuid}")
 
         # Should return 404 or 422 depending on validation layer
         assert invalid_preview_response.status_code in [404, 422]
@@ -423,7 +423,7 @@ class TestCompleteGitHubIssueFlow:
         - State management correctness
         """
         # Step 1: Submit request
-        submit_response = e2e_test_client.post("/api/request", json={
+        submit_response = e2e_test_client.post("/api/v1/request", json={
             "nl_input": "Add password reset functionality",
             "auto_post": False
         })
@@ -432,7 +432,7 @@ class TestCompleteGitHubIssueFlow:
         request_id = submit_response.json()["request_id"]
 
         # Step 2: First confirmation (should succeed)
-        first_confirm = e2e_test_client.post(f"/api/confirm/{request_id}")
+        first_confirm = e2e_test_client.post(f"/api/v1/confirm/{request_id}")
 
         assert first_confirm.status_code == 200
         first_issue_number = first_confirm.json()["issue_number"]
@@ -441,7 +441,7 @@ class TestCompleteGitHubIssueFlow:
         assert mock_github_poster.post_issue.call_count == 1
 
         # Step 3: Second confirmation attempt (should fail)
-        second_confirm = e2e_test_client.post(f"/api/confirm/{request_id}")
+        second_confirm = e2e_test_client.post(f"/api/v1/confirm/{request_id}")
 
         # Should return 404 since request was cleaned up
         assert second_confirm.status_code == 404
@@ -501,7 +501,7 @@ class TestCompleteGitHubIssueFlow:
             )
 
             # Submit request
-            submit_response = e2e_test_client.post("/api/request", json={
+            submit_response = e2e_test_client.post("/api/v1/request", json={
                 "nl_input": test_case["input"],
                 "auto_post": False
             })
@@ -510,7 +510,7 @@ class TestCompleteGitHubIssueFlow:
             request_id = submit_response.json()["request_id"]
 
             # Get cost estimate
-            cost_response = e2e_test_client.get(f"/api/preview/{request_id}/cost")
+            cost_response = e2e_test_client.get(f"/api/v1/preview/{request_id}/cost")
 
             assert cost_response.status_code == 200
             cost_data = cost_response.json()
@@ -669,7 +669,7 @@ class TestGitHubIssueFlowEdgeCases:
             mock_poster_class.return_value = poster_instance
 
             # Submit request
-            submit_response = e2e_test_client.post("/api/request", json={
+            submit_response = e2e_test_client.post("/api/v1/request", json={
                 "nl_input": "Test feature",
                 "auto_post": False
             })
@@ -678,7 +678,7 @@ class TestGitHubIssueFlowEdgeCases:
             request_id = submit_response.json()["request_id"]
 
             # Attempt confirmation with webhook offline
-            confirm_response = e2e_test_client.post(f"/api/confirm/{request_id}")
+            confirm_response = e2e_test_client.post(f"/api/v1/confirm/{request_id}")
 
             # The webhook health check happens async/parallel - the API may still succeed
             # posting the issue even if webhook is offline (webhook is for triggering workflow, not required for posting)
@@ -736,7 +736,7 @@ class TestGitHubIssueFlowEdgeCases:
             mock_poster_class.return_value = poster_instance
 
             # Submit request
-            submit_response = e2e_test_client.post("/api/request", json={
+            submit_response = e2e_test_client.post("/api/v1/request", json={
                 "nl_input": "Test feature",
                 "auto_post": False
             })
@@ -745,7 +745,7 @@ class TestGitHubIssueFlowEdgeCases:
             request_id = submit_response.json()["request_id"]
 
             # Attempt confirmation with unhealthy webhook
-            confirm_response = e2e_test_client.post(f"/api/confirm/{request_id}")
+            confirm_response = e2e_test_client.post(f"/api/v1/confirm/{request_id}")
 
             # Webhook health check may not prevent posting - same as offline test
             # Accept 200 (posted despite unhealthy webhook) or 500/503 (webhook error prevented operation)
@@ -794,7 +794,7 @@ class TestGitHubIssueFlowEdgeCases:
             # Submit multiple requests
             request_ids = []
             for i in range(5):
-                submit_response = e2e_test_client.post("/api/request", json={
+                submit_response = e2e_test_client.post("/api/v1/request", json={
                     "nl_input": f"Feature request number {i + 1}",
                     "auto_post": False
                 })
@@ -807,14 +807,14 @@ class TestGitHubIssueFlowEdgeCases:
 
             # Verify each request can be accessed independently
             for i, request_id in enumerate(request_ids):
-                preview_response = e2e_test_client.get(f"/api/preview/{request_id}")
+                preview_response = e2e_test_client.get(f"/api/v1/preview/{request_id}")
                 assert preview_response.status_code == 200
 
                 preview_data = preview_response.json()
                 assert f"Feature request number {i + 1}" in preview_data["body"]
 
                 # Verify cost estimate accessible
-                cost_response = e2e_test_client.get(f"/api/preview/{request_id}/cost")
+                cost_response = e2e_test_client.get(f"/api/v1/preview/{request_id}/cost")
                 assert cost_response.status_code == 200
 
 
@@ -932,14 +932,14 @@ class TestGitHubIssueFlowDataPersistence:
             mock_client_class.return_value = mock_client
 
             # Submit and confirm request
-            submit_response = e2e_test_client.post("/api/request", json={
+            submit_response = e2e_test_client.post("/api/v1/request", json={
                 "nl_input": "Implement search functionality",
                 "auto_post": False
             })
 
             request_id = submit_response.json()["request_id"]
 
-            confirm_response = e2e_test_client.post(f"/api/confirm/{request_id}")
+            confirm_response = e2e_test_client.post(f"/api/v1/confirm/{request_id}")
             assert confirm_response.status_code == 200
 
             # Verify save_cost_estimate was called with correct data
@@ -1045,7 +1045,7 @@ class TestGitHubIssueFlowPerformance:
 
             # Test submit performance
             with performance_monitor.track("submit_request"):
-                submit_response = e2e_test_client.post("/api/request", json={
+                submit_response = e2e_test_client.post("/api/v1/request", json={
                     "nl_input": "Add user profile page",
                     "auto_post": False
                 })
@@ -1055,13 +1055,13 @@ class TestGitHubIssueFlowPerformance:
 
             # Test preview retrieval performance
             with performance_monitor.track("get_preview"):
-                preview_response = e2e_test_client.get(f"/api/preview/{request_id}")
+                preview_response = e2e_test_client.get(f"/api/v1/preview/{request_id}")
 
             assert preview_response.status_code == 200
 
             # Test cost estimate retrieval performance
             with performance_monitor.track("get_cost"):
-                cost_response = e2e_test_client.get(f"/api/preview/{request_id}/cost")
+                cost_response = e2e_test_client.get(f"/api/v1/preview/{request_id}/cost")
 
             assert cost_response.status_code == 200
 

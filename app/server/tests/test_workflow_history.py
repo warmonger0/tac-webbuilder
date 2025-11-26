@@ -944,7 +944,7 @@ def test_resync_endpoint_single_workflow(temp_db):
     client = TestClient(app)
 
     with patch('core.workflow_history_utils.sync_manager.resync_workflow_cost', return_value=mock_result):
-        response = client.post("/api/workflow-history/resync?adw_id=endpoint-test-1")
+        response = client.post("/api/v1/workflow-history/resync?adw_id=endpoint-test-1")
 
     assert response.status_code == 200
     data = response.json()
@@ -968,7 +968,7 @@ def test_resync_endpoint_all_workflows(temp_db):
     client = TestClient(app)
 
     with patch('core.workflow_history_utils.sync_manager.resync_all_completed_workflows', return_value=(2, mock_workflows, mock_errors)):
-        response = client.post("/api/workflow-history/resync")
+        response = client.post("/api/v1/workflow-history/resync")
 
     assert response.status_code == 200
     data = response.json()
@@ -988,7 +988,7 @@ def test_resync_endpoint_force_mode(temp_db):
     client = TestClient(app)
 
     with patch('core.workflow_history_utils.sync_manager.resync_all_completed_workflows', return_value=(1, mock_workflows, mock_errors)) as mock_resync:
-        response = client.post("/api/workflow-history/resync?force=true")
+        response = client.post("/api/v1/workflow-history/resync?force=true")
 
     assert response.status_code == 200
     data = response.json()
@@ -1012,7 +1012,7 @@ def test_resync_endpoint_error_cases(temp_db):
     client = TestClient(app)
 
     with patch('core.workflow_history_utils.sync_manager.resync_workflow_cost', return_value=mock_result):
-        response = client.post("/api/workflow-history/resync?adw_id=nonexistent")
+        response = client.post("/api/v1/workflow-history/resync?adw_id=nonexistent")
 
     assert response.status_code == 200  # Still returns 200 with error details
     data = response.json()
@@ -1025,7 +1025,7 @@ def test_resync_endpoint_error_cases(temp_db):
     mock_errors = ["w2: Cost files not found"]
 
     with patch('core.workflow_history_utils.sync_manager.resync_all_completed_workflows', return_value=(1, mock_workflows, mock_errors)):
-        response = client.post("/api/workflow-history/resync")
+        response = client.post("/api/v1/workflow-history/resync")
 
     assert response.status_code == 200
     data = response.json()
@@ -1041,7 +1041,7 @@ def test_resync_endpoint_unexpected_error(temp_db):
 
     # Mock an unexpected exception
     with patch('core.workflow_history_utils.sync_manager.resync_all_completed_workflows', side_effect=Exception("Unexpected error")):
-        response = client.post("/api/workflow-history/resync")
+        response = client.post("/api/v1/workflow-history/resync")
 
     assert response.status_code == 200  # Still returns 200 with error details
     data = response.json()

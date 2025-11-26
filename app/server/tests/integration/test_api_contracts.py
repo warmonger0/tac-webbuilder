@@ -21,12 +21,12 @@ class TestHealthEndpoints:
 
     def test_health_check_returns_200(self, integration_client):
         """Verify /api/health returns 200 OK."""
-        response = integration_client.get("/api/health")
+        response = integration_client.get("/api/v1/health")
         assert response.status_code == 200
 
     def test_health_check_response_structure(self, integration_client):
         """Verify health check response has required fields."""
-        response = integration_client.get("/api/health")
+        response = integration_client.get("/api/v1/health")
         data = response.json()
 
         assert "status" in data
@@ -36,7 +36,7 @@ class TestHealthEndpoints:
 
     def test_system_status_endpoint(self, integration_client):
         """Verify /api/status endpoint returns system information."""
-        response = integration_client.get("/api/status")
+        response = integration_client.get("/api/v1/status")
 
         if response.status_code == 200:
             data = response.json()
@@ -52,7 +52,7 @@ class TestWorkflowEndpoints:
         """Verify workflow history endpoint returns data."""
         with patch('core.workflow_history_utils.database.DB_PATH', db_with_workflows):
             # Correct endpoint is /api/workflow-history (not /api/workflows/history)
-            response = integration_client.get("/api/workflow-history")
+            response = integration_client.get("/api/v1/workflow-history")
 
             assert response.status_code == 200
             data = response.json()
@@ -63,7 +63,7 @@ class TestWorkflowEndpoints:
     def test_workflow_analytics_endpoint(self, integration_client, db_with_workflows):
         """Verify analytics endpoint returns metrics."""
         with patch('core.workflow_history_utils.database.DB_PATH', db_with_workflows):
-            response = integration_client.get("/api/workflows/analytics")
+            response = integration_client.get("/api/v1/workflows/analytics")
 
             if response.status_code == 200:
                 data = response.json()
@@ -77,7 +77,7 @@ class TestDatabaseEndpoints:
 
     def test_schema_endpoint(self, integration_client):
         """Verify database schema endpoint returns table information."""
-        response = integration_client.get("/api/db/schema")
+        response = integration_client.get("/api/v1/db/schema")
 
         if response.status_code == 200:
             data = response.json()
@@ -90,7 +90,7 @@ class TestDatabaseEndpoints:
     ])
     def test_sql_injection_protection(self, integration_client, invalid_query):
         """Verify SQL injection attempts are blocked."""
-        response = integration_client.post("/api/query", json={
+        response = integration_client.post("/api/v1/query", json={
             "nl_query": invalid_query,
             "table": "users",
         })
@@ -105,13 +105,13 @@ class TestErrorHandling:
 
     def test_not_found_endpoint(self, integration_client):
         """Verify 404 for non-existent endpoints."""
-        response = integration_client.get("/api/nonexistent")
+        response = integration_client.get("/api/v1/nonexistent")
         assert response.status_code == 404
 
     def test_invalid_json_payload(self, integration_client):
         """Verify proper error for invalid JSON."""
         response = integration_client.post(
-            "/api/request",
+            "/api/v1/request",
             data="invalid json",
             headers={"Content-Type": "application/json"}
         )
@@ -120,7 +120,7 @@ class TestErrorHandling:
 
     def test_missing_required_fields(self, integration_client):
         """Verify validation errors for missing fields."""
-        response = integration_client.post("/api/query", json={})
+        response = integration_client.post("/api/v1/query", json={})
         assert response.status_code == 422
 
 

@@ -156,7 +156,7 @@ Eve,32,Boston"""
         """
         # Step 1: Upload CSV file
         response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("people.csv", io.BytesIO(sample_csv_content), "text/csv")},
         )
 
@@ -183,7 +183,7 @@ Eve,32,Boston"""
 
         # Step 2: Execute NL query to retrieve all data
         query_response = integration_client.post(
-            "/api/query",
+            "/api/v1/query",
             json={
                 "query": "Show me all people in the database",
                 "llm_provider": "openai",
@@ -217,7 +217,7 @@ Eve,32,Boston"""
 
         # Step 3: Test aggregate query
         avg_query_response = integration_client.post(
-            "/api/query",
+            "/api/v1/query",
             json={
                 "query": "What is the average age of people?",
                 "llm_provider": "openai",
@@ -259,7 +259,7 @@ Eve,32,Boston"""
         """
         # Test 1: Upload JSON file
         json_response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("products.json", io.BytesIO(sample_json_content), "application/json")},
         )
 
@@ -281,7 +281,7 @@ Eve,32,Boston"""
 
         # Test 2: Upload JSONL file
         jsonl_response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("employees.jsonl", io.BytesIO(sample_jsonl_content), "application/jsonl")},
         )
 
@@ -302,7 +302,7 @@ Eve,32,Boston"""
         assert sample["salary"] == 80000
 
         # Test 3: Verify both tables exist in schema
-        schema_response = integration_client.get("/api/schema")
+        schema_response = integration_client.get("/api/v1/schema")
         assert schema_response.status_code == 200
         schema_data = schema_response.json()
 
@@ -342,7 +342,7 @@ Eve,32,Boston"""
         uploaded_tables = []
         for filename, content, content_type in tables_to_upload:
             response = integration_client.post(
-                "/api/upload",
+                "/api/v1/upload",
                 files={"file": (filename, io.BytesIO(content), content_type)},
             )
             assert response.status_code == 200
@@ -350,7 +350,7 @@ Eve,32,Boston"""
             uploaded_tables.append(data["table_name"])
 
         # Get database schema
-        schema_response = integration_client.get("/api/schema")
+        schema_response = integration_client.get("/api/v1/schema")
         assert schema_response.status_code == 200
         schema_data = schema_response.json()
 
@@ -411,14 +411,14 @@ Eve,32,Boston"""
         """
         # Upload CSV with mixed data types
         upload_response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("people.csv", io.BytesIO(sample_csv_content), "text/csv")},
         )
         assert upload_response.status_code == 200
 
         # Request insights for the table
         insights_response = integration_client.post(
-            "/api/insights",
+            "/api/v1/insights",
             json={
                 "table_name": "people",
                 "column_names": None,  # Analyze all columns
@@ -471,7 +471,7 @@ Eve,32,Boston"""
 
         # Test 4: Request insights for specific columns only
         specific_insights_response = integration_client.post(
-            "/api/insights",
+            "/api/v1/insights",
             json={
                 "table_name": "people",
                 "column_names": ["age", "city"],
@@ -509,14 +509,14 @@ Eve,32,Boston"""
         """
         # Upload test data
         upload_response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("people.csv", io.BytesIO(sample_csv_content), "text/csv")},
         )
         assert upload_response.status_code == 200
 
         # Test 1: Invalid SQL syntax (mocked to return invalid SQL)
         invalid_sql_response = integration_client.post(
-            "/api/query",
+            "/api/v1/query",
             json={
                 "query": "This is an invalid query that generates bad SQL",
                 "llm_provider": "openai",
@@ -538,7 +538,7 @@ Eve,32,Boston"""
             mock_gen.return_value = "SELECT * FROM nonexistent_table"
 
             nonexistent_response = integration_client.post(
-                "/api/query",
+                "/api/v1/query",
                 json={
                     "query": "Show data from nonexistent table",
                     "llm_provider": "openai",
@@ -553,7 +553,7 @@ Eve,32,Boston"""
 
         # Test 3: Empty query
         empty_response = integration_client.post(
-            "/api/query",
+            "/api/v1/query",
             json={
                 "query": "",
                 "llm_provider": "openai",
@@ -585,7 +585,7 @@ Eve,32,Boston"""
         """
         # Upload test data
         upload_response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("people.csv", io.BytesIO(sample_csv_content), "text/csv")},
         )
         assert upload_response.status_code == 200
@@ -595,7 +595,7 @@ Eve,32,Boston"""
             mock_gen.return_value = "DROP TABLE people; --"
 
             drop_response = integration_client.post(
-                "/api/query",
+                "/api/v1/query",
                 json={
                     "query": "Drop the people table",
                     "llm_provider": "openai",
@@ -613,7 +613,7 @@ Eve,32,Boston"""
             mock_gen.return_value = "DELETE FROM people WHERE 1=1"
 
             delete_response = integration_client.post(
-                "/api/query",
+                "/api/v1/query",
                 json={
                     "query": "Delete all people",
                     "llm_provider": "openai",
@@ -631,7 +631,7 @@ Eve,32,Boston"""
             mock_gen.return_value = "UPDATE people SET age = 99 WHERE name = 'Alice'"
 
             update_response = integration_client.post(
-                "/api/query",
+                "/api/v1/query",
                 json={
                     "query": "Update Alice's age",
                     "llm_provider": "openai",
@@ -649,7 +649,7 @@ Eve,32,Boston"""
             mock_gen.return_value = "SELECT * FROM people -- WHERE age > 30"
 
             comment_response = integration_client.post(
-                "/api/query",
+                "/api/v1/query",
                 json={
                     "query": "Show people with comment injection",
                     "llm_provider": "openai",
@@ -667,7 +667,7 @@ Eve,32,Boston"""
             mock_gen.return_value = "SELECT * FROM people; DROP TABLE people;"
 
             multi_response = integration_client.post(
-                "/api/query",
+                "/api/v1/query",
                 json={
                     "query": "Show people and drop table",
                     "llm_provider": "openai",
@@ -685,7 +685,7 @@ Eve,32,Boston"""
             mock_gen.return_value = "SELECT COUNT(*) as count FROM people"
 
             verify_response = integration_client.post(
-                "/api/query",
+                "/api/v1/query",
                 json={
                     "query": "Count people",
                     "llm_provider": "openai",
@@ -707,7 +707,7 @@ Eve,32,Boston"""
         txt_content = b"This is a text file"
 
         response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("data.txt", io.BytesIO(txt_content), "text/plain")},
         )
 
@@ -724,7 +724,7 @@ Eve,32,Boston"""
         empty_csv = b"name,age,city\n"  # Header only, no data
 
         response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("empty.csv", io.BytesIO(empty_csv), "text/csv")},
         )
 
@@ -742,7 +742,7 @@ Eve,32,Boston"""
         malformed_json = b'{"name": "Alice", "age": 30'  # Missing closing brace
 
         response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("malformed.json", io.BytesIO(malformed_json), "application/json")},
         )
 
@@ -762,13 +762,13 @@ Eve,32,Boston"""
         """Test random query generation based on database schema."""
         # Upload test data
         upload_response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("people.csv", io.BytesIO(sample_csv_content), "text/csv")},
         )
         assert upload_response.status_code == 200
 
         # Request random query generation
-        random_query_response = integration_client.get("/api/generate-random-query")
+        random_query_response = integration_client.get("/api/v1/generate-random-query")
 
         assert random_query_response.status_code == 200
         random_data = random_query_response.json()
@@ -792,7 +792,7 @@ Eve,32,Boston"""
         large_csv = '\n'.join(lines).encode('utf-8')
 
         response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("large.csv", io.BytesIO(large_csv), "text/csv")},
         )
 
@@ -809,7 +809,7 @@ Eve,32,Boston"""
         csv_with_special = b'name,description,price\n"Widget Pro","A widget with quotes",19.99\n"Gadget, Plus","A gadget, with commas",29.99\n"Thing","Has newlines",39.99'
 
         response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("special.csv", io.BytesIO(csv_with_special), "text/csv")},
         )
 
@@ -826,7 +826,7 @@ Eve,32,Boston"""
     def test_insights_nonexistent_table(self, integration_client: TestClient, shared_test_db):
         """Test insights generation for non-existent table."""
         response = integration_client.post(
-            "/api/insights",
+            "/api/v1/insights",
             json={
                 "table_name": "nonexistent_table",
                 "column_names": None,
@@ -850,14 +850,14 @@ Eve,32,Boston"""
         """Test insights generation with invalid column names."""
         # Upload test data
         upload_response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("people.csv", io.BytesIO(sample_csv_content), "text/csv")},
         )
         assert upload_response.status_code == 200
 
         # Request insights for non-existent columns
         response = integration_client.post(
-            "/api/insights",
+            "/api/v1/insights",
             json={
                 "table_name": "people",
                 "column_names": ["nonexistent_column", "another_fake_column"],
@@ -926,7 +926,7 @@ Eve,32,Boston"""
         def upload_file(file_num: int):
             csv_data = f"id,value\n{file_num},test{file_num}".encode('utf-8')
             response = integration_client.post(
-                "/api/upload",
+                "/api/v1/upload",
                 files={"file": (f"file{file_num}.csv", io.BytesIO(csv_data), "text/csv")},
             )
             return response.status_code == 200
@@ -949,7 +949,7 @@ Eve,32,Boston"""
         csv_data = f"{header}\n{row}".encode('utf-8')
 
         response = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("wide.csv", io.BytesIO(csv_data), "text/csv")},
         )
 
@@ -968,7 +968,7 @@ Eve,32,Boston"""
         """Test uploading file with same name (should replace)."""
         # First upload
         response1 = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("data.csv", io.BytesIO(sample_csv_content), "text/csv")},
         )
         assert response1.status_code == 200
@@ -978,7 +978,7 @@ Eve,32,Boston"""
         # Second upload with different content but same filename
         new_csv = b"name,age,city\nZoe,40,Denver"
         response2 = integration_client.post(
-            "/api/upload",
+            "/api/v1/upload",
             files={"file": ("data.csv", io.BytesIO(new_csv), "text/csv")},
         )
 

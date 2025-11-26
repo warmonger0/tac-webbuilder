@@ -37,7 +37,7 @@ def init_system_routes(health_service, service_controller, app_start_time):
     This function is called from server.py to inject service dependencies.
     """
 
-    @router.get("/api/health", response_model=HealthCheckResponse)
+    @router.get("/health", response_model=HealthCheckResponse)
     async def health_check() -> HealthCheckResponse:
         """Health check endpoint with database status"""
         try:
@@ -66,7 +66,7 @@ def init_system_routes(health_service, service_controller, app_start_time):
                 uptime_seconds=0
             )
 
-    @router.get("/api/system-status", response_model=SystemStatusResponse)
+    @router.get("/system-status", response_model=SystemStatusResponse)
     async def get_system_status() -> SystemStatusResponse:
         """
         Comprehensive system health check - delegates to HealthService.
@@ -94,7 +94,7 @@ def init_system_routes(health_service, service_controller, app_start_time):
 
         return response
 
-    @router.get("/api/adw-monitor", response_model=AdwMonitorResponse)
+    @router.get("/adw-monitor", response_model=AdwMonitorResponse)
     async def get_adw_monitor_status() -> AdwMonitorResponse:
         """
         Get real-time status of all ADW workflows.
@@ -141,7 +141,7 @@ def init_system_routes(health_service, service_controller, app_start_time):
                 last_updated=datetime.now().isoformat()
             )
 
-    @router.get("/api/adw-monitor/{adw_id}/health", response_model=AdwHealthCheckResponse)
+    @router.get("/adw-monitor/{adw_id}/health", response_model=AdwHealthCheckResponse)
     async def get_adw_health(adw_id: str) -> AdwHealthCheckResponse:
         """
         Get comprehensive health check for a specific ADW workflow.
@@ -197,27 +197,27 @@ def init_system_routes(health_service, service_controller, app_start_time):
                 checked_at=datetime.now().isoformat()
             )
 
-    @router.post("/api/services/webhook/start")
+    @router.post("/services/webhook/start")
     async def start_webhook_service() -> dict:
         """Start the webhook service - delegates to ServiceController"""
         return service_controller.start_webhook_service()
 
-    @router.post("/api/services/cloudflare/restart")
+    @router.post("/services/cloudflare/restart")
     async def restart_cloudflare_tunnel() -> dict:
         """Restart the Cloudflare tunnel - delegates to ServiceController"""
         return service_controller.restart_cloudflare_tunnel()
 
-    @router.get("/api/services/github-webhook/health")
+    @router.get("/services/github-webhook/health")
     async def get_github_webhook_health() -> dict:
         """Check GitHub webhook health - delegates to ServiceController"""
         return service_controller.get_github_webhook_health()
 
-    @router.post("/api/services/github-webhook/redeliver")
+    @router.post("/services/github-webhook/redeliver")
     async def redeliver_github_webhook() -> dict:
         """Redeliver GitHub webhook - delegates to ServiceController"""
         return service_controller.redeliver_github_webhook()
 
-    @router.get("/api/preflight-checks")
+    @router.get("/preflight-checks")
     async def run_preflight_health_checks(skip_tests: bool = Query(False)) -> dict:
         """
         Run pre-flight checks before launching ADW workflows.

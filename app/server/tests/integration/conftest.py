@@ -81,7 +81,7 @@ def integration_app(integration_test_db: Path):
     Usage:
         def test_api_workflow(integration_app):
             client = TestClient(integration_app)
-            response = client.get("/api/health")
+            response = client.get("/api/v1/health")
             assert response.status_code == 200
     """
     # Patch database path before importing server
@@ -100,7 +100,7 @@ def integration_client(integration_app) -> Generator[TestClient, None, None]:
 
     Usage:
         def test_submit_workflow(integration_client):
-            response = integration_client.post("/api/submit", json={
+            response = integration_client.post("/api/v1/submit", json={
                 "nl_query": "Show all users",
                 "table": "users"
             })
@@ -272,7 +272,7 @@ def mock_github_api():
 
     Usage:
         def test_github_integration(mock_github_api, integration_client):
-            response = integration_client.post("/api/github/issues/42/comment", json={
+            response = integration_client.post("/api/v1/github/issues/42/comment", json={
                 "body": "Test comment"
             })
             assert response.status_code == 200
@@ -304,7 +304,7 @@ def mock_openai_api():
 
     Usage:
         def test_sql_generation(mock_openai_api, integration_client):
-            response = integration_client.post("/api/query", json={
+            response = integration_client.post("/api/v1/query", json={
                 "nl_query": "Show all users",
                 "provider": "openai"
             })
@@ -338,7 +338,7 @@ def mock_anthropic_api():
 
     Usage:
         def test_sql_generation_anthropic(mock_anthropic_api, integration_client):
-            response = integration_client.post("/api/query", json={
+            response = integration_client.post("/api/v1/query", json={
                 "nl_query": "Show all users",
                 "provider": "anthropic"
             })

@@ -253,7 +253,7 @@ class TestWorkflowHistoryIntegration:
 
         # Test 1: Batch fetch 3 workflows
         batch_ids = [workflow_ids[0], workflow_ids[2], workflow_ids[4]]
-        response = integration_client.post("/api/workflows/batch", json=batch_ids)
+        response = integration_client.post("/api/v1/workflows/batch", json=batch_ids)
 
         assert response.status_code == 200
         data = response.json()
@@ -266,18 +266,18 @@ class TestWorkflowHistoryIntegration:
             assert workflow["workflow_template"] == "adw_sdlc_iso"
 
         # Test 3: Empty list returns empty result
-        response = integration_client.post("/api/workflows/batch", json=[])
+        response = integration_client.post("/api/v1/workflows/batch", json=[])
         assert response.status_code == 200
         assert response.json() == []
 
         # Test 4: Non-existent workflow IDs
-        response = integration_client.post("/api/workflows/batch", json=["NONEXISTENT-001"])
+        response = integration_client.post("/api/v1/workflows/batch", json=["NONEXISTENT-001"])
         assert response.status_code == 200
         assert len(response.json()) == 0
 
         # Test 5: Mixed existing and non-existing
         mixed_ids = [workflow_ids[0], "NONEXISTENT-001", workflow_ids[1]]
-        response = integration_client.post("/api/workflows/batch", json=mixed_ids)
+        response = integration_client.post("/api/v1/workflows/batch", json=mixed_ids)
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 2
@@ -285,7 +285,7 @@ class TestWorkflowHistoryIntegration:
 
         # Test 6: Maximum limit enforcement (more than 20)
         too_many_ids = [f"TEST-BATCH-{i:03d}" for i in range(25)]
-        response = integration_client.post("/api/workflows/batch", json=too_many_ids)
+        response = integration_client.post("/api/v1/workflows/batch", json=too_many_ids)
         assert response.status_code == 400
         assert "Maximum 20 workflows" in response.json()["detail"]
 
@@ -367,7 +367,7 @@ class TestWorkflowHistoryIntegration:
         )
 
         # Test analytics endpoint
-        response = integration_client.get(f"/api/workflow-analytics/{adw_id}")
+        response = integration_client.get(f"/api/v1/workflow-analytics/{adw_id}")
         assert response.status_code == 200
 
         analytics = response.json()
@@ -439,7 +439,7 @@ class TestWorkflowHistoryIntegration:
                 )
 
         # Test trend endpoint with daily grouping
-        response = integration_client.get("/api/workflow-trends?days=30&group_by=day")
+        response = integration_client.get("/api/v1/workflow-trends?days=30&group_by=day")
         assert response.status_code == 200
 
         trends = response.json()
@@ -518,7 +518,7 @@ class TestWorkflowHistoryIntegration:
 
         # Test prediction endpoint (without complexity filter since column doesn't exist)
         response = integration_client.get(
-            f"/api/cost-predictions?classification={template}&complexity=&model={model}"
+            f"/api/v1/cost-predictions?classification={template}&complexity=&model={model}"
         )
         assert response.status_code == 200
 
@@ -551,7 +551,7 @@ class TestWorkflowHistoryIntegration:
 
         # Test 2: Prediction with no historical data
         response = integration_client.get(
-            "/api/cost-predictions?classification=nonexistent&complexity=low&model=claude-opus"
+            "/api/v1/cost-predictions?classification=nonexistent&complexity=low&model=claude-opus"
         )
         assert response.status_code == 200
 
@@ -575,11 +575,11 @@ class TestWorkflowHistoryIntegration:
         # So we just insert data and it will be available via the client
 
         # First, get baseline count
-        response = integration_client.get("/api/workflow-history?limit=100")
+        response = integration_client.get("/api/v1/workflow-history?limit=100")
         baseline_count = response.json()["total_count"]
 
         # Test 1: Get all workflows with analytics
-        response = integration_client.get("/api/workflow-history?limit=20&offset=0")
+        response = integration_client.get("/api/v1/workflow-history?limit=20&offset=0")
         assert response.status_code == 200
 
         data = response.json()
@@ -603,7 +603,7 @@ class TestWorkflowHistoryIntegration:
         end_date = (datetime.now() + timedelta(days=1)).isoformat()
 
         response = integration_client.get(
-            f"/api/workflow-history?start_date={start_date}&end_date={end_date}"
+            f"/api/v1/workflow-history?start_date={start_date}&end_date={end_date}"
         )
         assert response.status_code == 200
         data = response.json()
@@ -613,7 +613,7 @@ class TestWorkflowHistoryIntegration:
 
         # Test 3: Sort by cost ascending
         response = integration_client.get(
-            "/api/workflow-history?sort_by=actual_cost_total&sort_order=ASC&limit=5"
+            "/api/v1/workflow-history?sort_by=actual_cost_total&sort_order=ASC&limit=5"
         )
         assert response.status_code == 200
         data = response.json()
@@ -674,7 +674,7 @@ class TestWorkflowHistoryIntegration:
 
         # Test 1: Single workflow resync
         with patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
-            response = integration_client.post(f"/api/workflow-history/resync?adw_id={adw_id}")
+            response = integration_client.post(f"/api/v1/workflow-history/resync?adw_id={adw_id}")
             assert response.status_code == 200
 
             data = response.json()
@@ -689,7 +689,7 @@ class TestWorkflowHistoryIntegration:
 
         # Test 2: Resync non-existent workflow
         response = integration_client.post(
-            "/api/workflow-history/resync?adw_id=NONEXISTENT-001"
+            "/api/v1/workflow-history/resync?adw_id=NONEXISTENT-001"
         )
         assert response.status_code == 200
         data = response.json()
@@ -698,7 +698,7 @@ class TestWorkflowHistoryIntegration:
 
         # Test 3: Bulk resync with force
         with patch('core.workflow_history_utils.enrichment.read_cost_history', return_value=mock_cost_data):
-            response = integration_client.post("/api/workflow-history/resync?force=true")
+            response = integration_client.post("/api/v1/workflow-history/resync?force=true")
             assert response.status_code == 200
 
             data = response.json()
@@ -720,7 +720,7 @@ class TestWorkflowHistoryEdgeCases:
         assert total_count == 0
 
         # Test analytics with no data
-        response = integration_client.get("/api/workflow-history")
+        response = integration_client.get("/api/v1/workflow-history")
         assert response.status_code == 200
         data = response.json()
         assert data["total_count"] == 0
@@ -733,7 +733,7 @@ class TestWorkflowHistoryEdgeCases:
         assert workflow is None
 
         # Analytics for non-existent workflow
-        response = integration_client.get("/api/workflow-analytics/NONEXISTENT-001")
+        response = integration_client.get("/api/v1/workflow-analytics/NONEXISTENT-001")
         assert response.status_code == 404
 
     @pytest.mark.skip(reason="Database schema mismatch: submission_hour column missing (Issue #66)")
@@ -786,7 +786,7 @@ class TestWorkflowHistoryEdgeCases:
 
         # Invalid sort order (violates Literal["ASC", "DESC"] constraint)
         response = integration_client.get(
-            "/api/workflow-history?sort_by=created_at&sort_order=INVALID"
+            "/api/v1/workflow-history?sort_by=created_at&sort_order=INVALID"
         )
         assert response.status_code == 422
         data = response.json()
@@ -795,7 +795,7 @@ class TestWorkflowHistoryEdgeCases:
 
         # Valid parameters should work
         response = integration_client.get(
-            "/api/workflow-history?sort_by=created_at&sort_order=DESC"
+            "/api/v1/workflow-history?sort_by=created_at&sort_order=DESC"
         )
         assert response.status_code == 200
         data = response.json()

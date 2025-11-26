@@ -19,7 +19,7 @@ from utils.db_connection import get_connection
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/issue", tags=["issue-completion"])
+router = APIRouter(prefix="/issue", tags=["issue-completion"])
 
 # Initialize services
 phase_queue_service = PhaseQueueService()

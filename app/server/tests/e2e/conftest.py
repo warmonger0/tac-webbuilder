@@ -385,7 +385,7 @@ def e2e_test_db_cleanup(e2e_database):
     Usage:
         def test_github_flow(e2e_test_client, e2e_test_db_cleanup):
             # Database is clean for this test
-            response = e2e_test_client.post("/api/request", json={...})
+            response = e2e_test_client.post("/api/v1/request", json={...})
             # Cleanup happens automatically after test
     """
     import sqlite3
@@ -460,7 +460,7 @@ def e2e_test_client(e2e_database, mock_external_services_e2e, e2e_test_db_cleanu
     Usage:
         def test_complete_api_flow(e2e_test_client):
             # Test complete user flow through API
-            response = e2e_test_client.post("/api/submit", json={...})
+            response = e2e_test_client.post("/api/v1/submit", json={...})
             assert response.status_code == 200
             # Continue multi-step workflow
     """
@@ -704,7 +704,7 @@ def response_validator():
 
     Usage:
         def test_api_response(e2e_test_client, response_validator):
-            response = e2e_test_client.get("/api/health")
+            response = e2e_test_client.get("/api/v1/health")
             response_validator.validate_health_response(response)
     """
     class ResponseValidator:

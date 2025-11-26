@@ -78,7 +78,7 @@ def determine_workflow_for_phase(phase_data: dict, github_poster=None, issue_num
 
 
 # Router will be created with dependencies injected from server.py
-router = APIRouter(prefix="/api/queue", tags=["Phase Queue"])
+router = APIRouter(prefix="/queue", tags=["Phase Queue"])
 
 
 class PhaseQueueItemResponse(BaseModel):
@@ -458,8 +458,8 @@ def init_queue_routes(phase_queue_service):
     return router
 
 
-# Create a separate router for webhook endpoint (not under /api/queue prefix)
-webhook_router = APIRouter(prefix="/api", tags=["Webhooks"])
+# Create a separate router for webhook endpoint (not under /queue prefix)
+webhook_router = APIRouter(prefix="", tags=["Webhooks"])
 
 
 def init_webhook_routes(phase_queue_service, github_poster):
