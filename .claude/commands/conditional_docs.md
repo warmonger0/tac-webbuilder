@@ -223,6 +223,18 @@
     - Understanding temporal analytics columns (hour_of_day, day_of_week)
     - Fixing schema mismatches between Python models and database tables
 
+### Configuration & Settings Features
+- `app_docs/feature-adw-68df79f1-frontend-config-refactor.md` - Centralized frontend configuration system, environment detection, API/WebSocket/Storage/GitHub configuration modules, type-safe configuration architecture
+  - Conditions:
+    - Working with frontend configuration or settings
+    - Implementing environment-specific configuration (dev/staging/production)
+    - Adding or modifying API endpoints, WebSocket connections, or storage keys
+    - Refactoring hardcoded values to use centralized configuration
+    - Understanding configuration module structure (app/client/src/config/)
+    - Working with environment variables (VITE_*)
+    - Troubleshooting configuration-related issues
+    - Adding new configuration domains or modules
+
 ### Templates & Integration Features
 - `app_docs/feature-0f04f66d-project-templates-docs.md` - Project templates, scaffolding scripts, setup_new_project.sh
 - `templates/existing_webapp/integration_guide.md` - Integrating ADW into existing projects
