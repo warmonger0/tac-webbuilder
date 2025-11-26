@@ -463,6 +463,7 @@ export function RequestForm() {
         <ConfirmDialog
           issue={preview}
           costEstimate={costEstimate}
+          predictedPatterns={predictedPatterns}
           onConfirm={handleConfirm}
           onCancel={handleCancel}
         />

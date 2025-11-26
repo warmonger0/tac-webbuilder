@@ -1,10 +1,11 @@
-import type { CostEstimate, GitHubIssue } from '../types';
+import type { CostEstimate, GitHubIssue, PredictedPattern } from '../types';
 import { IssuePreview } from './IssuePreview';
 import { CostEstimateCard } from './CostEstimateCard';
 
 interface ConfirmDialogProps {
   issue: GitHubIssue;
   costEstimate?: CostEstimate | null;
+  predictedPatterns?: PredictedPattern[] | null;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -12,6 +13,7 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({
   issue,
   costEstimate,
+  predictedPatterns,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -20,6 +22,27 @@ export function ConfirmDialog({
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 space-y-6">
           <h3 className="text-2xl font-bold">Confirm GitHub Issue</h3>
+
+          {/* Predicted Patterns Display */}
+          {predictedPatterns && predictedPatterns.length > 0 && (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+              <h4 className="text-sm font-medium text-emerald-600 mb-2">
+                🎯 Detected Patterns
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {predictedPatterns.map((pred, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="px-2 py-1 bg-emerald-500/20 text-emerald-700 text-xs rounded-md border border-emerald-500/30">
+                      {pred.pattern}
+                    </span>
+                    <span className="text-xs text-gray-600">
+                      {(pred.confidence * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Cost Estimate - Show prominently at top */}
           {costEstimate && (
