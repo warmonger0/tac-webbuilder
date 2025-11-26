@@ -8,13 +8,14 @@ This document tracks critical bug fixes and improvements made to the tac-webbuil
 
 ## Summary Statistics
 
-**Total Issues Fixed:** 10 (8 bugs + 1 performance + 1 security)
-**Lines of Code Changed:** +3,874 / -2,389
+**Total Issues Fixed:** 11 (8 bugs + 1 performance + 1 security + 1 quality gate)
+**Lines of Code Changed:** +4,110 / -2,389
 **Dead Code Removed:** 1,831 lines
 **Documentation Added:** 3,481 lines
 **Performance Improvements:** 3 database indexes (100x speedup)
 **Security Improvements:** Input validation (7 validation rules + 18 tests)
-**Commits:** 4 commits (e063700, fd7090f, 710538d, c56dd99) + 1 pending
+**Quality Gate Improvements:** Coverage enforcement (3 thresholds by issue type)
+**Commits:** 6 commits (e063700, fd7090f, 710538d, c56dd99, 231e606, 1319370)
 
 ---
 
@@ -595,6 +596,153 @@ def validate_depends_on_phase(cls, v: Optional[int], info) -> Optional[int]:
 
 ---
 
+## Session 5: Quality Gates - Code Coverage Enforcement
+
+**Commit:** `1319370` - "feat: Add code coverage enforcement to ADW test phase"
+**Time:** November 25, 2025 (Post-security improvements)
+
+### Quality Gate: Code Coverage Enforcement (1)
+
+#### ADW Test Phase Coverage Thresholds 🎯
+**Severity:** HIGH (Quality Gate)
+**File:** `adws/adw_test_iso.py` (236 lines added)
+**Issue:** Coverage collected but never enforced, allowing untested code to merge
+**Impact:** Completes ADW quality gate implementation from health assessment
+
+**Coverage Thresholds Implemented:**
+- **LIGHTWEIGHT Issues:** 0% (advisory only, no enforcement)
+- **STANDARD Issues:** 70% minimum coverage (blocks merge if lower)
+- **COMPLEX Issues:** 80% minimum coverage (strict enforcement)
+
+**Implementation Components:**
+
+**1. Issue Type Detection (Lines 815-842):**
+```python
+def get_issue_type(issue_number: int) -> str:
+    """Determine issue type from GitHub labels."""
+    # Fetches labels via gh CLI
+    # Returns: LIGHTWEIGHT | STANDARD | COMPLEX
+    # Safe fallback to STANDARD if detection fails
+```
+
+**2. Coverage Enforcement Logic (Lines 1206-1367):**
+```python
+# Extract coverage from state
+coverage_percentage = external_test_results.get("coverage_percentage")
+
+# Determine threshold by issue type
+if issue_type == "STANDARD":
+    coverage_threshold = 70
+elif issue_type == "COMPLEX":
+    coverage_threshold = 80
+else:  # LIGHTWEIGHT
+    coverage_threshold = 0  # Advisory only
+
+# Block if below threshold
+if coverage_threshold > 0 and coverage_percentage < coverage_threshold:
+    logger.error(f"Coverage {coverage_percentage}% below {coverage_threshold}%")
+    sys.exit(1)  # Block merge
+```
+
+**3. GitHub Feedback:**
+Posts detailed comment when coverage fails:
+```markdown
+❌ **Coverage check failed**
+
+**Issue Type:** STANDARD
+**Current Coverage:** 65.0%
+**Required Coverage:** 70%
+**Missing Coverage:** 5.0%
+
+Please add tests to increase coverage before merging.
+
+**Files with 0% coverage (3):**
+- `app/server/core/new_feature.py`
+- `app/server/routers/new_endpoint.py`
+- `app/server/utils/helper.py`
+```
+
+**4. Command-Line Options:**
+```bash
+# Skip coverage enforcement (debugging)
+--skip-coverage
+
+# Override threshold
+--coverage-threshold 50
+```
+
+**5. State Tracking:**
+New ADW state fields:
+```python
+{
+    "coverage_check": "passed" | "failed",
+    "coverage_percentage": 75.5,
+    "coverage_threshold": 70,
+    "coverage_lines_covered": 302,
+    "coverage_lines_total": 400,
+    "coverage_missing": 5.0  # If failed
+}
+```
+
+**Behavior Examples:**
+
+**STANDARD Issue with 65% Coverage (Blocked):**
+```
+[COVERAGE] Issue type: STANDARD
+[COVERAGE] Coverage: 65.0% (threshold: 70%)
+[COVERAGE] ❌ Coverage check failed
+[EXIT] Blocking merge due to insufficient coverage
+Exit code: 1
+```
+
+**STANDARD Issue with 75% Coverage (Passed):**
+```
+[COVERAGE] Issue type: STANDARD
+[COVERAGE] ✅ Coverage check passed: 75.0% (threshold: 70%)
+Exit code: 0
+```
+
+**LIGHTWEIGHT Issue with 30% Coverage (Advisory):**
+```
+[COVERAGE] Issue type: LIGHTWEIGHT
+[COVERAGE] No coverage requirement (advisory only)
+[COVERAGE] Current coverage: 30.0%
+Exit code: 0
+```
+
+**Quality Gate Impact:**
+- Completes ADW quality gate system (lint, build, test, **coverage**)
+- Prevents untested code from merging to production
+- Different standards for different issue complexity
+- Zero additional cost (uses existing coverage collection)
+- Clear feedback via GitHub comments
+
+**Cost-Benefit:**
+- **Cost:** $0.00 (no additional LLM calls)
+- **Quality Improvement:** HIGH (blocks untested code)
+- **ROI:** ⭐⭐⭐⭐⭐ (maximum value)
+
+**Files Changed:**
+- **Modified:** `adws/adw_test_iso.py` (236 lines added)
+  - Added `get_issue_type()` function
+  - Added coverage enforcement logic
+  - Added command-line argument parsing
+  - Updated docstring and usage
+
+**Integration with Quality Gate System:**
+```
+ADW Quality Gates (Now Complete):
+✅ Validate Phase - Baseline error detection
+✅ Build Phase - Type checking, compilation
+✅ Lint Phase - Style enforcement (now blocking)
+✅ Test Phase - Unit/E2E tests + Coverage (NEW)
+⚠️ Review Phase - AI code review (advisory)
+❌ Document Phase - No validation
+✅ Ship Phase - State validation
+```
+
+---
+
 ## Next Steps
 
 ### Immediate (When Queue Unpaused)
@@ -606,8 +754,8 @@ def validate_depends_on_phase(cls, v: Optional[int], info) -> Optional[int]:
 ### Short-term (This Week)
 1. ✅ ~~Add database indexes~~ (COMPLETED - Session 3)
 2. ✅ ~~Add input validation~~ (COMPLETED - Session 4)
-3. Fix N+1 queries in queue_routes.py (NEXT)
-4. Add code coverage enforcement to ADW
+3. ✅ ~~Add code coverage enforcement to ADW~~ (COMPLETED - Session 5)
+4. Fix N+1 queries in queue_routes.py (NEXT)
 5. Refactor `queue_routes.py` (650 lines → extract services)
 6. Replace 31 `any` types in frontend
 
