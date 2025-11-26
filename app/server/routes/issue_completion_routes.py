@@ -59,52 +59,49 @@ async def complete_issue(issue_number: int, request: IssueCompletionRequest) -> 
 
     try:
         # Step 1: Mark queue phases as completed
-        db_conn = get_connection()
-        cursor = db_conn.cursor()
-
         # Find all queue entries for this issue
-        if request.phase_number:
-            cursor.execute(
-                """
-                SELECT queue_id, phase_number, status
-                FROM phase_queue
-                WHERE parent_issue = ? AND phase_number = ?
-                """,
-                (issue_number, request.phase_number)
-            )
-        else:
-            cursor.execute(
-                """
-                SELECT queue_id, phase_number, status
-                FROM phase_queue
-                WHERE parent_issue = ?
-                """,
-                (issue_number,)
-            )
+        # Note: Query by issue_number, not parent_issue (hopper workflows have parent_issue=0)
+        with get_connection() as db_conn:
+            cursor = db_conn.cursor()
 
-        queue_entries = cursor.fetchall()
+            if request.phase_number:
+                cursor.execute(
+                    """
+                    SELECT queue_id, phase_number, status
+                    FROM phase_queue
+                    WHERE issue_number = ? AND phase_number = ?
+                    """,
+                    (issue_number, request.phase_number)
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT queue_id, phase_number, status
+                    FROM phase_queue
+                    WHERE issue_number = ?
+                    """,
+                    (issue_number,)
+                )
+
+            queue_entries = cursor.fetchall()
 
         if queue_entries:
             for queue_id, phase_num, status in queue_entries:
                 if status != 'completed':
-                    cursor.execute(
-                        """
-                        UPDATE phase_queue
-                        SET status = 'completed',
-                            updated_at = datetime('now')
-                        WHERE queue_id = ?
-                        """,
-                        (queue_id,)
+                    # Use phase_queue_service to mark complete (triggers next phase)
+                    next_phase_triggered = phase_queue_service.mark_phase_complete(queue_id)
+                    logger.info(
+                        f"[COMPLETION] Marked queue entry {queue_id} (issue #{issue_number} phase {phase_num}) as completed"
                     )
-                    logger.info(f"[COMPLETION] Marked queue entry {queue_id} (issue #{issue_number} phase {phase_num}) as completed")
+                    if next_phase_triggered:
+                        logger.info(f"[COMPLETION] Next phase triggered for parent issue #{issue_number}")
+                        messages.append(f"Phase {phase_num} completed, next phase triggered")
+                    else:
+                        messages.append(f"Phase {phase_num} completed (no next phase)")
 
-            db_conn.commit()
             queue_updated = True
-            messages.append(f"Updated {len(queue_entries)} queue entries")
         else:
             messages.append(f"No queue entries found for issue #{issue_number}")
-
-        db_conn.close()
 
         # Step 2: Close GitHub issue
         try:

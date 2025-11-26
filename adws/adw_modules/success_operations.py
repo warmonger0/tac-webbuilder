@@ -37,6 +37,7 @@ def complete_queue_for_issue(issue_number: str, logger: logging.Logger) -> Tuple
 
         response = requests.post(
             f"{BACKEND_URL}/api/issue/{issue_number}/complete",
+            json={"issue_number": int(issue_number)},
             timeout=10
         )
 
