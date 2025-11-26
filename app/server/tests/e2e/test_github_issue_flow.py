@@ -18,12 +18,9 @@ Test Coverage:
 - TC-005: Cost estimate accuracy validation
 """
 
-import json
 import pytest
 import sqlite3
-import uuid
-from unittest.mock import AsyncMock, Mock, patch, MagicMock
-from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
 
 @pytest.mark.e2e
@@ -435,7 +432,7 @@ class TestCompleteGitHubIssueFlow:
         first_confirm = e2e_test_client.post(f"/api/confirm/{request_id}")
 
         assert first_confirm.status_code == 200
-        first_issue_number = first_confirm.json()["issue_number"]
+        first_confirm.json()["issue_number"]
 
         # Verify GitHub poster called once
         assert mock_github_poster.post_issue.call_count == 1

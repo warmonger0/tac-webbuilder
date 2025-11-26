@@ -12,7 +12,6 @@ Uses real FastAPI app with test database and mocked external APIs.
 
 import pytest
 from unittest.mock import patch
-from fastapi.testclient import TestClient
 
 
 @pytest.mark.integration

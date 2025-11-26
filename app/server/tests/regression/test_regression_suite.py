@@ -53,8 +53,6 @@ class TestRegressionSuite:
         try:
             # Create a fresh database with the schema from database.py
             # We'll manually execute the CREATE TABLE statement from init_db
-            from core.workflow_history_utils.database import init_db
-            from utils.db_connection import get_connection as get_db_connection
 
             # Temporarily point to our test database by creating it directly
             conn = sqlite3.connect(tmp_db_path)

@@ -13,7 +13,6 @@ from typing import Optional
 
 from core.cost_estimate_storage import get_cost_estimate
 from core.cost_tracker import read_cost_history
-from core.data_models import CostData
 from core.workflow_analytics import (
     calculate_cost_efficiency_score,
     calculate_nl_input_clarity_score,

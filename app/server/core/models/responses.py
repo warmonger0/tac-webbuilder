@@ -142,7 +142,8 @@ class PredictPatternsResponse(BaseModel):
 
 
 # Forward references - imported at end to avoid circular imports
-from .domain import ChildIssueInfo, GitHubIssue, ProjectContext, Route  # noqa: E402
+from .domain import GitHubIssue, ProjectContext, Route  # noqa: E402
+from .queue import ChildIssueInfo  # noqa: E402
 from .workflow import AdwMonitorSummary, AdwWorkflowStatus, PatternPrediction, SimilarWorkflowSummary  # noqa: E402
 
 # Rebuild models with forward references

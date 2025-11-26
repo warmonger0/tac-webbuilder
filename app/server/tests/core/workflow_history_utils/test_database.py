@@ -16,8 +16,7 @@ Covers edge cases including:
 import json
 import logging
 import sqlite3
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -92,12 +91,50 @@ def mock_get_db_connection(mock_db_connection):
     ]
     mock_pragma_rows = [{"name": col} for col in pragma_columns]
 
-    # Set up fetchall to return column info when PRAGMA is called
-    mock_cursor.fetchall.return_value = mock_pragma_rows
+    # Create a smarter fetchall that handles both PRAGMA queries and test-specific data
+    # We'll use a callable side_effect that can be partially overridden by tests
+    class FetchallHandler:
+        def __init__(self):
+            self.test_data_queue = []
+            self.default_data = []
 
-    with patch('core.workflow_history_utils.database.get_db_connection') as mock_get_conn:
-        mock_get_conn.return_value = mock_conn
-        yield mock_get_conn, mock_conn, mock_cursor
+        def __call__(self):
+            # Check what the last execute was
+            if mock_cursor.execute.called:
+                last_call = str(mock_cursor.execute.call_args[0][0]) if mock_cursor.execute.call_args else ""
+                if "PRAGMA table_info" in last_call:
+                    return mock_pragma_rows
+
+            # If there's test-specific data queued, return it
+            if self.test_data_queue:
+                return self.test_data_queue.pop(0)
+
+            # Return default
+            return self.default_data
+
+    fetchall_handler = FetchallHandler()
+    mock_cursor.fetchall.side_effect = fetchall_handler
+    # Store handler so tests can queue data: mock_cursor.fetchall.side_effect.test_data_queue.append(data)
+    mock_cursor._fetchall_handler = fetchall_handler
+
+    # Patch all the places where get_connection is imported
+    patches = [
+        patch('core.workflow_history_utils.database.schema.get_db_connection'),
+        patch('core.workflow_history_utils.database.mutations.get_db_connection'),
+        patch('core.workflow_history_utils.database.queries.get_db_connection'),
+        patch('core.workflow_history_utils.database.analytics.get_db_connection'),
+    ]
+
+    mocks = [p.start() for p in patches]
+    for mock_get_conn in mocks:
+        # Configure the mock to be a context manager that returns mock_conn
+        mock_get_conn.return_value.__enter__ = Mock(return_value=mock_conn)
+        mock_get_conn.return_value.__exit__ = Mock(return_value=False)
+
+    yield mocks[0], mock_conn, mock_cursor
+
+    for p in patches:
+        p.stop()
 
 
 # ============================================================================
@@ -112,7 +149,7 @@ class TestInitDB:
         """Test that init_db creates the database directory if it doesn't exist."""
         mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
 
-        with patch('core.workflow_history_utils.database.DB_PATH') as mock_db_path:
+        with patch('core.workflow_history_utils.database.schema.DB_PATH') as mock_db_path:
             mock_parent = Mock()
             mock_db_path.parent = mock_parent
 
@@ -164,9 +201,10 @@ class TestInitDB:
         # Simulate column doesn't exist (raise OperationalError)
         mock_cursor.execute.side_effect = [
             None,  # CREATE TABLE
-            None, None, None, None, None, None,  # CREATE INDEX calls
-            sqlite3.OperationalError("no such column: gh_issue_state"),  # SELECT check
+            None, None, None, None, None, None,  # CREATE INDEX calls (6 indexes)
+            sqlite3.OperationalError("no such column: gh_issue_state"),  # SELECT check for gh_issue_state
             None,  # ALTER TABLE (add column)
+            None,  # SELECT for phantom records check
         ]
 
         init_db()
@@ -901,8 +939,8 @@ class TestGetWorkflowHistory:
             {"total": 50},  # Total count
         ]
 
-        # Mock paginated results
-        mock_cursor.fetchall.return_value = [
+        # Mock paginated results - queue data for the fetchall handler
+        mock_cursor.fetchall.side_effect.test_data_queue.append([
             {
                 "id": 1,
                 "adw_id": "test-001",
@@ -921,7 +959,7 @@ class TestGetWorkflowHistory:
                 "anomaly_flags": None,
                 "optimization_recommendations": None,
             }
-        ]
+        ])
 
         with caplog.at_level(logging.DEBUG):
             results, total_count = get_workflow_history()
@@ -1156,7 +1194,7 @@ class TestGetWorkflowHistory:
         mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
 
         mock_cursor.fetchone.return_value = {"total": 2}
-        mock_cursor.fetchall.return_value = [
+        mock_cursor.fetchall.side_effect.test_data_queue.append([
             {
                 "id": 1,
                 "adw_id": "test-001",
@@ -1193,7 +1231,7 @@ class TestGetWorkflowHistory:
                 "error_phase_distribution": None,
                 "optimization_recommendations": None,
             }
-        ]
+        ])
 
         results, total_count = get_workflow_history()
 
@@ -1372,7 +1410,7 @@ class TestGetHistoryAnalytics:
             [],
         ]
 
-        analytics = get_history_analytics()
+        get_history_analytics()
 
         # Verify query filters for completed status (3rd query executed)
         # Query execution order: 1. COUNT(*) 2. GROUP BY status 3. AVG(duration) for completed
@@ -1397,7 +1435,7 @@ class TestGetHistoryAnalytics:
             [],
         ]
 
-        analytics = get_history_analytics()
+        get_history_analytics()
 
         # Verify cost query filters (6th query executed)
         # Query order: 1.COUNT 2.status 3.duration 4.model 5.template 6.cost 7.tokens
@@ -1557,7 +1595,7 @@ class TestEdgeCasesAndErrorHandling:
             "nested": {"key": "value"}
         }
 
-        row_id = insert_workflow_history(
+        insert_workflow_history(
             adw_id="test-json-types",
             status="completed",
             structured_input=complex_data

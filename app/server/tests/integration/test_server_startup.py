@@ -16,7 +16,6 @@ This test suite ensures:
 3. Future PRs don't accidentally introduce absolute imports
 """
 
-import os
 import sys
 import subprocess
 from pathlib import Path

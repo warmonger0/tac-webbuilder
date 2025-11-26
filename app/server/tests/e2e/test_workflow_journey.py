@@ -159,7 +159,7 @@ class TestRealtimeUpdatesJourney:
         2. User starts a workflow
         3. User receives status updates in realtime
         """
-        client = full_stack_context["client"]
+        full_stack_context["client"]
         ws_manager = full_stack_context["websocket"]
 
         # Create mock WebSocket client

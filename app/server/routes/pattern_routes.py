@@ -5,17 +5,17 @@ Provides endpoints for real-time pattern prediction from natural language input.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
-from app.server.core.data_models import (
+from core.data_models import (
     PatternPrediction,
     PredictPatternsRequest,
     PredictPatternsResponse,
     SimilarWorkflowSummary,
 )
-from app.server.core.pattern_predictor import predict_patterns_from_input
-from app.server.core.workflow_history import get_workflow_history
-from app.server.core.workflow_analytics.similarity import calculate_text_similarity
+from core.pattern_predictor import predict_patterns_from_input
+from core.workflow_history import get_workflow_history
+from core.workflow_analytics.similarity import calculate_text_similarity
 
 logger = logging.getLogger(__name__)
 

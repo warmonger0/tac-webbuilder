@@ -10,18 +10,17 @@ Tests the complete flow of multi-phase workflow execution including:
 """
 
 import asyncio
-import json
 import os
 import sqlite3
 import tempfile
 from datetime import datetime
-from typing import Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from typing import Optional
+from unittest.mock import AsyncMock
 
 import pytest
 
 from services.phase_coordinator import PhaseCoordinator
-from services.phase_queue_service import PhaseQueueService, PhaseQueueItem
+from services.phase_queue_service import PhaseQueueService
 
 
 # ============================================================================

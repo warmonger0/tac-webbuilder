@@ -4,7 +4,6 @@ Unit tests for workflow_history.models module.
 Tests type definitions, enums, and dataclasses.
 """
 
-import pytest
 from core.workflow_history_utils.models import (
     WorkflowStatus,
     ErrorCategory,

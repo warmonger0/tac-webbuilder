@@ -4,8 +4,7 @@ Unit tests for workflow_history.github_client module.
 Tests GitHub API client functions.
 """
 
-import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from core.workflow_history_utils.github_client import fetch_github_issue_state
 from utils.process_runner import ProcessResult
 

@@ -209,7 +209,7 @@ class MultiPhaseIssueHandler:
 """
 
         # Add workflow command to trigger ADW automatically
-        phase_body += f"""
+        phase_body += """
 ---
 
 **Workflow:** adw_plan_iso with base model

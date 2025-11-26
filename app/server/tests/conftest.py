@@ -15,7 +15,6 @@ Fixtures provided:
 
 import os
 import sqlite3
-import sys
 import tempfile
 from pathlib import Path
 from typing import Generator

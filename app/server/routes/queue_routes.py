@@ -373,7 +373,7 @@ def init_queue_routes(phase_queue_service):
             )
 
             # Launch workflow in background
-            process = subprocess.Popen(
+            subprocess.Popen(
                 cmd,
                 cwd=repo_root,
                 start_new_session=True,
@@ -585,7 +585,7 @@ def init_webhook_routes(phase_queue_service, github_poster):
 
             if not os.path.exists(workflow_script):
                 logger.error(f"[WEBHOOK] Workflow script not found: {workflow_script}")
-                response.message += f". Next phase ready but workflow script not found"
+                response.message += ". Next phase ready but workflow script not found"
                 return response
 
             cmd = ["uv", "run", workflow_script, str(next_phase.issue_number), adw_id]
@@ -596,7 +596,7 @@ def init_webhook_routes(phase_queue_service, github_poster):
             )
 
             # Launch workflow in background
-            process = subprocess.Popen(
+            subprocess.Popen(
                 cmd,
                 cwd=repo_root,
                 start_new_session=True,

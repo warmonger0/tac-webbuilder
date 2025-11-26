@@ -9,11 +9,10 @@ Tests cover:
 - Error handling
 """
 
-import pytest
 from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
-from app.server.server import app
-from app.server.core.data_models import WorkflowHistoryResponse, WorkflowHistoryItem
+from server import app
+from core.data_models import WorkflowHistoryResponse, WorkflowHistoryItem
 
 
 client = TestClient(app)

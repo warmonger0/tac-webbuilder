@@ -16,7 +16,6 @@ Run from app/server/ directory:
 import sys
 import sqlite3
 from pathlib import Path
-from datetime import datetime
 
 
 def main():

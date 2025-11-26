@@ -13,9 +13,7 @@ Tests use real database operations with integration_test_db fixture.
 """
 
 import json
-import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -576,7 +574,7 @@ class TestWorkflowHistoryIntegration:
 
         # First, get baseline count
         response = integration_client.get("/api/workflow-history?limit=100")
-        baseline_count = response.json()["total_count"]
+        response.json()["total_count"]
 
         # Test 1: Get all workflows with analytics
         response = integration_client.get("/api/workflow-history?limit=20&offset=0")

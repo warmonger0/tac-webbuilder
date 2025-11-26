@@ -393,7 +393,7 @@ class HealthService:
             else:
                 # Fallback: try to access webhook endpoint
                 try:
-                    with urllib.request.urlopen("https://webhook.directmyagent.com/health", timeout=3) as response:
+                    with urllib.request.urlopen("https://webhook.directmyagent.com/health", timeout=3):
                         return ServiceHealth(
                             name="GitHub Webhook",
                             status="healthy",

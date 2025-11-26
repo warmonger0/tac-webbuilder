@@ -4,8 +4,6 @@ Unit tests for workflow_history.metrics module.
 Tests metric calculation functions.
 """
 
-import pytest
-from datetime import datetime, timezone
 from core.workflow_history_utils.metrics import (
     calculate_phase_metrics,
     categorize_error,

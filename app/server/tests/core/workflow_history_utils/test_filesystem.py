@@ -14,7 +14,7 @@ Covers edge cases including:
 import json
 import logging
 from pathlib import Path
-from unittest.mock import Mock, mock_open, patch
+from unittest.mock import Mock, patch
 
 import pytest
 

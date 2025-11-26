@@ -10,7 +10,6 @@ mocked external dependencies (GitHub API, OpenAI/Anthropic APIs).
 """
 
 import asyncio
-import json
 import os
 import sqlite3
 import subprocess
