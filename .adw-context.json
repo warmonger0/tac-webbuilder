@@ -1,12 +1,19 @@
 {
   "adw_id": "adw-fb7aff61",
   "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/adw-fb7aff61",
-  "created_at": "2025-11-25T20:14:02.546185",
+  "created_at": "2025-11-25T20:16:55.197520",
   "spec_file": "/Users/Warmonger0/tac/tac-webbuilder/trees/adw-fb7aff61/specs/issue-114-adw-adw-fb7aff61-sdlc_planner-phase-1-complete-submission-time-pattern-detection.md",
   "changed_files": [
     ".adw-context.json",
     ".claude/commands/e2e/test_pattern_prediction_ui.md",
     ".mcp.json",
+    ".playwright-mcp/01_initial_state.png",
+    ".playwright-mcp/02_test_input_entered.png",
+    ".playwright-mcp/03_preview_with_patterns.png",
+    ".playwright-mcp/03_preview_without_patterns.png",
+    ".playwright-mcp/review_01_initial_state.png",
+    ".playwright-mcp/review_02_test_input_entered.png",
+    ".playwright-mcp/review_03_confirmation_dialog_with_patterns.png",
     "app/client/src/components/ConfirmDialog.tsx",
     "app/client/src/components/RequestForm.tsx",
     "app/server/core/adw_monitor.py",
@@ -100,9 +107,430 @@
     "app/server/tests/utils/test_process_runner.py",
     "app/server/utils/llm_client.py",
     "app/server/utils/process_runner.py",
-    "docs/pattern_recognition/PHASE_1_IMPLEMENTATION_VERIFICATION.md"
+    "docs/pattern_recognition/PHASE_1_IMPLEMENTATION_VERIFICATION.md",
+    "specs/patch/patch-adw-fb7aff61-predicted-patterns-dialog-display.md"
   ],
-  "review_image_dir": "/Users/Warmonger0/tac/tac-webbuilder/trees/adw-fb7aff61/agents/adw-fb7aff61/reviewer/review_img",
-  "backend_port": 9113,
-  "frontend_port": 9213
+  "changed_files_stats": {
+    ".adw-context.json": {
+      "additions": 102,
+      "deletions": 10
+    },
+    ".claude/commands/e2e/test_pattern_prediction_ui.md": {
+      "additions": 124,
+      "deletions": 0
+    },
+    ".mcp.json": {
+      "additions": 1,
+      "deletions": 1
+    },
+    ".playwright-mcp/01_initial_state.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    ".playwright-mcp/02_test_input_entered.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    ".playwright-mcp/03_preview_with_patterns.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    ".playwright-mcp/03_preview_without_patterns.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    ".playwright-mcp/review_01_initial_state.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    ".playwright-mcp/review_02_test_input_entered.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    ".playwright-mcp/review_03_confirmation_dialog_with_patterns.png": {
+      "additions": 0,
+      "deletions": 0
+    },
+    "app/client/src/components/ConfirmDialog.tsx": {
+      "additions": 24,
+      "deletions": 1
+    },
+    "app/client/src/components/RequestForm.tsx": {
+      "additions": 29,
+      "deletions": 2
+    },
+    "app/server/core/adw_monitor.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/core/data_models.py": {
+      "additions": 27,
+      "deletions": 27
+    },
+    "app/server/core/file_processor.py": {
+      "additions": 7,
+      "deletions": 7
+    },
+    "app/server/core/github_poster.py": {
+      "additions": 3,
+      "deletions": 3
+    },
+    "app/server/core/health_checks.py": {
+      "additions": 9,
+      "deletions": 10
+    },
+    "app/server/core/input_analyzer.py": {
+      "additions": 4,
+      "deletions": 4
+    },
+    "app/server/core/issue_formatter.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/core/llm_processor.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/models/__init__.py": {
+      "additions": 5,
+      "deletions": 3
+    },
+    "app/server/core/models/domain.py": {
+      "additions": 0,
+      "deletions": 1
+    },
+    "app/server/core/models/queue.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/core/models/requests.py": {
+      "additions": 2,
+      "deletions": 0
+    },
+    "app/server/core/models/responses.py": {
+      "additions": 2,
+      "deletions": 1
+    },
+    "app/server/core/nl_processor.py": {
+      "additions": 3,
+      "deletions": 3
+    },
+    "app/server/core/pattern_logging.py": {
+      "additions": 238,
+      "deletions": 0
+    },
+    "app/server/core/pattern_matcher.py": {
+      "additions": 6,
+      "deletions": 7
+    },
+    "app/server/core/pattern_predictor.py": {
+      "additions": 78,
+      "deletions": 40
+    },
+    "app/server/core/pattern_signatures.py": {
+      "additions": 2,
+      "deletions": 3
+    },
+    "app/server/core/preflight_checks.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/core/routes_analyzer.py": {
+      "additions": 15,
+      "deletions": 18
+    },
+    "app/server/core/workflow_analytics/__init__.py": {
+      "additions": 8,
+      "deletions": 9
+    },
+    "app/server/core/workflow_analytics/recommendations.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/workflow_analytics/scoring/__init__.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/core/workflow_analytics/scoring/cost_efficiency_scorer.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/workflow_analytics/similarity.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/workflow_history.py": {
+      "additions": 6,
+      "deletions": 6
+    },
+    "app/server/core/workflow_history_utils/database/__init__.py": {
+      "additions": 4,
+      "deletions": 5
+    },
+    "app/server/core/workflow_history_utils/database/analytics.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/workflow_history_utils/database/mutations.py": {
+      "additions": 13,
+      "deletions": 12
+    },
+    "app/server/core/workflow_history_utils/database/queries.py": {
+      "additions": 1,
+      "deletions": 0
+    },
+    "app/server/core/workflow_history_utils/database_old.py": {
+      "additions": 4,
+      "deletions": 4
+    },
+    "app/server/core/workflow_history_utils/enrichment.py": {
+      "additions": 4,
+      "deletions": 6
+    },
+    "app/server/core/workflow_history_utils/github_client.py": {
+      "additions": 1,
+      "deletions": 2
+    },
+    "app/server/core/workflow_history_utils/metrics.py": {
+      "additions": 0,
+      "deletions": 1
+    },
+    "app/server/core/workflow_history_utils/models.py": {
+      "additions": 8,
+      "deletions": 9
+    },
+    "app/server/core/workflow_history_utils/sync_manager.py": {
+      "additions": 4,
+      "deletions": 3
+    },
+    "app/server/models/phase_queue_item.py": {
+      "additions": 10,
+      "deletions": 10
+    },
+    "app/server/pyproject.toml": {
+      "additions": 4,
+      "deletions": 0
+    },
+    "app/server/repositories/phase_queue_repository.py": {
+      "additions": 5,
+      "deletions": 6
+    },
+    "app/server/routes/data_routes.py": {
+      "additions": 3,
+      "deletions": 3
+    },
+    "app/server/routes/issue_completion_routes.py": {
+      "additions": 6,
+      "deletions": 8
+    },
+    "app/server/routes/queue_routes.py": {
+      "additions": 13,
+      "deletions": 14
+    },
+    "app/server/routes/workflow_routes.py": {
+      "additions": 4,
+      "deletions": 4
+    },
+    "app/server/scripts/fix_phantom_records.py": {
+      "additions": 1,
+      "deletions": 2
+    },
+    "app/server/server.py": {
+      "additions": 10,
+      "deletions": 2
+    },
+    "app/server/services/github_issue_service.py": {
+      "additions": 18,
+      "deletions": 19
+    },
+    "app/server/services/health_service.py": {
+      "additions": 2,
+      "deletions": 2
+    },
+    "app/server/services/issue_linking_service.py": {
+      "additions": 1,
+      "deletions": 2
+    },
+    "app/server/services/multi_phase_issue_handler.py": {
+      "additions": 8,
+      "deletions": 15
+    },
+    "app/server/services/phase_coordination/phase_coordinator.py": {
+      "additions": 11,
+      "deletions": 11
+    },
+    "app/server/services/phase_coordination/phase_github_notifier.py": {
+      "additions": 4,
+      "deletions": 4
+    },
+    "app/server/services/phase_coordination/workflow_completion_detector.py": {
+      "additions": 2,
+      "deletions": 3
+    },
+    "app/server/services/phase_dependency_tracker.py": {
+      "additions": 2,
+      "deletions": 3
+    },
+    "app/server/services/phase_queue_service.py": {
+      "additions": 10,
+      "deletions": 9
+    },
+    "app/server/services/workflow_service.py": {
+      "additions": 3,
+      "deletions": 4
+    },
+    "app/server/tests/conftest.py": {
+      "additions": 4,
+      "deletions": 6
+    },
+    "app/server/tests/core/test_adw_monitor.py": {
+      "additions": 1,
+      "deletions": 3
+    },
+    "app/server/tests/core/test_llm_processor.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/tests/core/workflow_history_utils/test_database.py": {
+      "additions": 4,
+      "deletions": 7
+    },
+    "app/server/tests/core/workflow_history_utils/test_enrichment.py": {
+      "additions": 1,
+      "deletions": 3
+    },
+    "app/server/tests/core/workflow_history_utils/test_filesystem.py": {
+      "additions": 1,
+      "deletions": 2
+    },
+    "app/server/tests/core/workflow_history_utils/test_github_client.py": {
+      "additions": 2,
+      "deletions": 2
+    },
+    "app/server/tests/core/workflow_history_utils/test_metrics.py": {
+      "additions": 1,
+      "deletions": 3
+    },
+    "app/server/tests/core/workflow_history_utils/test_models.py": {
+      "additions": 7,
+      "deletions": 8
+    },
+    "app/server/tests/e2e/conftest.py": {
+      "additions": 4,
+      "deletions": 11
+    },
+    "app/server/tests/e2e/test_github_issue_flow.py": {
+      "additions": 12,
+      "deletions": 14
+    },
+    "app/server/tests/e2e/test_multi_phase_execution.py": {
+      "additions": 5,
+      "deletions": 9
+    },
+    "app/server/tests/e2e/test_workflow_journey.py": {
+      "additions": 3,
+      "deletions": 2
+    },
+    "app/server/tests/integration/conftest.py": {
+      "additions": 5,
+      "deletions": 7
+    },
+    "app/server/tests/integration/test_adw_monitor_endpoint.py": {
+      "additions": 0,
+      "deletions": 3
+    },
+    "app/server/tests/integration/test_api_contracts.py": {
+      "additions": 3,
+      "deletions": 3
+    },
+    "app/server/tests/integration/test_database_operations.py": {
+      "additions": 13,
+      "deletions": 18
+    },
+    "app/server/tests/integration/test_file_query_pipeline.py": {
+      "additions": 24,
+      "deletions": 10
+    },
+    "app/server/tests/integration/test_server_startup.py": {
+      "additions": 2,
+      "deletions": 3
+    },
+    "app/server/tests/integration/test_workflow_history_integration.py": {
+      "additions": 1,
+      "deletions": 4
+    },
+    "app/server/tests/manual/analyze_pattern_logs.py": {
+      "additions": 225,
+      "deletions": 0
+    },
+    "app/server/tests/manual/batch_process_patterns.py": {
+      "additions": 1,
+      "deletions": 1
+    },
+    "app/server/tests/manual/query_pattern_stats.py": {
+      "additions": 1,
+      "deletions": 2
+    },
+    "app/server/tests/manual/test_existing_pattern_detection.py": {
+      "additions": 3,
+      "deletions": 3
+    },
+    "app/server/tests/manual/test_pattern_prediction.py": {
+      "additions": 155,
+      "deletions": 0
+    },
+    "app/server/tests/regression/__init__.py": {
+      "additions": 1,
+      "deletions": 5
+    },
+    "app/server/tests/regression/conftest.py": {
+      "additions": 3,
+      "deletions": 2
+    },
+    "app/server/tests/regression/test_regression_suite.py": {
+      "additions": 4,
+      "deletions": 6
+    },
+    "app/server/tests/services/test_health_service.py": {
+      "additions": 2,
+      "deletions": 2
+    },
+    "app/server/tests/services/test_phase_coordinator.py": {
+      "additions": 3,
+      "deletions": 6
+    },
+    "app/server/tests/services/test_phase_queue_service.py": {
+      "additions": 7,
+      "deletions": 10
+    },
+    "app/server/tests/test_workflow_analytics.py": {
+      "additions": 4,
+      "deletions": 4
+    },
+    "app/server/tests/test_workflow_history.py": {
+      "additions": 29,
+      "deletions": 29
+    },
+    "app/server/tests/utils/test_process_runner.py": {
+      "additions": 66,
+      "deletions": 66
+    },
+    "app/server/utils/llm_client.py": {
+      "additions": 6,
+      "deletions": 9
+    },
+    "app/server/utils/process_runner.py": {
+      "additions": 6,
+      "deletions": 7
+    },
+    "docs/pattern_recognition/PHASE_1_IMPLEMENTATION_VERIFICATION.md": {
+      "additions": 374,
+      "deletions": 0
+    },
+    "specs/patch/patch-adw-fb7aff61-predicted-patterns-dialog-display.md": {
+      "additions": 68,
+      "deletions": 0
+    }
+  },
+  "documentation_screenshots_dir": "/Users/Warmonger0/tac/tac-webbuilder/trees/adw-fb7aff61/agents/adw-fb7aff61/reviewer/review_img"
 }

@@ -223,6 +223,17 @@
     - Understanding temporal analytics columns (hour_of_day, day_of_week)
     - Fixing schema mismatches between Python models and database tables
 
+### Pattern Recognition Features
+- `app_docs/feature-adw-fb7aff61-pattern-detection-logging.md` - Pattern recognition Phase 1 implementation, structured logging infrastructure, pattern prediction at submission time, frontend pattern display
+  - Conditions:
+    - Working with pattern recognition or prediction systems
+    - Implementing or troubleshooting pattern_logging.py or pattern_predictor.py
+    - Understanding pattern_predictions database schema
+    - Adding pattern detection to new workflow types
+    - Troubleshooting pattern prediction accuracy
+    - Working with ConfirmDialog or RequestForm pattern display components
+    - Analyzing pattern recognition logs or performance metrics
+
 ### Templates & Integration Features
 - `app_docs/feature-0f04f66d-project-templates-docs.md` - Project templates, scaffolding scripts, setup_new_project.sh
 - `templates/existing_webapp/integration_guide.md` - Integrating ADW into existing projects
