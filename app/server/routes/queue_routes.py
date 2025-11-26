@@ -7,7 +7,7 @@ import subprocess
 from typing import List
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from core.nl_processor import suggest_adw_workflow
 
 logger = logging.getLogger(__name__)
@@ -105,10 +105,66 @@ class QueueListResponse(BaseModel):
 
 class EnqueueRequest(BaseModel):
     """Request to enqueue a phase"""
-    parent_issue: int = Field(..., description="Parent GitHub issue number")
-    phase_number: int = Field(..., description="Phase number")
-    phase_data: dict = Field(..., description="Phase metadata {title, content, externalDocs}")
-    depends_on_phase: int | None = Field(None, description="Phase number this depends on")
+    parent_issue: int = Field(
+        ge=0,
+        description="Parent GitHub issue number (0 for hopper workflows)"
+    )
+    phase_number: int = Field(
+        ge=1,
+        le=20,
+        description="Phase number (1-20, typically 1-10)"
+    )
+    phase_data: dict = Field(
+        description="Phase metadata {title, content, externalDocs, workflow_type, adw_id}"
+    )
+    depends_on_phase: int | None = Field(
+        default=None,
+        ge=1,
+        description="Phase number this phase depends on"
+    )
+
+    @field_validator('phase_data')
+    @classmethod
+    def validate_phase_data(cls, v: dict) -> dict:
+        """Validate phase_data contains required fields."""
+        required_fields = ['workflow_type', 'adw_id']
+        missing_fields = [field for field in required_fields if field not in v]
+
+        if missing_fields:
+            raise ValueError(
+                f"phase_data missing required fields: {', '.join(missing_fields)}. "
+                f"Required: {required_fields}"
+            )
+
+        # Validate workflow_type is a string
+        if not isinstance(v.get('workflow_type'), str):
+            raise ValueError("phase_data.workflow_type must be a string")
+
+        # Validate adw_id is a string
+        if not isinstance(v.get('adw_id'), str):
+            raise ValueError("phase_data.adw_id must be a string")
+
+        # Validate workflow_type is not empty
+        if not v['workflow_type'].strip():
+            raise ValueError("phase_data.workflow_type cannot be empty")
+
+        # Validate adw_id is not empty
+        if not v['adw_id'].strip():
+            raise ValueError("phase_data.adw_id cannot be empty")
+
+        return v
+
+    @field_validator('depends_on_phase')
+    @classmethod
+    def validate_depends_on_phase(cls, v: int | None, info) -> int | None:
+        """Ensure depends_on_phase is less than phase_number."""
+        if v is not None and 'phase_number' in info.data:
+            phase_number = info.data['phase_number']
+            if v >= phase_number:
+                raise ValueError(
+                    f"depends_on_phase ({v}) must be less than phase_number ({phase_number})"
+                )
+        return v
 
 
 class EnqueueResponse(BaseModel):
