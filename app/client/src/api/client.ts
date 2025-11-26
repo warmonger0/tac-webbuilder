@@ -1,454 +1,133 @@
-import type {
-  ConfirmResponse,
-  CostEstimate,
-  CostResponse,
-  DatabaseSchemaResponse,
-  FileUploadResponse,
-  GitHubIssue,
-  HistoryFilters,
-  HistoryItem,
-  QueryRequest,
-  QueryResponse,
-  RandomQueryResponse,
-  RoutesResponse,
-  SubmitRequestData,
-  SubmitRequestResponse,
-  WorkflowExecution,
-  WorkflowHistoryItem,
-  WorkflowHistoryResponse,
-} from '../types';
+/**
+ * Barrel export for all API clients.
+ *
+ * This file re-exports all domain-specific API clients for easy importing.
+ * Components can import from this file to maintain backward compatibility
+ * or import from specific domain clients for better organization.
+ *
+ * Domain clients:
+ * - baseClient: Shared utilities (API_BASE, fetchJSON)
+ * - githubClient: GitHub issue workflow operations
+ * - workflowClient: ADW workflow execution and history
+ * - sqlClient: SQL queries, schema, and data export
+ * - queueClient: Phase queue and ADW monitoring
+ * - systemClient: System status and service management
+ *
+ * @example
+ * // Import specific functions (backward compatible)
+ * import { submitRequest, getPreview } from '@/api/client';
+ *
+ * @example
+ * // Import client namespace for better organization
+ * import { githubClient } from '@/api/client';
+ * githubClient.submitRequest(data);
+ *
+ * @example
+ * // Import from specific domain client
+ * import { githubClient } from '@/api/githubClient';
+ */
 
-const API_BASE = '/api/v1';
+// ============================================================================
+// Base Client - Shared utilities
+// ============================================================================
+export * from './baseClient';
 
-async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
+// ============================================================================
+// GitHub Client - Issue workflow operations
+// ============================================================================
+export * from './githubClient';
+export { githubClient } from './githubClient';
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`API Error: ${response.status} ${error}`);
-  }
+// ============================================================================
+// Workflow Client - ADW workflow execution and history
+// ============================================================================
+export * from './workflowClient';
+export { workflowClient } from './workflowClient';
 
-  return response.json();
-}
+// ============================================================================
+// SQL Client - Database queries and data operations
+// ============================================================================
+export * from './sqlClient';
+export { sqlClient } from './sqlClient';
 
-export async function submitRequest(
-  data: SubmitRequestData
-): Promise<SubmitRequestResponse> {
-  return fetchJSON<SubmitRequestResponse>(`${API_BASE}/request`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
+// ============================================================================
+// Queue Client - Phase queue and ADW monitoring
+// ============================================================================
+export * from './queueClient';
+export { queueClient } from './queueClient';
 
-export async function getPreview(request_id: string): Promise<GitHubIssue> {
-  return fetchJSON<GitHubIssue>(`${API_BASE}/preview/${request_id}`);
-}
+// ============================================================================
+// System Client - System status and services
+// ============================================================================
+export * from './systemClient';
+export { systemClient } from './systemClient';
 
-export async function getCostEstimate(request_id: string): Promise<CostEstimate> {
-  return fetchJSON<CostEstimate>(`${API_BASE}/preview/${request_id}/cost`);
-}
-
-export async function confirmAndPost(
-  request_id: string
-): Promise<ConfirmResponse> {
-  return fetchJSON<ConfirmResponse>(`${API_BASE}/confirm/${request_id}`, {
-    method: 'POST',
-  });
-}
-
-export async function listWorkflows(): Promise<WorkflowExecution[]> {
-  return fetchJSON<WorkflowExecution[]>(`${API_BASE}/workflows`);
-}
-
-export async function getHistory(limit: number = 20): Promise<HistoryItem[]> {
-  return fetchJSON<HistoryItem[]>(`${API_BASE}/history?limit=${limit}`);
-}
-
-export async function getWorkflowHistory(
-  filters?: HistoryFilters
-): Promise<WorkflowHistoryResponse> {
-  const params = new URLSearchParams();
-  if (filters) {
-    if (filters.limit) params.append('limit', filters.limit.toString());
-    if (filters.offset) params.append('offset', filters.offset.toString());
-    if (filters.status) params.append('status', filters.status);
-    if (filters.model) params.append('model', filters.model);
-    if (filters.template) params.append('template', filters.template);
-    if (filters.start_date) params.append('start_date', filters.start_date);
-    if (filters.end_date) params.append('end_date', filters.end_date);
-    if (filters.search) params.append('search', filters.search);
-    if (filters.sort_by) params.append('sort_by', filters.sort_by);
-    if (filters.sort_order) params.append('sort_order', filters.sort_order);
-  }
-  const url = params.toString()
-    ? `${API_BASE}/workflow-history?${params.toString()}`
-    : `${API_BASE}/workflow-history`;
-  return fetchJSON<WorkflowHistoryResponse>(url);
-}
-
-export async function fetchWorkflowsBatch(
-  workflowIds: string[]
-): Promise<WorkflowHistoryItem[]> {
-  /**
-   * Fetch multiple workflows by ADW IDs in a single request.
-   *
-   * This is optimized for Phase 3E's similar workflows feature.
-   * Instead of making N separate requests, this batches them into one.
-   *
-   * @param workflowIds - Array of ADW IDs to fetch (max 20)
-   * @returns Array of workflow history items
-   * @throws Error if request fails or more than 20 IDs provided
-   */
-  const response = await fetch(`${API_BASE}/workflows/batch`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(workflowIds),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch workflows: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-export async function getRoutes(): Promise<RoutesResponse> {
-  return fetchJSON<RoutesResponse>(`${API_BASE}/routes`);
-}
-
-export async function fetchWorkflowCosts(adwId: string): Promise<CostResponse> {
-  return fetchJSON<CostResponse>(`${API_BASE}/workflows/${adwId}/costs`);
-}
-
-export async function processQuery(data: QueryRequest): Promise<QueryResponse> {
-  return fetchJSON<QueryResponse>(`${API_BASE}/query`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
-
-export async function generateRandomQuery(): Promise<RandomQueryResponse> {
-  return fetchJSON<RandomQueryResponse>(`${API_BASE}/random-query`);
-}
-
-export async function uploadFile(file: File): Promise<FileUploadResponse> {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await fetch(`${API_BASE}/upload`, {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`API Error: ${response.status} ${error}`);
-  }
-
-  return response.json();
-}
-
-export async function getSchema(): Promise<DatabaseSchemaResponse> {
-  return fetchJSON<DatabaseSchemaResponse>(`${API_BASE}/schema`);
-}
-
-export async function exportQueryResults(results: Record<string, any>[], columns: string[]): Promise<void> {
-  // Convert results to CSV
-  const csv = [
-    columns.join(','),
-    ...results.map(row => columns.map(col => {
-      const value = row[col];
-      // Escape values that contain commas or quotes
-      if (value === null || value === undefined) return '';
-      const stringValue = String(value);
-      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-        return `"${stringValue.replace(/"/g, '""')}"`;
-      }
-      return stringValue;
-    }).join(','))
-  ].join('\n');
-
-  // Download file
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `query-results-${new Date().toISOString()}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-export async function exportTable(tableName: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/export/${tableName}`);
-
-  if (!response.ok) {
-    throw new Error('Failed to export table');
-  }
-
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${tableName}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-export async function getWebhookStatus(): Promise<any> {
-  // Try to fetch from webhook service directly
-  try {
-    const response = await fetch('http://localhost:8001/webhook-status');
-    if (response.ok) {
-      return response.json();
-    }
-  } catch {
-    // Fallback to backend proxy if direct access fails
-  }
-
-  // Fallback to backend API proxy
-  return fetchJSON<any>(`${API_BASE}/webhook-status`);
-}
-
-export async function getSystemStatus(): Promise<any> {
-  return fetchJSON<any>(`${API_BASE}/system-status`);
-}
-
-export async function startWebhookService(): Promise<any> {
-  const response = await fetch(`${API_BASE}/services/webhook/start`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to start webhook service: ${response.statusText}`);
-  }
-  return response.json();
-}
-
-export async function restartCloudflare(): Promise<any> {
-  const response = await fetch(`${API_BASE}/services/cloudflare/restart`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to restart Cloudflare: ${response.statusText}`);
-  }
-  return response.json();
-}
-
-export async function getGitHubWebhookHealth(): Promise<any> {
-  return fetchJSON<any>(`${API_BASE}/services/github-webhook/health`);
-}
-
-export async function redeliverGitHubWebhook(): Promise<any> {
-  const response = await fetch(`${API_BASE}/services/github-webhook/redeliver`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to redeliver webhook: ${response.statusText}`);
-  }
-  return response.json();
-}
-
-// Phase Queue API Functions
-export interface PhaseQueueItem {
-  queue_id: string;
-  parent_issue: number;
-  phase_number: number;
-  issue_number?: number;
-  status: 'queued' | 'ready' | 'running' | 'completed' | 'blocked' | 'failed';
-  depends_on_phase?: number;
-  phase_data: {
-    title: string;
-    content: string;
-    externalDocs?: string[];
-  };
-  created_at: string;
-  updated_at: string;
-  error_message?: string;
-  adw_id?: string;
-  pr_number?: number;
-}
-
-export interface QueueListResponse {
-  phases: PhaseQueueItem[];
-  total: number;
-}
-
-export async function getQueueAll(): Promise<QueueListResponse> {
-  return fetchJSON<QueueListResponse>(`${API_BASE}/queue`);
-}
-
-export async function getQueueByParent(parentIssue: number): Promise<QueueListResponse> {
-  return fetchJSON<QueueListResponse>(`${API_BASE}/queue/${parentIssue}`);
-}
-
-export interface QueueConfigResponse {
-  paused: boolean;
-}
-
-export async function getQueueConfig(): Promise<QueueConfigResponse> {
-  return fetchJSON<QueueConfigResponse>(`${API_BASE}/queue/config`);
-}
-
-export async function setQueuePaused(paused: boolean): Promise<QueueConfigResponse> {
-  return fetchJSON<QueueConfigResponse>(`${API_BASE}/queue/config/pause`, {
-    method: 'POST',
-    body: JSON.stringify({ paused }),
-  });
-}
-
-export async function dequeuePhase(queueId: string): Promise<{ success: boolean; message: string }> {
-  return fetchJSON<{ success: boolean; message: string }>(`${API_BASE}/queue/${queueId}`, {
-    method: 'DELETE'
-  });
-}
-
-export interface ExecutePhaseResponse {
-  success: boolean;
-  message: string;
-  issue_number?: number;
-  adw_id?: string;
-}
-
-export async function executePhase(queueId: string): Promise<ExecutePhaseResponse> {
-  return fetchJSON<ExecutePhaseResponse>(`${API_BASE}/queue/${queueId}/execute`, {
-    method: 'POST'
-  });
-}
-
-// ADW Monitor API Functions
-export interface AdwWorkflowStatus {
-  adw_id: string;
-  issue_number: number | null;
-  pr_number: number | null;
-  issue_class: string;
-  title: string;
-  status: 'running' | 'completed' | 'failed' | 'paused' | 'queued';
-  current_phase: string | null;
-  phase_progress: number;
-  workflow_template: string;
-  start_time: string | null;
-  end_time: string | null;
-  duration_seconds: number | null;
-  github_url: string | null;
-  worktree_path: string | null;
-  current_cost: number | null;
-  estimated_cost_total: number | null;
-  error_count: number;
-  last_error: string | null;
-  is_process_active: boolean;
-  phases_completed: string[];
-}
-
-export interface AdwMonitorSummary {
-  total: number;
-  running: number;
-  completed: number;
-  failed: number;
-  paused: number;
-}
-
-export interface AdwMonitorResponse {
-  summary: AdwMonitorSummary;
-  workflows: AdwWorkflowStatus[];
-  last_updated: string;
-}
-
-export async function getAdwMonitor(): Promise<AdwMonitorResponse> {
-  return fetchJSON<AdwMonitorResponse>(`${API_BASE}/adw-monitor`);
-}
-
-// ADW Health Check Types
-export interface PortHealthCheck {
-  status: 'ok' | 'warning' | 'critical';
-  backend_port: number | null;
-  frontend_port: number | null;
-  available: boolean;
-  in_use: boolean;
-  conflicts: any[];
-  warnings: string[];
-}
-
-export interface WorktreeHealthCheck {
-  status: 'ok' | 'warning' | 'critical';
-  path: string | null;
-  exists: boolean;
-  clean: boolean;
-  uncommitted_files: string[];
-  git_registered: boolean;
-  warnings: string[];
-}
-
-export interface StateFileHealthCheck {
-  status: 'ok' | 'warning' | 'critical';
-  path: string;
-  exists: boolean;
-  valid: boolean;
-  last_modified: string | null;
-  age_seconds: number | null;
-  warnings: string[];
-}
-
-export interface ProcessHealthCheck {
-  status: 'ok' | 'warning' | 'critical';
-  active: boolean;
-  processes: any[];
-  warnings: string[];
-}
-
-export interface AdwHealthCheckResponse {
-  adw_id: string;
-  overall_health: 'ok' | 'warning' | 'critical';
-  checks: {
-    ports: PortHealthCheck;
-    worktree: WorktreeHealthCheck;
-    state_file: StateFileHealthCheck;
-    process: ProcessHealthCheck;
-  };
-  warnings: string[];
-  checked_at: string;
-}
-
-export async function getAdwHealth(adwId: string): Promise<AdwHealthCheckResponse> {
-  return fetchJSON<AdwHealthCheckResponse>(`${API_BASE}/adw-monitor/${adwId}/health`);
-}
-
-// Export as namespace object for compatibility with existing code
-export const api = {
+// ============================================================================
+// Legacy API namespace export for backward compatibility
+// ============================================================================
+import {
   submitRequest,
   getPreview,
   getCostEstimate,
   confirmAndPost,
+} from './githubClient';
+import {
   listWorkflows,
   getHistory,
   getWorkflowHistory,
-  getRoutes,
   fetchWorkflowCosts,
+} from './workflowClient';
+import {
   processQuery,
   generateRandomQuery,
   uploadFile,
   getSchema,
   exportQueryResults,
   exportTable,
-  getWebhookStatus,
-  getSystemStatus,
+} from './sqlClient';
+import {
   getQueueAll,
   getQueueByParent,
   dequeuePhase,
   executePhase,
   getAdwMonitor,
   getAdwHealth,
+} from './queueClient';
+import { getRoutes, getWebhookStatus, getSystemStatus } from './systemClient';
+
+/**
+ * Legacy API namespace object for components that use:
+ * import { api } from '@/api/client';
+ * api.submitRequest(...)
+ */
+export const api = {
+  // GitHub operations
+  submitRequest,
+  getPreview,
+  getCostEstimate,
+  confirmAndPost,
+  // Workflow operations
+  listWorkflows,
+  getHistory,
+  getWorkflowHistory,
+  fetchWorkflowCosts,
+  // SQL operations
+  processQuery,
+  generateRandomQuery,
+  uploadFile,
+  getSchema,
+  exportQueryResults,
+  exportTable,
+  // Queue operations
+  getQueueAll,
+  getQueueByParent,
+  dequeuePhase,
+  executePhase,
+  // ADW Monitor operations
+  getAdwMonitor,
+  getAdwHealth,
+  // System operations
+  getRoutes,
+  getWebhookStatus,
+  getSystemStatus,
 };
