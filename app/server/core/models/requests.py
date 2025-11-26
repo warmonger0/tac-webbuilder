@@ -81,6 +81,12 @@ class ResyncRequest(BaseModel):
     force: bool = Field(False, description="Clear existing cost data before resync")
 
 
+# Pattern Prediction Models
+class PredictPatternsRequest(BaseModel):
+    nl_input: str = Field(..., description="Natural language input for pattern prediction")
+    project_path: str | None = Field(None, description="Optional project path for context")
+
+
 # Forward references - imported at end to avoid circular imports
 from .queue import Phase  # noqa: E402
 SubmitRequestData.model_rebuild()

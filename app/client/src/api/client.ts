@@ -7,6 +7,8 @@ import type {
   GitHubIssue,
   HistoryFilters,
   HistoryItem,
+  PredictPatternsRequest,
+  PredictPatternsResponse,
   QueryRequest,
   QueryResponse,
   RandomQueryResponse,
@@ -60,6 +62,41 @@ export async function confirmAndPost(
   return fetchJSON<ConfirmResponse>(`${API_BASE}/confirm/${request_id}`, {
     method: 'POST',
   });
+}
+
+export async function predictPatterns(
+  nlInput: string,
+  projectPath?: string
+): Promise<PredictPatternsResponse> {
+  try {
+    const requestData: PredictPatternsRequest = {
+      nl_input: nlInput,
+      project_path: projectPath,
+    };
+
+    const response = await fetch(`${API_BASE}/predict-patterns`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    });
+
+    if (!response.ok) {
+      throw new Error(`Pattern prediction failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    // Return error in response format rather than throwing
+    return {
+      predictions: [],
+      similar_workflows: [],
+      recommendations: [],
+      error: error instanceof Error ? error.message : 'Failed to predict patterns',
+    };
+  }
 }
 
 export async function listWorkflows(): Promise<WorkflowExecution[]> {

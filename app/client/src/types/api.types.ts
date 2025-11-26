@@ -371,3 +371,31 @@ export interface RequestFormPersistedState {
   autoPost: boolean;
   timestamp: string;
 }
+
+// Pattern Prediction Types
+export interface PatternPrediction {
+  pattern: string;
+  confidence: number;
+  reasoning: string;
+}
+
+export interface SimilarWorkflowSummary {
+  adw_id: string;
+  nl_input: string;
+  similarity_score: number;
+  clarity_score: number | null;
+  total_cost: number | null;
+  status: string;
+}
+
+export interface PredictPatternsRequest {
+  nl_input: string;
+  project_path?: string;
+}
+
+export interface PredictPatternsResponse {
+  predictions: PatternPrediction[];
+  similar_workflows: SimilarWorkflowSummary[];
+  recommendations: string[];
+  error?: string;
+}

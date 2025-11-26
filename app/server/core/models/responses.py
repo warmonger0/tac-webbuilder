@@ -133,12 +133,21 @@ class AdwMonitorResponse(BaseModel):
     last_updated: str = Field(..., description="Last update timestamp (ISO format)")
 
 
+# Pattern Prediction Models
+class PredictPatternsResponse(BaseModel):
+    predictions: list["PatternPrediction"] = Field(default_factory=list, description="Predicted patterns with confidence scores")  # Forward ref
+    similar_workflows: list["SimilarWorkflowSummary"] = Field(default_factory=list, description="Similar historical workflows")  # Forward ref
+    recommendations: list[str] = Field(default_factory=list, description="Optimization recommendations")
+    error: str | None = Field(None, description="Error message if prediction failed")
+
+
 # Forward references - imported at end to avoid circular imports
 from .domain import ChildIssueInfo, GitHubIssue, ProjectContext, Route  # noqa: E402
-from .workflow import AdwMonitorSummary, AdwWorkflowStatus  # noqa: E402
+from .workflow import AdwMonitorSummary, AdwWorkflowStatus, PatternPrediction, SimilarWorkflowSummary  # noqa: E402
 
 # Rebuild models with forward references
 NLProcessResponse.model_rebuild()
 SubmitRequestResponse.model_rebuild()
 RoutesResponse.model_rebuild()
 AdwMonitorResponse.model_rebuild()
+PredictPatternsResponse.model_rebuild()

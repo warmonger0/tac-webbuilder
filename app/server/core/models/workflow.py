@@ -296,3 +296,21 @@ class AdwHealthCheckResponse(BaseModel):
     checks: dict[str, Any] = Field(..., description="Individual health checks (ports, worktree, state_file, process)")
     warnings: list[str] = Field(default_factory=list, description="All warning messages")
     checked_at: str = Field(..., description="Timestamp of health check (ISO format)")
+
+
+# Pattern Prediction Models
+class PatternPrediction(BaseModel):
+    """Predicted operational pattern with confidence score"""
+    pattern: str = Field(..., description="Pattern signature (e.g., 'test:pytest:backend')")
+    confidence: float = Field(..., description="Confidence score (0.0-1.0)")
+    reasoning: str = Field(..., description="Explanation for why this pattern was predicted")
+
+
+class SimilarWorkflowSummary(BaseModel):
+    """Summary of a similar historical workflow"""
+    adw_id: str = Field(..., description="ADW workflow identifier")
+    nl_input: str = Field(..., description="Natural language input from the similar workflow")
+    similarity_score: int = Field(..., description="Similarity score (0-100)")
+    clarity_score: float | None = Field(None, description="NL input clarity score")
+    total_cost: float | None = Field(None, description="Total cost in dollars")
+    status: str = Field(..., description="Workflow status (completed, failed, etc.)")

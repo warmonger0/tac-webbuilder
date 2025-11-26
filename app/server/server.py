@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import route modules
-from routes import data_routes, github_routes, issue_completion_routes, queue_routes, system_routes, websocket_routes, workflow_routes
+from routes import data_routes, github_routes, issue_completion_routes, pattern_routes, queue_routes, system_routes, websocket_routes, workflow_routes
 from services.background_tasks import BackgroundTaskManager
 from services.github_issue_service import GitHubIssueService
 from services.health_service import HealthService
@@ -214,6 +214,10 @@ app.include_router(queue_routes.webhook_router)
 
 websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state)
 app.include_router(websocket_routes.router)
+
+# Initialize pattern prediction routes
+pattern_router = pattern_routes.create_pattern_router()
+app.include_router(pattern_router)
 
 if __name__ == "__main__":
     import uvicorn
