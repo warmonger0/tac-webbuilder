@@ -18,17 +18,25 @@ class PostgreSQLAdapter(DatabaseAdapter):
     """PostgreSQL database adapter with connection pooling"""
 
     def __init__(self):
-        """Initialize PostgreSQL adapter with connection pool"""
-        self.pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=int(os.getenv("POSTGRES_POOL_MIN", "1")),
-            maxconn=int(os.getenv("POSTGRES_POOL_MAX", "10")),
-            host=os.getenv("POSTGRES_HOST", "localhost"),
-            port=int(os.getenv("POSTGRES_PORT", "5432")),
-            database=os.getenv("POSTGRES_DB", "tac_webbuilder"),
-            user=os.getenv("POSTGRES_USER", "tac_user"),
-            password=os.getenv("POSTGRES_PASSWORD"),
-            cursor_factory=RealDictCursor  # Dict-like row access
-        )
+        """Initialize PostgreSQL adapter (lazy connection pool)"""
+        self._pool = None
+        self._pool_config = {
+            "minconn": int(os.getenv("POSTGRES_POOL_MIN", "1")),
+            "maxconn": int(os.getenv("POSTGRES_POOL_MAX", "10")),
+            "host": os.getenv("POSTGRES_HOST", "localhost"),
+            "port": int(os.getenv("POSTGRES_PORT", "5432")),
+            "database": os.getenv("POSTGRES_DB", "tac_webbuilder"),
+            "user": os.getenv("POSTGRES_USER", "tac_user"),
+            "password": os.getenv("POSTGRES_PASSWORD"),
+            "cursor_factory": RealDictCursor,  # Dict-like row access
+        }
+
+    @property
+    def pool(self):
+        """Lazy-initialize connection pool on first access"""
+        if self._pool is None:
+            self._pool = psycopg2.pool.ThreadedConnectionPool(**self._pool_config)
+        return self._pool
 
     @contextmanager
     def get_connection(self) -> Generator[Any, None, None]:
@@ -64,8 +72,8 @@ class PostgreSQLAdapter(DatabaseAdapter):
 
     def close(self) -> None:
         """Close connection pool"""
-        if self.pool:
-            self.pool.closeall()
+        if self._pool:
+            self._pool.closeall()
 
     def health_check(self) -> bool:
         """Check PostgreSQL health"""
