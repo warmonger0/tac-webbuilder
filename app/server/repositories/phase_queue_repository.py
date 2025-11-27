@@ -50,14 +50,15 @@ class PhaseQueueRepository:
                 cursor = conn.execute("SELECT COALESCE(MAX(queue_position), 0) + 1 FROM phase_queue")
                 next_position = cursor.fetchone()[0]
 
+                ph = self.adapter.placeholder()
                 conn.execute(
-                    """
+                    f"""
                     INSERT INTO phase_queue (
                         queue_id, parent_issue, phase_number, status,
                         depends_on_phase, phase_data, created_at, updated_at,
                         priority, queue_position, ready_timestamp
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                     """,
                     (
                         item.queue_id,
@@ -89,8 +90,9 @@ class PhaseQueueRepository:
         """
         try:
             with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
                 cursor = conn.execute(
-                    "SELECT * FROM phase_queue WHERE queue_id = ?",
+                    f"SELECT * FROM phase_queue WHERE queue_id = {ph}",
                     (queue_id,)
                 )
                 row = cursor.fetchone()
@@ -113,10 +115,11 @@ class PhaseQueueRepository:
         """
         try:
             with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
                 cursor = conn.execute(
-                    """
+                    f"""
                     SELECT * FROM phase_queue
-                    WHERE parent_issue = ?
+                    WHERE parent_issue = {ph}
                     ORDER BY phase_number ASC
                     """,
                     (parent_issue,)
@@ -194,18 +197,21 @@ class PhaseQueueRepository:
         """
         try:
             with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
+                now_fn = self.adapter.now_function()
+
                 # Build dynamic SQL based on status transitions
-                updates = ["status = ?", "updated_at = ?"]
+                updates = [f"status = {ph}", f"updated_at = {ph}"]
                 params = [status, datetime.now().isoformat()]
 
                 if adw_id is not None:
-                    updates.append("adw_id = ?")
+                    updates.append(f"adw_id = {ph}")
                     params.append(adw_id)
 
                 if status == "ready":
-                    updates.append("ready_timestamp = datetime('now')")
+                    updates.append(f"ready_timestamp = {now_fn}")
                 elif status == "running":
-                    updates.append("started_timestamp = datetime('now')")
+                    updates.append(f"started_timestamp = {now_fn}")
 
                 params.append(queue_id)
 
@@ -213,7 +219,7 @@ class PhaseQueueRepository:
                     f"""
                     UPDATE phase_queue
                     SET {', '.join(updates)}
-                    WHERE queue_id = ?
+                    WHERE queue_id = {ph}
                     """,
                     tuple(params),
                 )
@@ -236,11 +242,12 @@ class PhaseQueueRepository:
         """
         try:
             with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
                 cursor = conn.execute(
-                    """
+                    f"""
                     UPDATE phase_queue
-                    SET issue_number = ?, updated_at = ?
-                    WHERE queue_id = ?
+                    SET issue_number = {ph}, updated_at = {ph}
+                    WHERE queue_id = {ph}
                     """,
                     (issue_number, datetime.now().isoformat(), queue_id),
                 )
@@ -263,11 +270,12 @@ class PhaseQueueRepository:
         """
         try:
             with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
                 cursor = conn.execute(
-                    """
+                    f"""
                     UPDATE phase_queue
-                    SET error_message = ?, updated_at = ?
-                    WHERE queue_id = ?
+                    SET error_message = {ph}, updated_at = {ph}
+                    WHERE queue_id = {ph}
                     """,
                     (error_message, datetime.now().isoformat(), queue_id),
                 )
@@ -289,8 +297,9 @@ class PhaseQueueRepository:
         """
         try:
             with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
                 cursor = conn.execute(
-                    "DELETE FROM phase_queue WHERE queue_id = ?",
+                    f"DELETE FROM phase_queue WHERE queue_id = {ph}",
                     (queue_id,)
                 )
                 return cursor.rowcount > 0
@@ -311,8 +320,9 @@ class PhaseQueueRepository:
         """
         try:
             with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
                 cursor = conn.execute(
-                    "SELECT config_value FROM queue_config WHERE config_key = ?",
+                    f"SELECT config_value FROM queue_config WHERE config_key = {ph}",
                     (config_key,)
                 )
                 row = cursor.fetchone()
@@ -335,10 +345,11 @@ class PhaseQueueRepository:
         """
         try:
             with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
                 conn.execute(
-                    """
+                    f"""
                     INSERT INTO queue_config (config_key, config_value, updated_at)
-                    VALUES (?, ?, ?)
+                    VALUES ({ph}, {ph}, {ph})
                     ON CONFLICT(config_key) DO UPDATE SET
                         config_value = excluded.config_value,
                         updated_at = excluded.updated_at

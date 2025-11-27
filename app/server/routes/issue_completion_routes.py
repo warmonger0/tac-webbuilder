@@ -64,22 +64,23 @@ async def complete_issue(issue_number: int, request: IssueCompletionRequest) -> 
         adapter = get_database_adapter()
         with adapter.get_connection() as db_conn:
             cursor = db_conn.cursor()
+            ph = adapter.placeholder()
 
             if request.phase_number:
                 cursor.execute(
-                    """
+                    f"""
                     SELECT queue_id, phase_number, status
                     FROM phase_queue
-                    WHERE issue_number = ? AND phase_number = ?
+                    WHERE issue_number = {ph} AND phase_number = {ph}
                     """,
                     (issue_number, request.phase_number)
                 )
             else:
                 cursor.execute(
-                    """
+                    f"""
                     SELECT queue_id, phase_number, status
                     FROM phase_queue
-                    WHERE issue_number = ?
+                    WHERE issue_number = {ph}
                     """,
                     (issue_number,)
                 )

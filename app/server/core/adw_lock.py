@@ -65,12 +65,13 @@ def acquire_lock(issue_number: int, adw_id: str, github_url: str | None = None) 
     """
     with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
+        ph = _db_adapter.placeholder()
 
         # Check if there's an existing lock for this issue
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT adw_id, status, created_at
             FROM adw_locks
-            WHERE issue_number = ?
+            WHERE issue_number = {ph}
             AND status IN ('planning', 'building', 'testing', 'reviewing', 'documenting')
         """, (issue_number,))
 
@@ -85,9 +86,9 @@ def acquire_lock(issue_number: int, adw_id: str, github_url: str | None = None) 
 
         # Acquire the lock
         try:
-            cursor.execute("""
+            cursor.execute(f"""
                 INSERT INTO adw_locks (issue_number, adw_id, status, github_url)
-                VALUES (?, ?, ?, ?)
+                VALUES ({ph}, {ph}, {ph}, {ph})
             """, (issue_number, adw_id, 'planning', github_url))
 
             logger.info(f"[ADW Lock] Lock acquired for issue #{issue_number} by ADW {adw_id}")
@@ -113,11 +114,12 @@ def update_lock_status(issue_number: int, adw_id: str, new_status: str) -> bool:
     """
     with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
+        ph = _db_adapter.placeholder()
 
-        cursor.execute("""
+        cursor.execute(f"""
             UPDATE adw_locks
-            SET status = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE issue_number = ? AND adw_id = ?
+            SET status = {ph}, updated_at = CURRENT_TIMESTAMP
+            WHERE issue_number = {ph} AND adw_id = {ph}
         """, (new_status, issue_number, adw_id))
 
         if cursor.rowcount > 0:
@@ -144,10 +146,11 @@ def release_lock(issue_number: int, adw_id: str) -> bool:
     """
     with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
+        ph = _db_adapter.placeholder()
 
-        cursor.execute("""
+        cursor.execute(f"""
             DELETE FROM adw_locks
-            WHERE issue_number = ? AND adw_id = ?
+            WHERE issue_number = {ph} AND adw_id = {ph}
         """, (issue_number, adw_id))
 
         if cursor.rowcount > 0:
@@ -176,10 +179,11 @@ def force_release_lock(issue_number: int) -> bool:
     """
     with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
+        ph = _db_adapter.placeholder()
 
-        cursor.execute("""
+        cursor.execute(f"""
             DELETE FROM adw_locks
-            WHERE issue_number = ?
+            WHERE issue_number = {ph}
         """, (issue_number,))
 
         if cursor.rowcount > 0:
@@ -238,11 +242,15 @@ def cleanup_stale_locks(max_age_hours: int = 24) -> int:
     """
     with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
+        ph = _db_adapter.placeholder()
 
-        cursor.execute("""
-            DELETE FROM adw_locks
-            WHERE created_at < datetime('now', '-' || ? || ' hours')
-        """, (max_age_hours,))
+        # Database-agnostic datetime subtraction
+        if _db_adapter.get_db_type() == "sqlite":
+            query = f"DELETE FROM adw_locks WHERE created_at < datetime('now', '-' || {ph} || ' hours')"
+        else:  # PostgreSQL
+            query = f"DELETE FROM adw_locks WHERE created_at < NOW() - INTERVAL '{ph} hours'"
+
+        cursor.execute(query, (max_age_hours,))
 
         count = cursor.rowcount
         if count > 0:

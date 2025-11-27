@@ -45,10 +45,11 @@ class WorkflowCompletionDetector:
         """
         try:
             with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
                 cursor = conn.execute(
-                    """
+                    f"""
                     SELECT status, end_time FROM workflow_history
-                    WHERE issue_number = ?
+                    WHERE issue_number = {ph}
                     ORDER BY created_at DESC
                     LIMIT 1
                     """,
@@ -87,10 +88,11 @@ class WorkflowCompletionDetector:
         """
         try:
             with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
                 cursor = conn.execute(
-                    """
+                    f"""
                     SELECT error_message FROM workflow_history
-                    WHERE issue_number = ? AND status = 'failed'
+                    WHERE issue_number = {ph} AND status = 'failed'
                     ORDER BY created_at DESC
                     LIMIT 1
                     """,

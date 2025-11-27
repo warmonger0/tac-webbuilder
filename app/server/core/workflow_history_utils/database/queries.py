@@ -24,7 +24,8 @@ def get_workflow_by_adw_id(adw_id: str) -> dict | None:
     """
     with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM workflow_history WHERE adw_id = ?", (adw_id,))
+        ph = _db_adapter.placeholder()
+        cursor.execute(f"SELECT * FROM workflow_history WHERE adw_id = {ph}", (adw_id,))
         row = cursor.fetchone()
 
         if row:
@@ -85,34 +86,35 @@ def get_workflow_history(
     """
     with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
+        ph = _db_adapter.placeholder()
 
         # Build WHERE clauses
         where_clauses = []
         params = []
 
         if status:
-            where_clauses.append("status = ?")
+            where_clauses.append(f"status = {ph}")
             params.append(status)
 
         if model:
-            where_clauses.append("model_used = ?")
+            where_clauses.append(f"model_used = {ph}")
             params.append(model)
 
         if template:
-            where_clauses.append("workflow_template = ?")
+            where_clauses.append(f"workflow_template = {ph}")
             params.append(template)
 
         if start_date:
-            where_clauses.append("created_at >= ?")
+            where_clauses.append(f"created_at >= {ph}")
             params.append(start_date)
 
         if end_date:
-            where_clauses.append("created_at <= ?")
+            where_clauses.append(f"created_at <= {ph}")
             params.append(end_date)
 
         if search:
             where_clauses.append(
-                "(adw_id LIKE ? OR nl_input LIKE ? OR github_url LIKE ?)"
+                f"(adw_id LIKE {ph} OR nl_input LIKE {ph} OR github_url LIKE {ph})"
             )
             search_param = f"%{search}%"
             params.extend([search_param, search_param, search_param])
@@ -144,7 +146,7 @@ def get_workflow_history(
             FROM workflow_history
             {where_sql}
             ORDER BY {sort_by} {sort_order}
-            LIMIT ? OFFSET ?
+            LIMIT {ph} OFFSET {ph}
         """
         cursor.execute(query, params + [limit, offset])
         rows = cursor.fetchall()

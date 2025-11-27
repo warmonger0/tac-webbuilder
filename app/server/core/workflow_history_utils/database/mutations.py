@@ -123,7 +123,8 @@ def insert_workflow_history(
                 else:
                     logger.debug(f"[DB] Skipping field '{field}' (maps to '{db_field}') - column doesn't exist in database")
 
-        placeholders = ", ".join(["?" for _ in values])
+        ph = _db_adapter.placeholder()
+        placeholders = ", ".join([ph for _ in values])
         fields_str = ", ".join(fields)
 
         query = f"INSERT INTO workflow_history ({fields_str}) VALUES ({placeholders})"
@@ -165,12 +166,13 @@ def update_workflow_history_by_issue(
 
     with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
+        ph = _db_adapter.placeholder()
 
         # Build UPDATE query
         set_clauses = []
         values = []
         for field, value in kwargs.items():
-            set_clauses.append(f"{field} = ?")
+            set_clauses.append(f"{field} = {ph}")
             values.append(value)
 
         set_clauses.append("updated_at = CURRENT_TIMESTAMP")
@@ -179,7 +181,7 @@ def update_workflow_history_by_issue(
         query = f"""
             UPDATE workflow_history
             SET {", ".join(set_clauses)}
-            WHERE issue_number = ?
+            WHERE issue_number = {ph}
         """
 
         cursor.execute(query, values)
@@ -246,13 +248,14 @@ def update_workflow_history(
             logger.warning(f"[DB] No valid fields to update for ADW {adw_id}")
             return False
 
-        set_clauses = [f"{field} = ?" for field in mapped_kwargs]
+        ph = _db_adapter.placeholder()
+        set_clauses = [f"{field} = {ph}" for field in mapped_kwargs]
         set_clauses.append("updated_at = CURRENT_TIMESTAMP")
 
         query = f"""
             UPDATE workflow_history
             SET {", ".join(set_clauses)}
-            WHERE adw_id = ?
+            WHERE adw_id = {ph}
         """
 
         # PHANTOM DETECTION: Log stack trace if updating to completed/failed without end_time
