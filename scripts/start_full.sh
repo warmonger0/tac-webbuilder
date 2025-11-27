@@ -18,7 +18,7 @@ sleep 3
 # Wait for backend health check
 echo "🔍 Checking backend health..."
 for i in {1..10}; do
-    if curl -s http://localhost:8002/api/health >/dev/null 2>&1; then
+    if curl -s http://localhost:8002/api/v1/health >/dev/null 2>&1; then
         echo "✅ Backend is ready!"
         break
     fi

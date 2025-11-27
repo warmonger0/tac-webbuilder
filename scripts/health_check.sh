@@ -101,8 +101,8 @@ check_json_endpoint() {
 
 # Function to check workflow history data
 check_workflow_history() {
-    local backend_url="http://localhost:$SERVER_PORT/api/workflow-history?limit=5"
-    local frontend_url="http://localhost:$CLIENT_PORT/api/workflow-history?limit=5"
+    local backend_url="http://localhost:$SERVER_PORT/api/v1/workflow-history?limit=5"
+    local frontend_url="http://localhost:$CLIENT_PORT/api/v1/workflow-history?limit=5"
 
     # Check backend directly (without -f flag to avoid 404 issues)
     response=$(curl -s -m 5 "$backend_url" 2>&1)
@@ -186,7 +186,7 @@ echo -e "${BLUE}[1/6] Backend Server (port $SERVER_PORT)${NC}"
 check_port $SERVER_PORT "Backend"
 if [ $? -eq 0 ]; then
     check_endpoint "http://localhost:$SERVER_PORT/docs" "Backend API Docs"
-    check_json_endpoint "http://localhost:$SERVER_PORT/api/routes" "Backend Routes API" "routes"
+    check_json_endpoint "http://localhost:$SERVER_PORT/api/v1/routes" "Backend Routes API" "routes"
 fi
 echo ""
 
@@ -208,8 +208,8 @@ echo ""
 
 # 4. Check API Connectivity
 echo -e "${BLUE}[4/6] API Connectivity${NC}"
-check_json_endpoint "http://localhost:$SERVER_PORT/api/workflows" "Workflows API" "" 10
-check_json_endpoint "http://localhost:$CLIENT_PORT/api/routes" "Frontend Proxy to Backend" "routes"
+check_json_endpoint "http://localhost:$SERVER_PORT/api/v1/workflows" "Workflows API" "" 10
+check_json_endpoint "http://localhost:$CLIENT_PORT/api/v1/routes" "Frontend Proxy to Backend" "routes"
 echo ""
 
 # 5. Check Workflow History

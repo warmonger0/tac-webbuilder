@@ -103,7 +103,7 @@ uv run python server.py &
 BACKEND_PID=$!
 
 # Wait for backend API to be ready (not just process started)
-if ! wait_for_endpoint "http://localhost:$SERVER_PORT/api/system-status" "Backend API" 30 1; then
+if ! wait_for_endpoint "http://localhost:$SERVER_PORT/api/v1/system-status" "Backend API" 30 1; then
     echo -e "${RED}❌ Backend API did not become ready!${NC}"
     if ! kill -0 $BACKEND_PID 2>/dev/null; then
         echo -e "${RED}   Backend process crashed during startup${NC}"
