@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from models.phase_queue_item import PhaseQueueItem
-from utils.db_connection import get_connection
+from database import SQLiteAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ class PhaseQueueRepository:
             db_path: Path to SQLite database
         """
         self.db_path = db_path
+        self.adapter = SQLiteAdapter(db_path=db_path)
 
     def insert_phase(self, item: PhaseQueueItem) -> None:
         """
@@ -44,7 +45,7 @@ class PhaseQueueRepository:
             Exception: If database operation fails
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 # Get next queue_position (max + 1)
                 cursor = conn.execute("SELECT COALESCE(MAX(queue_position), 0) + 1 FROM phase_queue")
                 next_position = cursor.fetchone()[0]
@@ -87,7 +88,7 @@ class PhaseQueueRepository:
             PhaseQueueItem or None if not found
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     "SELECT * FROM phase_queue WHERE queue_id = ?",
                     (queue_id,)
@@ -111,7 +112,7 @@ class PhaseQueueRepository:
             List of PhaseQueueItems ordered by phase number
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     """
                     SELECT * FROM phase_queue
@@ -136,7 +137,7 @@ class PhaseQueueRepository:
             List of PhaseQueueItems with status='ready' and no issue_number
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     """
                     SELECT * FROM phase_queue
@@ -160,7 +161,7 @@ class PhaseQueueRepository:
             List of all PhaseQueueItems ordered by parent issue and phase number
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     """
                     SELECT * FROM phase_queue
@@ -192,7 +193,7 @@ class PhaseQueueRepository:
             True if updated, False if not found
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 # Build dynamic SQL based on status transitions
                 updates = ["status = ?", "updated_at = ?"]
                 params = [status, datetime.now().isoformat()]
@@ -234,7 +235,7 @@ class PhaseQueueRepository:
             True if updated, False if not found
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     """
                     UPDATE phase_queue
@@ -261,7 +262,7 @@ class PhaseQueueRepository:
             True if updated, False if not found
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     """
                     UPDATE phase_queue
@@ -287,7 +288,7 @@ class PhaseQueueRepository:
             True if deleted, False if not found
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     "DELETE FROM phase_queue WHERE queue_id = ?",
                     (queue_id,)
@@ -309,7 +310,7 @@ class PhaseQueueRepository:
             Configuration value or None if not found
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     "SELECT config_value FROM queue_config WHERE config_key = ?",
                     (config_key,)
@@ -333,7 +334,7 @@ class PhaseQueueRepository:
             Exception: If database operation fails
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 conn.execute(
                     """
                     INSERT INTO queue_config (config_key, config_value, updated_at)

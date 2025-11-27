@@ -1,6 +1,6 @@
 from typing import Any
 
-from utils.db_connection import get_connection
+from database import get_database_adapter
 
 from .sql_security import SQLSecurityError, execute_query_safely, validate_sql_query
 
@@ -14,7 +14,8 @@ def execute_sql_safely(sql_query: str) -> dict[str, Any]:
         validate_sql_query(sql_query)
 
         # Connect to database
-        with get_connection() as conn:
+        adapter = get_database_adapter()
+        with adapter.get_connection() as conn:
             # Execute query safely
             # Note: Since this is a user-provided complete SQL query,
             # we can't use parameterization. The validate_sql_query
@@ -58,7 +59,8 @@ def get_database_schema() -> dict[str, Any]:
     Get complete database schema information
     """
     try:
-        with get_connection() as conn:
+        adapter = get_database_adapter()
+        with adapter.get_connection() as conn:
             cursor = conn.cursor()
 
             # Get all tables safely

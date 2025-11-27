@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from services.phase_queue_service import PhaseQueueService
-from utils.db_connection import get_connection
+from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,8 @@ async def complete_issue(issue_number: int, request: IssueCompletionRequest) -> 
         # Step 1: Mark queue phases as completed
         # Find all queue entries for this issue
         # Note: Query by issue_number, not parent_issue (hopper workflows have parent_issue=0)
-        with get_connection() as db_conn:
+        adapter = get_database_adapter()
+        with adapter.get_connection() as db_conn:
             cursor = db_conn.cursor()
 
             if request.phase_number:

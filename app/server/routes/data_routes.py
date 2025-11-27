@@ -35,7 +35,7 @@ from core.sql_security import (
 )
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
-from utils.db_connection import get_connection
+from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +226,8 @@ async def delete_table(table_name: str) -> dict:
         except SQLSecurityError as e:
             raise HTTPException(400, str(e))
 
-        with get_connection() as conn:
+        adapter = get_database_adapter()
+        with adapter.get_connection() as conn:
             # Check if table exists using secure method
             if not check_table_exists(conn, table_name):
                 raise HTTPException(404, f"Table '{table_name}' not found")
@@ -258,7 +259,8 @@ async def export_table(request: ExportRequest) -> Response:
         validate_identifier(request.table_name, "table")
 
         # Connect to database
-        with get_connection() as conn:
+        adapter = get_database_adapter()
+        with adapter.get_connection() as conn:
             # Check if table exists
             if not check_table_exists(conn, request.table_name):
                 raise HTTPException(404, f"Table '{request.table_name}' not found")

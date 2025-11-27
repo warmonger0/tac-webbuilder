@@ -18,8 +18,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.db_connection import get_connection as get_db_connection
-from core.workflow_history_utils.database import DB_PATH
+from core.workflow_history_utils.database import DB_PATH, _db_adapter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,7 +44,7 @@ def fix_phantom_records(dry_run: bool = False) -> dict:
         'details': []
     }
 
-    with get_db_connection(db_path=str(DB_PATH)) as conn:
+    with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Find all phantom records

@@ -7,8 +7,7 @@ This module provides all read operations for the workflow history system.
 import json
 import logging
 
-from utils.db_connection import get_connection as get_db_connection
-from .schema import DB_PATH
+from .schema import DB_PATH, _db_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ def get_workflow_by_adw_id(adw_id: str) -> dict | None:
     Returns:
         Dict: Workflow history record as a dictionary, or None if not found
     """
-    with get_db_connection(db_path=str(DB_PATH)) as conn:
+    with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM workflow_history WHERE adw_id = ?", (adw_id,))
         row = cursor.fetchone()
@@ -84,7 +83,7 @@ def get_workflow_history(
     Returns:
         Tuple[List[Dict], int]: List of workflow records and total count (before pagination)
     """
-    with get_db_connection(db_path=str(DB_PATH)) as conn:
+    with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Build WHERE clauses

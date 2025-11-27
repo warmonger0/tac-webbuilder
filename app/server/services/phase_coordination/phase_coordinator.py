@@ -18,7 +18,6 @@ from datetime import datetime
 from typing import Optional
 
 from services.phase_queue_service import PhaseQueueService
-from utils.db_connection import get_connection
 
 from .phase_github_notifier import PhaseGitHubNotifier
 from .workflow_completion_detector import WorkflowCompletionDetector
@@ -148,7 +147,7 @@ class PhaseCoordinator:
         Returns:
             List of phase rows with queue_id, issue_number, parent_issue, phase_number
         """
-        with get_connection(self.phase_queue_service.repository.db_path) as conn:
+        with self.phase_queue_service.repository.adapter.get_connection() as conn:
             cursor = conn.execute(
                 """
                 SELECT queue_id, issue_number, parent_issue, phase_number

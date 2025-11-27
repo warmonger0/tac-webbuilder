@@ -39,7 +39,7 @@ from core.github_poster import GitHubPoster
 from core.cost_estimate_storage import save_cost_estimate
 from core.pattern_predictor import predict_patterns_from_input, store_predicted_patterns
 from services.multi_phase_issue_handler import MultiPhaseIssueHandler
-from utils.db_connection import get_connection
+from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +171,8 @@ class GitHubIssueService:
 
             # Store predictions linked to request_id
             if predicted_patterns:
-                db_conn = get_connection()
+                adapter = get_database_adapter()
+                db_conn = adapter.get_connection()
                 store_predicted_patterns(
                     request_id=request_id,
                     predictions=predicted_patterns,

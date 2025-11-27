@@ -8,8 +8,7 @@ import json
 import logging
 import traceback
 
-from utils.db_connection import get_connection as get_db_connection
-from .schema import DB_PATH
+from .schema import DB_PATH, _db_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ def insert_workflow_history(
         logger.warning(f"[DB] Invalid status '{status}' for {adw_id}, defaulting to 'pending'")
         status = "pending"
 
-    with get_db_connection(db_path=str(DB_PATH)) as conn:
+    with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Build dynamic query based on provided kwargs
@@ -164,7 +163,7 @@ def update_workflow_history_by_issue(
         logger.warning(f"[DB] No fields provided to update for issue #{issue_number}")
         return 0
 
-    with get_db_connection(db_path=str(DB_PATH)) as conn:
+    with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Build UPDATE query
@@ -212,7 +211,7 @@ def update_workflow_history(
         logger.warning(f"[DB] No fields provided to update for ADW {adw_id}")
         return False
 
-    with get_db_connection(db_path=str(DB_PATH)) as conn:
+    with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Get existing columns from database to validate fields before updating

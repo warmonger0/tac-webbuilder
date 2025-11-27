@@ -1,5 +1,5 @@
 
-from utils.db_connection import get_connection
+from database import get_database_adapter
 
 from core.data_models import ColumnInsight
 
@@ -14,7 +14,8 @@ def generate_insights(table_name: str, column_names: list[str] | None = None) ->
         # Validate table name
         validate_identifier(table_name, "table")
 
-        with get_connection() as conn:
+        adapter = get_database_adapter()
+        with adapter.get_connection() as conn:
             # Get table schema using safe query execution
             cursor_info = execute_query_safely(
                 conn,

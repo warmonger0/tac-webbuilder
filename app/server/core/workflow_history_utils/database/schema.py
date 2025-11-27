@@ -9,12 +9,15 @@ import logging
 import sqlite3
 from pathlib import Path
 
-from utils.db_connection import get_connection as get_db_connection
+from database import SQLiteAdapter
 
 logger = logging.getLogger(__name__)
 
 # Database path - relative to package: core/workflow_history_utils/database/
 DB_PATH = Path(__file__).parent.parent.parent.parent / "db" / "workflow_history.db"
+
+# Database adapter for workflow history
+_db_adapter = SQLiteAdapter(db_path=str(DB_PATH))
 
 
 def init_db():
@@ -27,7 +30,7 @@ def init_db():
     # Ensure db directory exists
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    with get_db_connection(db_path=str(DB_PATH)) as conn:
+    with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Create workflow_history table with comprehensive fields

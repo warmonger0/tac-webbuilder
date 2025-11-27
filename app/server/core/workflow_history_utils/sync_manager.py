@@ -12,9 +12,9 @@ import json
 import logging
 from datetime import datetime
 
-from utils.db_connection import get_connection as get_db_connection
 from core.workflow_history_utils.database import (
     DB_PATH,
+    _db_adapter,
     insert_workflow_history,
     update_workflow_history,
     get_workflow_by_adw_id,
@@ -287,7 +287,7 @@ def resync_all_completed_workflows(force: bool = False) -> tuple[int, list[dict]
     """
     try:
         # Get all completed workflows
-        with get_db_connection(db_path=str(DB_PATH)) as conn:
+        with _db_adapter.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT adw_id, status FROM workflow_history WHERE status IN ('completed', 'failed')"

@@ -12,7 +12,7 @@ from core.data_models import (
 )
 from core.preflight_checks import run_preflight_checks
 from fastapi import APIRouter, Query
-from utils.db_connection import get_connection
+from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,8 @@ def init_system_routes(health_service, service_controller, app_start_time):
         """Health check endpoint with database status"""
         try:
             # Check database connection
-            with get_connection() as conn:
+            adapter = get_database_adapter()
+            with adapter.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
                 tables = cursor.fetchall()

@@ -15,7 +15,7 @@ import logging
 from typing import List, Optional
 
 from models.phase_queue_item import PhaseQueueItem
-from utils.db_connection import get_connection
+from database import SQLiteAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,7 @@ class HopperSorter:
             db_path: Path to SQLite database
         """
         self.db_path = db_path
+        self.adapter = SQLiteAdapter(db_path=db_path)
         logger.info("[INIT] HopperSorter initialized")
 
     def get_next_phase_1(self) -> Optional[PhaseQueueItem]:
@@ -66,7 +67,7 @@ class HopperSorter:
             ...     print(f"Start parent #{next_phase.parent_issue}")
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     """
                     SELECT * FROM phase_queue
@@ -121,7 +122,7 @@ class HopperSorter:
             ...     launch_workflow(phase)  # Start 3 workflows in parallel
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     """
                     SELECT * FROM phase_queue
@@ -164,7 +165,7 @@ class HopperSorter:
             Number of distinct parent issues with running phases
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     """
                     SELECT COUNT(DISTINCT parent_issue)
@@ -214,7 +215,7 @@ class HopperSorter:
             >>> print(f"Urgent phases: {stats['by_priority'][10]}")
         """
         try:
-            with get_connection(self.db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     """
                     SELECT

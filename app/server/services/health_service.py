@@ -39,7 +39,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 
 from core.data_models import ServiceHealth
-from utils.db_connection import get_connection
+from database import get_database_adapter
 from utils.process_runner import ProcessRunner
 
 logger = logging.getLogger(__name__)
@@ -271,7 +271,8 @@ class HealthService:
     def check_database(self) -> ServiceHealth:
         """Check the health of the SQLite database"""
         try:
-            with get_connection() as conn:
+            adapter = get_database_adapter()
+            with adapter.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
                 tables = cursor.fetchall()

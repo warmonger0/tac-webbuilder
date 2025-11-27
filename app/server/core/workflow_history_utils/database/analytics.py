@@ -6,8 +6,7 @@ This module provides analytics and aggregate queries for the workflow history sy
 
 import logging
 
-from utils.db_connection import get_connection as get_db_connection
-from .schema import DB_PATH
+from .schema import DB_PATH, _db_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ def get_history_analytics() -> dict:
             - avg_tokens: Average tokens per workflow
             - avg_cache_efficiency: Average cache efficiency percentage
     """
-    with get_db_connection(db_path=str(DB_PATH)) as conn:
+    with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Total workflows

@@ -14,7 +14,7 @@ All original functions remain accessible via this package for backward compatibi
 """
 
 # Schema operations
-from .schema import init_db, DB_PATH
+from .schema import init_db, DB_PATH, _db_adapter
 
 # Mutation operations (INSERT, UPDATE)
 from .mutations import (
@@ -36,6 +36,7 @@ __all__ = [
     # Schema
     'init_db',
     'DB_PATH',
+    '_db_adapter',
     # Mutations
     'insert_workflow_history',
     'update_workflow_history_by_issue',

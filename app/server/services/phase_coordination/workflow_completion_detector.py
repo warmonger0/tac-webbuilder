@@ -7,7 +7,7 @@ Detects workflow status and errors from workflow_history database.
 import logging
 from typing import Optional
 
-from utils.db_connection import get_connection
+from database import SQLiteAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ class WorkflowCompletionDetector:
             workflow_db_path: Path to workflow_history database
         """
         self.workflow_db_path = workflow_db_path
+        self.adapter = SQLiteAdapter(db_path=workflow_db_path)
 
     def get_workflow_status(self, issue_number: int) -> Optional[str]:
         """
@@ -43,7 +44,7 @@ class WorkflowCompletionDetector:
             'completed', 'failed', 'running', 'pending', or None if not found
         """
         try:
-            with get_connection(self.workflow_db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     """
                     SELECT status, end_time FROM workflow_history
@@ -85,7 +86,7 @@ class WorkflowCompletionDetector:
             Error message string or None
         """
         try:
-            with get_connection(self.workflow_db_path) as conn:
+            with self.adapter.get_connection() as conn:
                 cursor = conn.execute(
                     """
                     SELECT error_message FROM workflow_history
