@@ -314,23 +314,38 @@ uv run pytest tests/ -v --tb=short 2>&1 | tee /tmp/postgres_test_results.txt
    - Location: `app/server/tests/conftest.py`
    - Approach: Added `cleanup_workflow_history_data` and `cleanup_phase_queue_data` fixtures with `autouse=True`
    - Implementation: Automatically deletes ALL workflow_history records before and after each test
-   - Tests Fixed: ~33 UNIQUE constraint violations resolved
+   - Tests Fixed: 33 UNIQUE constraint violations resolved
+
+2. ✅ **Fixed Test Database Schemas**
+   - Location: Test fixtures in `test_phase_coordinator.py`, `test_phase_queue_service.py`, `test_multi_phase_execution.py`
+   - Issue: Tests created temp databases without complete schema (missing queue_position column)
+   - Fix: Added missing columns (adw_id, pr_number, priority, queue_position, ready_timestamp, started_timestamp)
+   - Tests Fixed: 15 "no such column: queue_position" errors resolved
 
 ### Test Results After Phase 4.1
 
 **SQLite:**
 - Before: 572/766 passed (74.7%)
-- After: 605/766 passed (79.0%)
-- Change: +33 tests (+5.8% improvement)
+- After Cleanup Fix: 605/766 passed (79.0%) [+33]
+- After Schema Fix: 620/766 passed (81.0%) [+15]
+- **Final: 620/766 passed (81.0%)**
+- **Total Change: +48 tests (+8.4% improvement)**
 
 **PostgreSQL:**
 - Before: 563/766 passed (73.5%)
-- After: 596/766 passed (77.8%)
-- Change: +33 tests (+5.8% improvement)
+- After Cleanup Fix: 596/766 passed (77.8%) [+33]
+- After Schema Fix: 611/766 passed (79.8%) [+15]
+- **Final: 611/766 passed (79.8%)**
+- **Total Change: +48 tests (+8.5% improvement)**
 
 ### Analysis
 
-The test isolation fix successfully resolved ~33 UNIQUE constraint violations in both SQLite and PostgreSQL. The improvement was identical for both databases, confirming this was a test infrastructure issue, not a migration issue.
+Phase 4.1 successfully fixed 48 test failures through two improvements:
+
+1. **Test Isolation (+33 tests)**: Resolved UNIQUE constraint violations by adding automatic cleanup fixtures
+2. **Test Schema Completeness (+15 tests)**: Added missing columns to test database schemas
+
+Both fixes showed identical improvements across SQLite and PostgreSQL, confirming these were test infrastructure issues, not database migration issues. The production schemas were already complete.
 
 ### Remaining Issues
 
@@ -364,6 +379,9 @@ The test isolation fix successfully resolved ~33 UNIQUE constraint violations in
 ### Files Modified
 
 - `app/server/tests/conftest.py` - Added auto-cleanup fixtures
+- `app/server/tests/services/test_phase_coordinator.py` - Fixed phase_queue schema
+- `app/server/tests/services/test_phase_queue_service.py` - Fixed phase_queue schema
+- `app/server/tests/e2e/test_multi_phase_execution.py` - Fixed phase_queue schema
 
 ### Performance Impact
 

@@ -47,7 +47,13 @@ def temp_phase_db():
                 phase_data TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                error_message TEXT
+                error_message TEXT,
+                adw_id TEXT,
+                pr_number INTEGER,
+                priority INTEGER DEFAULT 50,
+                queue_position INTEGER,
+                ready_timestamp TEXT,
+                started_timestamp TEXT
             )
         """)
         conn.commit()
