@@ -310,17 +310,23 @@ export function AdwMonitorCard() {
                 {/* Header */}
                 <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between relative z-10">
                   <div className="flex items-center gap-3">
-                    {currentWorkflow.github_url ? (
+                    {currentWorkflow.issue_number ? (
                       <div className="flex items-center gap-2">
-                        <a
-                          href={currentWorkflow.github_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-emerald-400 hover:text-emerald-300 font-mono text-lg font-bold transition-colors"
-                        >
-                          #{currentWorkflow.issue_number}
-                        </a>
-                        {currentWorkflow.pr_number && (
+                        {currentWorkflow.github_url ? (
+                          <a
+                            href={currentWorkflow.github_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-emerald-400 hover:text-emerald-300 font-mono text-lg font-bold transition-colors"
+                          >
+                            #{currentWorkflow.issue_number}
+                          </a>
+                        ) : (
+                          <span className="text-emerald-400 font-mono text-lg font-bold">
+                            #{currentWorkflow.issue_number}
+                          </span>
+                        )}
+                        {currentWorkflow.pr_number && currentWorkflow.github_url && (
                           <>
                             <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
