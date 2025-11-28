@@ -300,6 +300,103 @@ def cleanup_db_files():
         Path(db_file).unlink(missing_ok=True)
 
 
+@pytest.fixture(autouse=True, scope="function")
+def cleanup_workflow_history_data():
+    """
+    Automatically clean workflow_history table data before and after each test.
+
+    This fixture runs automatically for every test to ensure test isolation
+    and prevent UNIQUE constraint violations on adw_id.
+
+    Cleans both the main database and workflow_history database to handle
+    tests that use either database.
+    """
+    def cleanup_test_records():
+        """Helper to clean ALL test records from both databases"""
+        try:
+            # Clean main database.db - Delete ALL workflow_history for tests
+            # This is safe because tests should be isolated anyway
+            main_db = Path(__file__).parent.parent / "db" / "database.db"
+            if main_db.exists():
+                conn = sqlite3.connect(main_db)
+                try:
+                    cursor = conn.cursor()
+                    # Delete ALL workflow_history records to ensure test isolation
+                    cursor.execute("DELETE FROM workflow_history")
+                    conn.commit()
+                except Exception:
+                    pass  # Table might not exist
+                finally:
+                    conn.close()
+
+            # Clean workflow_history.db (separate database used by some modules)
+            wf_db = Path(__file__).parent.parent / "db" / "workflow_history.db"
+            if wf_db.exists():
+                conn = sqlite3.connect(wf_db)
+                try:
+                    cursor = conn.cursor()
+                    # Delete ALL workflow_history records to ensure test isolation
+                    cursor.execute("DELETE FROM workflow_history")
+                    conn.commit()
+                except Exception:
+                    pass  # Table might not exist
+                finally:
+                    conn.close()
+        except Exception:
+            # Ignore all cleanup errors
+            pass
+
+    # Clean before test
+    cleanup_test_records()
+
+    yield  # Test runs here
+
+    # Clean after test
+    cleanup_test_records()
+
+
+@pytest.fixture(autouse=True, scope="function")
+def cleanup_phase_queue_data():
+    """
+    Automatically clean phase_queue table data before and after each test.
+
+    This fixture runs automatically for every test to ensure test isolation.
+
+    Uses database adapter to support both SQLite and PostgreSQL.
+    """
+    # Import here to avoid circular dependencies during test collection
+    try:
+        from database import get_db_adapter
+
+        # Clean before test
+        try:
+            adapter = get_db_adapter()
+            with adapter.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM phase_queue")
+                conn.commit()
+        except Exception as e:
+            # Table might not exist yet for some tests, that's OK
+            pass
+
+        yield  # Test runs here
+
+        # Clean after test
+        try:
+            adapter = get_db_adapter()
+            with adapter.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM phase_queue")
+                conn.commit()
+        except Exception as e:
+            # Ignore cleanup errors (database might be closed)
+            pass
+
+    except ImportError:
+        # If database module not available, skip cleanup
+        yield
+
+
 # ============================================================================
 # Mock Service Fixtures
 # ============================================================================

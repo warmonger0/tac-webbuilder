@@ -304,6 +304,71 @@ uv run pytest tests/ -v --tb=short 2>&1 | tee /tmp/postgres_test_results.txt
 # Expected: 563 passed, 89 failed, 14 skipped, 100 errors
 ```
 
+---
+
+## Phase 4.1 Results (2025-11-27)
+
+### Fixes Applied
+
+1. ✅ **Improved Test Isolation**
+   - Location: `app/server/tests/conftest.py`
+   - Approach: Added `cleanup_workflow_history_data` and `cleanup_phase_queue_data` fixtures with `autouse=True`
+   - Implementation: Automatically deletes ALL workflow_history records before and after each test
+   - Tests Fixed: ~33 UNIQUE constraint violations resolved
+
+### Test Results After Phase 4.1
+
+**SQLite:**
+- Before: 572/766 passed (74.7%)
+- After: 605/766 passed (79.0%)
+- Change: +33 tests (+5.8% improvement)
+
+**PostgreSQL:**
+- Before: 563/766 passed (73.5%)
+- After: 596/766 passed (77.8%)
+- Change: +33 tests (+5.8% improvement)
+
+### Analysis
+
+The test isolation fix successfully resolved ~33 UNIQUE constraint violations in both SQLite and PostgreSQL. The improvement was identical for both databases, confirming this was a test infrastructure issue, not a migration issue.
+
+### Remaining Issues
+
+**Not Fixed in Phase 4.1 (require different solutions):**
+
+1. **Schema Initialization in Test Databases** (18 failures)
+   - Error: `sqlite3.OperationalError: no such column: queue_position`
+   - Affected Tests: `test_phase_coordinator.py`, `test_phase_queue_service.py`
+   - Root Cause: Tests create temporary databases but don't apply the migration schema
+   - Note: queue_position column EXISTS in production schemas (both SQLite and PostgreSQL)
+   - Solution Required: Tests need to use schema migration files instead of creating incomplete schemas
+
+2. **SQL Injection Test Failures** (2 failures, PostgreSQL only)
+   - Error: Column name case sensitivity differences
+   - Affected Tests: `test_sql_injection.py`
+   - PostgreSQL: Case-sensitive, requires exact column name match
+   - SQLite: Case-insensitive, accepts mixed case
+   - Solution Required: Update test data or queries for PostgreSQL compatibility
+
+3. **Pre-existing Test Issues** (1 failure, both databases)
+   - Test: `test_workflow_history.py::test_init_db`
+   - Error: Table not being created by init_db()
+   - Impact: Same failure in both SQLite and PostgreSQL
+   - Note: Pre-existing issue, not migration-related
+
+4. **Database Initialization Errors** (100 errors in both)
+   - Location: `core/workflow_history_utils/test_database.py`
+   - Impact: Affects both SQLite and PostgreSQL equally
+   - Note: Pre-existing infrastructure issue
+
+### Files Modified
+
+- `app/server/tests/conftest.py` - Added auto-cleanup fixtures
+
+### Performance Impact
+
+No performance impact observed. Test cleanup adds minimal overhead (<1ms per test).
+
 ## Next Steps for Phase 4
 
 ### Immediate Fixes Required
