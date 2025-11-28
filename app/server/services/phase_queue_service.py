@@ -51,6 +51,7 @@ class PhaseQueueService:
         phase_number: int,
         phase_data: dict[str, Any],
         depends_on_phase: int | None = None,
+        predicted_patterns: list[str] | None = None,
     ) -> str:
         """
         Enqueue a phase for execution.
@@ -60,6 +61,7 @@ class PhaseQueueService:
             phase_number: Phase number (1, 2, 3, ...)
             phase_data: Phase metadata {title, content, externalDocs}
             depends_on_phase: Phase number this phase depends on (None for Phase 1)
+            predicted_patterns: Optional list of predicted pattern strings for this phase
 
         Returns:
             queue_id: Unique identifier for this queue entry
@@ -69,6 +71,10 @@ class PhaseQueueService:
         """
         queue_id = str(uuid.uuid4())
         status = "ready" if phase_number == 1 else "queued"  # Phase 1 is ready immediately
+
+        # Merge predicted patterns into phase_data if provided
+        if predicted_patterns:
+            phase_data = {**phase_data, 'predicted_patterns': predicted_patterns}
 
         item = PhaseQueueItem(
             queue_id=queue_id,

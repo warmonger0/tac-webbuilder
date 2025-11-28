@@ -29,7 +29,11 @@ class MultiPhaseIssueHandler:
         self.github_poster = github_poster
         self.phase_queue_service = phase_queue_service
 
-    async def handle_multi_phase_request(self, request: SubmitRequestData) -> SubmitRequestResponse:
+    async def handle_multi_phase_request(
+        self,
+        request: SubmitRequestData,
+        predicted_patterns: list[dict] | None = None
+    ) -> SubmitRequestResponse:
         """
         Handle multi-phase request by creating sequential issues and enqueueing phases.
 
@@ -41,6 +45,7 @@ class MultiPhaseIssueHandler:
 
         Args:
             request: SubmitRequestData with phases populated
+            predicted_patterns: Optional list of predicted patterns with pattern/confidence/reasoning
 
         Returns:
             SubmitRequestResponse with multi-phase information
@@ -81,7 +86,7 @@ class MultiPhaseIssueHandler:
 
         try:
             # Create Phase 1 issue and enqueue all phases
-            child_issues = await self._create_phase_issues_and_enqueue(request)
+            child_issues = await self._create_phase_issues_and_enqueue(request, predicted_patterns)
 
             # Generate unique request ID (for consistency with single-phase flow)
             request_id = str(uuid.uuid4())
@@ -106,7 +111,8 @@ class MultiPhaseIssueHandler:
 
     async def _create_phase_issues_and_enqueue(
         self,
-        request: SubmitRequestData
+        request: SubmitRequestData,
+        predicted_patterns: list[dict] | None = None
     ) -> list[ChildIssueInfo]:
         """
         Create Phase 1 issue and enqueue all phases.
@@ -117,6 +123,7 @@ class MultiPhaseIssueHandler:
 
         Args:
             request: SubmitRequestData with phases
+            predicted_patterns: Optional list of predicted patterns (will be converted to strings)
 
         Returns:
             List of ChildIssueInfo objects
@@ -125,6 +132,11 @@ class MultiPhaseIssueHandler:
             Exception: If GitHub posting or enqueueing fails
         """
         child_issues = []
+
+        # Extract pattern strings from predictions if provided
+        pattern_strings = None
+        if predicted_patterns:
+            pattern_strings = [p['pattern'] for p in predicted_patterns]
 
         # IMPORTANT: Process phases in sequential order (1, 2, 3, ...)
         for phase in sorted(request.phases, key=lambda p: p.number):
@@ -140,7 +152,8 @@ class MultiPhaseIssueHandler:
                     "externalDocs": phase.externalDocs or [],
                     "total_phases": len(request.phases)  # Store for just-in-time creation
                 },
-                depends_on_phase=depends_on_phase
+                depends_on_phase=depends_on_phase,
+                predicted_patterns=pattern_strings
             )
 
             # Only create GitHub issue for Phase 1 (ready to execute immediately)

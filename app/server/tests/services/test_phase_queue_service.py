@@ -284,3 +284,66 @@ def test_invalid_status_raises_error(service):
 
     with pytest.raises(ValueError, match="Invalid status"):
         service.update_status(queue_id, "invalid_status")
+
+
+def test_enqueue_with_predicted_patterns(service):
+    """Test enqueueing phase with predicted patterns"""
+    patterns = ["test:pytest:backend", "build:typecheck"]
+    phase_data = {
+        "title": "Test Phase",
+        "content": "Run tests and build"
+    }
+
+    queue_id = service.enqueue(
+        parent_issue=123,
+        phase_number=1,
+        phase_data=phase_data,
+        predicted_patterns=patterns
+    )
+
+    # Verify patterns stored in phase_data
+    items = service.get_queue_by_parent(123)
+    assert len(items) == 1
+    assert items[0].phase_data['predicted_patterns'] == patterns
+    assert items[0].phase_data['title'] == "Test Phase"
+
+
+def test_enqueue_without_predicted_patterns(service):
+    """Test enqueueing phase without patterns (backward compatibility)"""
+    phase_data = {
+        "title": "Test Phase",
+        "content": "Run tests"
+    }
+
+    queue_id = service.enqueue(
+        parent_issue=456,
+        phase_number=1,
+        phase_data=phase_data,
+        predicted_patterns=None  # Explicitly None
+    )
+
+    # Verify no patterns in phase_data
+    items = service.get_queue_by_parent(456)
+    assert len(items) == 1
+    assert 'predicted_patterns' not in items[0].phase_data
+    assert items[0].phase_data['title'] == "Test Phase"
+
+
+def test_enqueue_with_empty_patterns_list(service):
+    """Test enqueueing phase with empty patterns list"""
+    phase_data = {
+        "title": "Test Phase",
+        "content": "Run tests"
+    }
+
+    queue_id = service.enqueue(
+        parent_issue=789,
+        phase_number=1,
+        phase_data=phase_data,
+        predicted_patterns=[]  # Empty list
+    )
+
+    # Empty list should not be stored
+    items = service.get_queue_by_parent(789)
+    assert len(items) == 1
+    assert 'predicted_patterns' not in items[0].phase_data
