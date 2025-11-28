@@ -11,6 +11,7 @@
 
 import type { RoutesResponse } from '../types';
 import { API_BASE, fetchJSON } from './baseClient';
+import { apiConfig } from '../config/api';
 
 /**
  * Get list of available API routes.
@@ -32,7 +33,7 @@ export async function getRoutes(): Promise<RoutesResponse> {
 export async function getWebhookStatus(): Promise<any> {
   // Try to fetch from webhook service directly
   try {
-    const response = await fetch('http://localhost:8001/webhook-status');
+    const response = await fetch(`${apiConfig.webhookServiceUrl}/webhook-status`);
     if (response.ok) {
       return response.json();
     }

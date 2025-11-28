@@ -1,4 +1,6 @@
 import type { CostEstimate } from '../types';
+import { thresholds } from '../config/thresholds';
+import { costEstimateIcons } from '../config/theme';
 
 interface CostEstimateCardProps {
   estimate: CostEstimate;
@@ -18,26 +20,26 @@ export function CostEstimateCard({ estimate }: CostEstimateCardProps) {
       border: 'border-green-200',
       text: 'text-green-800',
       badge: 'bg-green-100 text-green-800',
-      icon: '💡',
+      icon: costEstimateIcons.lightweight,
     },
     standard: {
       bg: 'bg-yellow-50',
       border: 'border-yellow-200',
       text: 'text-yellow-800',
       badge: 'bg-yellow-100 text-yellow-800',
-      icon: '💰',
+      icon: costEstimateIcons.standard,
     },
     complex: {
       bg: 'bg-red-50',
       border: 'border-red-200',
       text: 'text-red-800',
       badge: 'bg-red-100 text-red-800',
-      icon: '⚠️',
+      icon: costEstimateIcons.complex,
     },
   };
 
   const config = levelConfig[estimate.level];
-  const showWarning = estimate.max_cost > 2.0;
+  const showWarning = estimate.max_cost > thresholds.cost.highCostWarning;
 
   return (
     <div className={`rounded-lg border-2 p-5 ${config.bg} ${config.border}`}>

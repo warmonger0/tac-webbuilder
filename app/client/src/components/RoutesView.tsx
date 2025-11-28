@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useRoutesWebSocket } from '../hooks/useWebSocket';
 import type { Route } from '../types';
+import { httpMethodColors } from '../config/theme';
 
 function formatTimestamp(date: Date | null): string {
   if (!date) return '';
@@ -15,15 +16,7 @@ function formatTimestamp(date: Date | null): string {
 }
 
 function MethodBadge({ method }: { method: string }) {
-  const colors: Record<string, string> = {
-    GET: 'bg-blue-100 text-blue-800',
-    POST: 'bg-green-100 text-green-800',
-    PUT: 'bg-yellow-100 text-yellow-800',
-    DELETE: 'bg-red-100 text-red-800',
-    PATCH: 'bg-purple-100 text-purple-800',
-  };
-
-  const colorClass = colors[method] || 'bg-gray-100 text-gray-800';
+  const colorClass = httpMethodColors[method as keyof typeof httpMethodColors] || 'bg-gray-100 text-gray-800';
 
   return (
     <span

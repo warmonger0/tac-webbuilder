@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { getQueueAll, getQueueConfig, setQueuePaused, type PhaseQueueItem } from "../api/client";
 import { PhaseQueueList } from "./PhaseQueueCard";
 import { QueuePauseToggle } from "./QueuePauseToggle";
+import { intervals } from '../config/intervals';
 
 type TabType = "in-progress" | "completed";
 
@@ -36,7 +37,7 @@ export function ZteHopperQueueCard() {
     fetchData();
 
     // Poll every 10 seconds for updates
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(fetchData, intervals.components.hopperQueue.pollingInterval);
 
     return () => clearInterval(interval);
   }, []); // Empty deps = run once on mount, cleanup on unmount

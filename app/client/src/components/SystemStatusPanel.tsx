@@ -3,6 +3,8 @@ import { getSystemStatus, redeliverGitHubWebhook, restartCloudflare, startWebhoo
 import type { ServiceHealth, SystemStatusResponse } from '../types';
 import { useReliablePolling } from '../hooks/useReliablePolling';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
+import { intervals } from '../config/intervals';
+import { serviceDisplayOrder } from '../config/services';
 
 export function SystemStatusPanel() {
   const [status, setStatus] = useState<SystemStatusResponse | null>(null);
@@ -20,7 +22,7 @@ export function SystemStatusPanel() {
       setError(err.message);
     },
     enabled: true,
-    interval: 30000,
+    interval: intervals.components.systemStatus.pollingInterval,
     adaptiveInterval: true,
   });
 
@@ -75,7 +77,7 @@ export function SystemStatusPanel() {
       const result = await startWebhookService();
       setActionMessage({ type: 'success', text: result.message || 'Webhook service started' });
       // Refresh status after a moment
-      setTimeout(() => fetchStatus(), 2000);
+      setTimeout(() => fetchStatus(), intervals.components.systemStatus.refreshDelayAfterAction);
     } catch (err) {
       setActionMessage({
         type: 'error',
@@ -93,7 +95,7 @@ export function SystemStatusPanel() {
       const result = await restartCloudflare();
       setActionMessage({ type: 'success', text: result.message || 'Cloudflare tunnel restarted' });
       // Refresh status after a moment
-      setTimeout(() => fetchStatus(), 2000);
+      setTimeout(() => fetchStatus(), intervals.components.systemStatus.refreshDelayAfterAction);
     } catch (err) {
       setActionMessage({
         type: 'error',
@@ -130,7 +132,7 @@ export function SystemStatusPanel() {
       setActionMessage({ type: messageType, text: messageText });
 
       // Refresh status after a moment
-      setTimeout(() => fetchStatus(), 2000);
+      setTimeout(() => fetchStatus(), intervals.components.systemStatus.refreshDelayAfterAction);
     } catch (err) {
       setActionMessage({
         type: 'error',
@@ -240,7 +242,8 @@ export function SystemStatusPanel() {
   };
 
   // Define service order (swapping frontend and cloudflare_tunnel)
-  const serviceOrder = ['backend_api', 'database', 'webhook', 'frontend', 'cloudflare_tunnel', 'github_webhook'];
+  // Use service display order from configuration
+  const serviceOrder = [...serviceDisplayOrder];
 
   return (
     <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 flex-1 flex flex-col">

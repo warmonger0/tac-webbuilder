@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { intervals } from '../config/intervals';
 
 interface ReliablePollingOptions<T> {
   fetchFn: () => Promise<T>;
@@ -33,11 +34,11 @@ export function useReliablePolling<T>({
   onSuccess,
   onError,
   enabled = true,
-  interval = 60000,
+  interval = intervals.polling.defaultInterval,
   adaptiveInterval = true,
-  minInterval = 30000,
-  maxInterval = 120000,
-  maxConsecutiveErrors = 5,
+  minInterval = intervals.polling.minInterval,
+  maxInterval = intervals.polling.maxInterval,
+  maxConsecutiveErrors = intervals.polling.maxConsecutiveErrors,
 }: ReliablePollingOptions<T>) {
   const [state, setState] = useState<PollingState>({
     isPolling: false,
@@ -77,7 +78,7 @@ export function useReliablePolling<T>({
     }
 
     // Increase interval exponentially with errors
-    const multiplier = Math.pow(1.5, Math.min(errors, 5));
+    const multiplier = Math.pow(intervals.polling.backoffMultiplier, Math.min(errors, 5));
     const adaptedInterval = Math.min(interval * multiplier, maxInterval);
     return Math.max(adaptedInterval, minInterval);
   }, [adaptiveInterval, interval, minInterval, maxInterval]);

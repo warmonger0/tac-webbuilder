@@ -7,6 +7,8 @@ import {
 } from '../api/client';
 import { useReliablePolling } from '../hooks/useReliablePolling';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
+import { intervals } from '../config/intervals';
+import { workflowPhases, workflowTypeLabels } from '../config/workflows';
 
 export function AdwMonitorCard() {
   const [workflows, setWorkflows] = useState<AdwWorkflowStatus[]>([]);
@@ -29,8 +31,10 @@ export function AdwMonitorCard() {
       setError(err.message);
     },
     enabled: true,
-    // Dynamic interval: 10s for active workflows, 30s for idle
-    interval: summary.running > 0 ? 10000 : 30000,
+    // Dynamic interval: active polling for running workflows, idle polling otherwise
+    interval: summary.running > 0
+      ? intervals.components.adwMonitor.activePollingInterval
+      : intervals.components.adwMonitor.idlePollingInterval,
     adaptiveInterval: true,
   });
 
@@ -52,18 +56,25 @@ export function AdwMonitorCard() {
     return `$${cost.toFixed(2)}`;
   };
 
-  // Workflow phases for the pipeline visualization (9 phases total)
-  const workflowPhases = [
-    { name: 'Plan', icon: 'clipboard', key: 'plan' },
-    { name: 'Validate', icon: 'check-circle', key: 'validate' },
-    { name: 'Build', icon: 'cube', key: 'build' },
-    { name: 'Lint', icon: 'sparkles', key: 'lint' },
-    { name: 'Test', icon: 'beaker', key: 'test' },
-    { name: 'Review', icon: 'eye', key: 'review' },
-    { name: 'Doc', icon: 'document', key: 'doc' },
-    { name: 'Ship', icon: 'rocket', key: 'ship' },
-    { name: 'Cleanup', icon: 'trash', key: 'cleanup' }
-  ];
+  // Workflow phases for the pipeline visualization (imported from config)
+  // Using icon map for rendering since we still need SVG icons here
+  const phaseIconMap: Record<string, string> = {
+    plan: 'clipboard',
+    validate: 'check-circle',
+    build: 'cube',
+    lint: 'sparkles',
+    test: 'beaker',
+    review: 'eye',
+    doc: 'document',
+    ship: 'rocket',
+    cleanup: 'trash'
+  };
+
+  const phasesWithIcons = workflowPhases.map(phase => ({
+    name: phase.name,
+    icon: phaseIconMap[phase.phase] || 'clipboard',
+    key: phase.phase
+  }));
 
   // Icon rendering helper
   const renderIcon = (iconName: string, status: 'pending' | 'active' | 'completed' = 'pending') => {
@@ -336,10 +347,7 @@ export function AdwMonitorCard() {
                     )}
                     <div>
                       <h3 className="text-white font-semibold text-base leading-tight">
-                        {currentWorkflow.workflow_template === 'adw_plan_iso' && 'Planning Phase' ||
-                         currentWorkflow.workflow_template === 'adw_sdlc_complete_iso' && 'Full SDLC' ||
-                         currentWorkflow.workflow_template === 'adw_sdlc_iso' && 'Standard SDLC' ||
-                         `Workflow ${currentWorkflow.adw_id.substring(0, 8)}`}
+                        {workflowTypeLabels.getLabel(currentWorkflow.workflow_template)}
                       </h3>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded-md font-medium">
@@ -640,9 +648,9 @@ export function AdwMonitorCard() {
                     </div>
 
                     {/* Phase Nodes in Circle */}
-                    {workflowPhases.map((phase, idx) => {
+                    {phasesWithIcons.map((phase, idx) => {
                       const status = getPhaseStatus(currentWorkflow, phase.key);
-                      const totalPhases = workflowPhases.length;
+                      const totalPhases = phasesWithIcons.length;
                       const angle = (idx * 360) / totalPhases - 90; // Start from top
                       const radius = 110; // Distance from center
                       const x = Math.cos((angle * Math.PI) / 180) * radius;

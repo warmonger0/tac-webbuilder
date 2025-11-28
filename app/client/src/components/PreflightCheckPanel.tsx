@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { intervals } from '../config/intervals';
 
 interface PreflightCheck {
   check: string;
@@ -41,7 +42,7 @@ export function PreflightCheckPanel() {
       }
       return response.json();
     },
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    refetchInterval: intervals.components.preflightChecks.autoRefreshInterval,
   });
 
   const getStatusIcon = (status: string) => {

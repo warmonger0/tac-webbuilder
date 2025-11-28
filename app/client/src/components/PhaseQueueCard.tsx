@@ -8,6 +8,8 @@
 import { useState } from 'react';
 import { executePhase } from '../api/client';
 import { WorkflowStateDisplay } from './WorkflowStateDisplay';
+import { apiConfig } from '../config/api';
+import { phaseQueueStatusColors, uiIcons } from '../config/theme';
 
 export interface PhaseQueueItem {
   queue_id: string;
@@ -32,56 +34,8 @@ interface PhaseQueueCardProps {
   queueItem: PhaseQueueItem;
 }
 
-const STATUS_COLORS = {
-  queued: {
-    bg: 'bg-gray-100',
-    border: 'border-gray-300',
-    text: 'text-gray-700',
-    badge: 'bg-gray-500',
-    icon: '⏸️',
-    label: 'Queued'
-  },
-  ready: {
-    bg: 'bg-blue-50',
-    border: 'border-blue-300',
-    text: 'text-blue-900',
-    badge: 'bg-blue-500',
-    icon: '▶️',
-    label: 'Ready'
-  },
-  running: {
-    bg: 'bg-yellow-50',
-    border: 'border-yellow-300',
-    text: 'text-yellow-900',
-    badge: 'bg-yellow-500',
-    icon: '⚙️',
-    label: 'Running'
-  },
-  completed: {
-    bg: 'bg-green-50',
-    border: 'border-green-300',
-    text: 'text-green-900',
-    badge: 'bg-green-500',
-    icon: '✅',
-    label: 'Completed'
-  },
-  blocked: {
-    bg: 'bg-orange-50',
-    border: 'border-orange-300',
-    text: 'text-orange-900',
-    badge: 'bg-orange-500',
-    icon: '🚫',
-    label: 'Blocked'
-  },
-  failed: {
-    bg: 'bg-red-50',
-    border: 'border-red-300',
-    text: 'text-red-900',
-    badge: 'bg-red-500',
-    icon: '❌',
-    label: 'Failed'
-  }
-};
+// Import status colors from centralized theme configuration
+const STATUS_COLORS = phaseQueueStatusColors;
 
 export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
   const { phase_number, phase_data, status, issue_number, queue_id, adw_id, pr_number } = queueItem;
@@ -91,14 +45,14 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
 
   const handleClick = () => {
     if (issue_number) {
-      window.open(`https://github.com/warmonger0/tac-webbuilder/issues/${issue_number}`, '_blank');
+      window.open(apiConfig.github.getIssueUrl(issue_number), '_blank');
     }
   };
 
   const handlePRClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (pr_number) {
-      window.open(`https://github.com/warmonger0/tac-webbuilder/pull/${pr_number}`, '_blank');
+      window.open(apiConfig.github.getPullRequestUrl(pr_number), '_blank');
     }
   };
 
@@ -160,7 +114,7 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
               className="text-gray-600 hover:text-gray-900 transition-colors"
               title={isExpanded ? "Collapse details" : "Expand details"}
             >
-              {isExpanded ? '▼' : '▶'}
+              {isExpanded ? uiIcons.collapse : uiIcons.expand}
             </button>
 
             {status === 'ready' ? (
@@ -203,7 +157,7 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
                 className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors"
                 title={`View Issue #${issue_number}`}
               >
-                <span>⭕</span>
+                <span>{uiIcons.issue}</span>
                 <span>Open</span>
               </button>
             )}
@@ -213,7 +167,7 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
                 className="inline-flex items-center gap-1 px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded transition-colors"
                 title={`View PR #${pr_number}`}
               >
-                <span>🔀</span>
+                <span>{uiIcons.pullRequest}</span>
                 <span>#{pr_number}</span>
               </button>
             )}

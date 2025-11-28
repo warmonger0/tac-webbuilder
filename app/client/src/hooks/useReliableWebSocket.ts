@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { intervals } from '../config/intervals';
 
 interface ReliableWebSocketOptions<T, M = any> {
   url: string;
@@ -33,9 +34,9 @@ export function useReliableWebSocket<T, M = any>({
   queryFn,
   onMessage,
   enabled = true,
-  pollingInterval = 3000,
-  maxReconnectDelay = 30000,
-  maxReconnectAttempts = 10,
+  pollingInterval = intervals.websocket.pollingInterval,
+  maxReconnectDelay = intervals.websocket.maxReconnectDelay,
+  maxReconnectAttempts = intervals.websocket.maxReconnectAttempts,
 }: ReliableWebSocketOptions<T, M>) {
   const [state, setState] = useState<ConnectionState>({
     isConnected: false,

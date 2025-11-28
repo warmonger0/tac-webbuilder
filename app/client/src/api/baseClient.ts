@@ -5,7 +5,9 @@
  * used by all domain-specific API clients.
  */
 
-export const API_BASE = '/api/v1';
+import { apiConfig } from '../config/api';
+
+export const API_BASE = apiConfig.basePath;
 
 /**
  * Generic fetch wrapper with JSON handling and error management.

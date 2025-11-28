@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { getRoutes, getWorkflowHistory, listWorkflows } from '../api/client';
 import type { HistoryAnalytics, Route, WorkflowExecution, WorkflowHistoryItem } from '../types';
 import { useReliableWebSocket } from './useReliableWebSocket';
+import { apiConfig } from '../config/api';
+import { intervals } from '../config/intervals';
 
 interface WorkflowsWebSocketMessage {
   type: 'workflows_update';
@@ -16,9 +18,7 @@ interface RoutesWebSocketMessage {
 export function useWorkflowsWebSocket() {
   const [workflows, setWorkflows] = useState<WorkflowExecution[]>([]);
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.hostname;
-  const wsUrl = `${protocol}//${host}:8000/ws/workflows`;
+  const wsUrl = apiConfig.websocket.workflows();
 
   const connectionState = useReliableWebSocket<WorkflowExecution[], WorkflowsWebSocketMessage>({
     url: wsUrl,
@@ -50,9 +50,7 @@ export function useWorkflowsWebSocket() {
 export function useRoutesWebSocket() {
   const [routes, setRoutes] = useState<Route[]>([]);
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.hostname;
-  const wsUrl = `${protocol}//${host}:8000/ws/routes`;
+  const wsUrl = apiConfig.websocket.routes();
 
   const connectionState = useReliableWebSocket<{ routes: Route[] }, RoutesWebSocketMessage>({
     url: wsUrl,
@@ -95,9 +93,7 @@ export function useWorkflowHistoryWebSocket() {
   const [totalCount, setTotalCount] = useState(0);
   const [analytics, setAnalytics] = useState<HistoryAnalytics | null>(null);
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.hostname;
-  const wsUrl = `${protocol}//${host}:8000/ws/workflow-history`;
+  const wsUrl = apiConfig.websocket.workflowHistory();
 
   const connectionState = useReliableWebSocket<
     {
@@ -109,7 +105,7 @@ export function useWorkflowHistoryWebSocket() {
   >({
     url: wsUrl,
     queryKey: ['workflow-history'],
-    queryFn: () => getWorkflowHistory({ limit: 50, offset: 0 }),
+    queryFn: () => getWorkflowHistory({ limit: intervals.components.workflowHistory.defaultLimit, offset: 0 }),
     onMessage: (message: any) => {
       // Handle both WebSocket message format and HTTP polling response format
       if (message.type === 'workflow_history_update') {
@@ -166,9 +162,7 @@ interface ADWStateWebSocketMessage {
 export function useADWStateWebSocket(adwId: string | null) {
   const [state, setState] = useState<ADWStateWebSocketMessage['data'] | null>(null);
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.hostname;
-  const wsUrl = adwId ? `${protocol}//${host}:8000/ws/adw-state/${adwId}` : '';
+  const wsUrl = adwId ? apiConfig.websocket.adwState(adwId) : '';
 
   const connectionState = useReliableWebSocket<
     ADWStateWebSocketMessage['data'],
@@ -187,7 +181,7 @@ export function useADWStateWebSocket(adwId: string | null) {
       }
     },
     enabled: !!adwId,
-    maxReconnectAttempts: 5, // Lower retry count for ADW state
+    maxReconnectAttempts: intervals.components.adwMonitor.maxReconnectAttempts,
   });
 
   return {
