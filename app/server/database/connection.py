@@ -6,8 +6,9 @@ Supports both SQLite and PostgreSQL through a unified interface.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any
 
 
 class DatabaseAdapter(ABC):
@@ -30,7 +31,7 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    def execute_query(self, query: str, params: Optional[tuple] = None) -> Any:
+    def execute_query(self, query: str, params: tuple | None = None) -> Any:
         """
         Execute a query and return results.
 

@@ -32,19 +32,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-from core.workflow_history import sync_workflow_history
-from core.workflow_history_utils.database import (
-    DB_PATH as WORKFLOW_DB_PATH,
-    get_history_analytics,
-    get_workflow_by_adw_id,
-    get_workflow_history,
-    init_db,
-    insert_workflow_history,
-    update_workflow_history,
-)
 from core.adw_lock import (
-    DB_PATH as LOCK_DB_PATH,
     acquire_lock,
     cleanup_stale_locks,
     force_release_lock,
@@ -53,7 +41,15 @@ from core.adw_lock import (
     release_lock,
     update_lock_status,
 )
-
+from core.workflow_history import sync_workflow_history
+from core.workflow_history_utils.database import (
+    get_history_analytics,
+    get_workflow_by_adw_id,
+    get_workflow_history,
+    init_db,
+    insert_workflow_history,
+    update_workflow_history,
+)
 
 # ============================================================================
 # Workflow History Database Tests
@@ -597,7 +593,6 @@ class TestWorkflowHistoryDatabase:
             init_db()
 
             # Act: First sync - Create a simpler mock approach
-            import core.workflow_history as wh_module
 
             def mocked_scan():
                 """Scan our test agents directory."""

@@ -1,7 +1,6 @@
 """Test database operations with both SQLite and PostgreSQL"""
 import os
 import sys
-from datetime import datetime
 
 # Test with PostgreSQL
 os.environ["DB_TYPE"] = "postgresql"
@@ -12,8 +11,8 @@ os.environ["POSTGRES_USER"] = "tac_user"
 os.environ["POSTGRES_PASSWORD"] = "changeme"
 
 from database import get_database_adapter
-from repositories.phase_queue_repository import PhaseQueueRepository
 from models.phase_queue_item import PhaseQueueItem
+from repositories.phase_queue_repository import PhaseQueueRepository
 
 print("=" * 70)
 print("Testing Database Operations with PostgreSQL")
@@ -59,7 +58,7 @@ try:
     # Verify update
     found = repo.find_by_id("test-postgres-001")
     if found and found.status == "running":
-        print(f"✅ Update verified: status is now 'running'")
+        print("✅ Update verified: status is now 'running'")
     else:
         raise Exception("Update verification failed")
 
@@ -70,7 +69,7 @@ try:
     # Verify delete
     found = repo.find_by_id("test-postgres-001")
     if found is None:
-        print(f"✅ Delete verified: item no longer exists")
+        print("✅ Delete verified: item no longer exists")
     else:
         raise Exception("Delete verification failed")
 

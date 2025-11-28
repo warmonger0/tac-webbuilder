@@ -6,7 +6,7 @@ This module provides analytics and aggregate queries for the workflow history sy
 
 import logging
 
-from .schema import DB_PATH, _db_adapter
+from .schema import _db_adapter
 
 logger = logging.getLogger(__name__)
 

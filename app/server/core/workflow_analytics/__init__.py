@@ -19,16 +19,21 @@ All original functions remain accessible via this package for backward compatibi
 """
 
 # Helper functions
+# Anomaly detection
+from .anomaly_detection import detect_anomalies
 from .helpers import (
-    extract_hour,
-    extract_day_of_week,
     detect_complexity,
+    extract_day_of_week,
+    extract_hour,
 )
+
+# Recommendations
+from .recommendations import generate_optimization_recommendations
 
 # Scoring functions
 from .scoring import (
-    calculate_nl_input_clarity_score,
     calculate_cost_efficiency_score,
+    calculate_nl_input_clarity_score,
     calculate_performance_score,
     calculate_quality_score,
 )
@@ -38,12 +43,6 @@ from .similarity import (
     calculate_text_similarity,
     find_similar_workflows,
 )
-
-# Anomaly detection
-from .anomaly_detection import detect_anomalies
-
-# Recommendations
-from .recommendations import generate_optimization_recommendations
 
 # Export all functions for backward compatibility
 __all__ = [

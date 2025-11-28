@@ -10,16 +10,12 @@ services, databases, and workflow orchestration where possible.
 
 import asyncio
 import json
-import os
-import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Generator
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
-
 
 # ============================================================================
 # E2E Test Environment Setup
@@ -172,7 +168,7 @@ def e2e_database(e2e_test_environment):
         conn.commit()
         conn.close()
 
-    yield db_path
+    return db_path
 
 
 # ============================================================================
@@ -389,7 +385,6 @@ def e2e_test_db_cleanup(e2e_database):
             # Cleanup happens automatically after test
     """
     import sqlite3
-    import time
 
     # Cleanup BEFORE test to ensure clean state
     try:
@@ -496,7 +491,6 @@ def performance_monitor():
             metrics = performance_monitor.get_metrics()
             assert metrics["workflow_creation"]["duration"] < 5.0
     """
-    import time
 
     class PerformanceMonitor:
         def __init__(self):

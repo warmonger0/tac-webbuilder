@@ -8,10 +8,9 @@ Tests cover:
 - Parallel execution support
 """
 
-import pytest
 import sqlite3
-from datetime import datetime
 
+import pytest
 from services.hopper_sorter import HopperSorter, get_priority_name
 from services.phase_queue_service import PhaseQueueService
 
@@ -144,7 +143,7 @@ def test_fifo_within_priority(test_db, sorter, queue_service):
 
     # Mark as running to remove from ready queue
     conn = sqlite3.connect(test_db)
-    conn.execute(f"UPDATE phase_queue SET status = 'running' WHERE parent_issue = 100")
+    conn.execute("UPDATE phase_queue SET status = 'running' WHERE parent_issue = 100")
     conn.commit()
     conn.close()
 
@@ -269,7 +268,6 @@ def test_get_priority_name():
 def test_deterministic_tiebreaker(test_db, sorter, queue_service):
     """Test that parent_issue is used as tiebreaker"""
     # Create two phases with same priority and queue_position
-    import time
 
     queue_service.enqueue(
         parent_issue=200,

@@ -12,7 +12,6 @@ Run with: uv run python scripts/fix_phantom_records.py [--dry-run]
 import argparse
 import logging
 import sys
-from datetime import datetime
 from pathlib import Path
 
 # Add parent directory to path for imports

@@ -5,9 +5,9 @@ GitHub CLI integration for posting issues.
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
+from utils.process_runner import ProcessRunner
 
 from core.data_models import GitHubIssue
-from utils.process_runner import ProcessRunner
 
 
 class GitHubPoster:

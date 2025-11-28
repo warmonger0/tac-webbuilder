@@ -8,7 +8,7 @@ import json
 import logging
 import traceback
 
-from .schema import DB_PATH, _db_adapter
+from .schema import _db_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ def insert_workflow_history(
         ]
 
         # Get existing columns from database to validate fields before inserting
-        cursor.execute(f"PRAGMA table_info(workflow_history)")
+        cursor.execute("PRAGMA table_info(workflow_history)")
         existing_columns = {row["name"] for row in cursor.fetchall()}
 
         # Map field names from code schema to database schema
@@ -217,7 +217,7 @@ def update_workflow_history(
         cursor = conn.cursor()
 
         # Get existing columns from database to validate fields before updating
-        cursor.execute(f"PRAGMA table_info(workflow_history)")
+        cursor.execute("PRAGMA table_info(workflow_history)")
         existing_columns = {row["name"] for row in cursor.fetchall()}
 
         # Convert dicts and lists to JSON strings

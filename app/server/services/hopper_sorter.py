@@ -12,10 +12,9 @@ Key Features:
 """
 
 import logging
-from typing import List, Optional
 
-from models.phase_queue_item import PhaseQueueItem
 from database import SQLiteAdapter
+from models.phase_queue_item import PhaseQueueItem
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +44,7 @@ class HopperSorter:
         self.adapter = SQLiteAdapter(db_path=db_path)
         logger.info("[INIT] HopperSorter initialized")
 
-    def get_next_phase_1(self) -> Optional[PhaseQueueItem]:
+    def get_next_phase_1(self) -> PhaseQueueItem | None:
         """
         Get the next Phase 1 to start from the hopper (deterministic).
 
@@ -98,7 +97,7 @@ class HopperSorter:
             logger.error(f"[ERROR] Failed to get next Phase 1: {str(e)}")
             raise
 
-    def get_next_phases_parallel(self, max_parallel: int = 5) -> List[PhaseQueueItem]:
+    def get_next_phases_parallel(self, max_parallel: int = 5) -> list[PhaseQueueItem]:
         """
         Get multiple Phase 1s that can run in parallel.
 

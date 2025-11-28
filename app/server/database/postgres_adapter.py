@@ -4,12 +4,13 @@ PostgreSQL Database Adapter
 Implements DatabaseAdapter interface using psycopg2 with connection pooling.
 """
 
-import psycopg2
-from psycopg2 import pool
-from psycopg2.extras import RealDictCursor
-from contextlib import contextmanager
-from typing import Any, Generator, Optional
 import os
+from collections.abc import Generator
+from contextlib import contextmanager
+from typing import Any
+
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 from .connection import DatabaseAdapter
 
@@ -52,7 +53,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
         finally:
             self.pool.putconn(conn)
 
-    def execute_query(self, query: str, params: Optional[tuple] = None) -> Any:
+    def execute_query(self, query: str, params: tuple | None = None) -> Any:
         """Execute query and return results"""
         with self.get_connection() as conn:
             cursor = conn.cursor()

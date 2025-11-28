@@ -16,11 +16,9 @@ Covers edge cases including:
 import json
 import logging
 import sqlite3
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-
 from core.workflow_history_utils.database import (
     DB_PATH,
     get_history_analytics,
@@ -31,7 +29,6 @@ from core.workflow_history_utils.database import (
     update_workflow_history,
     update_workflow_history_by_issue,
 )
-
 
 # ============================================================================
 # Test Fixtures

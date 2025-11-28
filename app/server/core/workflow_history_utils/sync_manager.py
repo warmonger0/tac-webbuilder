@@ -13,14 +13,13 @@ import logging
 from datetime import datetime
 
 from core.workflow_history_utils.database import (
-    DB_PATH,
     _db_adapter,
-    insert_workflow_history,
-    update_workflow_history,
     get_workflow_by_adw_id,
     get_workflow_history,
+    insert_workflow_history,
+    update_workflow_history,
 )
-from core.workflow_history_utils.enrichment import enrich_workflow, enrich_cost_data_for_resync
+from core.workflow_history_utils.enrichment import enrich_cost_data_for_resync, enrich_workflow
 from core.workflow_history_utils.filesystem import scan_agents_directory
 
 logger = logging.getLogger(__name__)

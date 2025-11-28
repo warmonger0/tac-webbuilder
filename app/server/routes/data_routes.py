@@ -33,9 +33,9 @@ from core.sql_security import (
     execute_query_safely,
     validate_identifier,
 )
+from database import get_database_adapter
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
-from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 

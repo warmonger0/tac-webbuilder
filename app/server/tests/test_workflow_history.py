@@ -44,10 +44,10 @@ def temp_db(monkeypatch):
 
     # Use monkeypatch to replace DB_PATH in all modules that import it
     # This works better than patch() because it happens before module-level code runs
-    import core.workflow_history_utils.database.schema as schema_module
+    import core.workflow_history_utils.database.analytics as analytics_module
     import core.workflow_history_utils.database.mutations as mutations_module
     import core.workflow_history_utils.database.queries as queries_module
-    import core.workflow_history_utils.database.analytics as analytics_module
+    import core.workflow_history_utils.database.schema as schema_module
 
     monkeypatch.setattr(schema_module, 'DB_PATH', temp_db_path)
     monkeypatch.setattr(mutations_module, 'DB_PATH', temp_db_path)

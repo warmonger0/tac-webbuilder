@@ -10,19 +10,15 @@ Tests the complete flow of multi-phase workflow execution including:
 """
 
 import asyncio
-import json
 import os
 import sqlite3
 import tempfile
 from datetime import datetime
-from typing import Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock
 
 import pytest
-
 from services.phase_coordinator import PhaseCoordinator
-from services.phase_queue_service import PhaseQueueService, PhaseQueueItem
-
+from services.phase_queue_service import PhaseQueueService
 
 # ============================================================================
 # Fixtures
@@ -126,8 +122,8 @@ def create_workflow_entry(
     workflow_db_path: str,
     issue_number: int,
     status: str = "running",
-    error_message: Optional[str] = None,
-    phase_number: Optional[int] = None,
+    error_message: str | None = None,
+    phase_number: int | None = None,
     is_multi_phase: bool = True
 ):
     """
@@ -169,7 +165,7 @@ def update_workflow_status(
     workflow_db_path: str,
     issue_number: int,
     status: str,
-    error_message: Optional[str] = None
+    error_message: str | None = None
 ):
     """
     Helper to update workflow status.

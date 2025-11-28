@@ -18,12 +18,10 @@ Test Coverage:
 - TC-005: Cost estimate accuracy validation
 """
 
-import json
-import pytest
 import sqlite3
-import uuid
-from unittest.mock import AsyncMock, Mock, patch, MagicMock
-from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 
 @pytest.mark.e2e
@@ -168,7 +166,7 @@ class TestCompleteGitHubIssueFlow:
             import logging
             logging.warning(f"Failed to cleanup before test: {e}")
 
-        yield
+        return
 
     def test_complete_nl_request_to_issue_creation(
         self,
@@ -581,7 +579,7 @@ class TestGitHubIssueFlowEdgeCases:
             import logging
             logging.warning(f"Failed to cleanup before test: {e}")
 
-        yield
+        return
 
     @pytest.fixture
     def mock_failing_webhook(self):
@@ -861,7 +859,7 @@ class TestGitHubIssueFlowDataPersistence:
             import logging
             logging.warning(f"Failed to cleanup before test: {e}")
 
-        yield
+        return
 
     def test_cost_estimate_saved_correctly(
         self,
@@ -999,7 +997,7 @@ class TestGitHubIssueFlowPerformance:
             import logging
             logging.warning(f"Failed to cleanup before test: {e}")
 
-        yield
+        return
 
     def test_request_processing_performance(
         self,

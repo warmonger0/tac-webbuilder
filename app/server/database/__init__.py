@@ -5,9 +5,9 @@ Provides unified interface for both SQLite and PostgreSQL.
 """
 
 from .connection import DatabaseAdapter
-from .sqlite_adapter import SQLiteAdapter
+from .factory import close_database_adapter, get_database_adapter
 from .postgres_adapter import PostgreSQLAdapter
-from .factory import get_database_adapter, close_database_adapter
+from .sqlite_adapter import SQLiteAdapter
 
 __all__ = [
     "DatabaseAdapter",

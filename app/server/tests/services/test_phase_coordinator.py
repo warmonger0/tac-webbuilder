@@ -15,14 +15,11 @@ import os
 import sqlite3
 import tempfile
 from datetime import datetime
-from typing import Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
-
 from services.phase_coordinator import PhaseCoordinator
 from services.phase_queue_service import PhaseQueueService
-
 
 # ============================================================================
 # Fixtures
@@ -123,7 +120,7 @@ def add_workflow(
     workflow_db_path: str,
     issue_number: int,
     status: str = "running",
-    error_message: Optional[str] = None
+    error_message: str | None = None
 ):
     """Add a workflow to workflow_history"""
     conn = sqlite3.connect(workflow_db_path)

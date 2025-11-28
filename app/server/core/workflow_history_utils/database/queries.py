@@ -7,7 +7,7 @@ This module provides all read operations for the workflow history system.
 import json
 import logging
 
-from .schema import DB_PATH, _db_adapter
+from .schema import _db_adapter
 
 logger = logging.getLogger(__name__)
 

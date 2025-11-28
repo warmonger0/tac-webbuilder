@@ -11,8 +11,8 @@ from core.data_models import (
     SystemStatusResponse,
 )
 from core.preflight_checks import run_preflight_checks
-from fastapi import APIRouter, Query
 from database import get_database_adapter
+from fastapi import APIRouter, Query
 
 logger = logging.getLogger(__name__)
 

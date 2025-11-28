@@ -8,9 +8,8 @@ import os
 from typing import Union
 
 from .connection import DatabaseAdapter
-from .sqlite_adapter import SQLiteAdapter
 from .postgres_adapter import PostgreSQLAdapter
-
+from .sqlite_adapter import SQLiteAdapter
 
 # Global adapter instance (singleton pattern)
 _adapter: Union[DatabaseAdapter, None] = None

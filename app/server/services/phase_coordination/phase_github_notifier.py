@@ -6,10 +6,10 @@ Posts GitHub comments on parent issues about phase status changes.
 
 import logging
 import os
-from typing import Optional
+
+from utils.process_runner import ProcessRunner
 
 from services.phase_queue_service import PhaseQueueService
-from utils.process_runner import ProcessRunner
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class PhaseGitHubNotifier:
         phase_number: int,
         child_issue: int,
         status: str,
-        error_message: Optional[str] = None
+        error_message: str | None = None
     ):
         """
         Post a comment to the parent GitHub issue about phase completion/failure.
@@ -120,7 +120,7 @@ Phase {phase_number} has completed successfully."""
         return comment
 
     def _format_failure_comment(
-        self, phase_number: int, child_issue: int, error_message: Optional[str]
+        self, phase_number: int, child_issue: int, error_message: str | None
     ) -> str:
         """
         Format failure comment for a failed phase.

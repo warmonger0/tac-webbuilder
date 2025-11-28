@@ -4,6 +4,7 @@ import sys
 import time
 from datetime import datetime
 
+
 def benchmark_operations(db_type, iterations=100):
     """Benchmark basic operations"""
     # Set environment
@@ -23,9 +24,9 @@ def benchmark_operations(db_type, iterations=100):
         del sys.modules['database.postgres_adapter']
         del sys.modules['database.sqlite_adapter']
 
-    from database import get_database_adapter, close_database_adapter
-    from repositories.phase_queue_repository import PhaseQueueRepository
+    from database import close_database_adapter, get_database_adapter
     from models.phase_queue_item import PhaseQueueItem
+    from repositories.phase_queue_repository import PhaseQueueRepository
 
     adapter = get_database_adapter()
     repo = PhaseQueueRepository()
@@ -88,7 +89,7 @@ print("=" * 70)
 print("DATABASE PERFORMANCE BENCHMARK")
 print("=" * 70)
 print(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-print(f"Iterations per operation: 100")
+print("Iterations per operation: 100")
 print("=" * 70)
 
 try:

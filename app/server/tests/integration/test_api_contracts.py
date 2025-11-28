@@ -10,9 +10,9 @@ These tests validate that API endpoints:
 Uses real FastAPI app with test database and mocked external APIs.
 """
 
-import pytest
 from unittest.mock import patch
-from fastapi.testclient import TestClient
+
+import pytest
 
 
 @pytest.mark.integration

@@ -5,6 +5,7 @@ This module generates actionable recommendations based on workflow anomalies.
 """
 
 import logging
+
 from .helpers import detect_complexity
 
 logger = logging.getLogger(__name__)

@@ -7,8 +7,9 @@ into the DatabaseAdapter interface for backward compatibility.
 
 import sqlite3
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any
 
 from .connection import DatabaseAdapter
 
@@ -87,7 +88,7 @@ class SQLiteAdapter(DatabaseAdapter):
             # Always close the connection
             conn.close()
 
-    def execute_query(self, query: str, params: Optional[tuple] = None) -> Any:
+    def execute_query(self, query: str, params: tuple | None = None) -> Any:
         """
         Execute a query and return results.
 

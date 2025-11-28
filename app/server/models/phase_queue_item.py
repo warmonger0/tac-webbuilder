@@ -6,7 +6,7 @@ Represents a single phase in the multi-phase workflow queue.
 
 import json
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class PhaseQueueItem:
@@ -17,19 +17,19 @@ class PhaseQueueItem:
         queue_id: str,
         parent_issue: int,
         phase_number: int,
-        issue_number: Optional[int] = None,
+        issue_number: int | None = None,
         status: str = "queued",
-        depends_on_phase: Optional[int] = None,
-        phase_data: Optional[Dict[str, Any]] = None,
-        created_at: Optional[str] = None,
-        updated_at: Optional[str] = None,
-        error_message: Optional[str] = None,
-        adw_id: Optional[str] = None,
-        pr_number: Optional[int] = None,
+        depends_on_phase: int | None = None,
+        phase_data: dict[str, Any] | None = None,
+        created_at: str | None = None,
+        updated_at: str | None = None,
+        error_message: str | None = None,
+        adw_id: str | None = None,
+        pr_number: int | None = None,
         priority: int = 50,
-        queue_position: Optional[int] = None,
-        ready_timestamp: Optional[str] = None,
-        started_timestamp: Optional[str] = None,
+        queue_position: int | None = None,
+        ready_timestamp: str | None = None,
+        started_timestamp: str | None = None,
     ):
         self.queue_id = queue_id
         self.parent_issue = parent_issue
@@ -48,7 +48,7 @@ class PhaseQueueItem:
         self.ready_timestamp = ready_timestamp
         self.started_timestamp = started_timestamp
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         return {
             "queue_id": self.queue_id,

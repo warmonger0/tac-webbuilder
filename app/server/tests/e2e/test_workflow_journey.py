@@ -10,8 +10,9 @@ These tests validate complete user workflows from start to finish:
 Simulates real user interactions with minimal mocking.
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 
 @pytest.mark.e2e

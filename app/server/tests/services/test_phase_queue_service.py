@@ -6,12 +6,9 @@ Tests phase queue management, dependency tracking, and sequential execution coor
 
 import os
 import tempfile
-import uuid
-from datetime import datetime
 
 import pytest
-
-from services.phase_queue_service import PhaseQueueService, PhaseQueueItem
+from services.phase_queue_service import PhaseQueueService
 
 
 @pytest.fixture

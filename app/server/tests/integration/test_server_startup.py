@@ -16,9 +16,8 @@ This test suite ensures:
 3. Future PRs don't accidentally introduce absolute imports
 """
 
-import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -162,7 +161,7 @@ class TestLaunchScriptConsistency:
         if not launch_script.exists():
             pytest.skip("launch.sh not found, skipping validation")
 
-        with open(launch_script, 'r') as f:
+        with open(launch_script) as f:
             content = f.read()
 
         # Check that launch script does: cd app/server && uv run python server.py
