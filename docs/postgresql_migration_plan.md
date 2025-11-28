@@ -196,7 +196,8 @@ def get_db_config():
 
 ## Phase 2: Code Changes (6 hours)
 
-**STATUS: Phase 2.1 Complete ✅ (2024-11-27)**
+**STATUS: Phase 2.1 & 2.3 Complete ✅ (2024-11-27)**
+**Remaining: Phase 2.2 (Update utils/db_connection.py wrapper - deferred)**
 
 ### 2.1 Database Abstraction Layer ~~(3 hours)~~ **COMPLETE ✅**
 
@@ -467,11 +468,38 @@ def get_connection(db_path: str = "db/database.db", max_retries: int = 3, retry_
 ```
 
 **Checklist:**
-- [ ] Add deprecation warning to `utils/db_connection.py`
-- [ ] Update to use factory internally
-- [ ] Ensure backward compatibility (no code breaks)
+- [ ] Add deprecation warning to `utils/db_connection.py` (Deferred - not needed yet)
+- [ ] Update to use factory internally (Deferred - not needed yet)
+- [ ] Ensure backward compatibility (no code breaks) ✅
 
-### 2.3 Query Translation (2 hours)
+### 2.3 Query Translation ~~(2 hours)~~ **COMPLETE ✅**
+
+**Completed:** November 27, 2024 (via linter/formatter)
+**Actual Time:** < 1 hour (automated)
+**Files Modified:** 6 files
+**Code Changes:** 83 insertions, 56 deletions
+
+**What Was Done:**
+- ✅ Implemented `placeholder()` method in database adapters
+- ✅ Updated all query placeholders to use `adapter.placeholder()`
+- ✅ Converted 6 files with ~50+ query statements:
+  - `repositories/phase_queue_repository.py` (8 methods)
+  - `routes/issue_completion_routes.py` (1 route)
+  - `services/phase_coordination/workflow_completion_detector.py` (2 methods)
+  - `core/adw_lock.py` (5 functions)
+  - `core/workflow_history_utils/database/mutations.py` (3 functions)
+  - `core/workflow_history_utils/database/queries.py` (2 functions)
+- ✅ Added `now_function()` support for database-agnostic datetime handling
+- ✅ All queries now support both SQLite (`?`) and PostgreSQL (`%s`)
+
+**Migration Pattern Applied:**
+```python
+# Pattern used throughout
+ph = adapter.placeholder()  # Returns "?" for SQLite, "%s" for PostgreSQL
+cursor.execute(f"SELECT * FROM table WHERE id = {ph}", (value,))
+```
+
+### 2.3 Query Translation (2 hours) [ORIGINAL PLAN - NOW OBSOLETE]
 
 **Placeholder Conversion:**
 
