@@ -1,5 +1,6 @@
 # Environment variables
 .env
+.env.postgres
 app/server/.env
 .ports.env
 
@@ -27,6 +28,13 @@ dist/
 *.db
 *.sqlite
 *.sqlite3
+
+# Docker
+docker-compose.override.yml
+
+# PostgreSQL test results
+postgres_test_results.txt
+app/server/postgres_test_results.txt
 
 # IDE
 .vscode/
