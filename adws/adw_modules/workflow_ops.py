@@ -24,6 +24,88 @@ from adw_modules.state import ADWState
 from adw_modules.utils import parse_json
 
 
+def extract_files_from_plan(plan_file: str, logger: Optional[logging.Logger] = None) -> List[str]:
+    """Extract list of files to modify from a plan file.
+
+    Looks for sections like:
+    - ## Files to Modify
+    - ## Files to Change
+    - ## Files Affected
+
+    And extracts the file paths (lines starting with - or * followed by a path).
+
+    Args:
+        plan_file: Path to the plan markdown file
+        logger: Optional logger for debug output
+
+    Returns:
+        List of absolute file paths that need to be modified
+    """
+    if not os.path.exists(plan_file):
+        if logger:
+            logger.warning(f"Plan file not found: {plan_file}")
+        return []
+
+    try:
+        with open(plan_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Look for file list sections (case-insensitive)
+        section_patterns = [
+            r'##\s+Files?\s+to\s+Modify',
+            r'##\s+Files?\s+to\s+Change',
+            r'##\s+Files?\s+Affected',
+            r'##\s+Target\s+Files?',
+        ]
+
+        files = []
+        for pattern in section_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                # Extract section content until next ## header or end of file
+                section_start = match.end()
+                next_header = re.search(r'\n##\s+', content[section_start:])
+                section_end = section_start + next_header.start() if next_header else len(content)
+                section_content = content[section_start:section_end]
+
+                # Extract file paths (lines starting with -, *, or numbers)
+                # Match patterns like:
+                # - app/server/file.py
+                # * app/client/file.tsx
+                # 1. app/server/file.py
+                file_lines = re.findall(r'^\s*[-*•]|\d+\.\s+(.+?)(?:\s+[-–—].*)?$', section_content, re.MULTILINE)
+
+                for line in section_content.split('\n'):
+                    line = line.strip()
+                    # Match lines starting with -, *, •, or number.
+                    if re.match(r'^[-*•]|\d+\.', line):
+                        # Extract path (everything after the bullet/number until optional description)
+                        path_match = re.match(r'^(?:[-*•]|\d+\.)\s+([^\s]+)', line)
+                        if path_match:
+                            path = path_match.group(1).strip()
+                            # Remove any trailing punctuation or description
+                            path = re.sub(r'\s+[-–—].*$', '', path)
+                            path = path.rstrip(',:;')
+
+                            # Validate it looks like a file path
+                            if '/' in path or '\\' in path or path.endswith(('.py', '.tsx', '.ts', '.js', '.md', '.json', '.yaml', '.yml')):
+                                files.append(path)
+
+                if files:
+                    if logger:
+                        logger.info(f"Extracted {len(files)} target files from plan: {files}")
+                    return files
+
+        if logger:
+            logger.warning(f"No 'Files to Modify' section found in plan: {plan_file}")
+        return []
+
+    except Exception as e:
+        if logger:
+            logger.error(f"Error extracting files from plan: {e}")
+        return []
+
+
 def validate_issue_number(issue_number: str) -> int:
     """Validate and convert issue_number to integer.
 
@@ -492,6 +574,36 @@ def implement_plan(
             context_data["changed_files"] = result.stdout.strip().split('\n')
     except Exception as e:
         logger.debug(f"Could not get changed files: {e}")
+
+    # OPTIMIZATION: Extract target files from plan and pre-load them
+    # This significantly reduces context loading during implementation
+    target_files = extract_files_from_plan(plan_file, logger)
+    if target_files:
+        logger.info(f"🎯 File scope optimization: Pre-loading {len(target_files)} target files")
+        context_data["target_files"] = target_files
+
+        # Pre-load file contents to further reduce implementation phase context
+        preloaded_content = {}
+        for file_path in target_files:
+            # Convert to absolute path if relative
+            abs_path = file_path if os.path.isabs(file_path) else os.path.join(worktree_path, file_path)
+
+            if os.path.exists(abs_path):
+                try:
+                    with open(abs_path, 'r', encoding='utf-8') as f:
+                        preloaded_content[file_path] = f.read()
+                    logger.debug(f"  ✓ Pre-loaded: {file_path}")
+                except Exception as e:
+                    logger.warning(f"  ✗ Could not pre-load {file_path}: {e}")
+            else:
+                # File doesn't exist yet - it will be created
+                logger.debug(f"  • {file_path} (new file)")
+
+        if preloaded_content:
+            context_data["preloaded_content"] = preloaded_content
+            logger.info(f"💾 Pre-loaded {len(preloaded_content)} files to reduce context loading")
+    else:
+        logger.warning("⚠️ No target files extracted from plan - implementation may load excessive context")
 
     # Only create context file if we have data
     if context_data:

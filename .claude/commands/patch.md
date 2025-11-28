@@ -46,9 +46,17 @@ review_change_request: `{review_change_request}`
 **Solution:** <brief description of the solution approach based on the `review_change_request`>
 
 ## Files to Modify
-Use these files to implement the patch:
+**CRITICAL: This section defines file scope boundaries for cost optimization.**
+**List EVERY file that needs to be modified - be specific and minimal for patches.**
+**The implementation phase will ONLY load these files - unlisted files will NOT be accessible.**
 
-<list only the files that need changes - be specific and minimal>
+### Existing Files
+<List ALL existing files that will be modified, using absolute paths from project root. Example:
+- app/server/routes/workflow_routes.py - Fix response format
+>
+
+### New Files
+<List ALL new files that will be created (most patches won't need new files).>
 
 ## Implementation Steps
 IMPORTANT: Execute every step in order, top to bottom.

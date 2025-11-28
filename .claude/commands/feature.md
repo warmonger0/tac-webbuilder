@@ -75,10 +75,28 @@ So that <benefit/value>
 ## Solution Statement
 <describe the proposed solution approach and how it solves the problem>
 
-## Relevant Files
-Use these files to implement the feature:
+## Files to Modify
+**CRITICAL: This section defines file scope boundaries for cost optimization.**
+**List EVERY file that needs to be modified (existing files) or created (new files).**
+**The implementation phase will ONLY load these files - unlisted files will NOT be accessible.**
 
-<find and list the files that are relevant to the feature describe why they are relevant in bullet points. If there are new files that need to be created to implement the feature, list them in an h3 'New Files' section.>
+### Existing Files
+<List ALL existing files that will be modified, using absolute paths from project root. Example:
+- app/server/routes/workflow_routes.py - Add new endpoint for status
+- app/client/src/components/WorkflowCard.tsx - Update UI to show status
+- app/server/tests/test_workflow_routes.py - Add test for new endpoint
+>
+
+### New Files
+<List ALL new files that will be created. Example:
+- app/server/services/workflow_status_service.py - New service for workflow status
+- app/client/src/types/workflow-status.types.ts - Type definitions for status
+>
+
+## Relevant Files
+Use these files for context and understanding (will NOT be loaded during implementation unless listed in "Files to Modify"):
+
+<find and list the files that are relevant to understanding the feature but won't be directly modified. Describe why they are relevant in bullet points.>
 
 ## Implementation Plan
 ### Phase 1: Foundation

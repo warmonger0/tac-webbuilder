@@ -73,10 +73,24 @@ issue_json: `{issue_json}`
 ## Root Cause Analysis
 <analyze and explain the root cause of the bug>
 
-## Relevant Files
-Use these files to fix the bug:
+## Files to Modify
+**CRITICAL: This section defines file scope boundaries for cost optimization.**
+**List EVERY file that needs to be modified (existing files) or created (new files).**
+**The implementation phase will ONLY load these files - unlisted files will NOT be accessible.**
 
-<find and list the files that are relevant to the bug describe why they are relevant in bullet points. If there are new files that need to be created to fix the bug, list them in an h3 'New Files' section.>
+### Existing Files
+<List ALL existing files that will be modified, using absolute paths from project root. Example:
+- app/server/routes/workflow_routes.py - Fix status calculation bug
+- app/server/tests/test_workflow_routes.py - Add regression test
+>
+
+### New Files
+<List ALL new files that will be created (if any). Most bug fixes won't need new files.>
+
+## Relevant Files
+Use these files for context and understanding (will NOT be loaded during implementation unless listed in "Files to Modify"):
+
+<find and list the files that are relevant to understanding the bug but won't be directly modified. Describe why they are relevant in bullet points.>
 
 ## Step by Step Tasks
 IMPORTANT: Execute every step in order, top to bottom.
