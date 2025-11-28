@@ -4,7 +4,7 @@ import sys
 
 # Configure PostgreSQL connection
 os.environ["DB_TYPE"] = "postgresql"
-os.environ["POSTGRES_HOST"] = "localhost"
+os.environ["POSTGRES_HOST"] = "127.0.0.1"
 os.environ["POSTGRES_PORT"] = "5432"
 os.environ["POSTGRES_DB"] = "tac_webbuilder"
 os.environ["POSTGRES_USER"] = "tac_user"
@@ -29,15 +29,15 @@ try:
         # Get PostgreSQL version
         cursor.execute("SELECT version()")
         version = cursor.fetchone()
-        print(f"✅ PostgreSQL version: {version[0][:50]}...")
+        print(f"✅ PostgreSQL version: {version['version'][:50]}...")
 
         # Count tables
         cursor.execute("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) as count
             FROM information_schema.tables
             WHERE table_schema = 'public'
         """)
-        table_count = cursor.fetchone()[0]
+        table_count = cursor.fetchone()['count']
         print(f"✅ Tables in database: {table_count}")
 
         # List tables
@@ -48,7 +48,7 @@ try:
             ORDER BY table_name
         """)
         tables = cursor.fetchall()
-        print(f"✅ Tables: {', '.join([t[0] for t in tables[:5]])}{'...' if len(tables) > 5 else ''}")
+        print(f"✅ Tables: {', '.join([t['table_name'] for t in tables[:5]])}{'...' if len(tables) > 5 else ''}")
 
     print("\n" + "=" * 70)
     print("✅ PostgreSQL connection test PASSED!")

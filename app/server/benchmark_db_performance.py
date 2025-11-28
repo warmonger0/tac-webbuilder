@@ -10,7 +10,7 @@ def benchmark_operations(db_type, iterations=100):
     os.environ["DB_TYPE"] = db_type
 
     if db_type == "postgresql":
-        os.environ["POSTGRES_HOST"] = "localhost"
+        os.environ["POSTGRES_HOST"] = "127.0.0.1"
         os.environ["POSTGRES_PORT"] = "5432"
         os.environ["POSTGRES_DB"] = "tac_webbuilder"
         os.environ["POSTGRES_USER"] = "tac_user"

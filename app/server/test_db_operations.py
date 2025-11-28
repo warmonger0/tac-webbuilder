@@ -5,7 +5,7 @@ from datetime import datetime
 
 # Test with PostgreSQL
 os.environ["DB_TYPE"] = "postgresql"
-os.environ["POSTGRES_HOST"] = "localhost"
+os.environ["POSTGRES_HOST"] = "127.0.0.1"
 os.environ["POSTGRES_PORT"] = "5432"
 os.environ["POSTGRES_DB"] = "tac_webbuilder"
 os.environ["POSTGRES_USER"] = "tac_user"
@@ -117,15 +117,15 @@ try:
         # Test placeholder
         cursor.execute(f"SELECT {ph} as test_value", (42,))
         result = cursor.fetchone()
-        if result[0] != 42:
-            raise Exception(f"Expected 42, got {result[0]}")
-        print(f"✅ Placeholder test: {ph} works correctly (result: {result[0]})")
+        if result['test_value'] != 42:
+            raise Exception(f"Expected 42, got {result['test_value']}")
+        print(f"✅ Placeholder test: {ph} works correctly (result: {result['test_value']})")
 
         # Test NOW() function
         now_fn = adapter.now_function()
         cursor.execute(f"SELECT {now_fn} as current_time")
         current_time = cursor.fetchone()
-        print(f"✅ DateTime function test: {now_fn} returned {current_time[0]}")
+        print(f"✅ DateTime function test: {now_fn} returned {current_time['current_time']}")
 
     print("✅ Database-agnostic queries test PASSED!")
 

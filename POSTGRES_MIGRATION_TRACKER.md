@@ -94,59 +94,91 @@
 
 ---
 
-### ✅ Phase 3: Testing Infrastructure (COMPLETE)
-**Duration:** ~4 hours
+### ✅ Phase 3: Testing Infrastructure & Validation (COMPLETE)
+**Duration:** ~6 hours (4 hours setup + 2 hours testing)
 **Status:** Complete
-**Commit:** [Latest commit in this session]
+**Commit:** `1d75da6 - docs: Add PostgreSQL migration tracking and Phase 3 test prompt`
 
-**Deliverables:**
-- Connection validation script
-- CRUD operations test script
-- Performance benchmark script
-- Automated test runner
-- Test documentation template
-- Configuration files
+**Actual Deliverables:**
+- ✅ Connection validation script
+- ✅ CRUD operations test script
+- ✅ Performance benchmark script
+- ✅ Automated test runner
+- ✅ Complete test results documentation
+- ✅ Configuration files and troubleshooting guides
 
 **Files Created:**
 - `app/server/test_postgres_connection.py`
 - `app/server/test_db_operations.py`
 - `app/server/benchmark_db_performance.py`
 - `scripts/test_postgres_migration.sh`
-- `POSTGRES_TEST_RESULTS.md` (template)
+- `POSTGRES_TEST_RESULTS.md` (complete with actual results)
 - `.env.postgres.example`
 
 **Files Modified:**
 - `.gitignore` - PostgreSQL test artifacts
+- Test scripts - Fixed password, host, and RealDictCursor issues
+
+**Test Results Summary:**
+- ✅ Connection Test: PASSED
+- ✅ CRUD Operations: PASSED
+- ✅ Performance Benchmark: PASSED (PostgreSQL 1.03x faster overall!)
+- ⚠️ Full Test Suite: 563/766 passed (73.5%) vs 572/766 SQLite (74.7%)
+- 📊 Performance: PostgreSQL 1.3x faster on UPDATEs, competitive on all operations
+
+**Issues Identified:**
+- Priority 1: Missing queue_position column (38 failures)
+- Priority 1: Test isolation/UNIQUE constraints (40+ failures)
+- Priority 1: Missing adw_locks table (7 failures)
+- Priority 2: PRAGMA statement compatibility (1-2 failures)
+- Priority 2: Column case sensitivity (2 failures)
+
+**Configuration Fixes Applied:**
+- Stopped local PostgreSQL@16 to avoid port conflicts
+- Updated password to "changeme" in all test scripts
+- Changed host to 127.0.0.1 to force IPv4
+- Fixed RealDictCursor dictionary access
 
 **Prompt:** `POSTGRES_PHASE3_TEST_PROMPT.md`
-- Use this to run tests in a new context
-- Validates all Phase 1-3 work
-- Identifies Phase 4 issues
+**Test Results:** `POSTGRES_TEST_RESULTS.md`
 
 ---
 
-### 🔄 Phase 4: Testing & Fixes (IN PROGRESS)
-**Duration:** TBD (depends on test results)
-**Status:** Ready to start
-**Next Action:** Run Phase 3 tests to identify issues
+### 🔄 Phase 4: Issue Fixes (READY TO START)
+**Duration:** Estimated 4-6 hours
+**Status:** Ready to start (test results analyzed)
+**Next Action:** Execute Phase 4.1 critical fixes
 
 **Planned Deliverables:**
-- Test failure analysis
-- Critical bug fixes
-- Schema corrections
-- Query optimization
-- Missing index additions
-- Edge case handling
+- ✅ Test failure analysis complete (see POSTGRES_TEST_RESULTS.md)
+- Schema corrections (queue_position column, adw_locks table)
+- Test isolation improvements
+- PostgreSQL compatibility fixes (PRAGMA → information_schema)
+- Column case sensitivity standardization
+- Regression testing
 
 **Prompt Status:**
 - ✅ Phase 3 Test Prompt created
-- ⏳ Phase 4 Fix Prompts (pending test results)
+- 🔄 Phase 4.1 Prompt: POSTGRES_PHASE4_CRITICAL_FIXES.md (creating)
+- ⏳ Phase 4.2 Prompt: POSTGRES_PHASE4_COMPATIBILITY_FIXES.md (creating)
 
 **Sub-Phases:**
-- **Phase 4.1:** Critical fixes (blocks basic functionality)
-- **Phase 4.2:** High priority (major features broken)
-- **Phase 4.3:** Medium priority (edge cases)
-- **Phase 4.4:** Low priority (optimization)
+- **Phase 4.1:** Critical schema & isolation fixes (38+40+7 = 85 test failures)
+  - Missing queue_position column
+  - Test isolation/UNIQUE constraints
+  - Missing adw_locks table
+  - Estimated: 2-3 hours
+
+- **Phase 4.2:** PostgreSQL compatibility fixes (3-4 test failures)
+  - PRAGMA statement replacement
+  - Column case sensitivity
+  - Estimated: 1-2 hours
+
+- **Phase 4.3:** Validation & regression testing
+  - Re-run full test suite
+  - Verify no new failures
+  - Performance validation
+  - Estimated: 1 hour
 
 ---
 
@@ -203,38 +235,45 @@
 
 ### Available Prompts
 
-1. **POSTGRES_PHASE3_TEST_PROMPT.md**
-   - **Phase:** 3 (Testing)
+1. **POSTGRES_PHASE3_TEST_PROMPT.md** ✅
+   - **Phase:** 3 (Testing & Validation)
    - **Purpose:** Run PostgreSQL test suite and validate migration
    - **Duration:** 20-30 minutes
    - **Use When:** Need to validate Phase 1-3 work
    - **Output:** Test results and Phase 4 issue list
+   - **Status:** Complete, used successfully
 
-### Pending Prompts (Create After Test Results)
+2. **POSTGRES_PHASE4_CRITICAL_FIXES.md** ✅
+   - **Phase:** 4.1 (Critical Fixes)
+   - **Purpose:** Fix 85 critical test failures (schema + isolation + missing tables)
+   - **Duration:** 2-3 hours
+   - **Use When:** After Phase 3 testing complete
+   - **Fixes:** queue_position column, test isolation, adw_locks table
+   - **Status:** Ready to use
 
-2. **POSTGRES_PHASE4_CRITICAL_FIXES.md**
-   - **Phase:** 4.1
-   - **Purpose:** Fix issues blocking basic functionality
-   - **Create When:** After identifying critical test failures
-   - **Template:** Same format as PHASE3_TEST_PROMPT
+3. **POSTGRES_PHASE4_COMPATIBILITY_FIXES.md** ✅
+   - **Phase:** 4.2 (Compatibility Fixes)
+   - **Purpose:** Fix PostgreSQL-specific compatibility issues
+   - **Duration:** 1-2 hours
+   - **Use When:** After Phase 4.1 complete
+   - **Fixes:** PRAGMA → information_schema, column case sensitivity
+   - **Status:** Ready to use
 
-3. **POSTGRES_PHASE4_FEATURE_FIXES.md**
-   - **Phase:** 4.2
-   - **Purpose:** Fix major feature breakages
-   - **Create When:** After Phase 4.1 complete
-   - **Template:** Same format as PHASE3_TEST_PROMPT
+### Pending Prompts (Create After Phase 4 Complete)
 
-4. **POSTGRES_PHASE4_OPTIMIZATION.md**
-   - **Phase:** 4.3-4.4
-   - **Purpose:** Performance tuning and edge cases
+4. **POSTGRES_PHASE4_REGRESSION_TESTING.md**
+   - **Phase:** 4.3 (Validation)
+   - **Purpose:** Comprehensive regression testing after all fixes
    - **Create When:** After Phase 4.2 complete
-   - **Template:** Same format as PHASE3_TEST_PROMPT
+   - **Duration:** 1 hour
+   - **Template:** Same format as other prompts
 
 5. **POSTGRES_PHASE5_PRODUCTION_READY.md**
-   - **Phase:** 5
-   - **Purpose:** Production configuration and deployment
-   - **Create When:** After all Phase 4 fixes complete
-   - **Template:** Same format as PHASE3_TEST_PROMPT
+   - **Phase:** 5 (Production Readiness)
+   - **Purpose:** Production configuration and deployment setup
+   - **Create When:** After all Phase 4 complete and tests passing
+   - **Duration:** 2-4 hours
+   - **Template:** Same format as other prompts
 
 ---
 
@@ -282,19 +321,27 @@ After completing a phase:
 - ✅ Phase 2.1: Database adapter pattern
 - ✅ Phase 2.2: Query placeholders standardized
 - ✅ Phase 2.3: Database functions abstracted
-- ✅ Phase 3: Testing infrastructure complete
+- ✅ Phase 3: Testing infrastructure and validation complete
+  - All connection and CRUD tests passing
+  - Performance benchmarked (PostgreSQL 3% faster overall!)
+  - Full test suite run with both databases
+  - Issues identified and categorized
 
 ### What's Next
-1. **Immediate:** Run Phase 3 tests using `POSTGRES_PHASE3_TEST_PROMPT.md`
-2. **Then:** Analyze test results
-3. **Then:** Create Phase 4 fix prompts based on results
-4. **Then:** Execute Phase 4 fixes
+1. **Immediate:** Execute Phase 4.1 critical fixes (85 test failures)
+   - Add queue_position column
+   - Fix test isolation issues
+   - Add adw_locks table
+2. **Then:** Execute Phase 4.2 compatibility fixes (4 test failures)
+   - Replace PRAGMA statements
+   - Fix column case sensitivity
+3. **Then:** Phase 4.3 regression testing
+4. **Finally:** Phase 5 production readiness
 
-### Active Prompt
-**File:** `POSTGRES_PHASE3_TEST_PROMPT.md`
-**Action:** Copy to new context and run PostgreSQL tests
-**Expected Time:** 20-30 minutes
-**Output:** Test results → Phase 4 planning
+### Active Prompts
+**Phase 4.1:** `POSTGRES_PHASE4_CRITICAL_FIXES.md` (creating)
+**Phase 4.2:** `POSTGRES_PHASE4_COMPATIBILITY_FIXES.md` (creating)
+**Expected Time:** 4-6 hours total
 
 ---
 
@@ -302,71 +349,101 @@ After completing a phase:
 
 ### Phase 3 Test Results
 **File:** `POSTGRES_TEST_RESULTS.md`
-**Status:** Template created, awaiting actual results
+**Status:** ✅ Complete with actual results (Date: 2025-11-27)
 
 **Checklist:**
-- [ ] Docker started
-- [ ] PostgreSQL container running
-- [ ] Connection test passed
-- [ ] CRUD operations test passed
-- [ ] Performance benchmark completed
-- [ ] Full pytest suite (SQLite) results
-- [ ] Full pytest suite (PostgreSQL) results
-- [ ] Results documented
-- [ ] Phase 4 issues categorized
+- [X] Docker started
+- [X] PostgreSQL container running (healthy status)
+- [X] Connection test passed ✅
+- [X] CRUD operations test passed ✅
+- [X] Performance benchmark completed ✅
+- [X] Full pytest suite (SQLite) results: 572/766 passed (74.7%)
+- [X] Full pytest suite (PostgreSQL) results: 563/766 passed (73.5%)
+- [X] Results documented in POSTGRES_TEST_RESULTS.md
+- [X] Phase 4 issues categorized (85 critical + 4 compatibility)
 
 ---
 
-## Issue Tracking Template
+## Phase 4 Issues (From Test Results)
 
-### Phase 4 Issues (Populate After Testing)
+### Critical Issues (Phase 4.1) - 85 Test Failures
 
-#### Critical Issues (Phase 4.1)
-```markdown
-- [ ] **Issue #1:** [Description]
-  - **Test:** [failing test name]
-  - **Error:** [error message]
-  - **Location:** [file:line]
-  - **Fix Plan:** [proposed solution]
-  - **Estimated Time:** [hours]
-```
+- [ ] **Issue #1: Missing `queue_position` Column**
+  - **Tests Affected:** 38 failures
+  - **Error:** `sqlite3.OperationalError: no such column: queue_position`
+  - **Location:** `phase_queue` table schema
+  - **Files:** `migration/postgres_schema.sql`, SQLite schema
+  - **Fix Plan:** Add `queue_position INTEGER` column to both databases
+  - **Estimated Time:** 30 minutes
 
-#### High Priority (Phase 4.2)
-```markdown
-- [ ] **Issue #2:** [Description]
-  - ...
-```
+- [ ] **Issue #2: Test Isolation - UNIQUE Constraint Violations**
+  - **Tests Affected:** 40+ failures
+  - **Error:** `sqlite3.IntegrityError: UNIQUE constraint failed: workflow_history.adw_id`
+  - **Location:** `test_workflow_history.py`, `test_database_operations.py`, `test_workflow_history_integration.py`
+  - **Fix Plan:** Improve test fixtures in conftest.py, add proper cleanup
+  - **Estimated Time:** 1-2 hours
 
-#### Medium Priority (Phase 4.3)
-```markdown
-- [ ] **Issue #3:** [Description]
-  - ...
-```
+- [ ] **Issue #3: Missing `adw_locks` Table**
+  - **Tests Affected:** 7 failures
+  - **Error:** `sqlite3.OperationalError: no such table: adw_locks`
+  - **Location:** Test database initialization
+  - **Fix Plan:** Ensure adw_locks table is created in test setup
+  - **Estimated Time:** 30 minutes
 
-#### Low Priority (Phase 4.4)
-```markdown
-- [ ] **Issue #4:** [Description]
-  - ...
-```
+### Important Issues (Phase 4.2) - 3-4 Test Failures
+
+- [ ] **Issue #4: PRAGMA Statement Compatibility**
+  - **Tests Affected:** 1-2 failures
+  - **Error:** `syntax error at or near "PRAGMA"`
+  - **Location:** Tests using `PRAGMA table_info()`
+  - **Fix Plan:** Replace with `information_schema.columns` queries
+  - **Estimated Time:** 30 minutes
+
+- [ ] **Issue #5: Column Name Case Sensitivity**
+  - **Tests Affected:** 2 failures
+  - **Error:** `column "id" does not exist` (PostgreSQL is case-sensitive)
+  - **Location:** SQL injection tests
+  - **Fix Plan:** Standardize to lowercase column names
+  - **Estimated Time:** 30 minutes
+
+### Pre-existing Issues (Not Migration-Related)
+
+- [ ] **Issue #6: Database Initialization Test Errors**
+  - **Tests Affected:** 100 errors (same in both SQLite and PostgreSQL)
+  - **Location:** `core/workflow_history_utils/test_database.py`
+  - **Note:** Pre-existing issue, not caused by migration
+  - **Priority:** Low (outside migration scope)
 
 ---
 
 ## Performance Benchmarks
 
 ### Baseline (SQLite)
-- **INSERT:** [TBD after testing]
-- **SELECT:** [TBD after testing]
-- **UPDATE:** [TBD after testing]
-- **DELETE:** [TBD after testing]
+- **INSERT:** 0.110s (906.9 ops/sec)
+- **SELECT:** 0.060s (1675.7 ops/sec)
+- **UPDATE:** 0.118s (848.0 ops/sec)
+- **DELETE:** 0.128s (782.3 ops/sec)
+- **TOTAL:** 0.416s
 
 ### PostgreSQL Results
-- **INSERT:** [TBD after testing]
-- **SELECT:** [TBD after testing]
-- **UPDATE:** [TBD after testing]
-- **DELETE:** [TBD after testing]
+- **INSERT:** 0.106s (942.3 ops/sec) - 4% faster
+- **SELECT:** 0.062s (1614.9 ops/sec) - 4% slower
+- **UPDATE:** 0.093s (1070.3 ops/sec) - **27% faster** ⚡
+- **DELETE:** 0.143s (700.3 ops/sec) - 12% slower
+- **TOTAL:** 0.404s - **3% faster overall**
 
 ### Analysis
-[Add analysis after benchmark complete]
+PostgreSQL shows **excellent performance** compared to SQLite:
+- **Overall**: 3% faster (0.404s vs 0.416s)
+- **UPDATEs**: 27% faster (significant improvement!)
+- **INSERTs**: 4% faster (competitive)
+- **SELECTs/DELETEs**: Within 12% (marginal difference)
+
+**Key Findings:**
+- No significant performance regression
+- PostgreSQL excels at UPDATE operations
+- Real-world performance will likely favor PostgreSQL under concurrent load
+- Client-server architecture overhead is minimal for this workload
 
 ---
 
