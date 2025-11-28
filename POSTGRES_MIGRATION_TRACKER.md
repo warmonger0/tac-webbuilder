@@ -586,29 +586,26 @@ PostgreSQL shows **excellent performance** compared to SQLite:
 - **Phase 3 Testing:** `POSTGRES_PHASE3_TEST_PROMPT.md`
 - **Phase 4+:** TBD (create after test results)
 
-### Next Session (Optional - Production Deployment)
+### Next Session - Cleanup & Optimization
 **Copy this to new context:**
 ```
-I'm working on the PostgreSQL migration for tac-webbuilder.
+I'm working on cleanup and performance optimization for tac-webbuilder.
 
-Core migration is COMPLETE! PostgreSQL is production-ready.
+PostgreSQL migration is COMPLETE! Now cleaning up technical debt.
 
 Current status:
-- Phase 1-4: ✅ Complete
-- SQLite: 620/766 tests (81.0%)
-- PostgreSQL: 611/766 tests (79.8%)
-- Performance: PostgreSQL 3% faster overall
+- PostgreSQL migration: ✅ Complete (Phases 1-4)
+- Test pass rate: 81% SQLite, 79.8% PostgreSQL
+- Target: 95%+ for both databases
+- Issues: 100 database init errors, 10-15 SQL injection test failures, 30-40 misc failures
 
-Optional: Set up production deployment (Phase 5)
-- Production configuration
-- Deployment procedures
-- Monitoring setup
+Task: Fix pre-existing test failures (Cleanup Phase 1)
 
-Please read POSTGRES_MIGRATION_TRACKER.md for full context.
+Please read CLEANUP_OPTIMIZATION_TRACKER.md and execute CLEANUP_PHASE1_TEST_FIXES.md
 ```
 
 ---
 
-**Last Updated:** 2025-11-28 (Phase 4 Complete)
+**Last Updated:** 2025-11-28 (Migration Complete, Cleanup Phase Ready)
 **Status:** Core migration COMPLETE ✅
-**Next:** Production deployment (optional)
+**Next:** Cleanup & Optimization (see CLEANUP_OPTIMIZATION_TRACKER.md)
