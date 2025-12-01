@@ -528,7 +528,7 @@ class TestWorkflowHistoryDatabase:
         assert 5.0 <= analytics["total_cost"] <= 5.1
 
         # Average cost (18 workflows with cost data)
-        avg_cost = total_cost / 18
+        total_cost / 18
         assert 0.25 <= analytics["avg_cost"] <= 0.35
 
         # Assert: Token analytics
@@ -669,7 +669,7 @@ class TestWorkflowHistoryDatabase:
                             mock_gh.return_value = "open"
                             mock_est.return_value = None
 
-                            synced_count2 = sync_workflow_history()
+                            sync_workflow_history()
 
         # Assert: No new workflows created (updates only)
         with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):

@@ -110,7 +110,7 @@ async def complete_issue(issue_number: int, request: IssueCompletionRequest) -> 
                 close_msg += f"\n\nCommit: {request.commit_sha}"
 
             # Use gh CLI to close the issue
-            result = subprocess.run(
+            subprocess.run(
                 [
                     "gh", "issue", "close", str(issue_number),
                     "--repo", "warmonger0/tac-webbuilder",
@@ -142,7 +142,7 @@ async def complete_issue(issue_number: int, request: IssueCompletionRequest) -> 
 
     except Exception as e:
         logger.error(f"[COMPLETION] Error completing issue #{issue_number}: {str(e)}")
-        raise HTTPException(500, f"Error completing issue: {str(e)}")
+        raise HTTPException(500, f"Error completing issue: {str(e)}") from e
 
 
 @router.post("/complete-from-commit", response_model=dict)

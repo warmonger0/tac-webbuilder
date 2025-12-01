@@ -28,7 +28,7 @@ def benchmark_operations(db_type, iterations=100):
     from models.phase_queue_item import PhaseQueueItem
     from repositories.phase_queue_repository import PhaseQueueRepository
 
-    adapter = get_database_adapter()
+    get_database_adapter()
     repo = PhaseQueueRepository()
 
     print(f"\n{'='*70}")

@@ -13,6 +13,7 @@ Responsibilities:
 """
 
 import asyncio
+import contextlib
 import logging
 from datetime import datetime
 
@@ -86,10 +87,8 @@ class PhaseCoordinator:
         self._is_running = False
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
         logger.info("[STOP] PhaseCoordinator background task stopped")
 
     async def _poll_loop(self):

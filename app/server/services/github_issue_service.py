@@ -124,7 +124,7 @@ class GitHubIssueService:
         except Exception as e:
             logger.error(f"[ERROR] Failed to process NL request: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error processing request: {str(e)}")
+            raise HTTPException(500, f"Error processing request: {str(e)}") from e
 
     async def _handle_single_phase_request(self, request: SubmitRequestData) -> SubmitRequestResponse:
         """
@@ -272,7 +272,7 @@ class GitHubIssueService:
         except Exception as e:
             logger.error(f"[ERROR] Failed to get preview: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error retrieving preview: {str(e)}")
+            raise HTTPException(500, f"Error retrieving preview: {str(e)}") from e
 
     async def get_cost_estimate(self, request_id: str) -> CostEstimate:
         """
@@ -303,7 +303,7 @@ class GitHubIssueService:
         except Exception as e:
             logger.error(f"[ERROR] Failed to get cost estimate: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error retrieving cost estimate: {str(e)}")
+            raise HTTPException(500, f"Error retrieving cost estimate: {str(e)}") from e
 
     async def check_webhook_trigger_health(self) -> dict:
         """
@@ -356,7 +356,7 @@ class GitHubIssueService:
             raise HTTPException(
                 503,
                 f"Failed to verify ADW webhook trigger status: {str(e)}"
-            )
+            ) from e
 
     async def confirm_and_post_issue(self, request_id: str) -> ConfirmResponse:
         """
@@ -421,4 +421,4 @@ class GitHubIssueService:
         except Exception as e:
             logger.error(f"[ERROR] Failed to post issue: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error posting issue: {str(e)}")
+            raise HTTPException(500, f"Error posting issue: {str(e)}") from e

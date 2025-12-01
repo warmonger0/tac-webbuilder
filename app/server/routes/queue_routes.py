@@ -242,7 +242,7 @@ def init_queue_routes(phase_queue_service):
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to get queued phases: {str(e)}")
-            raise HTTPException(500, f"Error retrieving queue: {str(e)}")
+            raise HTTPException(500, f"Error retrieving queue: {str(e)}") from e
 
     @router.get("/config", response_model=QueueConfigResponse)
     async def get_queue_config() -> QueueConfigResponse:
@@ -258,7 +258,7 @@ def init_queue_routes(phase_queue_service):
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to get queue config: {str(e)}")
-            raise HTTPException(500, f"Error retrieving queue config: {str(e)}")
+            raise HTTPException(500, f"Error retrieving queue config: {str(e)}") from e
 
     @router.post("/config/pause", response_model=QueueConfigResponse)
     async def set_queue_paused(request: SetQueuePausedRequest) -> QueueConfigResponse:
@@ -281,7 +281,7 @@ def init_queue_routes(phase_queue_service):
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to set queue paused state: {str(e)}")
-            raise HTTPException(500, f"Error setting queue config: {str(e)}")
+            raise HTTPException(500, f"Error setting queue config: {str(e)}") from e
 
     @router.get("/{parent_issue}", response_model=QueueListResponse)
     async def get_queue_by_parent(parent_issue: int) -> QueueListResponse:
@@ -304,7 +304,7 @@ def init_queue_routes(phase_queue_service):
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to get phases for issue #{parent_issue}: {str(e)}")
-            raise HTTPException(500, f"Error retrieving phases: {str(e)}")
+            raise HTTPException(500, f"Error retrieving phases: {str(e)}") from e
 
     @router.post("/enqueue", response_model=EnqueueResponse)
     async def enqueue_phase(request: EnqueueRequest) -> EnqueueResponse:
@@ -331,7 +331,7 @@ def init_queue_routes(phase_queue_service):
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to enqueue phase: {str(e)}")
-            raise HTTPException(500, f"Error enqueueing phase: {str(e)}")
+            raise HTTPException(500, f"Error enqueueing phase: {str(e)}") from e
 
     @router.delete("/{queue_id}", response_model=DequeueResponse)
     async def dequeue_phase(queue_id: str) -> DequeueResponse:
@@ -358,7 +358,7 @@ def init_queue_routes(phase_queue_service):
             raise
         except Exception as e:
             logger.error(f"[ERROR] Failed to dequeue phase: {str(e)}")
-            raise HTTPException(500, f"Error dequeueing phase: {str(e)}")
+            raise HTTPException(500, f"Error dequeueing phase: {str(e)}") from e
 
     @router.post("/{queue_id}/execute", response_model=ExecutePhaseResponse)
     async def execute_phase(queue_id: str) -> ExecutePhaseResponse:
@@ -423,7 +423,7 @@ def init_queue_routes(phase_queue_service):
             )
 
             # Launch workflow in background
-            process = subprocess.Popen(
+            subprocess.Popen(
                 cmd,
                 cwd=repo_root,
                 start_new_session=True,
@@ -452,7 +452,7 @@ def init_queue_routes(phase_queue_service):
             logger.error(f"[ERROR] Failed to execute phase: {str(e)}")
             import traceback
             logger.error(f"Traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error executing phase: {str(e)}")
+            raise HTTPException(500, f"Error executing phase: {str(e)}") from e
 
     return router
 
@@ -663,7 +663,7 @@ def init_webhook_routes(phase_queue_service, github_poster):
             )
 
             # Launch workflow in background
-            process = subprocess.Popen(
+            subprocess.Popen(
                 cmd,
                 cwd=repo_root,
                 start_new_session=True,
@@ -695,6 +695,6 @@ def init_webhook_routes(phase_queue_service, github_poster):
             logger.error(f"[WEBHOOK] Error processing workflow completion: {str(e)}")
             import traceback
             logger.error(f"Traceback:\n{traceback.format_exc()}")
-            raise HTTPException(500, f"Error processing workflow completion: {str(e)}")
+            raise HTTPException(500, f"Error processing workflow completion: {str(e)}") from e
 
     return webhook_router

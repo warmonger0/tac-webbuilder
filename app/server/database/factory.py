@@ -31,10 +31,7 @@ def get_database_adapter() -> DatabaseAdapter:
     if _adapter is None:
         db_type = os.getenv("DB_TYPE", "sqlite").lower()
 
-        if db_type == "postgresql":
-            _adapter = PostgreSQLAdapter()
-        else:
-            _adapter = SQLiteAdapter()
+        _adapter = PostgreSQLAdapter() if db_type == "postgresql" else SQLiteAdapter()
 
     return _adapter
 

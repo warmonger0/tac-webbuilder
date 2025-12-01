@@ -112,7 +112,7 @@ class GitHubPoster:
             return issue_number
 
         except Exception as e:
-            raise RuntimeError(f"Failed to post issue to GitHub: {str(e)}")
+            raise RuntimeError(f"Failed to post issue to GitHub: {str(e)}") from e
 
     def _ensure_labels_exist(self, labels: list):
         """
@@ -247,4 +247,4 @@ class GitHubPoster:
             return json.loads(result)
 
         except Exception as e:
-            raise RuntimeError(f"Failed to get repository info: {str(e)}")
+            raise RuntimeError(f"Failed to get repository info: {str(e)}") from e

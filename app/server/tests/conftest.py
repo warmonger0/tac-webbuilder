@@ -298,7 +298,7 @@ def cleanup_db_files():
         Path(db_file).unlink(missing_ok=True)
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True)
 def cleanup_workflow_history_data():
     """
     Automatically clean workflow_history table data before and after each test.
@@ -353,7 +353,7 @@ def cleanup_workflow_history_data():
     cleanup_test_records()
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True)
 def cleanup_phase_queue_data():
     """
     Automatically clean phase_queue table data before and after each test.

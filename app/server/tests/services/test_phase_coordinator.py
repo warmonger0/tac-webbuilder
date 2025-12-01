@@ -603,7 +603,7 @@ def test_get_ready_phases(phase_coordinator, phase_queue_service):
         depends_on_phase=None,
     )
 
-    queued_id = phase_queue_service.enqueue(
+    phase_queue_service.enqueue(
         parent_issue=1200,
         phase_number=2,
         phase_data={"title": "Queued Phase", "content": "Test"},

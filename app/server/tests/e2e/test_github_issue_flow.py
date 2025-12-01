@@ -137,7 +137,7 @@ class TestCompleteGitHubIssueFlow:
         """
         # Cleanup before test
         try:
-            if isinstance(e2e_test_db_cleanup, (str, bytes)):
+            if isinstance(e2e_test_db_cleanup, str | bytes):
                 db_path = e2e_test_db_cleanup
             else:
                 db_path = str(e2e_test_db_cleanup)
@@ -433,7 +433,7 @@ class TestCompleteGitHubIssueFlow:
         first_confirm = e2e_test_client.post(f"/api/v1/confirm/{request_id}")
 
         assert first_confirm.status_code == 200
-        first_issue_number = first_confirm.json()["issue_number"]
+        first_confirm.json()["issue_number"]
 
         # Verify GitHub poster called once
         assert mock_github_poster.post_issue.call_count == 1
@@ -550,7 +550,7 @@ class TestGitHubIssueFlowEdgeCases:
         """
         # Cleanup before test
         try:
-            if isinstance(e2e_test_db_cleanup, (str, bytes)):
+            if isinstance(e2e_test_db_cleanup, str | bytes):
                 db_path = e2e_test_db_cleanup
             else:
                 db_path = str(e2e_test_db_cleanup)
@@ -830,7 +830,7 @@ class TestGitHubIssueFlowDataPersistence:
         """
         # Cleanup before test
         try:
-            if isinstance(e2e_test_db_cleanup, (str, bytes)):
+            if isinstance(e2e_test_db_cleanup, str | bytes):
                 db_path = e2e_test_db_cleanup
             else:
                 db_path = str(e2e_test_db_cleanup)
@@ -968,7 +968,7 @@ class TestGitHubIssueFlowPerformance:
         """
         # Cleanup before test
         try:
-            if isinstance(e2e_test_db_cleanup, (str, bytes)):
+            if isinstance(e2e_test_db_cleanup, str | bytes):
                 db_path = e2e_test_db_cleanup
             else:
                 db_path = str(e2e_test_db_cleanup)

@@ -9,6 +9,7 @@ services, databases, and workflow orchestration where possible.
 """
 
 import asyncio
+import contextlib
 import json
 import tempfile
 import time
@@ -425,13 +426,11 @@ def e2e_test_db_cleanup(e2e_database):
             WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
         """)
 
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("""
                 DELETE FROM adw_locks
                 WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
             """)
-        except sqlite3.OperationalError:
-            pass
 
         conn.commit()
         conn.close()

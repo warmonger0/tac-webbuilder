@@ -114,7 +114,7 @@ def insert_workflow_history(
                         "anomaly_flags", "optimization_recommendations"
                     ]
                     if field in json_fields:
-                        if isinstance(kwargs[field], (dict, list)):
+                        if isinstance(kwargs[field], dict | list):
                             values.append(json.dumps(kwargs[field]))
                         else:
                             values.append(kwargs[field])
@@ -227,7 +227,7 @@ def update_workflow_history(
             "anomaly_flags", "optimization_recommendations"
         ]
         for field in json_fields:
-            if field in kwargs and isinstance(kwargs[field], (dict, list)):
+            if field in kwargs and isinstance(kwargs[field], dict | list):
                 kwargs[field] = json.dumps(kwargs[field])
 
         # Map field names from code schema to database schema

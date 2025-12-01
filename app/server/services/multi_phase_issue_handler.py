@@ -102,7 +102,7 @@ class MultiPhaseIssueHandler:
             raise
         except Exception as e:
             logger.error(f"[ERROR] Failed to handle multi-phase request: {str(e)}")
-            raise HTTPException(500, f"Error processing multi-phase request: {str(e)}")
+            raise HTTPException(500, f"Error processing multi-phase request: {str(e)}") from e
 
     async def _create_phase_issues_and_enqueue(
         self,

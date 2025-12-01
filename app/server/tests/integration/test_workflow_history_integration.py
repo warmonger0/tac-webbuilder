@@ -573,7 +573,7 @@ class TestWorkflowHistoryIntegration:
 
         # First, get baseline count
         response = integration_client.get("/api/v1/workflow-history?limit=100")
-        baseline_count = response.json()["total_count"]
+        response.json()["total_count"]
 
         # Test 1: Get all workflows with analytics
         response = integration_client.get("/api/v1/workflow-history?limit=20&offset=0")

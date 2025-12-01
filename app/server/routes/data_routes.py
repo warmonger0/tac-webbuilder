@@ -224,7 +224,7 @@ async def delete_table(table_name: str) -> dict:
         try:
             validate_identifier(table_name, "table")
         except SQLSecurityError as e:
-            raise HTTPException(400, str(e))
+            raise HTTPException(400, str(e)) from e
 
         adapter = get_database_adapter()
         with adapter.get_connection() as conn:
@@ -248,7 +248,7 @@ async def delete_table(table_name: str) -> dict:
     except Exception as e:
         logger.error(f"[ERROR] Table deletion failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        raise HTTPException(500, f"Error deleting table: {str(e)}")
+        raise HTTPException(500, f"Error deleting table: {str(e)}") from e
 
 
 @router.post("/export/table")
@@ -281,7 +281,7 @@ async def export_table(request: ExportRequest) -> Response:
     except Exception as e:
         logger.error(f"[ERROR] Table export failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        raise HTTPException(500, f"Error exporting table: {str(e)}")
+        raise HTTPException(500, f"Error exporting table: {str(e)}") from e
 
 
 @router.post("/export/query")
@@ -302,4 +302,4 @@ async def export_query_results(request: QueryExportRequest) -> Response:
     except Exception as e:
         logger.error(f"[ERROR] Query export failed: {str(e)}")
         logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
-        raise HTTPException(500, f"Error exporting query results: {str(e)}")
+        raise HTTPException(500, f"Error exporting query results: {str(e)}") from e
