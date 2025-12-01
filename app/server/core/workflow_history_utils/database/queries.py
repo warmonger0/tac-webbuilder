@@ -54,6 +54,87 @@ def get_workflow_by_adw_id(adw_id: str) -> dict | None:
         return None
 
 
+def _build_where_clauses(
+    ph: str,
+    status: str | None,
+    model: str | None,
+    template: str | None,
+    start_date: str | None,
+    end_date: str | None,
+    search: str | None
+) -> tuple[list[str], list]:
+    """Build WHERE clauses and parameters for workflow history query."""
+    where_clauses = []
+    params = []
+
+    if status:
+        where_clauses.append(f"status = {ph}")
+        params.append(status)
+
+    if model:
+        where_clauses.append(f"model_used = {ph}")
+        params.append(model)
+
+    if template:
+        where_clauses.append(f"workflow_template = {ph}")
+        params.append(template)
+
+    if start_date:
+        where_clauses.append(f"created_at >= {ph}")
+        params.append(start_date)
+
+    if end_date:
+        where_clauses.append(f"created_at <= {ph}")
+        params.append(end_date)
+
+    if search:
+        where_clauses.append(
+            f"(adw_id LIKE {ph} OR nl_input LIKE {ph} OR github_url LIKE {ph})"
+        )
+        search_param = f"%{search}%"
+        params.extend([search_param, search_param, search_param])
+
+    return where_clauses, params
+
+
+def _process_workflow_row(row: dict) -> dict:
+    """Process a single workflow row from database."""
+    result = dict(row)
+
+    # Parse JSON fields
+    json_fields = [
+        "structured_input", "cost_breakdown", "token_breakdown",
+        "phase_durations", "retry_reasons", "error_phase_distribution",
+        "anomaly_flags", "optimization_recommendations"  # Phase 3D
+    ]
+    for field in json_fields:
+        if result.get(field):
+            try:
+                result[field] = json.loads(result[field])
+            except json.JSONDecodeError:
+                logger.warning(f"[DB] Failed to parse JSON for {field}")
+                result[field] = None
+        elif field in ["anomaly_flags", "optimization_recommendations"]:
+            # Default to empty arrays for Phase 3D fields
+            result[field] = []
+
+    # Convert None to defaults for score and temporal fields (legacy data compatibility)
+    default_fields = {
+        "nl_input_clarity_score": 0.0,
+        "cost_efficiency_score": 0.0,
+        "performance_score": 0.0,
+        "quality_score": 0.0,
+        "estimated_cost_total": 0.0,
+        "hour_of_day": -1,
+        "day_of_week": -1,
+    }
+    for field, default_value in default_fields.items():
+        if result.get(field) is None:
+            result[field] = default_value
+
+    return result
+
+
 def get_workflow_history(
     limit: int = 20,
     offset: int = 0,
@@ -89,36 +170,9 @@ def get_workflow_history(
         ph = _db_adapter.placeholder()
 
         # Build WHERE clauses
-        where_clauses = []
-        params = []
-
-        if status:
-            where_clauses.append(f"status = {ph}")
-            params.append(status)
-
-        if model:
-            where_clauses.append(f"model_used = {ph}")
-            params.append(model)
-
-        if template:
-            where_clauses.append(f"workflow_template = {ph}")
-            params.append(template)
-
-        if start_date:
-            where_clauses.append(f"created_at >= {ph}")
-            params.append(start_date)
-
-        if end_date:
-            where_clauses.append(f"created_at <= {ph}")
-            params.append(end_date)
-
-        if search:
-            where_clauses.append(
-                f"(adw_id LIKE {ph} OR nl_input LIKE {ph} OR github_url LIKE {ph})"
-            )
-            search_param = f"%{search}%"
-            params.extend([search_param, search_param, search_param])
-
+        where_clauses, params = _build_where_clauses(
+            ph, status, model, template, start_date, end_date, search
+        )
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
         # Get total count (before pagination)
@@ -151,45 +205,7 @@ def get_workflow_history(
         cursor.execute(query, params + [limit, offset])
         rows = cursor.fetchall()
 
-        results = []
-        for row in rows:
-            result = dict(row)
-
-            # No field name mapping needed - database and code use same names
-
-            # Parse JSON fields
-            json_fields = [
-                "structured_input", "cost_breakdown", "token_breakdown",
-                "phase_durations", "retry_reasons", "error_phase_distribution",
-                "anomaly_flags", "optimization_recommendations"  # Phase 3D
-            ]
-            for field in json_fields:
-                if result.get(field):
-                    try:
-                        result[field] = json.loads(result[field])
-                    except json.JSONDecodeError:
-                        logger.warning(f"[DB] Failed to parse JSON for {field}")
-                        result[field] = None
-                else:
-                    # Default to empty arrays for Phase 3D fields
-                    if field in ["anomaly_flags", "optimization_recommendations"]:
-                        result[field] = []
-
-            # Convert None to defaults for score and temporal fields (legacy data compatibility)
-            default_fields = {
-                "nl_input_clarity_score": 0.0,
-                "cost_efficiency_score": 0.0,
-                "performance_score": 0.0,
-                "quality_score": 0.0,
-                "estimated_cost_total": 0.0,
-                "hour_of_day": -1,
-                "day_of_week": -1,
-            }
-            for field, default_value in default_fields.items():
-                if result.get(field) is None:
-                    result[field] = default_value
-
-            results.append(result)
+        results = [_process_workflow_row(row) for row in rows]
 
         logger.debug(
             f"[DB] Retrieved {len(results)} workflows (total: {total_count}, "

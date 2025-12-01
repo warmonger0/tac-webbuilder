@@ -11,6 +11,82 @@ from .helpers import detect_complexity
 logger = logging.getLogger(__name__)
 
 
+def _handle_cost_anomaly(anomaly: dict, model: str, complexity: str) -> list[str]:
+    """Generate recommendations for cost anomalies."""
+    recs = []
+
+    # Model selection recommendations
+    if "sonnet" in model.lower() and complexity == "simple":
+        recs.append(
+            "💡 Consider using Haiku model for this simple task to reduce costs by ~80%"
+        )
+    elif "opus" in model.lower():
+        recs.append(
+            "💡 Consider using Sonnet instead of Opus to reduce costs by ~50%"
+        )
+
+    # Cost reduction recommendations
+    recs.append(
+        f"💰 Cost is {anomaly.get('actual', 0) / anomaly.get('expected', 1):.1f}x higher than expected - "
+        "review prompt complexity and reduce unnecessary context"
+    )
+
+    return recs
+
+
+def _handle_duration_anomaly(phase_durations: dict) -> list[str]:
+    """Generate recommendations for duration anomalies."""
+    if not phase_durations:
+        return [
+            "🚀 Duration is significantly longer than average - "
+            "review workflow steps and remove unnecessary operations"
+        ]
+
+    total_duration = sum(phase_durations.values())
+    slowest_phase = max(phase_durations.items(), key=lambda x: x[1])
+    phase_name, phase_time = slowest_phase
+
+    if phase_time > total_duration * 0.3:  # >30% of total time
+        return [
+            f"⏱️ Bottleneck in '{phase_name}' phase (takes {phase_time}s, {phase_time/total_duration*100:.0f}% of total) - "
+            "consider breaking down into smaller tasks"
+        ]
+
+    return []
+
+
+def _handle_retry_anomaly(anomaly: dict, error_count: int) -> list[str]:
+    """Generate recommendations for retry anomalies."""
+    if error_count > 0:
+        return [
+            f"🐛 Workflow required {anomaly.get('actual', 0)} retries with {error_count} errors - "
+            "add input validation and improve error handling to reduce costs"
+        ]
+
+    return [
+        f"💰 Workflow required {anomaly.get('actual', 0)} retries - "
+        "review workflow stability and external dependencies to reduce retry costs"
+    ]
+
+
+def _handle_cache_anomaly(anomaly: dict) -> list[str]:
+    """Generate recommendations for cache anomalies."""
+    cache_efficiency = anomaly.get("actual", 0)
+    return [
+        f"📦 Low cache efficiency ({cache_efficiency*100:.1f}%) - "
+        "use more consistent prompts and system messages to improve caching and reduce costs"
+    ]
+
+
+def _handle_error_category_anomaly(anomaly: dict) -> list[str]:
+    """Generate recommendations for error category anomalies."""
+    error_category = anomaly.get("actual", "")
+    return [
+        f"🐛 Unexpected error category '{error_category}' - "
+        "add validation steps and improve error handling to prevent runtime errors"
+    ]
+
+
 def generate_optimization_recommendations(workflow: dict, anomalies: list[dict]) -> list[str]:
     """
     Generate actionable optimization recommendations with emoji prefixes.
@@ -52,68 +128,15 @@ def generate_optimization_recommendations(workflow: dict, anomalies: list[dict])
             anomaly_type = anomaly.get("type", "")
 
             if anomaly_type == "cost_anomaly":
-                # Model selection recommendations
-                if "sonnet" in model.lower() and complexity == "simple":
-                    recommendations.append(
-                        "💡 Consider using Haiku model for this simple task to reduce costs by ~80%"
-                    )
-                elif "opus" in model.lower():
-                    recommendations.append(
-                        "💡 Consider using Sonnet instead of Opus to reduce costs by ~50%"
-                    )
-
-                # Cost reduction recommendations
-                recommendations.append(
-                    f"💰 Cost is {anomaly.get('actual', 0) / anomaly.get('expected', 1):.1f}x higher than expected - "
-                    "review prompt complexity and reduce unnecessary context"
-                )
-
+                recommendations.extend(_handle_cost_anomaly(anomaly, model, complexity))
             elif anomaly_type == "duration_anomaly":
-                # Bottleneck analysis
-                if phase_durations:
-                    total_duration = sum(phase_durations.values())
-                    slowest_phase = max(phase_durations.items(), key=lambda x: x[1])
-                    phase_name, phase_time = slowest_phase
-
-                    if phase_time > total_duration * 0.3:  # >30% of total time
-                        recommendations.append(
-                            f"⏱️ Bottleneck in '{phase_name}' phase (takes {phase_time}s, {phase_time/total_duration*100:.0f}% of total) - "
-                            "consider breaking down into smaller tasks"
-                        )
-                else:
-                    recommendations.append(
-                        "🚀 Duration is significantly longer than average - "
-                        "review workflow steps and remove unnecessary operations"
-                    )
-
+                recommendations.extend(_handle_duration_anomaly(phase_durations))
             elif anomaly_type == "retry_anomaly":
-                # Error handling and cost reduction
-                if error_count > 0:
-                    recommendations.append(
-                        f"🐛 Workflow required {anomaly.get('actual', 0)} retries with {error_count} errors - "
-                        "add input validation and improve error handling to reduce costs"
-                    )
-                else:
-                    recommendations.append(
-                        f"💰 Workflow required {anomaly.get('actual', 0)} retries - "
-                        "review workflow stability and external dependencies to reduce retry costs"
-                    )
-
+                recommendations.extend(_handle_retry_anomaly(anomaly, error_count))
             elif anomaly_type == "cache_anomaly":
-                # Cache optimization
-                cache_efficiency = anomaly.get("actual", 0)
-                recommendations.append(
-                    f"📦 Low cache efficiency ({cache_efficiency*100:.1f}%) - "
-                    "use more consistent prompts and system messages to improve caching and reduce costs"
-                )
-
+                recommendations.extend(_handle_cache_anomaly(anomaly))
             elif anomaly_type == "error_category_anomaly":
-                # Error prevention
-                error_category = anomaly.get("actual", "")
-                recommendations.append(
-                    f"🐛 Unexpected error category '{error_category}' - "
-                    "add validation steps and improve error handling to prevent runtime errors"
-                )
+                recommendations.extend(_handle_error_category_anomaly(anomaly))
 
         # Add input quality recommendation if input is too brief or unclear
         if nl_input and len(nl_input.split()) < 20:
