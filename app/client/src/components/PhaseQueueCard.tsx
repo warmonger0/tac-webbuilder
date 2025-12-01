@@ -22,6 +22,7 @@ export interface PhaseQueueItem {
     title: string;
     content: string;
     externalDocs?: string[];
+    predicted_patterns?: string[];  // Predicted operation patterns
   };
   created_at: string;
   updated_at: string;
@@ -171,6 +172,22 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
                 <span>#{pr_number}</span>
               </button>
             )}
+              </div>
+            )}
+
+            {/* Pattern Predictions */}
+            {phase_data.predicted_patterns && phase_data.predicted_patterns.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1 ml-11">
+                <span className="text-xs text-slate-400">Patterns:</span>
+                {phase_data.predicted_patterns.map((pattern, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-xs rounded-md border border-emerald-500/30"
+                    title="Predicted pattern"
+                  >
+                    {pattern}
+                  </span>
+                ))}
               </div>
             )}
 

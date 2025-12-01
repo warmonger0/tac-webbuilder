@@ -106,6 +106,7 @@ export interface Phase {
   title: string;
   content: string;
   externalDocs?: string[];
+  predicted_patterns?: string[];  // Predicted operation patterns for this phase
 }
 
 export interface ChildIssueInfo {

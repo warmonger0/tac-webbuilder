@@ -10,8 +10,7 @@ from typing import TYPE_CHECKING, Union
 from .connection import DatabaseAdapter
 
 if TYPE_CHECKING:
-    from .postgres_adapter import PostgreSQLAdapter
-    from .sqlite_adapter import SQLiteAdapter
+    pass
 
 # Global adapter instance (singleton pattern)
 _adapter: Union[DatabaseAdapter, None] = None

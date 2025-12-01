@@ -114,7 +114,26 @@ class GitHubIssueService:
                 logger.info(f"[INFO] Multi-phase request detected: {len(request.phases)} phases")
                 if not self.multi_phase_handler:
                     raise HTTPException(500, "Multi-phase requests not supported: PhaseQueueService not initialized")
-                return await self.multi_phase_handler.handle_multi_phase_request(request)
+
+                # Predict patterns for multi-phase requests
+                predicted_patterns = []
+                try:
+                    predicted_patterns = predict_patterns_from_input(
+                        nl_input=request.nl_input,
+                        project_path=request.project_path
+                    )
+                    if predicted_patterns:
+                        logger.info(
+                            f"[Multi-Phase] Predicted {len(predicted_patterns)} patterns: "
+                            f"{[p['pattern'] for p in predicted_patterns]}"
+                        )
+                except Exception as e:
+                    logger.error(f"[Multi-Phase] Pattern prediction failed: {e}")
+
+                return await self.multi_phase_handler.handle_multi_phase_request(
+                    request,
+                    predicted_patterns=predicted_patterns if predicted_patterns else None
+                )
 
             # Standard single-phase flow
             return await self._handle_single_phase_request(request)
