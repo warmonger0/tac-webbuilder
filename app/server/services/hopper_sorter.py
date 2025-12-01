@@ -65,7 +65,8 @@ class HopperSorter:
         """
         try:
             with self.adapter.get_connection() as conn:
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     """
                     SELECT * FROM phase_queue
                     WHERE status = 'ready'
@@ -120,7 +121,8 @@ class HopperSorter:
         """
         try:
             with self.adapter.get_connection() as conn:
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     """
                     SELECT * FROM phase_queue
                     WHERE status = 'ready'
@@ -163,7 +165,8 @@ class HopperSorter:
         """
         try:
             with self.adapter.get_connection() as conn:
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     """
                     SELECT COUNT(DISTINCT parent_issue)
                     FROM phase_queue
@@ -213,7 +216,8 @@ class HopperSorter:
         """
         try:
             with self.adapter.get_connection() as conn:
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     """
                     SELECT
                       priority,

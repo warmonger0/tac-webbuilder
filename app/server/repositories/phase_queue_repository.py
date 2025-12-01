@@ -44,11 +44,12 @@ class PhaseQueueRepository:
         try:
             with self.adapter.get_connection() as conn:
                 # Get next queue_position (max + 1)
-                cursor = conn.execute("SELECT COALESCE(MAX(queue_position), 0) + 1 FROM phase_queue")
+                cursor = conn.cursor()
+                cursor.execute("SELECT COALESCE(MAX(queue_position), 0) + 1 FROM phase_queue")
                 next_position = cursor.fetchone()[0]
 
                 ph = self.adapter.placeholder()
-                conn.execute(
+                cursor.execute(
                     f"""
                     INSERT INTO phase_queue (
                         queue_id, parent_issue, phase_number, status,
@@ -88,7 +89,8 @@ class PhaseQueueRepository:
         try:
             with self.adapter.get_connection() as conn:
                 ph = self.adapter.placeholder()
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     f"SELECT * FROM phase_queue WHERE queue_id = {ph}",
                     (queue_id,)
                 )
@@ -113,7 +115,8 @@ class PhaseQueueRepository:
         try:
             with self.adapter.get_connection() as conn:
                 ph = self.adapter.placeholder()
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     f"""
                     SELECT * FROM phase_queue
                     WHERE parent_issue = {ph}
@@ -138,7 +141,8 @@ class PhaseQueueRepository:
         """
         try:
             with self.adapter.get_connection() as conn:
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     """
                     SELECT * FROM phase_queue
                     WHERE status = 'ready' AND issue_number IS NULL
@@ -162,7 +166,8 @@ class PhaseQueueRepository:
         """
         try:
             with self.adapter.get_connection() as conn:
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     """
                     SELECT * FROM phase_queue
                     ORDER BY parent_issue ASC, phase_number ASC
@@ -212,7 +217,8 @@ class PhaseQueueRepository:
 
                 params.append(queue_id)
 
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     f"""
                     UPDATE phase_queue
                     SET {', '.join(updates)}
@@ -240,7 +246,8 @@ class PhaseQueueRepository:
         try:
             with self.adapter.get_connection() as conn:
                 ph = self.adapter.placeholder()
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     f"""
                     UPDATE phase_queue
                     SET issue_number = {ph}, updated_at = {ph}
@@ -268,7 +275,8 @@ class PhaseQueueRepository:
         try:
             with self.adapter.get_connection() as conn:
                 ph = self.adapter.placeholder()
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     f"""
                     UPDATE phase_queue
                     SET error_message = {ph}, updated_at = {ph}
@@ -295,7 +303,8 @@ class PhaseQueueRepository:
         try:
             with self.adapter.get_connection() as conn:
                 ph = self.adapter.placeholder()
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     f"DELETE FROM phase_queue WHERE queue_id = {ph}",
                     (queue_id,)
                 )
@@ -318,7 +327,8 @@ class PhaseQueueRepository:
         try:
             with self.adapter.get_connection() as conn:
                 ph = self.adapter.placeholder()
-                cursor = conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     f"SELECT config_value FROM queue_config WHERE config_key = {ph}",
                     (config_key,)
                 )
@@ -343,7 +353,8 @@ class PhaseQueueRepository:
         try:
             with self.adapter.get_connection() as conn:
                 ph = self.adapter.placeholder()
-                conn.execute(
+                cursor = conn.cursor()
+                cursor.execute(
                     f"""
                     INSERT INTO queue_config (config_key, config_value, updated_at)
                     VALUES ({ph}, {ph}, {ph})

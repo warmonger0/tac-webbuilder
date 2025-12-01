@@ -7,7 +7,6 @@ for the workflow history system.
 
 import logging
 import os
-import sqlite3
 from pathlib import Path
 
 from database import get_database_adapter
@@ -37,20 +36,27 @@ def init_db():
     Creates the workflow_history table with all required fields and indexes.
     Safe to call multiple times - creates tables only if they don't exist.
     """
+    adapter = _get_adapter()
+    db_type = adapter.get_db_type()
+
     # Ensure db directory exists (only needed for SQLite)
-    db_type = os.getenv("DB_TYPE", "sqlite").lower()
     if db_type == "sqlite":
         db_path = Path(__file__).parent.parent.parent.parent / "db"
         db_path.mkdir(parents=True, exist_ok=True)
 
-    adapter = _get_adapter()
     with adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Create workflow_history table with comprehensive fields
-        cursor.execute("""
+        # Use database-specific syntax for auto-incrementing primary key
+        if db_type == "postgresql":
+            pk_definition = "id SERIAL PRIMARY KEY"
+        else:  # sqlite
+            pk_definition = "id INTEGER PRIMARY KEY AUTOINCREMENT"
+
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS workflow_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                {pk_definition},
                 adw_id TEXT NOT NULL UNIQUE,
                 issue_number INTEGER,
                 nl_input TEXT,
@@ -141,9 +147,9 @@ def init_db():
         # Migration: Add gh_issue_state column if it doesn't exist
         try:
             cursor.execute("SELECT gh_issue_state FROM workflow_history LIMIT 1")
-        except sqlite3.OperationalError:
-            # Column doesn't exist, add it
-            logger.info("[DB] Adding gh_issue_state column to workflow_history table")
+        except Exception as e:
+            # Column doesn't exist, add it (catches both sqlite3.OperationalError and psycopg2.UndefinedColumn)
+            logger.info(f"[DB] Adding gh_issue_state column to workflow_history table (caught: {type(e).__name__})")
             cursor.execute("ALTER TABLE workflow_history ADD COLUMN gh_issue_state TEXT")
             conn.commit()
 

@@ -8,7 +8,7 @@ import json
 import logging
 import traceback
 
-from .schema import _db_adapter
+from .schema import _get_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,8 @@ def insert_workflow_history(
         logger.warning(f"[DB] Invalid status '{status}' for {adw_id}, defaulting to 'pending'")
         status = "pending"
 
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Build dynamic query based on provided kwargs
@@ -123,7 +124,7 @@ def insert_workflow_history(
                 else:
                     logger.debug(f"[DB] Skipping field '{field}' (maps to '{db_field}') - column doesn't exist in database")
 
-        ph = _db_adapter.placeholder()
+        ph = adapter.placeholder()
         placeholders = ", ".join([ph for _ in values])
         fields_str = ", ".join(fields)
 
@@ -164,9 +165,10 @@ def update_workflow_history_by_issue(
         logger.warning(f"[DB] No fields provided to update for issue #{issue_number}")
         return 0
 
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
-        ph = _db_adapter.placeholder()
+        ph = adapter.placeholder()
 
         # Build UPDATE query
         set_clauses = []
@@ -213,7 +215,8 @@ def update_workflow_history(
         logger.warning(f"[DB] No fields provided to update for ADW {adw_id}")
         return False
 
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Get existing columns from database to validate fields before updating
@@ -248,7 +251,7 @@ def update_workflow_history(
             logger.warning(f"[DB] No valid fields to update for ADW {adw_id}")
             return False
 
-        ph = _db_adapter.placeholder()
+        ph = adapter.placeholder()
         set_clauses = [f"{field} = {ph}" for field in mapped_kwargs]
         set_clauses.append("updated_at = CURRENT_TIMESTAMP")
 

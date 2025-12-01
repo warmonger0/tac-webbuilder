@@ -146,7 +146,8 @@ class PhaseCoordinator:
             List of phase rows with queue_id, issue_number, parent_issue, phase_number
         """
         with self.phase_queue_service.repository.adapter.get_connection() as conn:
-            cursor = conn.execute(
+            cursor = conn.cursor()
+            cursor.execute(
                 """
                 SELECT queue_id, issue_number, parent_issue, phase_number
                 FROM phase_queue

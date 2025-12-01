@@ -7,7 +7,7 @@ This module provides all read operations for the workflow history system.
 import json
 import logging
 
-from .schema import _db_adapter
+from .schema import _get_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,10 @@ def get_workflow_by_adw_id(adw_id: str) -> dict | None:
     Returns:
         Dict: Workflow history record as a dictionary, or None if not found
     """
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
-        ph = _db_adapter.placeholder()
+        ph = adapter.placeholder()
         cursor.execute(f"SELECT * FROM workflow_history WHERE adw_id = {ph}", (adw_id,))
         row = cursor.fetchone()
 
@@ -165,9 +166,10 @@ def get_workflow_history(
     Returns:
         Tuple[List[Dict], int]: List of workflow records and total count (before pagination)
     """
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
-        ph = _db_adapter.placeholder()
+        ph = adapter.placeholder()
 
         # Build WHERE clauses
         where_clauses, params = _build_where_clauses(
