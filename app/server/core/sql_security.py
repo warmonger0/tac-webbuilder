@@ -8,11 +8,32 @@ import re
 import sqlite3
 from typing import Any, Union
 
+try:
+    import psycopg2
+    PSYCOPG2_AVAILABLE = True
+except ImportError:
+    PSYCOPG2_AVAILABLE = False
+
 
 class SQLSecurityError(Exception):
     """Raised when SQL security validation fails."""
 
     pass
+
+
+def _is_postgresql_connection(conn) -> bool:
+    """
+    Check if a connection is PostgreSQL.
+
+    Args:
+        conn: Database connection object
+
+    Returns:
+        bool: True if PostgreSQL, False otherwise
+    """
+    if PSYCOPG2_AVAILABLE:
+        return isinstance(conn, psycopg2.extensions.connection)
+    return False
 
 
 def validate_identifier(identifier: str, identifier_type: str = "identifier") -> bool:
@@ -258,15 +279,23 @@ def get_safe_table_list(conn: sqlite3.Connection) -> list[str]:
     Get a list of all tables in the database safely.
 
     Args:
-        conn: SQLite connection object
+        conn: Database connection object (SQLite or PostgreSQL)
 
     Returns:
         List[str]: List of table names
     """
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-    )
+
+    if _is_postgresql_connection(conn):
+        cursor.execute("""
+            SELECT tablename FROM pg_catalog.pg_tables
+            WHERE schemaname = 'public'
+        """)
+    else:  # SQLite
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )
+
     return [row[0] for row in cursor.fetchall()]
 
 
@@ -275,7 +304,7 @@ def check_table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
     Check if a table exists in the database safely.
 
     Args:
-        conn: SQLite connection object
+        conn: Database connection object (SQLite or PostgreSQL)
         table_name: Name of the table to check
 
     Returns:
@@ -287,8 +316,16 @@ def check_table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
         return False
 
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
-        (table_name,),
-    )
+
+    if _is_postgresql_connection(conn):
+        cursor.execute("""
+            SELECT COUNT(*) FROM pg_catalog.pg_tables
+            WHERE schemaname = 'public' AND tablename = %s
+        """, (table_name,))
+    else:  # SQLite
+        cursor.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,),
+        )
+
     return cursor.fetchone()[0] > 0

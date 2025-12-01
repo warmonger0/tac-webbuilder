@@ -141,9 +141,20 @@ async def _health_check_handler(app_start_time: datetime) -> HealthCheckResponse
     try:
         # Check database connection
         adapter = get_database_adapter()
+        db_type = adapter.get_db_type()
+
         with adapter.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+
+            # Use database-specific query to list tables
+            if db_type == "postgresql":
+                cursor.execute("""
+                    SELECT tablename FROM pg_catalog.pg_tables
+                    WHERE schemaname = 'public'
+                """)
+            else:  # sqlite
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+
             tables = cursor.fetchall()
 
         uptime = (datetime.now() - app_start_time).total_seconds()
@@ -154,7 +165,7 @@ async def _health_check_handler(app_start_time: datetime) -> HealthCheckResponse
             tables_count=len(tables),
             uptime_seconds=uptime
         )
-        logger.info(f"[SUCCESS] Health check: OK, {len(tables)} tables, uptime: {uptime}s")
+        logger.info(f"[SUCCESS] Health check: OK, {len(tables)} tables ({db_type}), uptime: {uptime}s")
         return response
     except Exception as e:
         logger.error(f"[ERROR] Health check failed: {str(e)}")

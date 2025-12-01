@@ -60,11 +60,20 @@ def get_database_schema() -> dict[str, Any]:
     """
     try:
         adapter = get_database_adapter()
+        db_type = adapter.get_db_type()
+
         with adapter.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Get all tables safely
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            # Get all tables safely with database-specific queries
+            if db_type == "postgresql":
+                cursor.execute("""
+                    SELECT tablename FROM pg_catalog.pg_tables
+                    WHERE schemaname = 'public'
+                """)
+            else:  # sqlite
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+
             tables = cursor.fetchall()
 
             schema = {'tables': {}}
@@ -73,21 +82,36 @@ def get_database_schema() -> dict[str, Any]:
                 table_name = table[0]
 
                 # Skip system tables
-                if table_name.startswith('sqlite_'):
+                if table_name.startswith('sqlite_') or table_name.startswith('pg_'):
                     continue
 
                 try:
-                    # Get columns for each table using safe query execution
-                    cursor_info = execute_query_safely(
-                        conn,
-                        "PRAGMA table_info({table})",
-                        identifier_params={'table': table_name}
-                    )
-                    columns_info = cursor_info.fetchall()
+                    # Get columns for each table using database-specific queries
+                    if db_type == "postgresql":
+                        cursor.execute("""
+                            SELECT column_name, data_type, is_nullable
+                            FROM information_schema.columns
+                            WHERE table_schema = 'public' AND table_name = %s
+                            ORDER BY ordinal_position
+                        """, (table_name,))
+                        columns_info = cursor.fetchall()
+                    else:  # sqlite
+                        cursor_info = execute_query_safely(
+                            conn,
+                            "PRAGMA table_info({table})",
+                            identifier_params={'table': table_name}
+                        )
+                        columns_info = cursor_info.fetchall()
 
                     columns = {}
-                    for col in columns_info:
-                        columns[col[1]] = col[2]  # column_name: data_type
+                    if db_type == "postgresql":
+                        # PostgreSQL returns: (column_name, data_type, is_nullable)
+                        for col in columns_info:
+                            columns[col[0]] = col[1]  # column_name: data_type
+                    else:
+                        # SQLite PRAGMA returns: (cid, name, type, notnull, dflt_value, pk)
+                        for col in columns_info:
+                            columns[col[1]] = col[2]  # column_name: data_type
 
                     # Get row count safely
                     cursor_count = execute_query_safely(

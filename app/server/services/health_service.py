@@ -269,19 +269,30 @@ class HealthService:
             )
 
     def check_database(self) -> ServiceHealth:
-        """Check the health of the SQLite database"""
+        """Check the health of the database (SQLite or PostgreSQL)"""
         try:
             adapter = get_database_adapter()
+            db_type = adapter.get_db_type()
+
             with adapter.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+
+                # Use database-specific query to list tables
+                if db_type == "postgresql":
+                    cursor.execute("""
+                        SELECT tablename FROM pg_catalog.pg_tables
+                        WHERE schemaname = 'public'
+                    """)
+                else:  # sqlite
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+
                 tables = cursor.fetchall()
 
             return ServiceHealth(
                 name="Database",
                 status="healthy",
-                message=f"{len(tables)} tables available",
-                details={"tables_count": len(tables), "path": self.db_path}
+                message=f"{len(tables)} tables available ({db_type})",
+                details={"tables_count": len(tables), "database_type": db_type, "path": self.db_path}
             )
         except Exception as e:
             return ServiceHealth(
