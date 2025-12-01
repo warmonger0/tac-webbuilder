@@ -461,6 +461,151 @@ def init_queue_routes(phase_queue_service):
 webhook_router = APIRouter(prefix="", tags=["Webhooks"])
 
 
+def _update_phase_status(
+    phase_queue_service,
+    request: WorkflowCompleteRequest,
+    response: WorkflowCompleteResponse
+) -> None:
+    """Update phase status if queue_id provided (modifies response in place)."""
+    if not request.queue_id:
+        return
+
+    new_status = "completed" if request.status == "completed" else "failed"
+    updated = phase_queue_service.update_status(request.queue_id, new_status)
+
+    if updated:
+        response.phase_updated = True
+        response.message = f"Phase marked as {new_status}"
+        logger.info(f"[WEBHOOK] Updated phase {request.queue_id} to {new_status}")
+    else:
+        logger.warning(f"[WEBHOOK] Queue ID {request.queue_id} not found")
+        response.message = "Queue ID not found, but notification received"
+
+
+def _find_next_phase(phase_queue_service, request: WorkflowCompleteRequest):
+    """Find the next phase to execute."""
+    # Get all phases for this parent issue
+    phases = phase_queue_service.get_queue_by_parent(request.parent_issue)
+    next_phase = None
+    for phase in phases:
+        if phase.depends_on_phase == request.phase_number:
+            next_phase = phase
+            break
+
+    # If no next phase in current parent, check hopper
+    if not next_phase:
+        logger.info(
+            f"[WEBHOOK] No next phase in parent #{request.parent_issue}. "
+            "Checking hopper for other ready Phase 1s..."
+        )
+
+        from services.hopper_sorter import HopperSorter
+        sorter = HopperSorter()
+        next_phase = sorter.get_next_phase_1()
+
+        if next_phase:
+            logger.info(
+                f"[WEBHOOK] Hopper selected next parent: #{next_phase.parent_issue} "
+                f"(priority={next_phase.priority}, position={next_phase.queue_position})"
+            )
+        else:
+            logger.info("[WEBHOOK] Hopper empty - no more Phase 1s to start")
+
+    return next_phase, phases
+
+
+def _create_phase_issue(github_poster, next_phase, phases) -> int:
+    """Create GitHub issue for a phase."""
+    logger.info(f"[WEBHOOK] Creating GitHub issue for phase {next_phase.phase_number}")
+
+    phase_data = next_phase.phase_data
+    total_phases = max(p.phase_number for p in phases)
+
+    phase_title = f"Phase {next_phase.phase_number}: {phase_data.get('title', 'Untitled Phase')}"
+    phase_body = f"""# Phase {next_phase.phase_number} of {total_phases}
+
+**Execution Order:** After Phase {next_phase.depends_on_phase}
+
+## Description
+
+{phase_data.get('content', 'No description provided')}
+
+"""
+    external_docs = phase_data.get('externalDocs', [])
+    if external_docs:
+        phase_body += f"""
+## Referenced Documents
+
+{chr(10).join(f'- `{doc}`' for doc in external_docs)}
+
+"""
+
+    # Determine workflow for this phase
+    phase_workflow, phase_model = determine_workflow_for_phase(phase_data)
+
+    phase_body += f"""
+---
+
+**Workflow:** {phase_workflow} with {phase_model} model
+"""
+
+    # Use GitHubPoster to create issue
+    from core.data_models import GitHubIssue
+
+    phase_issue = GitHubIssue(
+        title=phase_title,
+        body=phase_body,
+        labels=[f"phase-{next_phase.phase_number}", "multi-phase"],
+        classification="feature",
+        workflow="adw_sdlc_iso",
+        model_set="base"
+    )
+
+    issue_number = github_poster.post_issue(phase_issue, confirm=False)
+    logger.info(f"[WEBHOOK] Created issue #{issue_number} for phase {next_phase.phase_number}")
+
+    return issue_number
+
+
+def _launch_workflow(next_phase) -> tuple[str, bool]:
+    """Launch workflow for next phase. Returns (adw_id, success)."""
+    import uuid
+    adw_id = f"adw-{uuid.uuid4().hex[:8]}"
+
+    # Determine appropriate workflow
+    workflow, model_set = determine_workflow_for_phase(next_phase.phase_data)
+    logger.info(f"[WEBHOOK] Selected workflow: {workflow} (model_set: {model_set})")
+
+    # Build command to launch workflow
+    server_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app_dir = os.path.dirname(server_dir)
+    repo_root = os.path.dirname(app_dir)
+    adws_dir = os.path.join(repo_root, "adws")
+    workflow_script = os.path.join(adws_dir, f"{workflow}.py")
+
+    if not os.path.exists(workflow_script):
+        logger.error(f"[WEBHOOK] Workflow script not found: {workflow_script}")
+        return adw_id, False
+
+    cmd = ["uv", "run", workflow_script, str(next_phase.issue_number), adw_id]
+
+    logger.info(
+        f"[WEBHOOK] Launching {workflow} for phase {next_phase.phase_number} "
+        f"(issue #{next_phase.issue_number}, adw_id: {adw_id})"
+    )
+
+    # Launch workflow in background
+    subprocess.Popen(
+        cmd,
+        cwd=repo_root,
+        start_new_session=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    return adw_id, True
+
+
 def init_webhook_routes(phase_queue_service, github_poster):
     """
     Initialize webhook routes with service dependencies.
@@ -509,21 +654,10 @@ def init_webhook_routes(phase_queue_service, github_poster):
                 next_phase_triggered=False
             )
 
-            # Update phase status if queue_id provided
-            if request.queue_id:
-                new_status = "completed" if request.status == "completed" else "failed"
-                updated = phase_queue_service.update_status(request.queue_id, new_status)
-
-                if updated:
-                    response.phase_updated = True
-                    response.message = f"Phase marked as {new_status}"
-                    logger.info(f"[WEBHOOK] Updated phase {request.queue_id} to {new_status}")
-                else:
-                    logger.warning(f"[WEBHOOK] Queue ID {request.queue_id} not found")
-                    response.message = "Queue ID not found, but notification received"
+            # Update phase status
+            _update_phase_status(phase_queue_service, request, response)
 
             # Check if we should trigger next phase
-            # Only if: trigger_next=True, status=completed, queue not paused
             if not request.trigger_next or request.status != "completed":
                 logger.info(f"[WEBHOOK] Not triggering next phase (trigger_next={request.trigger_next}, status={request.status})")
                 return response
@@ -534,142 +668,40 @@ def init_webhook_routes(phase_queue_service, github_poster):
                 response.message += ". Queue is paused, next phase not triggered"
                 return response
 
-            # Find next phase within SAME parent issue first
+            # Validate required fields
             if not request.parent_issue or not request.phase_number:
                 logger.warning("[WEBHOOK] Cannot trigger next phase: missing parent_issue or phase_number")
                 return response
 
-            # Get all phases for this parent issue
-            phases = phase_queue_service.get_queue_by_parent(request.parent_issue)
-            next_phase = None
-            for phase in phases:
-                if phase.depends_on_phase == request.phase_number:
-                    next_phase = phase
-                    break
+            # Find next phase
+            next_phase, phases = _find_next_phase(phase_queue_service, request)
 
-            # If no next phase in current parent, check for other ready Phase 1s (cross-parent)
             if not next_phase:
-                logger.info(
-                    f"[WEBHOOK] No next phase in parent #{request.parent_issue}. "
-                    "Checking hopper for other ready Phase 1s..."
-                )
-
-                # Use HopperSorter for deterministic cross-parent ordering
-                from services.hopper_sorter import HopperSorter
-                sorter = HopperSorter()
-                next_phase = sorter.get_next_phase_1()
-
-                if next_phase:
-                    logger.info(
-                        f"[WEBHOOK] Hopper selected next parent: #{next_phase.parent_issue} "
-                        f"(priority={next_phase.priority}, position={next_phase.queue_position})"
-                    )
-                else:
-                    logger.info("[WEBHOOK] Hopper empty - no more Phase 1s to start")
-                    response.message += ". No more phases in queue"
-                    return response
+                response.message += ". No more phases in queue"
+                return response
 
             logger.info(
                 f"[WEBHOOK] Found next phase: {next_phase.phase_number} "
                 f"(queue_id: {next_phase.queue_id})"
             )
 
-            # Create GitHub issue for next phase if it doesn't have one
+            # Create GitHub issue if needed
             if not next_phase.issue_number:
-                logger.info(f"[WEBHOOK] Creating GitHub issue for phase {next_phase.phase_number}")
-
-                # Build issue content from phase_data
-                phase_data = next_phase.phase_data
-                total_phases = max(p.phase_number for p in phases)
-
-                phase_title = f"Phase {next_phase.phase_number}: {phase_data.get('title', 'Untitled Phase')}"
-                phase_body = f"""# Phase {next_phase.phase_number} of {total_phases}
-
-**Execution Order:** After Phase {next_phase.depends_on_phase}
-
-## Description
-
-{phase_data.get('content', 'No description provided')}
-
-"""
-                external_docs = phase_data.get('externalDocs', [])
-                if external_docs:
-                    phase_body += f"""
-## Referenced Documents
-
-{chr(10).join(f'- `{doc}`' for doc in external_docs)}
-
-"""
-
-                # Determine workflow for this phase
-                phase_workflow, phase_model = determine_workflow_for_phase(phase_data)
-
-                phase_body += f"""
----
-
-**Workflow:** {phase_workflow} with {phase_model} model
-"""
-
-                # Use GitHubPoster to create issue
-                from core.data_models import GitHubIssue
-
-                phase_issue = GitHubIssue(
-                    title=phase_title,
-                    body=phase_body,
-                    labels=[f"phase-{next_phase.phase_number}", "multi-phase"],
-                    classification="feature",
-                    workflow="adw_sdlc_iso",
-                    model_set="base"
-                )
-
-                issue_number = github_poster.post_issue(phase_issue, confirm=False)
-
-                # Update queue with new issue number
+                issue_number = _create_phase_issue(github_poster, next_phase, phases)
                 phase_queue_service.update_issue_number(next_phase.queue_id, issue_number)
-                next_phase.issue_number = issue_number  # Update local object
-
+                next_phase.issue_number = issue_number
                 response.next_issue_created = issue_number
-                logger.info(f"[WEBHOOK] Created issue #{issue_number} for phase {next_phase.phase_number}")
 
             # Mark next phase as ready
             phase_queue_service.update_status(next_phase.queue_id, "ready")
             logger.info(f"[WEBHOOK] Marked phase {next_phase.phase_number} as ready")
 
-            # Auto-execute next phase
-            import uuid
-            adw_id = f"adw-{uuid.uuid4().hex[:8]}"
+            # Launch workflow
+            adw_id, success = _launch_workflow(next_phase)
 
-            # Determine appropriate workflow based on phase characteristics
-            workflow, model_set = determine_workflow_for_phase(next_phase.phase_data)
-            logger.info(f"[WEBHOOK] Selected workflow: {workflow} (model_set: {model_set})")
-
-            # Build command to launch workflow
-            server_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # app/server
-            app_dir = os.path.dirname(server_dir)  # app
-            repo_root = os.path.dirname(app_dir)  # repo root
-            adws_dir = os.path.join(repo_root, "adws")
-            workflow_script = os.path.join(adws_dir, f"{workflow}.py")
-
-            if not os.path.exists(workflow_script):
-                logger.error(f"[WEBHOOK] Workflow script not found: {workflow_script}")
+            if not success:
                 response.message += ". Next phase ready but workflow script not found"
                 return response
-
-            cmd = ["uv", "run", workflow_script, str(next_phase.issue_number), adw_id]
-
-            logger.info(
-                f"[WEBHOOK] Launching {workflow} for phase {next_phase.phase_number} "
-                f"(issue #{next_phase.issue_number}, adw_id: {adw_id})"
-            )
-
-            # Launch workflow in background
-            subprocess.Popen(
-                cmd,
-                cwd=repo_root,
-                start_new_session=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
 
             # Mark phase as running
             phase_queue_service.update_status(next_phase.queue_id, "running", adw_id=adw_id)
