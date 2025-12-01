@@ -335,20 +335,20 @@ class GitHubIssueService:
 
                 return health_data
 
-        except httpx.TimeoutException:
+        except httpx.TimeoutException as e:
             logger.error(f"[ERROR] Webhook trigger health check timed out at {health_endpoint}")
             raise HTTPException(
                 503,
                 "ADW webhook trigger is not responding (timeout). "
                 "Please start the trigger service: cd adws && uv run adw_triggers/trigger_webhook.py"
-            )
-        except httpx.ConnectError:
+            ) from e
+        except httpx.ConnectError as e:
             logger.error(f"[ERROR] Cannot connect to webhook trigger at {health_endpoint}")
             raise HTTPException(
                 503,
                 "ADW webhook trigger is offline. "
                 "Please start the trigger service: cd adws && uv run adw_triggers/trigger_webhook.py"
-            )
+            ) from e
         except HTTPException:
             raise
         except Exception as e:
