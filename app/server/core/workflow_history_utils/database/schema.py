@@ -6,7 +6,6 @@ for the workflow history system.
 """
 
 import logging
-import os
 from pathlib import Path
 
 from database import get_database_adapter
