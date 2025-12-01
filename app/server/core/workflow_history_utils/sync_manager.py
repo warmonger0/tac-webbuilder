@@ -25,6 +25,118 @@ from core.workflow_history_utils.filesystem import scan_agents_directory
 logger = logging.getLogger(__name__)
 
 
+def _should_update_cost(existing: dict, workflow_data: dict) -> tuple[bool, str, dict]:
+    """
+    Determine if cost should be updated. Returns (should_update, reason, updates_dict).
+
+    Logic:
+    - For completed/failed: update if cost changed
+    - For running: update only if cost increased
+    - Never allow decreases
+    """
+    if not workflow_data.get("cost_breakdown"):
+        return False, "no cost data", {}
+
+    old_cost = existing.get("actual_cost_total", 0.0)
+    new_cost = workflow_data.get("actual_cost_total", 0.0)
+    status = workflow_data.get("status", "unknown")
+
+    should_update = False
+    update_reason = ""
+
+    # For completed/failed workflows, only update if cost actually changed
+    if status in ["completed", "failed"] and new_cost != old_cost:
+        should_update = True
+        update_reason = f"final cost changed for {status} workflow: ${old_cost:.4f} → ${new_cost:.4f}"
+    # For running workflows, only update if cost increased
+    elif status == "running" and new_cost > old_cost:
+        should_update = True
+        update_reason = f"progressive increase from ${old_cost:.4f} to ${new_cost:.4f}"
+    # Skip if no change or decrease
+    else:
+        update_reason = f"no change (${old_cost:.4f} = ${new_cost:.4f})" if new_cost == old_cost else "no update needed"
+
+    if not should_update:
+        return False, update_reason, {}
+
+    # Build updates dict
+    updates = {
+        "cost_breakdown": workflow_data["cost_breakdown"],
+        "actual_cost_total": new_cost,
+        "input_tokens": workflow_data.get("input_tokens", 0),
+        "cached_tokens": workflow_data.get("cached_tokens", 0),
+        "cache_hit_tokens": workflow_data.get("cache_hit_tokens", 0),
+        "cache_miss_tokens": workflow_data.get("cache_miss_tokens", 0),
+        "output_tokens": workflow_data.get("output_tokens", 0),
+        "total_tokens": workflow_data.get("total_tokens", 0),
+        "cache_efficiency_percent": workflow_data.get("cache_efficiency_percent", 0.0),
+    }
+
+    return True, update_reason, updates
+
+
+def _build_update_dict(existing: dict, workflow_data: dict, duration_seconds: float | None, adw_id: str) -> dict:
+    """Build dictionary of updates for existing workflow."""
+    updates = {}
+
+    # Status update
+    if existing["status"] != workflow_data["status"]:
+        updates["status"] = workflow_data["status"]
+
+    # Current phase update
+    if workflow_data.get("current_phase") and existing["current_phase"] != workflow_data["current_phase"]:
+        updates["current_phase"] = workflow_data["current_phase"]
+
+    # Duration update
+    if duration_seconds and not existing["duration_seconds"]:
+        updates["duration_seconds"] = duration_seconds
+
+    # Cost update with status-aware logic
+    should_update, update_reason, cost_updates = _should_update_cost(existing, workflow_data)
+    if should_update:
+        updates.update(cost_updates)
+        logger.debug(f"[SYNC] Cost update for {adw_id} ({workflow_data.get('status')}): {update_reason}")
+    else:
+        logger.debug(f"[SYNC] Cost update skipped for {adw_id} ({workflow_data.get('status')}): {update_reason}")
+
+    # Performance metrics update
+    if workflow_data.get("phase_durations") and not existing.get("phase_durations"):
+        updates["phase_durations"] = workflow_data["phase_durations"]
+        updates["bottleneck_phase"] = workflow_data.get("bottleneck_phase")
+        updates["idle_time_seconds"] = workflow_data.get("idle_time_seconds")
+
+    # Error category update
+    if workflow_data.get("error_category") and not existing.get("error_category"):
+        updates["error_category"] = workflow_data["error_category"]
+
+    # Complexity update
+    if workflow_data.get("complexity_actual") and not existing.get("complexity_actual"):
+        updates["complexity_actual"] = workflow_data["complexity_actual"]
+
+    # Anomaly flags update (only for new workflows, so should_generate_insights is always False)
+    should_generate_insights = False
+    if should_generate_insights and "anomaly_flags" in workflow_data:
+        try:
+            new_anomaly_flags = json.loads(workflow_data.get("anomaly_flags", "[]"))
+            old_anomaly_flags = existing.get("anomaly_flags", [])
+            if new_anomaly_flags != old_anomaly_flags:
+                updates["anomaly_flags"] = workflow_data["anomaly_flags"]
+        except Exception:
+            pass
+
+    # Recommendations update (only for new workflows)
+    if should_generate_insights and "optimization_recommendations" in workflow_data:
+        try:
+            new_recommendations = json.loads(workflow_data.get("optimization_recommendations", "[]"))
+            old_recommendations = existing.get("optimization_recommendations", [])
+            if new_recommendations != old_recommendations:
+                updates["optimization_recommendations"] = workflow_data["optimization_recommendations"]
+        except Exception:
+            pass
+
+    return updates
+
+
 def sync_workflow_history() -> int:
     """
     Synchronize workflow history database with agents directory.
@@ -61,92 +173,7 @@ def sync_workflow_history() -> int:
 
         if existing:
             # Update existing record if status or other fields changed
-            updates = {}
-
-            if existing["status"] != workflow_data["status"]:
-                updates["status"] = workflow_data["status"]
-
-            if workflow_data.get("current_phase") and existing["current_phase"] != workflow_data["current_phase"]:
-                updates["current_phase"] = workflow_data["current_phase"]
-
-            if duration_seconds and not existing["duration_seconds"]:
-                updates["duration_seconds"] = duration_seconds
-
-            # Update cost data with status-aware logic to prevent staleness
-            # - Only update if cost has ACTUALLY CHANGED (prevent redundant writes)
-            # - For running workflows, only update if cost increased (progressive tracking)
-            # - Never allow cost decreases (prevents data corruption from out-of-order syncs)
-            if workflow_data.get("cost_breakdown"):
-                old_cost = existing.get("actual_cost_total", 0.0)
-                new_cost = workflow_data.get("actual_cost_total", 0.0)
-                status = workflow_data.get("status", "unknown")
-
-                should_update = False
-                update_reason = ""
-
-                # For completed/failed workflows, only update if cost actually changed
-                if status in ["completed", "failed"] and new_cost != old_cost:
-                    should_update = True
-                    update_reason = f"final cost changed for {status} workflow: ${old_cost:.4f} → ${new_cost:.4f}"
-                # For running workflows, only update if cost increased
-                elif status == "running" and new_cost > old_cost:
-                    should_update = True
-                    update_reason = f"progressive increase from ${old_cost:.4f} to ${new_cost:.4f}"
-                # Skip if no change or decrease
-                else:
-                    update_reason = f"no change (${old_cost:.4f} = ${new_cost:.4f})" if new_cost == old_cost else "no update needed"
-
-                if should_update:
-                    updates["cost_breakdown"] = workflow_data["cost_breakdown"]
-                    updates["actual_cost_total"] = new_cost
-                    updates["input_tokens"] = workflow_data.get("input_tokens", 0)
-                    updates["cached_tokens"] = workflow_data.get("cached_tokens", 0)
-                    updates["cache_hit_tokens"] = workflow_data.get("cache_hit_tokens", 0)
-                    updates["cache_miss_tokens"] = workflow_data.get("cache_miss_tokens", 0)
-                    updates["output_tokens"] = workflow_data.get("output_tokens", 0)
-                    updates["total_tokens"] = workflow_data.get("total_tokens", 0)
-                    updates["cache_efficiency_percent"] = workflow_data.get("cache_efficiency_percent", 0.0)
-                    logger.debug(f"[SYNC] Cost update for {adw_id} ({status}): ${old_cost:.4f} → ${new_cost:.4f} ({update_reason})")
-                else:
-                    logger.debug(f"[SYNC] Cost update skipped for {adw_id} ({status}): {update_reason}")
-
-            # Update performance metrics if available and not already set
-            if workflow_data.get("phase_durations") and not existing.get("phase_durations"):
-                updates["phase_durations"] = workflow_data["phase_durations"]
-                updates["bottleneck_phase"] = workflow_data.get("bottleneck_phase")
-                updates["idle_time_seconds"] = workflow_data.get("idle_time_seconds")
-
-            # Update error category if available and not already set
-            if workflow_data.get("error_category") and not existing.get("error_category"):
-                updates["error_category"] = workflow_data["error_category"]
-
-            # Update complexity if available and not already set
-            if workflow_data.get("complexity_actual") and not existing.get("complexity_actual"):
-                updates["complexity_actual"] = workflow_data["complexity_actual"]
-
-            # Anomaly Detection & Recommendations - Only update if we generated new insights
-            # (We only generate insights for new workflows, so this block rarely runs)
-            should_generate_insights = False  # Only for new workflows
-            if should_generate_insights and "anomaly_flags" in workflow_data:
-                try:
-                    # workflow_data has JSON strings, existing has parsed Python objects
-                    new_anomaly_flags = json.loads(workflow_data.get("anomaly_flags", "[]"))
-                    old_anomaly_flags = existing.get("anomaly_flags", [])
-                    if new_anomaly_flags != old_anomaly_flags:
-                        updates["anomaly_flags"] = workflow_data["anomaly_flags"]
-                except Exception:
-                    # If comparison fails, skip update (don't cause unnecessary writes)
-                    pass
-
-            if should_generate_insights and "optimization_recommendations" in workflow_data:
-                try:
-                    new_recommendations = json.loads(workflow_data.get("optimization_recommendations", "[]"))
-                    old_recommendations = existing.get("optimization_recommendations", [])
-                    if new_recommendations != old_recommendations:
-                        updates["optimization_recommendations"] = workflow_data["optimization_recommendations"]
-                except Exception:
-                    # If comparison fails, skip update (don't cause unnecessary writes)
-                    pass
+            updates = _build_update_dict(existing, workflow_data, duration_seconds, adw_id)
 
             if updates:
                 update_workflow_history(adw_id, **updates)
