@@ -8,17 +8,13 @@ processes a given issue at any time.
 
 import logging
 import sqlite3
-from pathlib import Path
 
-from database import SQLiteAdapter
+from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 
-# Database path
-DB_PATH = Path(__file__).parent.parent / "db" / "database.db"
-
-# Database adapter
-_db_adapter = SQLiteAdapter(db_path=str(DB_PATH))
+# Database adapter (uses factory to support SQLite or PostgreSQL)
+_db_adapter = get_database_adapter()
 
 
 def init_adw_locks_table() -> None:

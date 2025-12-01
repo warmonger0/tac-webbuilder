@@ -13,7 +13,7 @@ Key Features:
 
 import logging
 
-from database import SQLiteAdapter
+from database import get_database_adapter
 from models.phase_queue_item import PhaseQueueItem
 
 logger = logging.getLogger(__name__)
@@ -33,15 +33,13 @@ class HopperSorter:
     PRIORITY_LOW = 70
     PRIORITY_BACKGROUND = 90
 
-    def __init__(self, db_path: str = "db/database.db"):
+    def __init__(self):
         """
         Initialize HopperSorter.
 
-        Args:
-            db_path: Path to SQLite database
+        Uses database adapter from factory (SQLite or PostgreSQL based on DB_TYPE env var).
         """
-        self.db_path = db_path
-        self.adapter = SQLiteAdapter(db_path=db_path)
+        self.adapter = get_database_adapter()
         logger.info("[INIT] HopperSorter initialized")
 
     def get_next_phase_1(self) -> PhaseQueueItem | None:

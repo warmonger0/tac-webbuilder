@@ -31,7 +31,6 @@ class PhaseQueueService:
         self,
         repository: PhaseQueueRepository | None = None,
         dependency_tracker: PhaseDependencyTracker | None = None,
-        db_path: str = "db/database.db"
     ):
         """
         Initialize PhaseQueueService.
@@ -39,11 +38,14 @@ class PhaseQueueService:
         Args:
             repository: PhaseQueueRepository instance (or creates default)
             dependency_tracker: PhaseDependencyTracker instance (or creates default)
-            db_path: Path to SQLite database (used if repository not provided)
+
+        Note:
+            Database type (SQLite/PostgreSQL) is determined by DB_TYPE environment variable.
         """
-        self.repository = repository or PhaseQueueRepository(db_path)
+        self.repository = repository or PhaseQueueRepository()
         self.dependency_tracker = dependency_tracker or PhaseDependencyTracker(self.repository)
-        logger.info(f"[INIT] PhaseQueueService initialized (db: {db_path})")
+        db_type = self.repository.adapter.get_db_type()
+        logger.info(f"[INIT] PhaseQueueService initialized (database: {db_type})")
 
     def enqueue(
         self,

@@ -6,7 +6,7 @@ Detects workflow status and errors from workflow_history database.
 
 import logging
 
-from database import SQLiteAdapter
+from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -19,15 +19,13 @@ class WorkflowCompletionDetector:
     for issue-based workflow tracking.
     """
 
-    def __init__(self, workflow_db_path: str = "db/workflow_history.db"):
+    def __init__(self):
         """
         Initialize WorkflowCompletionDetector.
 
-        Args:
-            workflow_db_path: Path to workflow_history database
+        Uses database adapter from factory (SQLite or PostgreSQL based on DB_TYPE env var).
         """
-        self.workflow_db_path = workflow_db_path
-        self.adapter = SQLiteAdapter(db_path=workflow_db_path)
+        self.adapter = get_database_adapter()
 
     def get_workflow_status(self, issue_number: int) -> str | None:
         """

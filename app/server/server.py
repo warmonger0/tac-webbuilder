@@ -113,18 +113,16 @@ service_controller = ServiceController(
     github_webhook_id=os.environ.get("GITHUB_WEBHOOK_ID", "580534779")
 )
 health_service = HealthService(
-    db_path="db/database.db",
     webhook_url="http://localhost:8001/webhook-status",
     frontend_url=f"http://localhost:{os.environ.get('FRONTEND_PORT', '5173')}",
     backend_port=os.environ.get("BACKEND_PORT", "8000"),
     app_start_time=app_start_time,
     github_repo="warmonger0/tac-webbuilder"
 )
-phase_queue_service = PhaseQueueService(db_path="db/database.db")
+phase_queue_service = PhaseQueueService()
 github_poster = GitHubPoster()
 phase_coordinator = PhaseCoordinator(
     phase_queue_service=phase_queue_service,
-    workflow_db_path="db/workflow_history.db",
     poll_interval=10.0,
     websocket_manager=manager,
     github_poster=github_poster

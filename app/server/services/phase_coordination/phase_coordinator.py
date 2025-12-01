@@ -36,7 +36,6 @@ class PhaseCoordinator:
     def __init__(
         self,
         phase_queue_service: PhaseQueueService,
-        workflow_db_path: str = "db/workflow_history.db",
         poll_interval: float = 10.0,
         websocket_manager = None,
         github_poster = None
@@ -46,13 +45,14 @@ class PhaseCoordinator:
 
         Args:
             phase_queue_service: PhaseQueueService instance
-            workflow_db_path: Path to workflow_history database
             poll_interval: Polling interval in seconds (default: 10.0)
             websocket_manager: WebSocket manager for real-time updates (optional)
             github_poster: GitHubPoster for just-in-time issue creation (optional)
+
+        Note:
+            Database type (SQLite/PostgreSQL) is determined by DB_TYPE environment variable.
         """
         self.phase_queue_service = phase_queue_service
-        self.workflow_db_path = workflow_db_path
         self.poll_interval = poll_interval
         self.websocket_manager = websocket_manager
         self.github_poster = github_poster
@@ -60,13 +60,13 @@ class PhaseCoordinator:
         self._task: asyncio.Task | None = None
         self._processed_workflows = set()  # Track processed workflow IDs
 
-        # Initialize helper components
-        self.detector = WorkflowCompletionDetector(workflow_db_path)
+        # Initialize helper components (use database factory)
+        self.detector = WorkflowCompletionDetector()
         self.notifier = PhaseGitHubNotifier(phase_queue_service)
 
         logger.info(
             f"[INIT] PhaseCoordinator initialized "
-            f"(poll_interval={poll_interval}s, workflow_db={workflow_db_path})"
+            f"(poll_interval={poll_interval}s)"
         )
 
     async def start(self):

@@ -6,18 +6,16 @@ for the workflow history system.
 """
 
 import logging
+import os
 import sqlite3
 from pathlib import Path
 
-from database import SQLiteAdapter
+from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 
-# Database path - relative to package: core/workflow_history_utils/database/
-DB_PATH = Path(__file__).parent.parent.parent.parent / "db" / "workflow_history.db"
-
-# Database adapter for workflow history
-_db_adapter = SQLiteAdapter(db_path=str(DB_PATH))
+# Database adapter for workflow history (uses factory to support SQLite or PostgreSQL)
+_db_adapter = get_database_adapter()
 
 
 def init_db():
@@ -27,8 +25,11 @@ def init_db():
     Creates the workflow_history table with all required fields and indexes.
     Safe to call multiple times - creates tables only if they don't exist.
     """
-    # Ensure db directory exists
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # Ensure db directory exists (only needed for SQLite)
+    db_type = os.getenv("DB_TYPE", "sqlite").lower()
+    if db_type == "sqlite":
+        db_path = Path(__file__).parent.parent.parent.parent / "db"
+        db_path.mkdir(parents=True, exist_ok=True)
 
     with _db_adapter.get_connection() as conn:
         cursor = conn.cursor()
@@ -154,4 +155,5 @@ def init_db():
                     f"status={record['status']}, end_time={record['end_time']}"
                 )
 
-        logger.info(f"[DB] Workflow history database initialized at {DB_PATH}")
+        db_type = _db_adapter.get_db_type()
+        logger.info(f"[DB] Workflow history database initialized (type: {db_type})")
