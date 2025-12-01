@@ -63,6 +63,12 @@ export * from './systemClient';
 export { systemClient } from './systemClient';
 
 // ============================================================================
+// Context Review Client - AI-powered context analysis
+// ============================================================================
+export * from './contextReviewClient';
+export { contextReviewClient } from './contextReviewClient';
+
+// ============================================================================
 // Legacy API namespace export for backward compatibility
 // ============================================================================
 import {

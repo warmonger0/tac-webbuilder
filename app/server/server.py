@@ -15,11 +15,13 @@ from core.workflow_history import (
     init_db as init_workflow_history_db,
 )
 from dotenv import load_dotenv
+from migrations import init_context_review_db
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import route modules
 from routes import (
+    context_review_routes,
     data_routes,
     github_routes,
     issue_completion_routes,
@@ -58,6 +60,10 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize workflow history database
     init_workflow_history_db()
     logger.info("[STARTUP] Workflow history database initialized")
+
+    # Initialize context review database
+    init_context_review_db()
+    logger.info("[STARTUP] Context review database initialized")
 
     # Start background watchers using BackgroundTaskManager
     await background_task_manager.start_all()
@@ -236,6 +242,10 @@ app.include_router(queue_routes.webhook_router, prefix="/api/v1")
 
 websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state)
 app.include_router(websocket_routes.router, prefix="/api/v1")
+
+# Initialize context review routes
+context_review_routes.init_context_review_routes()
+app.include_router(context_review_routes.router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
