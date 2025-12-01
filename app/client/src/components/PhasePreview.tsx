@@ -1,4 +1,4 @@
-import type { PhaseParseResult, ParsedPhase } from '../utils/phaseParser';
+import type { ParsedPhase, PhaseParseResult } from '../utils/phaseParser';
 
 interface PhasePreviewProps {
   parseResult: PhaseParseResult;

@@ -6,11 +6,10 @@ Tests multi-phase issue creation, pattern passing, and queue integration.
 
 import os
 import tempfile
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-
-from core.data_models import SubmitRequestData, Phase
+from core.data_models import Phase, SubmitRequestData
 from services.multi_phase_issue_handler import MultiPhaseIssueHandler
 from services.phase_queue_service import PhaseQueueService
 

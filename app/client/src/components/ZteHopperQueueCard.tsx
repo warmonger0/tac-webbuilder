@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { getQueueAll, getQueueConfig, setQueuePaused, type PhaseQueueItem } from "../api/client";
+import { useEffect, useState } from "react";
+import { getQueueAll, getQueueConfig, type PhaseQueueItem, setQueuePaused } from "../api/client";
 import { PhaseQueueList } from "./PhaseQueueCard";
 import { QueuePauseToggle } from "./QueuePauseToggle";
 import { intervals } from '../config/intervals';

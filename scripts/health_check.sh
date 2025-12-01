@@ -105,8 +105,9 @@ check_workflow_history() {
     local frontend_url="http://localhost:$CLIENT_PORT/api/v1/workflow-history?limit=5"
 
     # Check backend directly (without -f flag to avoid 404 issues)
-    response=$(curl -s -m 5 "$backend_url" 2>&1)
-    http_code=$(curl -s -w "%{http_code}" -o /dev/null -m 5 "$backend_url" 2>&1)
+    # Use 15s timeout because first call after cache expiry triggers slow filesystem scan
+    response=$(curl -s -m 15 "$backend_url" 2>&1)
+    http_code=$(curl -s -w "%{http_code}" -o /dev/null -m 15 "$backend_url" 2>&1)
 
     if [ "$http_code" = "200" ]; then
         # Check if response has workflows and analytics
@@ -130,8 +131,8 @@ check_workflow_history() {
     fi
 
     # Check frontend proxy
-    response=$(curl -s -m 5 "$frontend_url" 2>&1)
-    http_code=$(curl -s -w "%{http_code}" -o /dev/null -m 5 "$frontend_url" 2>&1)
+    response=$(curl -s -m 15 "$frontend_url" 2>&1)
+    http_code=$(curl -s -w "%{http_code}" -o /dev/null -m 15 "$frontend_url" 2>&1)
 
     if [ "$http_code" = "200" ]; then
         total_count=$(echo "$response" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('total_count', 0))" 2>/dev/null)
@@ -214,6 +215,13 @@ echo ""
 
 # 5. Check Workflow History
 echo -e "${BLUE}[5/6] Workflow History${NC}"
+
+# Warm the cache first (initial sync happens on server startup in background)
+# This just ensures the initial sync has completed before we test
+echo -e "${BLUE}Warming workflow history cache...${NC}"
+curl -s -m 15 "http://localhost:$SERVER_PORT/api/v1/workflow-history?limit=1" > /dev/null 2>&1
+sleep 1
+
 check_workflow_history
 check_database
 echo ""

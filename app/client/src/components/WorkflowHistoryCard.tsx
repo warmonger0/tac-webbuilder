@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { WorkflowHistoryItem } from '../types';
 import { StatusBadge } from './StatusBadge';
-import { formatDate, formatDuration, formatCost, formatNumber, truncateText, getClassificationColor } from './workflow-history-card/helpers';
+import { formatCost, formatDate, formatDuration, formatNumber, getClassificationColor, truncateText } from './workflow-history-card/helpers';
 import { CostSection } from './workflow-history-card/sections/CostSection';
 import { TokenSection } from './workflow-history-card/sections/TokenSection';
 import { ErrorSection } from './workflow-history-card/sections/ErrorSection';

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getHistory } from '../api/client';
 import { StatusBadge } from './StatusBadge';
+import { intervals } from '../config/intervals';
 
 function formatDate(timestamp: string): string {
   const date = new Date(timestamp);
@@ -14,7 +15,8 @@ export function HistoryView() {
     error,
   } = useQuery({
     queryKey: ['history'],
-    queryFn: () => getHistory(20),
+    queryFn: () => getHistory(intervals.components.workflowHistory.defaultLimit),
+    refetchInterval: 30000, // Auto-refresh every 30 seconds to show new workflows
   });
 
   if (isLoading) {

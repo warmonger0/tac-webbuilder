@@ -66,34 +66,34 @@ export { systemClient } from './systemClient';
 // Legacy API namespace export for backward compatibility
 // ============================================================================
 import {
-  submitRequest,
-  getPreview,
-  getCostEstimate,
   confirmAndPost,
+  getCostEstimate,
+  getPreview,
+  submitRequest,
 } from './githubClient';
 import {
-  listWorkflows,
+  fetchWorkflowCosts,
   getHistory,
   getWorkflowHistory,
-  fetchWorkflowCosts,
+  listWorkflows,
 } from './workflowClient';
 import {
-  processQuery,
-  generateRandomQuery,
-  uploadFile,
-  getSchema,
   exportQueryResults,
   exportTable,
+  generateRandomQuery,
+  getSchema,
+  processQuery,
+  uploadFile,
 } from './sqlClient';
 import {
-  getQueueAll,
-  getQueueByParent,
   dequeuePhase,
   executePhase,
-  getAdwMonitor,
   getAdwHealth,
+  getAdwMonitor,
+  getQueueAll,
+  getQueueByParent,
 } from './queueClient';
-import { getRoutes, getWebhookStatus, getSystemStatus } from './systemClient';
+import { getRoutes, getSystemStatus, getWebhookStatus } from './systemClient';
 
 /**
  * Legacy API namespace object for components that use:

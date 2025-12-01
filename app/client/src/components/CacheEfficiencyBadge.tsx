@@ -1,3 +1,5 @@
+import { thresholds } from '../config/thresholds';
+
 interface CacheEfficiencyBadgeProps {
   cacheEfficiencyPercent: number;
   cacheSavingsAmount: number;
@@ -8,16 +10,16 @@ export function CacheEfficiencyBadge({
   cacheSavingsAmount,
 }: CacheEfficiencyBadgeProps) {
   const getEfficiencyColor = (efficiency: number) => {
-    if (efficiency >= 80) return 'bg-green-100 text-green-800 border-green-200';
-    if (efficiency >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    if (efficiency >= 40) return 'bg-orange-100 text-orange-800 border-orange-200';
+    if (efficiency >= thresholds.cacheEfficiency.excellent) return 'bg-green-100 text-green-800 border-green-200';
+    if (efficiency >= thresholds.cacheEfficiency.good) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    if (efficiency >= thresholds.cacheEfficiency.fair) return 'bg-orange-100 text-orange-800 border-orange-200';
     return 'bg-red-100 text-red-800 border-red-200';
   };
 
   const getEfficiencyIcon = (efficiency: number) => {
-    if (efficiency >= 80) return '🚀';
-    if (efficiency >= 60) return '✅';
-    if (efficiency >= 40) return '⚡';
+    if (efficiency >= thresholds.cacheEfficiency.excellent) return '🚀';
+    if (efficiency >= thresholds.cacheEfficiency.good) return '✅';
+    if (efficiency >= thresholds.cacheEfficiency.fair) return '⚡';
     return '⚠️';
   };
 

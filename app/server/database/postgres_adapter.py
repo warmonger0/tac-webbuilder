@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from typing import Any
 
 import psycopg2
+import psycopg2.pool
 from psycopg2.extras import RealDictCursor
 
 from .connection import DatabaseAdapter

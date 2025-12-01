@@ -4,8 +4,8 @@
  * Tests pattern badge rendering and display logic.
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { PhaseQueueCard, PhaseQueueItem } from '../PhaseQueueCard';
 
 // Mock API client

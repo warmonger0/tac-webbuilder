@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { CheckCircle, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Loader2, XCircle } from 'lucide-react';
 
 interface WorkflowStep {
   id: string;

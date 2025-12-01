@@ -1,3 +1,5 @@
+import { thresholds } from '../config/thresholds';
+
 interface ScoreCardProps {
   title: string;
   score: number; // 0-100
@@ -12,9 +14,9 @@ export function ScoreCard({ title, score, description }: ScoreCardProps) {
 
   // Determine color based on score
   const getScoreColor = (score: number): ColorKey => {
-    if (score >= 90) return 'green';
-    if (score >= 70) return 'blue';
-    if (score >= 50) return 'yellow';
+    if (score >= thresholds.scores.excellent) return 'green';
+    if (score >= thresholds.scores.good) return 'blue';
+    if (score >= thresholds.scores.fair) return 'yellow';
     return 'orange';
   };
 

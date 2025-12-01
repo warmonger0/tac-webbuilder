@@ -5,11 +5,13 @@ This service is responsible for:
 - Scanning and reading workflow data from the agents directory
 - Discovering and introspecting API routes
 - Providing workflow history data with caching
+- Running background sync worker for workflow history
 """
 
 import json
 import logging
 import os
+import threading
 import time
 
 from core.data_models import (
@@ -42,6 +44,7 @@ class WorkflowService:
         agents_dir: str | None = None,
         sync_cache_seconds: int = 10,
         github_repo: str | None = None,
+        enable_background_sync: bool = True,
     ):
         """
         Initialize the WorkflowService
@@ -50,6 +53,7 @@ class WorkflowService:
             agents_dir: Path to agents directory (default: ../../agents from server location)
             sync_cache_seconds: Seconds to cache sync results (default: 10)
             github_repo: GitHub repository in format "owner/repo" (default: from env)
+            enable_background_sync: Enable background sync worker (default: True)
         """
         if agents_dir is None:
             # Default to ../../agents from server location
@@ -64,6 +68,74 @@ class WorkflowService:
             "GITHUB_REPO", "warmonger0/tac-webbuilder"
         )
         self._last_sync_time = 0
+        self._background_sync_enabled = enable_background_sync
+        self._background_sync_thread = None
+        self._stop_background_sync = threading.Event()
+
+        # Start background sync worker if enabled
+        if self._background_sync_enabled:
+            self._start_background_sync()
+
+    def _start_background_sync(self):
+        """Start background sync worker thread."""
+        logger.info("[WORKFLOW_SERVICE] Starting background sync worker")
+        self._background_sync_thread = threading.Thread(
+            target=self._background_sync_worker,
+            daemon=True,
+            name="workflow-sync-worker"
+        )
+        self._background_sync_thread.start()
+
+    def _background_sync_worker(self):
+        """Background worker that periodically syncs workflow history."""
+        logger.info(
+            f"[WORKFLOW_SERVICE] Background sync worker started "
+            f"(interval: {self.sync_cache_seconds}s)"
+        )
+
+        # Perform initial sync on startup to warm cache
+        try:
+            logger.info("[WORKFLOW_SERVICE] Performing initial sync...")
+            synced_count = sync_workflow_history()
+            self._last_sync_time = time.time()
+            logger.info(
+                f"[WORKFLOW_SERVICE] Initial sync complete: {synced_count} workflows"
+            )
+        except Exception as e:
+            logger.error(f"[WORKFLOW_SERVICE] Initial sync failed: {e}")
+
+        # Main sync loop
+        while not self._stop_background_sync.is_set():
+            try:
+                # Wait for sync interval or stop signal
+                if self._stop_background_sync.wait(timeout=self.sync_cache_seconds):
+                    break  # Stop signal received
+
+                # Perform sync
+                logger.debug("[WORKFLOW_SERVICE] Background sync triggered")
+                synced_count = sync_workflow_history()
+                self._last_sync_time = time.time()
+
+                if synced_count > 0:
+                    logger.info(
+                        f"[WORKFLOW_SERVICE] Background sync: {synced_count} workflows updated"
+                    )
+                else:
+                    logger.debug("[WORKFLOW_SERVICE] Background sync: no changes")
+
+            except Exception as e:
+                logger.error(f"[WORKFLOW_SERVICE] Background sync error: {e}")
+                # Continue running despite errors
+
+        logger.info("[WORKFLOW_SERVICE] Background sync worker stopped")
+
+    def stop_background_sync(self):
+        """Stop the background sync worker (for graceful shutdown)."""
+        if self._background_sync_enabled and self._background_sync_thread:
+            logger.info("[WORKFLOW_SERVICE] Stopping background sync worker...")
+            self._stop_background_sync.set()
+            self._background_sync_thread.join(timeout=5)
+            logger.info("[WORKFLOW_SERVICE] Background sync worker stopped")
 
     def get_workflows(self) -> list[Workflow]:
         """
@@ -206,34 +278,41 @@ class WorkflowService:
         """
         Get workflow history data with caching
 
-        This method:
-        1. Syncs workflow history if cache has expired
-        2. Applies filters
-        3. Fetches workflow history from database
-        4. Fetches analytics
+        With background sync enabled, this method instantly returns cached data.
+        The background worker keeps the cache fresh automatically.
+
+        Without background sync, falls back to the old behavior of syncing on-demand.
 
         Returns:
             tuple: (WorkflowHistoryResponse, did_sync: bool)
-                did_sync indicates if sync found and processed changes
+                did_sync is always False with background sync (sync happens independently)
         """
         did_sync = False
 
         try:
-            # Only sync if cache has expired
-            current_time = time.time()
-            if current_time - self._last_sync_time >= self.sync_cache_seconds:
+            # With background sync, we always use cached data (no blocking sync)
+            if self._background_sync_enabled:
+                current_time = time.time()
                 logger.debug(
-                    f"[WORKFLOW_SERVICE] Cache expired, syncing workflow history "
+                    f"[WORKFLOW_SERVICE] Using cached data from background worker "
                     f"(last sync {current_time - self._last_sync_time:.1f}s ago)"
                 )
-                synced_count = sync_workflow_history()
-                self._last_sync_time = current_time
-                did_sync = synced_count > 0  # Only True if actual changes found
             else:
-                logger.debug(
-                    f"[WORKFLOW_SERVICE] Using cached data "
-                    f"(last sync {current_time - self._last_sync_time:.1f}s ago)"
-                )
+                # Fallback: manual sync if background worker disabled
+                current_time = time.time()
+                if current_time - self._last_sync_time >= self.sync_cache_seconds:
+                    logger.debug(
+                        f"[WORKFLOW_SERVICE] Cache expired, syncing workflow history "
+                        f"(last sync {current_time - self._last_sync_time:.1f}s ago)"
+                    )
+                    synced_count = sync_workflow_history()
+                    self._last_sync_time = current_time
+                    did_sync = synced_count > 0
+                else:
+                    logger.debug(
+                        f"[WORKFLOW_SERVICE] Using cached data "
+                        f"(last sync {current_time - self._last_sync_time:.1f}s ago)"
+                    )
 
             # Apply filters
             filter_params = self._prepare_filter_params(filters)

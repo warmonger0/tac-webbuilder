@@ -6,9 +6,9 @@
  */
 
 import {
-  PHASE_HEADER_REGEX,
   extractExternalDocs,
   parsePhaseNumber,
+  PHASE_HEADER_REGEX,
 } from './phaseUtils';
 
 export interface ParsedPhase {

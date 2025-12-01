@@ -73,6 +73,7 @@ async def lifespan(app: FastAPI):
     logger.info("[SHUTDOWN] Application shutting down, stopping background tasks...")
     await phase_coordinator.stop()
     await background_task_manager.stop_all()
+    workflow_service.stop_background_sync()
     logger.info("[SHUTDOWN] All background tasks stopped")
 
 app = FastAPI(
@@ -100,7 +101,9 @@ os.makedirs("db", exist_ok=True)
 
 # Initialize services
 manager = ConnectionManager()
-workflow_service = WorkflowService()
+# Increase cache to 60s to avoid expensive filesystem scans on every request
+# The sync scans 116+ agent directories which takes ~10s
+workflow_service = WorkflowService(sync_cache_seconds=60)
 service_controller = ServiceController(
     webhook_port=8001,
     webhook_script_path="adw_triggers/trigger_webhook.py",

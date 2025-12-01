@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import {
-  getAdwMonitor,
-  type AdwWorkflowStatus,
+  type AdwHealthCheckResponse,
   type AdwMonitorSummary,
-  type AdwHealthCheckResponse
+  type AdwWorkflowStatus,
+  getAdwMonitor
 } from '../api/client';
 import { useReliablePolling } from '../hooks/useReliablePolling';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 import { intervals } from '../config/intervals';
-import { workflowPhases, workflowTypeLabels } from '../config/workflows';
+import { phaseSvgIconMap, workflowPhases, workflowTypeLabels } from '../config/workflows';
+import { uiText } from '../config/ui';
 
 export function AdwMonitorCard() {
   const [workflows, setWorkflows] = useState<AdwWorkflowStatus[]>([]);
@@ -57,22 +58,9 @@ export function AdwMonitorCard() {
   };
 
   // Workflow phases for the pipeline visualization (imported from config)
-  // Using icon map for rendering since we still need SVG icons here
-  const phaseIconMap: Record<string, string> = {
-    plan: 'clipboard',
-    validate: 'check-circle',
-    build: 'cube',
-    lint: 'sparkles',
-    test: 'beaker',
-    review: 'eye',
-    doc: 'document',
-    ship: 'rocket',
-    cleanup: 'trash'
-  };
-
   const phasesWithIcons = workflowPhases.map(phase => ({
     name: phase.name,
-    icon: phaseIconMap[phase.phase] || 'clipboard',
+    icon: phaseSvgIconMap[phase.phase] || 'clipboard',
     key: phase.phase
   }));
 
@@ -200,8 +188,12 @@ export function AdwMonitorCard() {
     );
   }
 
-  // Get only the current (first) workflow in the queue
-  const currentWorkflow = workflows.length > 0 ? workflows[0] : null;
+  // Get current workflow (first RUNNING workflow, not just first in list)
+  // Filter for running workflows first, then fall back to paused
+  // Don't show completed/failed workflows as "current"
+  const currentWorkflow = workflows.find(w => w.status === 'running')
+    || workflows.find(w => w.status === 'paused')
+    || null;
 
   // Determine colors based on workflow status
   const getStatusColors = (status: string) => {
@@ -271,9 +263,9 @@ export function AdwMonitorCard() {
               </div>
               <div>
                 <h2 className="text-lg font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-                  Current Workflow
+                  {uiText.adwMonitor.currentWorkflowTitle}
                 </h2>
-                <p className="text-slate-400 text-xs">Real-time progress</p>
+                <p className="text-slate-400 text-xs">{uiText.adwMonitor.currentWorkflowSubtitle}</p>
               </div>
             </div>
             <ConnectionStatusIndicator
@@ -297,7 +289,7 @@ export function AdwMonitorCard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
               </svg>
             </div>
-            <p className="text-lg font-semibold text-slate-300 mb-1">No Active Workflow</p>
+            <p className="text-lg font-semibold text-slate-300 mb-1">{uiText.adwMonitor.noActiveWorkflow}</p>
             <p className="text-slate-500 text-sm">Queue is empty</p>
           </div>
         ) : (
@@ -795,12 +787,12 @@ export function AdwMonitorCard() {
                         {currentWorkflow.is_process_active && (
                           <div className="flex items-center gap-1.5">
                             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                            <span className="text-green-400 text-xs font-medium">Process Active</span>
+                            <span className="text-green-400 text-xs font-medium">{uiText.adwMonitor.processActive}</span>
                           </div>
                         )}
                       </div>
                       <div className="text-slate-400 flex items-center gap-2">
-                        <span>{currentWorkflow.phases_completed.length} / {workflowPhases.length} phases completed</span>
+                        <span>{currentWorkflow.phases_completed.length} / {workflowPhases.length} {uiText.adwMonitor.phasesCompleted}</span>
                         {currentWorkflow.current_phase && (
                           <span className="text-emerald-400">• {currentWorkflow.current_phase}</span>
                         )}

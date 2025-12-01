@@ -3,19 +3,22 @@ import type { WorkflowExecution } from '../types';
 import { StatusBadge } from './StatusBadge';
 import { ProgressBar } from './ProgressBar';
 import { CostVisualization } from './CostVisualization';
+import { workflowPhases } from '../config/workflows';
+import { intervals } from '../config/intervals';
 
 interface WorkflowCardProps {
   workflow: WorkflowExecution;
 }
 
 export function WorkflowCard({ workflow }: WorkflowCardProps) {
-  const phases = ['plan', 'build', 'test', 'review', 'document', 'ship'];
+  // Extract phase names from config
+  const phases = workflowPhases.map(p => p.phase);
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Trigger pulse animation when phase changes
   useEffect(() => {
     setIsUpdating(true);
-    const timer = setTimeout(() => setIsUpdating(false), 1000);
+    const timer = setTimeout(() => setIsUpdating(false), intervals.components.fileUpload.successMessageDelay);
     return () => clearTimeout(timer);
   }, [workflow.phase]);
 

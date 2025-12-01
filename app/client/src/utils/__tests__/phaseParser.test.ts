@@ -3,8 +3,8 @@
  * Tests phase detection, validation, and external document extraction
  */
 
-import { describe, it, expect } from 'vitest';
-import { parsePhases, validatePhases, formatPhaseSummary } from '../phaseParser';
+import { describe, expect, it } from 'vitest';
+import { formatPhaseSummary, parsePhases, validatePhases } from '../phaseParser';
 
 describe('parsePhases', () => {
   describe('Single-phase documents', () => {

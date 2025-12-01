@@ -6,7 +6,7 @@ import { useStaggeredLoad } from '../hooks/useStaggeredLoad';
 import { parsePhases } from '../utils/phaseParser';
 import type { PhaseParseResult } from '../utils/phaseParser';
 import { PhaseDetectionHandler } from './request-form/PhaseDetectionHandler';
-import { saveFormState, loadFormState, clearFormState, PROJECT_PATH_STORAGE_KEY } from './request-form/utils/formStorage';
+import { clearFormState, loadFormState, PROJECT_PATH_STORAGE_KEY, saveFormState } from './request-form/utils/formStorage';
 import type { DragHandlers } from '../hooks/useDragAndDrop';
 
 export interface UseRequestFormReturn {

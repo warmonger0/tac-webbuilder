@@ -7,7 +7,7 @@
  * - ADW workflow monitoring and health checks
  */
 
-import { API_BASE, fetchJSON, apiPost, apiDelete } from './baseClient';
+import { API_BASE, apiDelete, apiPost, fetchJSON } from './baseClient';
 
 // ============================================================================
 // Phase Queue Types

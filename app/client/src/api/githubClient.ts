@@ -15,7 +15,7 @@ import type {
   SubmitRequestData,
   SubmitRequestResponse,
 } from '../types';
-import { API_BASE, fetchJSON, apiPost } from './baseClient';
+import { API_BASE, apiPost, fetchJSON } from './baseClient';
 
 /**
  * Submit a natural language request to generate a GitHub issue.

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { getWebhookStatus } from '../api/client';
 import { useReliablePolling } from '../hooks/useReliablePolling';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
+import { intervals } from '../config/intervals';
+import { thresholds } from '../config/thresholds';
 
 interface WebhookStatus {
   status: 'healthy' | 'degraded' | 'error' | 'unknown';
@@ -43,7 +45,7 @@ export function WebhookStatusPanel() {
       setStatus({ status: 'error' });
     },
     enabled: true,
-    interval: 30000,
+    interval: intervals.components.systemStatus.pollingInterval,
     adaptiveInterval: true,
   });
 
@@ -191,7 +193,7 @@ export function WebhookStatusPanel() {
               Recent Failures ({status.recent_failures.length})
             </div>
             <div className="space-y-2">
-              {status.recent_failures.slice(0, 3).map((failure, idx) => (
+              {status.recent_failures.slice(0, thresholds.display.recentFailuresLimit).map((failure, idx) => (
                 <div key={idx} className="text-xs text-yellow-800">
                   <span className="font-medium">Issue #{failure.issue}</span> •{' '}
                   {new Date(failure.timestamp).toLocaleString()}

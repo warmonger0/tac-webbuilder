@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { WorkflowHistoryItem } from '../types/api.types';
+import { thresholds } from '../config/thresholds';
 
 interface SimilarWorkflowsComparisonProps {
   currentWorkflowId: string;
@@ -22,7 +23,7 @@ export function SimilarWorkflowsComparison({
         setError(null);
 
         // Fetch current workflow
-        const currentResponse = await fetch(`/api/workflow-history?search=${currentWorkflowId}&limit=1`);
+        const currentResponse = await fetch(`/api/workflow-history?search=${currentWorkflowId}&limit=${thresholds.display.similarWorkflowsLimit}`);
         if (!currentResponse.ok) {
           throw new Error('Failed to fetch current workflow');
         }
@@ -34,7 +35,7 @@ export function SimilarWorkflowsComparison({
         // Fetch similar workflows
         const workflows: WorkflowHistoryItem[] = [];
         for (const id of similarWorkflowIds) {
-          const response = await fetch(`/api/workflow-history?search=${id}&limit=1`);
+          const response = await fetch(`/api/workflow-history?search=${id}&limit=${thresholds.display.similarWorkflowsLimit}`);
           if (response.ok) {
             const data = await response.json();
             if (data.workflows && data.workflows.length > 0) {

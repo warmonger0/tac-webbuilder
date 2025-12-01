@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { WorkflowHistoryItem } from '../../types';
 import { StatusBadge } from '../StatusBadge';
-import { formatDate, formatDuration, formatCost, formatNumber, truncateText, getClassificationColor } from './helpers';
+import { formatCost, formatDate, formatDuration, formatNumber, getClassificationColor, truncateText } from './helpers';
 import { CostSection } from './sections/CostSection';
 import { TokenSection } from './sections/TokenSection';
 import { ErrorSection } from './sections/ErrorSection';

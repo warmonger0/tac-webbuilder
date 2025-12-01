@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PhasePreview } from '../PhasePreview';
-import { validatePhases, type PhaseParseResult } from '../../utils/phaseParser';
+import { type PhaseParseResult, validatePhases } from '../../utils/phaseParser';
 import { useMultiPhaseSubmit } from './useMultiPhaseSubmit';
 
 interface PhaseDetectionHandlerProps {
