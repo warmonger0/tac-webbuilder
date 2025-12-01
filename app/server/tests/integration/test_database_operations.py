@@ -279,7 +279,7 @@ class TestWorkflowHistoryDatabase:
                 # Allow for small timing differences (< 1 second means it didn't change)
                 time_diff = abs((updated_ts - initial_ts).total_seconds())
                 assert time_diff > 0.05, f"Timestamp should have changed: {initial_updated_at} vs {updated['updated_at']}"
-            except:
+            except (ValueError, TypeError):
                 # Fallback to direct comparison if parsing fails
                 assert updated["updated_at"] != initial_updated_at
         else:
@@ -858,7 +858,7 @@ class TestADWLockDatabase:
                     # Allow for small timing differences (< 1 second means it didn't change)
                     time_diff = abs((updated_ts - initial_ts).total_seconds())
                     assert time_diff > 0.05, f"Timestamp should have changed: {initial_updated_at} vs {updated_lock['updated_at']}"
-                except:
+                except (ValueError, TypeError):
                     # Fallback to direct comparison if parsing fails
                     assert updated_lock["updated_at"] != initial_updated_at
             else:
