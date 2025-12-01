@@ -14,6 +14,10 @@ from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 
+# Database path - relative to package: core/workflow_history_utils/database/
+# Note: Only used for SQLite. For PostgreSQL, this is a placeholder.
+DB_PATH = Path(__file__).parent.parent.parent.parent / "db" / "workflow_history.db"
+
 # Database adapter for workflow history (uses factory to support SQLite or PostgreSQL)
 _db_adapter = get_database_adapter()
 
