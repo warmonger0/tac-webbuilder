@@ -13,8 +13,16 @@ from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 
-# Database adapter (uses factory to support SQLite or PostgreSQL)
-_db_adapter = get_database_adapter()
+# Database adapter - lazy loaded to ensure load_dotenv() runs first
+_db_adapter = None
+
+
+def _get_adapter():
+    """Lazy-load database adapter to ensure environment variables are loaded first."""
+    global _db_adapter
+    if _db_adapter is None:
+        _db_adapter = get_database_adapter()
+    return _db_adapter
 
 
 def init_adw_locks_table() -> None:
@@ -24,7 +32,7 @@ def init_adw_locks_table() -> None:
     This table tracks active ADW instances per issue to prevent
     concurrent workflows from competing for the same work.
     """
-    with _db_adapter.get_connection() as conn:
+    with _get_adapter().get_connection() as conn:
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -59,9 +67,10 @@ def acquire_lock(issue_number: int, adw_id: str, github_url: str | None = None) 
     Returns:
         True if lock acquired successfully, False if issue is already locked
     """
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
-        ph = _db_adapter.placeholder()
+        ph = adapter.placeholder()
 
         # Check if there's an existing lock for this issue
         cursor.execute(f"""
@@ -108,9 +117,10 @@ def update_lock_status(issue_number: int, adw_id: str, new_status: str) -> bool:
     Returns:
         True if update successful, False if no matching lock found
     """
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
-        ph = _db_adapter.placeholder()
+        ph = adapter.placeholder()
 
         cursor.execute(f"""
             UPDATE adw_locks
@@ -140,9 +150,10 @@ def release_lock(issue_number: int, adw_id: str) -> bool:
     Returns:
         True if lock released successfully, False if no matching lock found
     """
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
-        ph = _db_adapter.placeholder()
+        ph = adapter.placeholder()
 
         cursor.execute(f"""
             DELETE FROM adw_locks
@@ -173,9 +184,10 @@ def force_release_lock(issue_number: int) -> bool:
     Returns:
         True if lock released, False if no lock existed
     """
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
-        ph = _db_adapter.placeholder()
+        ph = adapter.placeholder()
 
         cursor.execute(f"""
             DELETE FROM adw_locks
@@ -236,9 +248,10 @@ def cleanup_stale_locks(max_age_hours: int = 24) -> int:
     Returns:
         Number of stale locks cleaned up
     """
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
-        ph = _db_adapter.placeholder()
+        ph = adapter.placeholder()
 
         # Database-agnostic datetime subtraction
         if _db_adapter.get_db_type() == "sqlite":

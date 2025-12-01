@@ -18,8 +18,16 @@ logger = logging.getLogger(__name__)
 # Note: Only used for SQLite. For PostgreSQL, this is a placeholder.
 DB_PATH = Path(__file__).parent.parent.parent.parent / "db" / "workflow_history.db"
 
-# Database adapter for workflow history (uses factory to support SQLite or PostgreSQL)
-_db_adapter = get_database_adapter()
+# Database adapter - lazy loaded to ensure load_dotenv() runs first
+_db_adapter = None
+
+
+def _get_adapter():
+    """Lazy-load database adapter to ensure environment variables are loaded first."""
+    global _db_adapter
+    if _db_adapter is None:
+        _db_adapter = get_database_adapter()
+    return _db_adapter
 
 
 def init_db():
@@ -35,7 +43,8 @@ def init_db():
         db_path = Path(__file__).parent.parent.parent.parent / "db"
         db_path.mkdir(parents=True, exist_ok=True)
 
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Create workflow_history table with comprehensive fields
@@ -159,5 +168,5 @@ def init_db():
                     f"status={record['status']}, end_time={record['end_time']}"
                 )
 
-        db_type = _db_adapter.get_db_type()
+        db_type = adapter.get_db_type()
         logger.info(f"[DB] Workflow history database initialized (type: {db_type})")
