@@ -349,105 +349,61 @@ async def _execute_phase_handler(queue_id: str, phase_queue_service) -> ExecuteP
     )
 
 
-def init_queue_routes(phase_queue_service):
-    """
-    Initialize queue routes with service dependencies.
+def _register_query_routes(router_obj, phase_queue_service):
+    """Register GET endpoints for queue queries."""
 
-    This function is called from server.py to inject service dependencies.
-    """
-
-    @router.get("", response_model=QueueListResponse)
+    @router_obj.get("", response_model=QueueListResponse)
     async def get_all_queued() -> QueueListResponse:
-        """
-        Get all phases in the queue.
-
-        Returns all phases regardless of status, ordered by parent issue and phase number.
-        """
+        """Get all phases in the queue."""
         try:
             return await _get_all_queued_handler(phase_queue_service)
         except Exception as e:
             logger.error(f"[ERROR] Failed to get queued phases: {str(e)}")
             raise HTTPException(500, f"Error retrieving queue: {str(e)}") from e
 
-    @router.get("/config", response_model=QueueConfigResponse)
+    @router_obj.get("/config", response_model=QueueConfigResponse)
     async def get_queue_config() -> QueueConfigResponse:
-        """
-        Get current queue configuration.
-
-        Returns:
-            Current pause state of the queue
-        """
+        """Get current queue configuration."""
         try:
             return await _get_queue_config_handler(phase_queue_service)
         except Exception as e:
             logger.error(f"[ERROR] Failed to get queue config: {str(e)}")
             raise HTTPException(500, f"Error retrieving queue config: {str(e)}") from e
 
-    @router.post("/config/pause", response_model=QueueConfigResponse)
-    async def set_queue_paused(request: SetQueuePausedRequest) -> QueueConfigResponse:
-        """
-        Set queue pause state.
-
-        When paused, workflows will not automatically proceed to the next phase.
-        When resumed, workflows will automatically kick off the next phase on completion.
-
-        Args:
-            request: Pause state to set
-
-        Returns:
-            Updated pause state
-        """
-        try:
-            return await _set_queue_paused_handler(request, phase_queue_service)
-        except Exception as e:
-            logger.error(f"[ERROR] Failed to set queue paused state: {str(e)}")
-            raise HTTPException(500, f"Error setting queue config: {str(e)}") from e
-
-    @router.get("/{parent_issue}", response_model=QueueListResponse)
+    @router_obj.get("/{parent_issue}", response_model=QueueListResponse)
     async def get_queue_by_parent(parent_issue: int) -> QueueListResponse:
-        """
-        Get all phases for a specific parent issue.
-
-        Args:
-            parent_issue: Parent GitHub issue number
-
-        Returns:
-            List of phases for this parent issue
-        """
+        """Get all phases for a specific parent issue."""
         try:
             return await _get_queue_by_parent_handler(parent_issue, phase_queue_service)
         except Exception as e:
             logger.error(f"[ERROR] Failed to get phases for issue #{parent_issue}: {str(e)}")
             raise HTTPException(500, f"Error retrieving phases: {str(e)}") from e
 
-    @router.post("/enqueue", response_model=EnqueueResponse)
+
+def _register_mutation_routes(router_obj, phase_queue_service):
+    """Register POST/DELETE endpoints for queue mutations."""
+
+    @router_obj.post("/config/pause", response_model=QueueConfigResponse)
+    async def set_queue_paused(request: SetQueuePausedRequest) -> QueueConfigResponse:
+        """Set queue pause state."""
+        try:
+            return await _set_queue_paused_handler(request, phase_queue_service)
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to set queue paused state: {str(e)}")
+            raise HTTPException(500, f"Error setting queue config: {str(e)}") from e
+
+    @router_obj.post("/enqueue", response_model=EnqueueResponse)
     async def enqueue_phase(request: EnqueueRequest) -> EnqueueResponse:
-        """
-        Enqueue a new phase.
-
-        Args:
-            request: Phase details including parent issue, phase number, and metadata
-
-        Returns:
-            Queue ID and confirmation message
-        """
+        """Enqueue a new phase."""
         try:
             return await _enqueue_phase_handler(request, phase_queue_service)
         except Exception as e:
             logger.error(f"[ERROR] Failed to enqueue phase: {str(e)}")
             raise HTTPException(500, f"Error enqueueing phase: {str(e)}") from e
 
-    @router.delete("/{queue_id}", response_model=DequeueResponse)
+    @router_obj.delete("/{queue_id}", response_model=DequeueResponse)
     async def dequeue_phase(queue_id: str) -> DequeueResponse:
-        """
-        Remove a phase from the queue.
-
-        Args:
-            queue_id: Queue ID to remove
-
-        Returns:
-            Success status and message
-        """
+        """Remove a phase from the queue."""
         try:
             return await _dequeue_phase_handler(queue_id, phase_queue_service)
         except HTTPException:
@@ -456,23 +412,11 @@ def init_queue_routes(phase_queue_service):
             logger.error(f"[ERROR] Failed to dequeue phase: {str(e)}")
             raise HTTPException(500, f"Error dequeueing phase: {str(e)}") from e
 
-    @router.post("/{queue_id}/execute", response_model=ExecutePhaseResponse)
+    @router_obj.post("/{queue_id}/execute", response_model=ExecutePhaseResponse)
     async def execute_phase(queue_id: str) -> ExecutePhaseResponse:
-        """
-        Manually trigger execution of a phase.
-
-        This endpoint launches the ADW workflow for a ready phase.
-        The phase must have an associated GitHub issue number.
-
-        Args:
-            queue_id: Queue ID to execute
-
-        Returns:
-            Execution status and details
-        """
+        """Manually trigger execution of a phase."""
         try:
             return await _execute_phase_handler(queue_id, phase_queue_service)
-
         except HTTPException:
             raise
         except Exception as e:
@@ -481,6 +425,11 @@ def init_queue_routes(phase_queue_service):
             logger.error(f"Traceback:\n{traceback.format_exc()}")
             raise HTTPException(500, f"Error executing phase: {str(e)}") from e
 
+
+def init_queue_routes(phase_queue_service):
+    """Initialize queue routes with service dependencies."""
+    _register_query_routes(router, phase_queue_service)
+    _register_mutation_routes(router, phase_queue_service)
     return router
 
 

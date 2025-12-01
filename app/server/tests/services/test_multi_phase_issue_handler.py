@@ -156,7 +156,7 @@ async def test_multi_phase_patterns_extracted_from_dict(handler, queue_service):
         }
     ]
 
-    response = await handler.handle_multi_phase_request(request, predicted_patterns)
+    _ = await handler.handle_multi_phase_request(request, predicted_patterns)
 
     # Verify only pattern strings stored (not full dict)
     phases = queue_service.get_queue_by_parent(0)
@@ -180,7 +180,7 @@ async def test_multi_phase_with_empty_patterns(handler, queue_service):
     # Empty patterns list
     predicted_patterns = []
 
-    response = await handler.handle_multi_phase_request(request, predicted_patterns)
+    _ = await handler.handle_multi_phase_request(request, predicted_patterns)
 
     # Verify no patterns stored when empty
     phases = queue_service.get_queue_by_parent(0)
@@ -206,7 +206,7 @@ async def test_multi_phase_patterns_persist_through_phases(handler, queue_servic
         {"pattern": "workflow:multi", "confidence": 0.85, "reasoning": "multi-phase detected"}
     ]
 
-    response = await handler.handle_multi_phase_request(request, predicted_patterns)
+    _ = await handler.handle_multi_phase_request(request, predicted_patterns)
 
     # All phases should have the same patterns
     phases = queue_service.get_queue_by_parent(0)
@@ -230,7 +230,7 @@ async def test_multi_phase_patterns_none_handling(handler, queue_service):
     )
 
     # Explicitly pass None
-    response = await handler.handle_multi_phase_request(request, predicted_patterns=None)
+    _ = await handler.handle_multi_phase_request(request, predicted_patterns=None)
 
     # Should work without errors
     phases = queue_service.get_queue_by_parent(0)

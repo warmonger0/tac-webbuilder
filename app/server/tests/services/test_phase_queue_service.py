@@ -294,7 +294,7 @@ def test_enqueue_with_predicted_patterns(service):
         "content": "Run tests and build"
     }
 
-    queue_id = service.enqueue(
+    _ = service.enqueue(
         parent_issue=123,
         phase_number=1,
         phase_data=phase_data,
@@ -315,7 +315,7 @@ def test_enqueue_without_predicted_patterns(service):
         "content": "Run tests"
     }
 
-    queue_id = service.enqueue(
+    _ = service.enqueue(
         parent_issue=456,
         phase_number=1,
         phase_data=phase_data,
@@ -336,7 +336,7 @@ def test_enqueue_with_empty_patterns_list(service):
         "content": "Run tests"
     }
 
-    queue_id = service.enqueue(
+    _ = service.enqueue(
         parent_issue=789,
         phase_number=1,
         phase_data=phase_data,
