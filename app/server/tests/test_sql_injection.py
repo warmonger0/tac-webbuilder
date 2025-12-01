@@ -26,10 +26,10 @@ from core.sql_security import (
 @pytest.fixture
 def test_db():
     """Create a test database with sample data"""
-    db_file = tempfile.NamedTemporaryFile(delete=False, suffix='.db')
-    db_file.close()
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as db_file:
+        db_path = db_file.name
 
-    conn = sqlite3.connect(db_file.name)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Create test tables
@@ -61,10 +61,10 @@ def test_db():
     conn.commit()
     conn.close()
 
-    yield db_file.name
+    yield db_path
 
     # Cleanup
-    os.unlink(db_file.name)
+    os.unlink(db_path)
 
 
 class TestSQLSecurityModule:

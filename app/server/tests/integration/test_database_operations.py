@@ -75,9 +75,8 @@ class TestWorkflowHistoryDatabase:
             integration_test_db.unlink()
 
         # Act: Initialize database
-        with patch.object(Path, 'parent', integration_test_db.parent):
-            with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
-                init_db()
+        with patch.object(Path, 'parent', integration_test_db.parent), patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+            init_db()
 
         # Assert: Database file was created
         assert integration_test_db.exists()
@@ -632,16 +631,18 @@ class TestWorkflowHistoryDatabase:
 
                 return workflows
 
-            with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', mocked_scan):
+            with (
+                patch('core.workflow_history_utils.sync_manager.scan_agents_directory', mocked_scan),
+                patch('core.cost_tracker.read_cost_history') as mock_cost,
+                patch('core.workflow_history_utils.github_client.fetch_github_issue_state') as mock_gh,
+                patch('core.cost_estimate_storage.get_cost_estimate') as mock_est
+            ):
                 # Also mock cost/GitHub functions to avoid external dependencies
-                with patch('core.cost_tracker.read_cost_history') as mock_cost:
-                    with patch('core.workflow_history_utils.github_client.fetch_github_issue_state') as mock_gh:
-                        with patch('core.cost_estimate_storage.get_cost_estimate') as mock_est:
-                            mock_cost.side_effect = Exception("No cost data")
-                            mock_gh.return_value = "open"
-                            mock_est.return_value = None
+                mock_cost.side_effect = Exception("No cost data")
+                mock_gh.return_value = "open"
+                mock_est.return_value = None
 
-                            synced_count = sync_workflow_history()
+                synced_count = sync_workflow_history()
 
         # Assert: Workflows were synced
         assert synced_count == 2
@@ -661,15 +662,17 @@ class TestWorkflowHistoryDatabase:
             assert wf2["status"] == "failed"  # Inferred from error.log
 
             # Act: Sync again (should not create duplicates)
-            with patch('core.workflow_history_utils.sync_manager.scan_agents_directory', mocked_scan):
-                with patch('core.cost_tracker.read_cost_history') as mock_cost:
-                    with patch('core.workflow_history_utils.github_client.fetch_github_issue_state') as mock_gh:
-                        with patch('core.cost_estimate_storage.get_cost_estimate') as mock_est:
-                            mock_cost.side_effect = Exception("No cost data")
-                            mock_gh.return_value = "open"
-                            mock_est.return_value = None
+            with (
+                patch('core.workflow_history_utils.sync_manager.scan_agents_directory', mocked_scan),
+                patch('core.cost_tracker.read_cost_history') as mock_cost,
+                patch('core.workflow_history_utils.github_client.fetch_github_issue_state') as mock_gh,
+                patch('core.cost_estimate_storage.get_cost_estimate') as mock_est
+            ):
+                mock_cost.side_effect = Exception("No cost data")
+                mock_gh.return_value = "open"
+                mock_est.return_value = None
 
-                            sync_workflow_history()
+                sync_workflow_history()
 
         # Assert: No new workflows created (updates only)
         with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):

@@ -162,6 +162,41 @@ def detect_framework(path: Path) -> str | None:
     return None
 
 
+def _check_python_backend(file_path: Path, frameworks: list[str]) -> str | None:
+    """Check for Python backend frameworks in a file."""
+    if not file_path.exists():
+        return None
+    try:
+        with open(file_path) as f:
+            content = f.read().lower()
+            for framework in frameworks:
+                if framework in content:
+                    return framework
+    except OSError:
+        pass
+    return None
+
+
+def _check_nodejs_backend(package_json: Path) -> str | None:
+    """Check for Node.js backend frameworks in package.json."""
+    if not package_json.exists():
+        return None
+    try:
+        with open(package_json) as f:
+            data = json.load(f)
+            deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
+
+            if "express" in deps:
+                return "express"
+            if "fastify" in deps:
+                return "fastify"
+            if "@nestjs/core" in deps:
+                return "nestjs"
+    except (OSError, json.JSONDecodeError, KeyError):
+        pass
+    return None
+
+
 def detect_backend(path: Path) -> str | None:
     """
     Detect backend framework.
@@ -172,52 +207,22 @@ def detect_backend(path: Path) -> str | None:
     Returns:
         Backend framework name or None
     """
-    # Check for FastAPI
-    pyproject_toml = path / "pyproject.toml"
-    if pyproject_toml.exists():
-        try:
-            with open(pyproject_toml) as f:
-                content = f.read()
-                if "fastapi" in content.lower():
-                    return "fastapi"
-                elif "django" in content.lower():
-                    return "django"
-                elif "flask" in content.lower():
-                    return "flask"
-        except OSError:
-            pass
+    python_frameworks = ["fastapi", "django", "flask"]
+
+    # Check pyproject.toml
+    backend = _check_python_backend(path / "pyproject.toml", python_frameworks)
+    if backend:
+        return backend
 
     # Check requirements.txt
-    requirements = path / "requirements.txt"
-    if requirements.exists():
-        try:
-            with open(requirements) as f:
-                content = f.read().lower()
-                if "fastapi" in content:
-                    return "fastapi"
-                elif "django" in content:
-                    return "django"
-                elif "flask" in content:
-                    return "flask"
-        except OSError:
-            pass
+    backend = _check_python_backend(path / "requirements.txt", python_frameworks)
+    if backend:
+        return backend
 
     # Check for Node.js backend
-    package_json = path / "package.json"
-    if package_json.exists():
-        try:
-            with open(package_json) as f:
-                data = json.load(f)
-                deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
-
-                if "express" in deps:
-                    return "express"
-                elif "fastify" in deps:
-                    return "fastify"
-                elif "@nestjs/core" in deps:
-                    return "nestjs"
-        except (OSError, json.JSONDecodeError, KeyError):
-            pass
+    backend = _check_nodejs_backend(path / "package.json")
+    if backend:
+        return backend
 
     return None
 
