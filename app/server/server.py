@@ -4,6 +4,7 @@ import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
 
+from core.context_review.database.schema import init_context_review_db
 from core.data_models import (
     Route,
     Workflow,
@@ -20,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Import route modules
 from routes import (
+    context_review_routes,
     data_routes,
     github_routes,
     issue_completion_routes,
@@ -58,6 +60,10 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize workflow history database
     init_workflow_history_db()
     logger.info("[STARTUP] Workflow history database initialized")
+
+    # Initialize context review database
+    init_context_review_db()
+    logger.info("[STARTUP] Context review database initialized")
 
     # Start background watchers using BackgroundTaskManager
     await background_task_manager.start_all()
@@ -229,6 +235,9 @@ app.include_router(queue_routes.router, prefix="/api/v1")
 
 # Initialize issue completion routes
 app.include_router(issue_completion_routes.router, prefix="/api/v1")
+
+# Initialize context review routes
+app.include_router(context_review_routes.router, prefix="/api/v1")
 
 # Initialize webhook routes for workflow completion notifications
 github_poster = GitHubPoster()
