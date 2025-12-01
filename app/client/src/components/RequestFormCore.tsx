@@ -56,10 +56,10 @@ export function RequestFormCore() {
     <>
       <div className="max-w-7xl mx-auto px-4">
         {/* First Row: Create New Request & Hopper Queue */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 items-stretch">
+        <div className="flex flex-col lg:flex-row gap-4 mb-4 items-stretch">
           {/* Left Column - Create New Request */}
           <div
-            className={`lg:col-span-2 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 space-y-3 relative transition-all flex flex-col ${
+            className={`lg:w-1/2 lg:flex-shrink-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 space-y-3 relative transition-all flex flex-col ${
               isDragging ? 'ring-4 ring-emerald-500 ring-opacity-50' : ''
             }`}
             {...dragHandlers}
@@ -172,7 +172,7 @@ export function RequestFormCore() {
           </div>
 
           {/* Right Column - Hopper Queue */}
-          <div className="lg:col-span-1">
+          <div className="lg:flex-grow lg:mr-4">
             {showHopperQueue ? (
               <ZteHopperQueueCard />
             ) : (
