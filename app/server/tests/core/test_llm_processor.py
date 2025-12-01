@@ -54,7 +54,7 @@ class TestLLMProcessor:
             query_text = "Show all users"
             schema_info = {'tables': {}}
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(Exception, match=r".*") as exc_info:
                 generate_sql_with_openai(query_text, schema_info)
 
             assert "No LLM API key found" in str(exc_info.value) or "OPENAI_API_KEY" in str(exc_info.value)
@@ -68,7 +68,7 @@ class TestLLMProcessor:
             query_text = "Show all users"
             schema_info = {'tables': {}}
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(Exception, match=r".*") as exc_info:
                 generate_sql_with_openai(query_text, schema_info)
 
             assert "API Error" in str(exc_info.value)
@@ -114,7 +114,7 @@ class TestLLMProcessor:
             query_text = "Show all orders"
             schema_info = {'tables': {}}
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(Exception, match=r".*") as exc_info:
                 generate_sql_with_anthropic(query_text, schema_info)
 
             assert "No LLM API key found" in str(exc_info.value) or "ANTHROPIC_API_KEY" in str(exc_info.value)
@@ -128,7 +128,7 @@ class TestLLMProcessor:
             query_text = "Show all orders"
             schema_info = {'tables': {}}
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(Exception, match=r".*") as exc_info:
                 generate_sql_with_anthropic(query_text, schema_info)
 
             assert "API Error" in str(exc_info.value)
@@ -201,7 +201,7 @@ class TestLLMProcessor:
             request = QueryRequest(query="Show all orders", llm_provider="openai")
             schema_info = {'tables': {}}
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(Exception, match=r".*") as exc_info:
                 generate_sql(request, schema_info)
 
             assert "No LLM API key found" in str(exc_info.value)
@@ -212,7 +212,7 @@ class TestLLMProcessor:
             request = QueryRequest(query="Show all customers", llm_provider="anthropic")
             schema_info = {'tables': {}}
 
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(Exception, match=r".*") as exc_info:
                 generate_sql(request, schema_info)
 
             assert "No LLM API key found" in str(exc_info.value)

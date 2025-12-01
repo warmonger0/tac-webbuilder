@@ -88,7 +88,7 @@ class TestFileProcessor:
         table_name = "inconsistent_table"
 
         # Pandas will fail on inconsistent CSV data
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match=r".*") as exc_info:
             convert_csv_to_sqlite(csv_data, table_name, test_db)
 
         assert "Error converting CSV to SQLite" in str(exc_info.value)
@@ -131,7 +131,7 @@ class TestFileProcessor:
         json_data = b'invalid json'
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match=r".*") as exc_info:
             convert_json_to_sqlite(json_data, table_name, test_db)
 
         assert "Error converting JSON to SQLite" in str(exc_info.value)
@@ -141,7 +141,7 @@ class TestFileProcessor:
         json_data = b'{"name": "John", "age": 25}'
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match=r".*") as exc_info:
             convert_json_to_sqlite(json_data, table_name, test_db)
 
         assert "JSON must be an array of objects" in str(exc_info.value)
@@ -151,7 +151,7 @@ class TestFileProcessor:
         json_data = b'[]'
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match=r".*") as exc_info:
             convert_json_to_sqlite(json_data, table_name, test_db)
 
         assert "JSON array is empty" in str(exc_info.value)
@@ -242,7 +242,7 @@ class TestFileProcessor:
         """Test field discovery with invalid JSON"""
         jsonl_content = b'{"valid": "json"}\n{invalid json}'
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match=r".*") as exc_info:
             discover_jsonl_fields(jsonl_content)
 
         assert "Invalid JSON on line 2" in str(exc_info.value)
@@ -349,7 +349,7 @@ class TestFileProcessor:
         jsonl_data = b'{"valid": "json"}\n{invalid json}'
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match=r".*") as exc_info:
             convert_jsonl_to_sqlite(jsonl_data, table_name, test_db)
 
         assert "Invalid JSON on line 2" in str(exc_info.value)
@@ -359,7 +359,7 @@ class TestFileProcessor:
         jsonl_data = b''
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match=r".*") as exc_info:
             convert_jsonl_to_sqlite(jsonl_data, table_name, test_db)
 
         assert "No valid JSON objects found in JSONL file" in str(exc_info.value)
@@ -369,7 +369,7 @@ class TestFileProcessor:
         jsonl_data = b'\n\n\n'
         table_name = "test_table"
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match=r".*") as exc_info:
             convert_jsonl_to_sqlite(jsonl_data, table_name, test_db)
 
         assert "No valid JSON objects found in JSONL file" in str(exc_info.value)

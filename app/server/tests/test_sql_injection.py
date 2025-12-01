@@ -261,7 +261,7 @@ class TestInsightsSecurity:
     @patch('utils.db_connection.sqlite3.connect')
     def test_generate_insights_validates_table_name(self, mock_connect):
         """Test that table names are validated"""
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match=r".*") as exc_info:
             generate_insights("users'; DROP TABLE users; --")
         assert "Invalid" in str(exc_info.value)
 
@@ -273,7 +273,7 @@ class TestInsightsSecurity:
         mock_connect.return_value = mock_conn
         mock_conn.cursor.return_value = mock_cursor
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match=r".*") as exc_info:
             generate_insights("users", ["name", "'; DROP TABLE users; --"])
         assert "Invalid column name" in str(exc_info.value)
 

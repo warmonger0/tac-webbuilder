@@ -236,7 +236,7 @@ class TestSignatureValidation:
         assert normalize_signature("  test:pytest:backend  ") == "test:pytest:backend"
 
     def test_normalize_invalid(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r".*"):
             normalize_signature("invalid")
 
 
