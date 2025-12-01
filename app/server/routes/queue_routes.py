@@ -218,6 +218,137 @@ class SetQueuePausedRequest(BaseModel):
     paused: bool = Field(..., description="True to pause automatic execution, False to resume")
 
 
+async def _get_queue_config_handler(phase_queue_service) -> QueueConfigResponse:
+    """Handler for getting queue configuration."""
+    paused = phase_queue_service.is_paused()
+    return QueueConfigResponse(paused=paused)
+
+
+async def _set_queue_paused_handler(request: SetQueuePausedRequest, phase_queue_service) -> QueueConfigResponse:
+    """Handler for setting queue pause state."""
+    phase_queue_service.set_paused(request.paused)
+    logger.info(f"[CONFIG] Queue {'paused' if request.paused else 'resumed'}")
+    return QueueConfigResponse(paused=request.paused)
+
+
+async def _get_all_queued_handler(phase_queue_service) -> QueueListResponse:
+    """Handler for getting all queued phases."""
+    items = phase_queue_service.get_all_queued()
+    phases = [
+        PhaseQueueItemResponse(**item.to_dict())
+        for item in items
+    ]
+    return QueueListResponse(phases=phases, total=len(phases))
+
+
+async def _get_queue_by_parent_handler(parent_issue: int, phase_queue_service) -> QueueListResponse:
+    """Handler for getting phases by parent issue."""
+    items = phase_queue_service.get_queue_by_parent(parent_issue)
+    phases = [
+        PhaseQueueItemResponse(**item.to_dict())
+        for item in items
+    ]
+    return QueueListResponse(phases=phases, total=len(phases))
+
+
+async def _enqueue_phase_handler(request: EnqueueRequest, phase_queue_service) -> EnqueueResponse:
+    """Handler for enqueueing a new phase."""
+    queue_id = phase_queue_service.enqueue(
+        parent_issue=request.parent_issue,
+        phase_number=request.phase_number,
+        phase_data=request.phase_data,
+        depends_on_phase=request.depends_on_phase,
+    )
+    return EnqueueResponse(
+        queue_id=queue_id,
+        message=f"Phase {request.phase_number} enqueued for issue #{request.parent_issue}"
+    )
+
+
+async def _dequeue_phase_handler(queue_id: str, phase_queue_service) -> DequeueResponse:
+    """Handler for dequeueing a phase."""
+    success = phase_queue_service.dequeue(queue_id)
+    if success:
+        return DequeueResponse(
+            success=True,
+            message=f"Phase {queue_id} removed from queue"
+        )
+    else:
+        raise HTTPException(404, f"Queue ID {queue_id} not found")
+
+
+async def _execute_phase_handler(queue_id: str, phase_queue_service) -> ExecutePhaseResponse:
+    """Handler for execute phase endpoint."""
+    # Get phase from queue
+    phase = phase_queue_service.repository.find_by_id(queue_id)
+
+    if not phase:
+        raise HTTPException(404, f"Queue ID {queue_id} not found")
+
+    # Validate phase status
+    if phase.status != "ready":
+        raise HTTPException(
+            400,
+            f"Phase must be 'ready' to execute (current status: {phase.status})"
+        )
+
+    # Check if phase has an issue number
+    if not phase.issue_number:
+        raise HTTPException(
+            400,
+            "Phase does not have a GitHub issue. Create an issue first before executing."
+        )
+
+    # Generate ADW ID
+    import uuid
+    adw_id = f"adw-{uuid.uuid4().hex[:8]}"
+
+    # Determine appropriate workflow
+    workflow, model_set = determine_workflow_for_phase(phase.phase_data)
+    logger.info(f"[EXECUTE] Selected workflow: {workflow} (model_set: {model_set})")
+
+    # Build command to launch workflow
+    server_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app_dir = os.path.dirname(server_dir)
+    repo_root = os.path.dirname(app_dir)
+    adws_dir = os.path.join(repo_root, "adws")
+    workflow_script = os.path.join(adws_dir, f"{workflow}.py")
+
+    if not os.path.exists(workflow_script):
+        raise HTTPException(500, f"Workflow script not found: {workflow_script}")
+
+    cmd = ["uv", "run", workflow_script, str(phase.issue_number), adw_id]
+
+    logger.info(
+        f"[EXECUTE] Launching {workflow} for phase {queue_id} "
+        f"(issue #{phase.issue_number}, adw_id: {adw_id})"
+    )
+
+    # Launch workflow in background
+    subprocess.Popen(
+        cmd,
+        cwd=repo_root,
+        start_new_session=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    # Mark phase as running
+    phase_queue_service.update_status(queue_id, "running", adw_id=adw_id)
+
+    logger.info(
+        f"[SUCCESS] Workflow launched for phase {queue_id} "
+        f"(issue #{phase.issue_number}, adw_id: {adw_id})"
+    )
+
+    return ExecutePhaseResponse(
+        success=True,
+        message=f"Workflow {workflow} started for phase {phase.phase_number}",
+        issue_number=phase.issue_number,
+        adw_id=adw_id
+    )
+
+
 def init_queue_routes(phase_queue_service):
     """
     Initialize queue routes with service dependencies.
@@ -233,13 +364,7 @@ def init_queue_routes(phase_queue_service):
         Returns all phases regardless of status, ordered by parent issue and phase number.
         """
         try:
-            items = phase_queue_service.get_all_queued()
-            phases = [
-                PhaseQueueItemResponse(**item.to_dict())
-                for item in items
-            ]
-            return QueueListResponse(phases=phases, total=len(phases))
-
+            return await _get_all_queued_handler(phase_queue_service)
         except Exception as e:
             logger.error(f"[ERROR] Failed to get queued phases: {str(e)}")
             raise HTTPException(500, f"Error retrieving queue: {str(e)}") from e
@@ -253,9 +378,7 @@ def init_queue_routes(phase_queue_service):
             Current pause state of the queue
         """
         try:
-            paused = phase_queue_service.is_paused()
-            return QueueConfigResponse(paused=paused)
-
+            return await _get_queue_config_handler(phase_queue_service)
         except Exception as e:
             logger.error(f"[ERROR] Failed to get queue config: {str(e)}")
             raise HTTPException(500, f"Error retrieving queue config: {str(e)}") from e
@@ -275,10 +398,7 @@ def init_queue_routes(phase_queue_service):
             Updated pause state
         """
         try:
-            phase_queue_service.set_paused(request.paused)
-            logger.info(f"[CONFIG] Queue {'paused' if request.paused else 'resumed'}")
-            return QueueConfigResponse(paused=request.paused)
-
+            return await _set_queue_paused_handler(request, phase_queue_service)
         except Exception as e:
             logger.error(f"[ERROR] Failed to set queue paused state: {str(e)}")
             raise HTTPException(500, f"Error setting queue config: {str(e)}") from e
@@ -295,13 +415,7 @@ def init_queue_routes(phase_queue_service):
             List of phases for this parent issue
         """
         try:
-            items = phase_queue_service.get_queue_by_parent(parent_issue)
-            phases = [
-                PhaseQueueItemResponse(**item.to_dict())
-                for item in items
-            ]
-            return QueueListResponse(phases=phases, total=len(phases))
-
+            return await _get_queue_by_parent_handler(parent_issue, phase_queue_service)
         except Exception as e:
             logger.error(f"[ERROR] Failed to get phases for issue #{parent_issue}: {str(e)}")
             raise HTTPException(500, f"Error retrieving phases: {str(e)}") from e
@@ -318,17 +432,7 @@ def init_queue_routes(phase_queue_service):
             Queue ID and confirmation message
         """
         try:
-            queue_id = phase_queue_service.enqueue(
-                parent_issue=request.parent_issue,
-                phase_number=request.phase_number,
-                phase_data=request.phase_data,
-                depends_on_phase=request.depends_on_phase,
-            )
-            return EnqueueResponse(
-                queue_id=queue_id,
-                message=f"Phase {request.phase_number} enqueued for issue #{request.parent_issue}"
-            )
-
+            return await _enqueue_phase_handler(request, phase_queue_service)
         except Exception as e:
             logger.error(f"[ERROR] Failed to enqueue phase: {str(e)}")
             raise HTTPException(500, f"Error enqueueing phase: {str(e)}") from e
@@ -345,15 +449,7 @@ def init_queue_routes(phase_queue_service):
             Success status and message
         """
         try:
-            success = phase_queue_service.dequeue(queue_id)
-            if success:
-                return DequeueResponse(
-                    success=True,
-                    message=f"Phase {queue_id} removed from queue"
-                )
-            else:
-                raise HTTPException(404, f"Queue ID {queue_id} not found")
-
+            return await _dequeue_phase_handler(queue_id, phase_queue_service)
         except HTTPException:
             raise
         except Exception as e:
@@ -375,76 +471,7 @@ def init_queue_routes(phase_queue_service):
             Execution status and details
         """
         try:
-            # Get phase from queue - Direct query (O(1) with index)
-            phase = phase_queue_service.repository.find_by_id(queue_id)
-
-            if not phase:
-                raise HTTPException(404, f"Queue ID {queue_id} not found")
-
-            # Validate phase status
-            if phase.status != "ready":
-                raise HTTPException(
-                    400,
-                    f"Phase must be 'ready' to execute (current status: {phase.status})"
-                )
-
-            # Check if phase has an issue number
-            if not phase.issue_number:
-                raise HTTPException(
-                    400,
-                    "Phase does not have a GitHub issue. Create an issue first before executing."
-                )
-
-            # Generate ADW ID
-            import uuid
-            adw_id = f"adw-{uuid.uuid4().hex[:8]}"
-
-            # Determine appropriate workflow based on phase characteristics
-            workflow, model_set = determine_workflow_for_phase(phase.phase_data)
-            logger.info(f"[EXECUTE] Selected workflow: {workflow} (model_set: {model_set})")
-
-            # Build command to launch workflow
-            # __file__ is in app/server/routes/queue_routes.py
-            # Go up: routes -> server -> app -> repo_root
-            server_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # app/server
-            app_dir = os.path.dirname(server_dir)  # app
-            repo_root = os.path.dirname(app_dir)  # repo root
-            adws_dir = os.path.join(repo_root, "adws")
-            workflow_script = os.path.join(adws_dir, f"{workflow}.py")
-
-            if not os.path.exists(workflow_script):
-                raise HTTPException(500, f"Workflow script not found: {workflow_script}")
-
-            cmd = ["uv", "run", workflow_script, str(phase.issue_number), adw_id]
-
-            logger.info(
-                f"[EXECUTE] Launching {workflow} for phase {queue_id} "
-                f"(issue #{phase.issue_number}, adw_id: {adw_id})"
-            )
-
-            # Launch workflow in background
-            subprocess.Popen(
-                cmd,
-                cwd=repo_root,
-                start_new_session=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-
-            # Mark phase as running and store ADW ID
-            phase_queue_service.update_status(queue_id, "running", adw_id=adw_id)
-
-            logger.info(
-                f"[SUCCESS] Workflow launched for phase {queue_id} "
-                f"(issue #{phase.issue_number}, adw_id: {adw_id})"
-            )
-
-            return ExecutePhaseResponse(
-                success=True,
-                message=f"Workflow {workflow} started for phase {phase.phase_number}",
-                issue_number=phase.issue_number,
-                adw_id=adw_id
-            )
+            return await _execute_phase_handler(queue_id, phase_queue_service)
 
         except HTTPException:
             raise

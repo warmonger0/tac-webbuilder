@@ -35,6 +35,193 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["Workflows"])
 
 
+# Endpoint handlers - extracted for testability and to reduce complexity
+
+
+async def _get_workflows_handler(workflow_service) -> list[Workflow]:
+    """Handler for getting all active workflows."""
+    workflows = workflow_service.get_workflows()
+    logger.debug(f"[SUCCESS] Retrieved {len(workflows)} active workflows")
+    return workflows
+
+
+async def _get_routes_handler(get_routes_data_func) -> RoutesResponse:
+    """Handler for getting all registered routes."""
+    route_list = get_routes_data_func()
+    response = RoutesResponse(routes=route_list, total=len(route_list))
+    logger.debug(f"[SUCCESS] Retrieved {len(route_list)} routes")
+    return response
+
+
+async def _get_workflow_costs_handler(adw_id: str) -> CostResponse:
+    """Handler for getting workflow cost data."""
+    logger.info(f"[REQUEST] Fetching cost data for ADW ID: {adw_id}")
+    try:
+        cost_data = read_cost_history(adw_id)
+        logger.info(f"[SUCCESS] Retrieved cost data for ADW ID: {adw_id}, total cost: ${cost_data.total_cost:.4f}")
+        return CostResponse(cost_data=cost_data)
+    except FileNotFoundError as e:
+        logger.warning(f"[WARNING] Cost data not found for ADW ID: {adw_id}: {str(e)}")
+        return CostResponse(error=f"Cost data not found for workflow {adw_id}")
+    except ValueError as e:
+        logger.warning(f"[WARNING] Invalid cost data for ADW ID: {adw_id}: {str(e)}")
+        return CostResponse(error=f"Invalid cost data for workflow {adw_id}")
+
+
+async def _get_workflow_history_handler(filters: WorkflowHistoryFilters, get_workflow_history_data_func) -> WorkflowHistoryResponse:
+    """Handler for getting workflow history."""
+    history_data, _ = get_workflow_history_data_func(filters)
+    logger.debug(f"[SUCCESS] Retrieved {len(history_data.workflows)} workflow history items (total: {history_data.total_count})")
+    return history_data
+
+
+async def _resync_workflow_history_handler(adw_id: str | None, force: bool) -> ResyncResponse:
+    """Handler for workflow history resync endpoint."""
+    logger.info(f"[RESYNC] Starting resync: adw_id={adw_id}, force={force}")
+
+    if adw_id:
+        # Resync single workflow
+        result = resync_workflow_cost(adw_id, force=force)
+
+        if result["success"]:
+            response = ResyncResponse(
+                resynced_count=1 if result["cost_updated"] else 0,
+                workflows=[{
+                    "adw_id": result["adw_id"],
+                    "cost_updated": result["cost_updated"]
+                }],
+                errors=[],
+                message=f"Successfully resynced workflow {adw_id}"
+            )
+            logger.info(f"[RESYNC] Single workflow resync completed: {adw_id}")
+            return response
+        else:
+            # Return error response
+            response = ResyncResponse(
+                resynced_count=0,
+                workflows=[],
+                errors=[result["error"]],
+                message=f"Failed to resync workflow {adw_id}"
+            )
+            logger.error(f"[RESYNC] Failed to resync {adw_id}: {result['error']}")
+            return response
+    else:
+        # Resync all completed workflows
+        resynced_count, workflows, errors = resync_all_completed_workflows(force=force)
+
+        response = ResyncResponse(
+            resynced_count=resynced_count,
+            workflows=workflows,
+            errors=errors,
+            message=f"Bulk resync completed: {resynced_count} workflows updated, {len(errors)} errors"
+        )
+        logger.info(f"[RESYNC] Bulk resync completed: {resynced_count} updated, {len(errors)} errors")
+        return response
+
+
+async def _get_workflow_analytics_handler(adw_id: str) -> WorkflowAnalyticsDetail:
+    """Handler for getting workflow analytics."""
+    workflow = get_workflow_by_adw_id(adw_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail=f"Workflow {adw_id} not found")
+
+    # Parse JSON fields (handle both string and already-parsed data)
+    similar_workflow_ids = []
+    if workflow.get("similar_workflow_ids"):
+        if isinstance(workflow["similar_workflow_ids"], list):
+            similar_workflow_ids = workflow["similar_workflow_ids"]
+        else:
+            with suppress(json.JSONDecodeError, TypeError):
+                similar_workflow_ids = json.loads(workflow["similar_workflow_ids"])
+
+    anomaly_flags = []
+    if workflow.get("anomaly_flags"):
+        if isinstance(workflow["anomaly_flags"], list):
+            anomaly_flags = workflow["anomaly_flags"]
+        else:
+            with suppress(json.JSONDecodeError, TypeError):
+                anomaly_flags = json.loads(workflow["anomaly_flags"])
+
+    optimization_recommendations = []
+    if workflow.get("optimization_recommendations"):
+        if isinstance(workflow["optimization_recommendations"], list):
+            optimization_recommendations = workflow["optimization_recommendations"]
+        else:
+            with suppress(json.JSONDecodeError, TypeError):
+                optimization_recommendations = json.loads(workflow["optimization_recommendations"])
+
+    analytics = WorkflowAnalyticsDetail(
+        adw_id=adw_id,
+        cost_efficiency_score=workflow.get("cost_efficiency_score"),
+        performance_score=workflow.get("performance_score"),
+        quality_score=workflow.get("quality_score"),
+        similar_workflow_ids=similar_workflow_ids,
+        anomaly_flags=anomaly_flags,
+        optimization_recommendations=optimization_recommendations,
+        nl_input_clarity_score=workflow.get("nl_input_clarity_score"),
+        nl_input_word_count=workflow.get("nl_input_word_count")
+    )
+
+    logger.info(f"[SUCCESS] Retrieved analytics for workflow {adw_id}")
+    return analytics
+
+
+async def _get_workflow_trends_handler(workflow_service, days: int, group_by: str) -> WorkflowTrends:
+    """Handler for getting workflow trends."""
+    trends = workflow_service.get_workflow_trends(days=days, group_by=group_by)
+    logger.info(f"[SUCCESS] Retrieved workflow trends for {days} days grouped by {group_by}")
+    return trends
+
+
+async def _predict_workflow_cost_handler(workflow_service, classification: str, complexity: str, model: str) -> CostPrediction:
+    """Handler for predicting workflow cost."""
+    prediction = workflow_service.predict_workflow_cost(
+        classification=classification,
+        complexity=complexity,
+        model=model
+    )
+    logger.info(f"[SUCCESS] Generated cost prediction for {classification}/{complexity}/{model}: ${prediction.predicted_cost:.4f}")
+    return prediction
+
+
+async def _get_workflow_catalog_handler(workflow_service) -> WorkflowCatalogResponse:
+    """Handler for getting workflow catalog."""
+    catalog = workflow_service.get_workflow_catalog()
+    logger.info(f"[SUCCESS] Retrieved {catalog.total} workflow templates")
+    return catalog
+
+
+async def _get_workflows_batch_handler(workflow_ids: list[str]) -> list[WorkflowHistoryItem]:
+    """Handler for batch workflows fetch endpoint."""
+    # Validate input
+    if not workflow_ids:
+        return []
+
+    if len(workflow_ids) > 20:
+        raise HTTPException(
+            status_code=400,
+            detail="Maximum 20 workflows can be fetched at once"
+        )
+
+    # Fetch workflows
+    workflows = []
+    for adw_id in workflow_ids:
+        workflow = get_workflow_by_adw_id(adw_id)
+        if workflow:
+            # Parse JSON fields if they're strings
+            if isinstance(workflow.get("similar_workflow_ids"), str):
+                with suppress(json.JSONDecodeError, TypeError):
+                    workflow["similar_workflow_ids"] = json.loads(workflow["similar_workflow_ids"])
+
+            if not workflow.get("similar_workflow_ids"):
+                workflow["similar_workflow_ids"] = []
+
+            workflows.append(WorkflowHistoryItem(**workflow))
+
+    logger.info(f"[BATCH] Fetched {len(workflows)}/{len(workflow_ids)} workflows")
+    return workflows
+
+
 def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_history_data_func):
     """
     Initialize workflow routes with service dependencies.
@@ -46,9 +233,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
     async def get_workflows() -> list[Workflow]:
         """Get all active ADW workflows (REST endpoint for fallback)"""
         try:
-            workflows = workflow_service.get_workflows()
-            logger.debug(f"[SUCCESS] Retrieved {len(workflows)} active workflows")
-            return workflows
+            return await _get_workflows_handler(workflow_service)
         except Exception as e:
             logger.error(f"[ERROR] Failed to retrieve workflows: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
@@ -58,10 +243,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
     async def get_routes() -> RoutesResponse:
         """Get all registered FastAPI routes (REST endpoint for fallback)"""
         try:
-            route_list = get_routes_data_func()
-            response = RoutesResponse(routes=route_list, total=len(route_list))
-            logger.debug(f"[SUCCESS] Retrieved {len(route_list)} routes")
-            return response
+            return await _get_routes_handler(get_routes_data_func)
         except Exception as e:
             logger.error(f"[ERROR] Failed to retrieve routes: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
@@ -77,16 +259,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
         and token usage statistics.
         """
         try:
-            logger.info(f"[REQUEST] Fetching cost data for ADW ID: {adw_id}")
-            cost_data = read_cost_history(adw_id)
-            logger.info(f"[SUCCESS] Retrieved cost data for ADW ID: {adw_id}, total cost: ${cost_data.total_cost:.4f}")
-            return CostResponse(cost_data=cost_data)
-        except FileNotFoundError as e:
-            logger.warning(f"[WARNING] Cost data not found for ADW ID: {adw_id}: {str(e)}")
-            return CostResponse(error=f"Cost data not found for workflow {adw_id}")
-        except ValueError as e:
-            logger.warning(f"[WARNING] Invalid cost data for ADW ID: {adw_id}: {str(e)}")
-            return CostResponse(error=f"Invalid cost data for workflow {adw_id}")
+            return await _get_workflow_costs_handler(adw_id)
         except Exception as e:
             logger.error(f"[ERROR] Failed to retrieve cost data for ADW ID: {adw_id}: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
@@ -119,9 +292,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
                 sort_by=sort_by,
                 sort_order=sort_order
             )
-            history_data, _ = get_workflow_history_data_func(filters)
-            logger.debug(f"[SUCCESS] Retrieved {len(history_data.workflows)} workflow history items (total: {history_data.total_count})")
-            return history_data
+            return await _get_workflow_history_handler(filters, get_workflow_history_data_func)
         except Exception as e:
             logger.error(f"[ERROR] Failed to retrieve workflow history: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
@@ -150,47 +321,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
         - errors: List of error messages encountered
         """
         try:
-            logger.info(f"[RESYNC] Starting resync: adw_id={adw_id}, force={force}")
-
-            if adw_id:
-                # Resync single workflow
-                result = resync_workflow_cost(adw_id, force=force)
-
-                if result["success"]:
-                    response = ResyncResponse(
-                        resynced_count=1 if result["cost_updated"] else 0,
-                        workflows=[{
-                            "adw_id": result["adw_id"],
-                            "cost_updated": result["cost_updated"]
-                        }],
-                        errors=[],
-                        message=f"Successfully resynced workflow {adw_id}"
-                    )
-                    logger.info(f"[RESYNC] Single workflow resync completed: {adw_id}")
-                    return response
-                else:
-                    # Return error response
-                    response = ResyncResponse(
-                        resynced_count=0,
-                        workflows=[],
-                        errors=[result["error"]],
-                        message=f"Failed to resync workflow {adw_id}"
-                    )
-                    logger.error(f"[RESYNC] Failed to resync {adw_id}: {result['error']}")
-                    return response
-            else:
-                # Resync all completed workflows
-                resynced_count, workflows, errors = resync_all_completed_workflows(force=force)
-
-                response = ResyncResponse(
-                    resynced_count=resynced_count,
-                    workflows=workflows,
-                    errors=errors,
-                    message=f"Bulk resync completed: {resynced_count} workflows updated, {len(errors)} errors"
-                )
-                logger.info(f"[RESYNC] Bulk resync completed: {resynced_count} updated, {len(errors)} errors")
-                return response
-
+            return await _resync_workflow_history_handler(adw_id, force)
         except Exception as e:
             logger.error(f"[RESYNC] Unexpected error: {str(e)}")
             logger.error(f"[RESYNC] Full traceback:\n{traceback.format_exc()}")
@@ -226,33 +357,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
             Returns: [{ workflow data }, { workflow data }, ...]
         """
         try:
-            # Validate input
-            if not workflow_ids:
-                return []
-
-            if len(workflow_ids) > 20:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Maximum 20 workflows can be fetched at once"
-                )
-
-            # Fetch workflows
-            workflows = []
-            for adw_id in workflow_ids:
-                workflow = get_workflow_by_adw_id(adw_id)
-                if workflow:
-                    # Parse JSON fields if they're strings
-                    if isinstance(workflow.get("similar_workflow_ids"), str):
-                        try:
-                            workflow["similar_workflow_ids"] = json.loads(workflow["similar_workflow_ids"])
-                        except (json.JSONDecodeError, TypeError):
-                            workflow["similar_workflow_ids"] = []
-
-                    workflows.append(WorkflowHistoryItem(**workflow))
-
-            logger.info(f"[BATCH] Fetched {len(workflows)}/{len(workflow_ids)} workflows")
-            return workflows
-
+            return await _get_workflows_batch_handler(workflow_ids)
         except HTTPException:
             raise
         except Exception as e:
@@ -263,49 +368,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
     async def get_workflow_analytics(adw_id: str) -> WorkflowAnalyticsDetail:
         """Get advanced analytics for a specific workflow"""
         try:
-            workflow = get_workflow_by_adw_id(adw_id)
-            if not workflow:
-                raise HTTPException(status_code=404, detail=f"Workflow {adw_id} not found")
-
-            # Parse JSON fields (handle both string and already-parsed data)
-            similar_workflow_ids = []
-            if workflow.get("similar_workflow_ids"):
-                if isinstance(workflow["similar_workflow_ids"], list):
-                    similar_workflow_ids = workflow["similar_workflow_ids"]
-                else:
-                    with suppress(json.JSONDecodeError, TypeError):
-                        similar_workflow_ids = json.loads(workflow["similar_workflow_ids"])
-
-            anomaly_flags = []
-            if workflow.get("anomaly_flags"):
-                if isinstance(workflow["anomaly_flags"], list):
-                    anomaly_flags = workflow["anomaly_flags"]
-                else:
-                    with suppress(json.JSONDecodeError, TypeError):
-                        anomaly_flags = json.loads(workflow["anomaly_flags"])
-
-            optimization_recommendations = []
-            if workflow.get("optimization_recommendations"):
-                if isinstance(workflow["optimization_recommendations"], list):
-                    optimization_recommendations = workflow["optimization_recommendations"]
-                else:
-                    with suppress(json.JSONDecodeError, TypeError):
-                        optimization_recommendations = json.loads(workflow["optimization_recommendations"])
-
-            analytics = WorkflowAnalyticsDetail(
-                adw_id=adw_id,
-                cost_efficiency_score=workflow.get("cost_efficiency_score"),
-                performance_score=workflow.get("performance_score"),
-                quality_score=workflow.get("quality_score"),
-                similar_workflow_ids=similar_workflow_ids,
-                anomaly_flags=anomaly_flags,
-                optimization_recommendations=optimization_recommendations,
-                nl_input_clarity_score=workflow.get("nl_input_clarity_score"),
-                nl_input_word_count=workflow.get("nl_input_word_count")
-            )
-
-            logger.info(f"[SUCCESS] Retrieved analytics for workflow {adw_id}")
-            return analytics
+            return await _get_workflow_analytics_handler(adw_id)
         except HTTPException:
             raise
         except Exception as e:
@@ -317,9 +380,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
     async def get_workflow_trends(days: int = 30, group_by: str = "day") -> WorkflowTrends:
         """Get trend data over time - delegates to WorkflowService"""
         try:
-            trends = workflow_service.get_workflow_trends(days=days, group_by=group_by)
-            logger.info(f"[SUCCESS] Retrieved workflow trends for {days} days grouped by {group_by}")
-            return trends
+            return await _get_workflow_trends_handler(workflow_service, days, group_by)
         except Exception as e:
             logger.error(f"[ERROR] Failed to retrieve workflow trends: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
@@ -329,13 +390,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
     async def predict_workflow_cost(classification: str, complexity: str, model: str) -> CostPrediction:
         """Predict workflow cost - delegates to WorkflowService"""
         try:
-            prediction = workflow_service.predict_workflow_cost(
-                classification=classification,
-                complexity=complexity,
-                model=model
-            )
-            logger.info(f"[SUCCESS] Generated cost prediction for {classification}/{complexity}/{model}: ${prediction.predicted_cost:.4f}")
-            return prediction
+            return await _predict_workflow_cost_handler(workflow_service, classification, complexity, model)
         except Exception as e:
             logger.error(f"[ERROR] Failed to predict workflow cost: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
@@ -345,9 +400,7 @@ def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_hi
     async def get_workflow_catalog() -> WorkflowCatalogResponse:
         """Get workflow catalog - delegates to WorkflowService"""
         try:
-            catalog = workflow_service.get_workflow_catalog()
-            logger.info(f"[SUCCESS] Retrieved {catalog.total} workflow templates")
-            return catalog
+            return await _get_workflow_catalog_handler(workflow_service)
         except Exception as e:
             logger.error(f"[ERROR] Failed to retrieve workflow catalog: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
