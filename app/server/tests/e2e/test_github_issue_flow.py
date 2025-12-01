@@ -18,6 +18,7 @@ Test Coverage:
 - TC-005: Cost estimate accuracy validation
 """
 
+import contextlib
 import sqlite3
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -152,13 +153,11 @@ class TestCompleteGitHubIssueFlow:
             """)
 
             # Also clear adw_locks if the table exists
-            try:
+            with contextlib.suppress(sqlite3.OperationalError):
                 cursor.execute("""
                     DELETE FROM adw_locks
                     WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
                 """)
-            except sqlite3.OperationalError:
-                pass  # Table might not exist
 
             conn.commit()
             conn.close()
@@ -565,13 +564,11 @@ class TestGitHubIssueFlowEdgeCases:
             """)
 
             # Also clear adw_locks if the table exists
-            try:
+            with contextlib.suppress(sqlite3.OperationalError):
                 cursor.execute("""
                     DELETE FROM adw_locks
                     WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
                 """)
-            except sqlite3.OperationalError:
-                pass  # Table might not exist
 
             conn.commit()
             conn.close()
@@ -845,13 +842,11 @@ class TestGitHubIssueFlowDataPersistence:
             """)
 
             # Also clear adw_locks if the table exists
-            try:
+            with contextlib.suppress(sqlite3.OperationalError):
                 cursor.execute("""
                     DELETE FROM adw_locks
                     WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
                 """)
-            except sqlite3.OperationalError:
-                pass  # Table might not exist
 
             conn.commit()
             conn.close()
@@ -983,13 +978,11 @@ class TestGitHubIssueFlowPerformance:
             """)
 
             # Also clear adw_locks if the table exists
-            try:
+            with contextlib.suppress(sqlite3.OperationalError):
                 cursor.execute("""
                     DELETE FROM adw_locks
                     WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
                 """)
-            except sqlite3.OperationalError:
-                pass  # Table might not exist
 
             conn.commit()
             conn.close()

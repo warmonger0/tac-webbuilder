@@ -259,14 +259,14 @@ def update_workflow_history(
         """
 
         # PHANTOM DETECTION: Log stack trace if updating to completed/failed without end_time
-        if "status" in mapped_kwargs and mapped_kwargs["status"] in ["completed", "failed"]:
-            if "end_time" not in mapped_kwargs or mapped_kwargs["end_time"] is None:
-                stack_trace = "".join(traceback.format_stack())
-                logger.error(
-                    f"[PHANTOM UPDATE] Attempting to update workflow_history to status='{mapped_kwargs['status']}' "
-                    f"without end_time for ADW {adw_id}\n"
-                    f"Stack trace:\n{stack_trace}"
-                )
+        if ("status" in mapped_kwargs and mapped_kwargs["status"] in ["completed", "failed"] and
+            ("end_time" not in mapped_kwargs or mapped_kwargs["end_time"] is None)):
+            stack_trace = "".join(traceback.format_stack())
+            logger.error(
+                f"[PHANTOM UPDATE] Attempting to update workflow_history to status='{mapped_kwargs['status']}' "
+                f"without end_time for ADW {adw_id}\n"
+                f"Stack trace:\n{stack_trace}"
+            )
 
         values = list(mapped_kwargs.values()) + [adw_id]
         cursor.execute(query, values)

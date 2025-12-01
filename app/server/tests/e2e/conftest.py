@@ -399,13 +399,11 @@ def e2e_test_db_cleanup(e2e_database):
         """)
 
         # Also clear adw_locks if the table exists
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("""
                 DELETE FROM adw_locks
                 WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
             """)
-        except sqlite3.OperationalError:
-            pass  # Table might not exist
 
         conn.commit()
         conn.close()

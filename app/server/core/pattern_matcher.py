@@ -63,14 +63,13 @@ class PatternMatcher:
             # Check if any trigger matches
             triggers = pattern_config.get("triggers", [])
             for trigger in triggers:
-                if trigger.lower() in input_lower:
-                    # Verify pattern is safe to use
-                    if self._is_safe_to_offload(task_context, pattern_config):
-                        logger.info(f"Matched pattern: {pattern_name}")
-                        return {
-                            "pattern_name": pattern_name,
-                            "pattern_config": pattern_config
-                        }
+                if trigger.lower() in input_lower and self._is_safe_to_offload(task_context, pattern_config):
+                    # Matched pattern and verified safe to use
+                    logger.info(f"Matched pattern: {pattern_name}")
+                    return {
+                        "pattern_name": pattern_name,
+                        "pattern_config": pattern_config
+                    }
 
         return None
 

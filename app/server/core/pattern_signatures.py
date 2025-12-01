@@ -165,10 +165,9 @@ def _detect_target(nl_input: str, workflow: dict) -> str:
     # Check for "all" in specific contexts (e.g., "run all tests")
     # Look for "all" as a standalone word or followed by common keywords
     import re
-    if re.search(r'\ball\b', nl_input):
-        # Check if it's "all tests", "all code", etc.
-        if any(word in nl_input for word in ["tests", "code", "files"]):
-            return "all"
+    if re.search(r'\ball\b', nl_input) and any(word in nl_input for word in ["tests", "code", "files"]):
+        # Found "all" with specific context (all tests, all code, etc.)
+        return "all"
 
     # Check explicit target keywords
     if "backend" in nl_input or "server" in nl_input or "api" in nl_input:
