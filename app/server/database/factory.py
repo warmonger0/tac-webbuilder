@@ -5,11 +5,13 @@ Selects the appropriate database adapter based on environment configuration.
 """
 
 import os
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 from .connection import DatabaseAdapter
-from .postgres_adapter import PostgreSQLAdapter
-from .sqlite_adapter import SQLiteAdapter
+
+if TYPE_CHECKING:
+    from .postgres_adapter import PostgreSQLAdapter
+    from .sqlite_adapter import SQLiteAdapter
 
 # Global adapter instance (singleton pattern)
 _adapter: Union[DatabaseAdapter, None] = None
@@ -31,7 +33,12 @@ def get_database_adapter() -> DatabaseAdapter:
     if _adapter is None:
         db_type = os.getenv("DB_TYPE", "sqlite").lower()
 
-        _adapter = PostgreSQLAdapter() if db_type == "postgresql" else SQLiteAdapter()
+        if db_type == "postgresql":
+            from .postgres_adapter import PostgreSQLAdapter
+            _adapter = PostgreSQLAdapter()
+        else:
+            from .sqlite_adapter import SQLiteAdapter
+            _adapter = SQLiteAdapter()
 
     return _adapter
 

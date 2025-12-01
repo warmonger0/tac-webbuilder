@@ -9,16 +9,18 @@ This package contains Pydantic models organized into focused modules:
 """
 
 from .domain import (
-    ChildIssueInfo,
     ColumnInfo,
     ColumnInsight,
     CostEstimate,
     GitHubIssue,
-    Phase,
     ProjectContext,
     Route,
     ServiceHealth,
     TableSchema,
+)
+from .queue import (
+    ChildIssueInfo,
+    Phase,
 )
 from .requests import (
     DatabaseSchemaRequest,
