@@ -117,7 +117,9 @@ def _build_update_dict(existing: dict, workflow_data: dict, duration_seconds: fl
     should_generate_insights = False
     if should_generate_insights and "anomaly_flags" in workflow_data:
         try:
-            new_anomaly_flags = json.loads(workflow_data.get("anomaly_flags", "[]"))
+            # Handle both string (SQLite) and dict (PostgreSQL RealDictCursor) formats
+            anomaly_data = workflow_data.get("anomaly_flags", "[]")
+            new_anomaly_flags = json.loads(anomaly_data) if isinstance(anomaly_data, str) else anomaly_data
             old_anomaly_flags = existing.get("anomaly_flags", [])
             if new_anomaly_flags != old_anomaly_flags:
                 updates["anomaly_flags"] = workflow_data["anomaly_flags"]
@@ -127,7 +129,9 @@ def _build_update_dict(existing: dict, workflow_data: dict, duration_seconds: fl
     # Recommendations update (only for new workflows)
     if should_generate_insights and "optimization_recommendations" in workflow_data:
         try:
-            new_recommendations = json.loads(workflow_data.get("optimization_recommendations", "[]"))
+            # Handle both string (SQLite) and dict (PostgreSQL RealDictCursor) formats
+            recommendations_data = workflow_data.get("optimization_recommendations", "[]")
+            new_recommendations = json.loads(recommendations_data) if isinstance(recommendations_data, str) else recommendations_data
             old_recommendations = existing.get("optimization_recommendations", [])
             if new_recommendations != old_recommendations:
                 updates["optimization_recommendations"] = workflow_data["optimization_recommendations"]

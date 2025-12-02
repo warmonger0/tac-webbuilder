@@ -50,6 +50,12 @@ class PhaseQueueItem:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
+        # Helper to convert datetime to ISO string
+        def to_iso(value):
+            if value is None:
+                return None
+            return value.isoformat() if isinstance(value, datetime) else value
+
         return {
             "queue_id": self.queue_id,
             "parent_issue": self.parent_issue,
@@ -58,15 +64,15 @@ class PhaseQueueItem:
             "status": self.status,
             "depends_on_phase": self.depends_on_phase,
             "phase_data": self.phase_data,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
+            "created_at": to_iso(self.created_at),
+            "updated_at": to_iso(self.updated_at),
             "error_message": self.error_message,
             "adw_id": self.adw_id,
             "pr_number": self.pr_number,
             "priority": self.priority,
             "queue_position": self.queue_position,
-            "ready_timestamp": self.ready_timestamp,
-            "started_timestamp": self.started_timestamp,
+            "ready_timestamp": to_iso(self.ready_timestamp),
+            "started_timestamp": to_iso(self.started_timestamp),
         }
 
     @classmethod
