@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useRequestForm } from './RequestFormHooks';
 import { RequestFormPreview } from './RequestFormPreview';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -5,8 +6,11 @@ import { SystemStatusPanel } from './SystemStatusPanel';
 import { ZteHopperQueueCard } from './ZteHopperQueueCard';
 import { AdwMonitorCard } from './AdwMonitorCard';
 import { FileUploadSection } from './request-form/FileUploadSection';
+import { ContextAnalysisButton } from './context-review/ContextAnalysisButton';
+import { ContextReviewPanel } from './context-review/ContextReviewPanel';
 
 export function RequestFormCore() {
+  const [contextReviewId, setContextReviewId] = useState<number | null>(null);
   const {
     // Form state
     nlInput,
@@ -117,6 +121,23 @@ export function RequestFormCore() {
                 className="w-full p-3 bg-slate-800 border border-slate-600 text-white placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
             </div>
+
+            {/* Context Analysis Section */}
+            <div className="border-t border-slate-700 pt-3">
+              <ContextAnalysisButton
+                changeDescription={nlInput}
+                projectPath={projectPath}
+                onAnalysisStart={setContextReviewId}
+                disabled={isLoading}
+              />
+            </div>
+
+            {contextReviewId && (
+              <ContextReviewPanel
+                reviewId={contextReviewId}
+                onClose={() => setContextReviewId(null)}
+              />
+            )}
 
             <div className="flex items-center">
               <input
