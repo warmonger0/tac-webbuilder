@@ -6,6 +6,7 @@ This module provides all read operations for the workflow history system.
 
 import json
 import logging
+from datetime import datetime
 
 from .schema import _get_adapter
 
@@ -110,14 +111,28 @@ def _process_workflow_row(row: dict) -> dict:
     ]
     for field in json_fields:
         if result.get(field):
-            try:
-                result[field] = json.loads(result[field])
-            except json.JSONDecodeError:
-                logger.warning(f"[DB] Failed to parse JSON for {field}")
-                result[field] = None
+            # Check if already parsed (PostgreSQL JSONB returns dict/list directly)
+            if isinstance(result[field], (dict, list)):
+                # Already parsed, no action needed
+                pass
+            else:
+                # String, need to parse
+                try:
+                    result[field] = json.loads(result[field])
+                except json.JSONDecodeError:
+                    logger.warning(f"[DB] Failed to parse JSON for {field}")
+                    result[field] = None
         elif field in ["anomaly_flags", "optimization_recommendations"]:
             # Default to empty arrays for Phase 3D fields
             result[field] = []
+
+    # Convert datetime objects to ISO format strings (PostgreSQL returns datetime objects)
+    datetime_fields = [
+        "created_at", "updated_at", "start_time", "end_time"
+    ]
+    for field in datetime_fields:
+        if result.get(field) and isinstance(result[field], datetime):
+            result[field] = result[field].isoformat()
 
     # Convert None to defaults for score and temporal fields (legacy data compatibility)
     default_fields = {
