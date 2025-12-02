@@ -3,6 +3,7 @@ import { getSystemStatus, redeliverGitHubWebhook, restartCloudflare, startWebhoo
 import type { ServiceHealth, SystemStatusResponse } from '../types';
 import { useReliablePolling } from '../hooks/useReliablePolling';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
+import { PreflightCheckPanel } from './PreflightCheckPanel';
 import { intervals } from '../config/intervals';
 import { serviceDisplayOrder } from '../config/services';
 
@@ -322,6 +323,11 @@ export function SystemStatusPanel() {
                   />
                 ) : null;
               })}
+            </div>
+
+            {/* Pre-Flight Health Checks */}
+            <div className="mt-6">
+              <PreflightCheckPanel />
             </div>
           </>
         )}
