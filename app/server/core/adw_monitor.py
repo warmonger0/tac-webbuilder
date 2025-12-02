@@ -668,11 +668,12 @@ def aggregate_adw_monitor_data() -> dict[str, Any]:
     # Sort workflows by priority:
     # 1. Running workflows first
     # 2. Paused workflows second
-    # 3. Then by most recent start time
-    # 4. For same status, prioritize higher progress
+    # 3. Then by most recent start time (RECENCY PRIORITIZED)
+    # 4. For same status and time, prioritize higher progress
     def sort_key(w):
+        from datetime import datetime
         status = w.get("status", "")
-        start_time = w.get("start_time") or ""
+        start_time_str = w.get("start_time") or ""
         progress = w.get("phase_progress", 0.0)
 
         # Priority order: running > paused > failed > completed > others
@@ -683,9 +684,20 @@ def aggregate_adw_monitor_data() -> dict[str, Any]:
             "completed": 3,
         }.get(status, 4)
 
-        # Return tuple: (priority, -progress, -time_length) for sorting
-        # Negative progress so higher progress comes first within same status
-        return (priority, -progress, -len(start_time))
+        # Parse start_time to sort by actual recency
+        # Use epoch 0 for workflows without start_time (they sort last)
+        if start_time_str:
+            try:
+                dt = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                timestamp = dt.timestamp()
+            except Exception:
+                timestamp = 0
+        else:
+            timestamp = 0
+
+        # Return tuple: (priority, -timestamp, -progress) for sorting
+        # Negative timestamp so more recent (larger timestamp) comes first
+        return (priority, -timestamp, -progress)
 
     workflows.sort(key=sort_key)
 

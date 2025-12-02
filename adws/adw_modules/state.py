@@ -41,7 +41,9 @@ class ADWState:
             # Workflow history sync fields
             "status", "workflow_template", "model_used", "start_time", "nl_input", "github_url",
             # Validate phase fields
-            "baseline_errors"
+            "baseline_errors",
+            # Real-time phase tracking
+            "current_phase"
         }
         for key, value in kwargs.items():
             if key in core_fields:
