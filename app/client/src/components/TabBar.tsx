@@ -1,14 +1,19 @@
 interface TabBarProps {
-  activeTab: 'request' | 'workflows' | 'history' | 'routes';
-  onChange: (tab: 'request' | 'workflows' | 'history' | 'routes') => void;
+  activeTab: 'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data';
+  onChange: (tab: 'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data') => void;
 }
 
 export function TabBar({ activeTab, onChange }: TabBarProps) {
   const tabs = [
-    { id: 'request' as const, label: 'New Request' },
-    { id: 'workflows' as const, label: "ADW's" },
-    { id: 'history' as const, label: 'History' },
-    { id: 'routes' as const, label: 'API Routes' },
+    { id: 'request' as const, label: 'New Request Panel' },
+    { id: 'workflows' as const, label: "ADW's Panel" },
+    { id: 'history' as const, label: 'History Panel' },
+    { id: 'routes' as const, label: 'API Routes Panel' },
+    { id: 'plans' as const, label: 'Plans Panel' },
+    { id: 'patterns' as const, label: 'Patterns Panel' },
+    { id: 'quality' as const, label: 'Quality / Compliance Panel' },
+    { id: 'review' as const, label: 'Review Panel' },
+    { id: 'data' as const, label: 'Data & Structure Panel' },
   ];
 
   return (

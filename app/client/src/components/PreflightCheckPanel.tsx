@@ -36,7 +36,7 @@ export function PreflightCheckPanel() {
   const { data, isLoading, error, refetch } = useQuery<PreflightCheckResult>({
     queryKey: ['preflightChecks', skipTests],
     queryFn: async () => {
-      const response = await fetch(`/api/preflight-checks?skip_tests=${skipTests}`);
+      const response = await fetch(`/api/v1/preflight-checks?skip_tests=${skipTests}`);
       if (!response.ok) {
         throw new Error('Failed to fetch pre-flight checks');
       }
