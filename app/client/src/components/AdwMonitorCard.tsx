@@ -414,11 +414,17 @@ export function AdwMonitorCard() {
                             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
                             PROCESS ACTIVE
                           </div>
-                        ) : currentWorkflow.status === 'running' ? (
-                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
-                            title="Marked as running but process not detected">
-                            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
+                        ) : currentWorkflow.status === 'running' && !currentWorkflow.is_process_active ? (
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-red-500/20 text-red-300 border border-red-500/30"
+                            title="Marked as running but process not detected - workflow may have crashed">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
                             NO PROCESS
+                          </div>
+                        ) : currentWorkflow.error_count > 0 ? (
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                            title={`Workflow has ${currentWorkflow.error_count} error(s): ${currentWorkflow.last_error || 'See logs for details'}`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                            {currentWorkflow.error_count} ERROR{currentWorkflow.error_count > 1 ? 'S' : ''}
                           </div>
                         ) : null}
 
