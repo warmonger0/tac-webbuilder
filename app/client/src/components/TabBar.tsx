@@ -6,7 +6,7 @@ interface TabBarProps {
 export function TabBar({ activeTab, onChange }: TabBarProps) {
   const tabs = [
     { id: 'request' as const, label: 'New Request' },
-    { id: 'workflows' as const, label: 'Workflows' },
+    { id: 'workflows' as const, label: "ADW's" },
     { id: 'history' as const, label: 'History' },
     { id: 'routes' as const, label: 'API Routes' },
   ];
