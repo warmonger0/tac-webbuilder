@@ -51,6 +51,7 @@ from adw_modules.worktree_ops import validate_worktree
 from adw_modules.data_types import ADWStateData
 from adw_modules.doc_cleanup import cleanup_adw_documentation
 from adw_modules.success_operations import close_issue_on_success
+from adw_modules.observability import log_phase_completion, get_phase_number
 
 # Agent name constant
 AGENT_SHIPPER = "shipper"
@@ -483,7 +484,20 @@ def main():
         agent_name=AGENT_SHIPPER,
         logger=logger
     )
-    
+
+    # OBSERVABILITY: Log phase completion
+    from datetime import datetime
+    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+    log_phase_completion(
+        adw_id=adw_id,
+        issue_number=int(issue_number),
+        phase_name="Ship",
+        phase_number=get_phase_number("Ship"),
+        success=True,
+        workflow_template="adw_ship_iso",
+        started_at=start_time,
+    )
+
     # Save final state
     state.save("adw_ship_iso")
     

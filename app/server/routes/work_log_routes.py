@@ -71,7 +71,9 @@ def init_work_log_routes(repository: WorkLogRepository | None = None):
                 offset=offset,
             )
         except Exception as e:
+            import traceback
             logger.error(f"Error retrieving work log entries: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail="Failed to retrieve work log entries")
 
     @router.get("/session/{session_id}", response_model=List[WorkLogEntry])

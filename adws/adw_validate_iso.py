@@ -30,6 +30,7 @@ from adw_modules.state import ADWState
 from adw_modules.github import make_issue_comment
 from adw_modules.workflow_ops import format_issue_message
 from adw_modules.utils import setup_logger
+from adw_modules.observability import log_phase_completion, get_phase_number
 
 
 def run_baseline_validation(
@@ -206,6 +207,20 @@ def main():
     )
 
     logger.info("Validation phase completed successfully")
+
+    # OBSERVABILITY: Log phase completion
+    from datetime import datetime
+    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+    log_phase_completion(
+        adw_id=adw_id,
+        issue_number=int(issue_number),
+        phase_name="Validate",
+        phase_number=get_phase_number("Validate"),
+        success=True,
+        workflow_template="adw_validate_iso",
+        started_at=start_time,
+    )
+
     sys.exit(0)
 
 

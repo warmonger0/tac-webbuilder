@@ -41,6 +41,7 @@ from adw_modules.workflow_ops import format_issue_message
 from adw_modules.utils import setup_logger, check_env_vars
 from adw_modules.doc_cleanup import cleanup_adw_documentation
 from adw_modules.worktree_ops import remove_worktree
+from adw_modules.observability import log_phase_completion, get_phase_number
 
 # Agent name constant
 AGENT_CLEANUP = "cleanup"
@@ -233,6 +234,19 @@ def main():
                 f"Manual cleanup: `./scripts/purge_tree.sh {adw_id}`"
             )
         )
+
+    # OBSERVABILITY: Log phase completion
+    from datetime import datetime
+    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+    log_phase_completion(
+        adw_id=adw_id,
+        issue_number=int(issue_number),
+        phase_name="Cleanup",
+        phase_number=get_phase_number("Cleanup"),
+        success=True,
+        workflow_template="adw_cleanup_iso",
+        started_at=start_time,
+    )
 
     # Step 3: Save final state
     state.save("adw_cleanup_iso")

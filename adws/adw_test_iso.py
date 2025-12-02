@@ -75,6 +75,7 @@ from adw_modules.workflow_ops import (
     classify_issue,
 )
 from adw_modules.worktree_ops import validate_worktree
+from adw_modules.observability import log_phase_completion, get_phase_number
 
 # Agent name constants
 AGENT_TESTER = "test_runner"
@@ -1447,9 +1448,23 @@ def main():
     make_issue_comment(
         issue_number, format_issue_message(adw_id, "ops", "✅ Isolated testing phase completed")
     )
-    
+
     # Save final state
     state.save("adw_test_iso")
+
+    # OBSERVABILITY: Log phase completion
+    from datetime import datetime
+    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+    log_phase_completion(
+        adw_id=adw_id,
+        issue_number=int(issue_number),
+        phase_name="Test",
+        phase_number=get_phase_number("Test"),
+        success=(total_failures == 0),  # Success only if no failures
+        workflow_template="adw_test_iso",
+        error_message=f"{total_failures} test failures" if total_failures > 0 else None,
+        started_at=start_time,
+    )
     
     # Post final state summary to issue
     make_issue_comment(

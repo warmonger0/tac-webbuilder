@@ -44,6 +44,7 @@ from adw_modules.workflow_ops import (
     find_spec_file,
 )
 from adw_modules.utils import setup_logger, check_env_vars
+from adw_modules.observability import log_phase_completion, get_phase_number
 from adw_modules.data_types import (
     GitHubIssue,
     GitHubUser,
@@ -559,6 +560,18 @@ def main():
         format_issue_message(
             adw_id, "ops", "✅ Isolated documentation phase completed"
         ),
+    )
+
+    # OBSERVABILITY: Log phase completion
+    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+    log_phase_completion(
+        adw_id=adw_id,
+        issue_number=int(issue_number),
+        phase_name="Document",
+        phase_number=get_phase_number("Document"),
+        success=True,
+        workflow_template="adw_document_iso",
+        started_at=start_time,
     )
 
     # Save final state

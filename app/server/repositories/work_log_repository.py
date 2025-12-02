@@ -38,11 +38,21 @@ class WorkLogRepository:
         if len(entry.summary) > 280:
             raise ValueError("Summary must be at most 280 characters")
 
-        query = """
-            INSERT INTO work_log (session_id, summary, chat_file_link, issue_number, workflow_id, tags, timestamp)
-            VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-            RETURNING id, timestamp, created_at
-        """
+        ph = self.adapter.placeholder()
+        db_type = self.adapter.get_db_type()
+
+        # SQLite doesn't support RETURNING clause
+        if db_type == "sqlite":
+            query = f"""
+                INSERT INTO work_log (session_id, summary, chat_file_link, issue_number, workflow_id, tags, timestamp)
+                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, CURRENT_TIMESTAMP)
+            """
+        else:
+            query = f"""
+                INSERT INTO work_log (session_id, summary, chat_file_link, issue_number, workflow_id, tags, timestamp)
+                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, CURRENT_TIMESTAMP)
+                RETURNING id, timestamp, created_at
+            """
 
         tags_json = json.dumps(entry.tags) if entry.tags else "[]"
 
@@ -60,12 +70,24 @@ class WorkLogRepository:
                         tags_json,
                     ),
                 )
-                result = cursor.fetchone()
                 conn.commit()
 
-                entry_id = result[0]
-                timestamp = result[1]
-                created_at = result[2]
+                if db_type == "sqlite":
+                    # SQLite: Use lastrowid and fetch the created row
+                    entry_id = cursor.lastrowid
+                    cursor.execute(
+                        f"SELECT id, timestamp, created_at FROM work_log WHERE id = {ph}",
+                        (entry_id,)
+                    )
+                    result = cursor.fetchone()
+                    timestamp = result[1]
+                    created_at = result[2]
+                else:
+                    # PostgreSQL: Use RETURNING clause
+                    result = cursor.fetchone()
+                    entry_id = result[0]
+                    timestamp = result[1]
+                    created_at = result[2]
 
                 logger.info(f"Created work log entry {entry_id} for session {entry.session_id}")
 
@@ -95,11 +117,12 @@ class WorkLogRepository:
         Returns:
             List of WorkLogEntry objects
         """
-        query = """
+        ph = self.adapter.placeholder()
+        query = f"""
             SELECT id, timestamp, session_id, summary, chat_file_link, issue_number, workflow_id, tags, created_at
             FROM work_log
             ORDER BY timestamp DESC
-            LIMIT %s OFFSET %s
+            LIMIT {ph} OFFSET {ph}
         """
 
         try:
@@ -141,10 +164,11 @@ class WorkLogRepository:
         Returns:
             List of WorkLogEntry objects for the session
         """
-        query = """
+        ph = self.adapter.placeholder()
+        query = f"""
             SELECT id, timestamp, session_id, summary, chat_file_link, issue_number, workflow_id, tags, created_at
             FROM work_log
-            WHERE session_id = %s
+            WHERE session_id = {ph}
             ORDER BY timestamp DESC
         """
 
@@ -179,14 +203,15 @@ class WorkLogRepository:
 
     def get_count(self) -> int:
         """Get total count of work log entries"""
-        query = "SELECT COUNT(*) FROM work_log"
+        query = "SELECT COUNT(*) AS count FROM work_log"
 
         try:
             with self.adapter.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(query)
                 result = cursor.fetchone()
-                return result[0] if result else 0
+                # Access by column name since Row objects don't support integer indexing
+                return result['count'] if result else 0
         except Exception as e:
             logger.error(f"Failed to get work log count: {e}")
             raise
@@ -204,7 +229,8 @@ class WorkLogRepository:
         Raises:
             Exception: If database operation fails
         """
-        query = "DELETE FROM work_log WHERE id = %s"
+        ph = self.adapter.placeholder()
+        query = f"DELETE FROM work_log WHERE id = {ph}"
 
         try:
             with self.adapter.get_connection() as conn:

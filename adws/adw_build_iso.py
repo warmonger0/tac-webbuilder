@@ -44,6 +44,7 @@ from adw_modules.workflow_ops import (
 from adw_modules.utils import setup_logger, check_env_vars
 from adw_modules.data_types import GitHubIssue
 from adw_modules.worktree_ops import validate_worktree
+from adw_modules.observability import log_phase_completion, get_phase_number
 
 
 def run_external_build(
@@ -407,9 +408,22 @@ def main():
     make_issue_comment(
         issue_number, format_issue_message(adw_id, "ops", "✅ Isolated implementation phase completed")
     )
-    
+
     # Save final state
     state.save("adw_build_iso")
+
+    # OBSERVABILITY: Log phase completion
+    from datetime import datetime
+    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+    log_phase_completion(
+        adw_id=adw_id,
+        issue_number=int(issue_number),
+        phase_name="Build",
+        phase_number=get_phase_number("Build"),
+        success=True,
+        workflow_template="adw_build_iso",
+        started_at=start_time,
+    )
     
     # Post final state summary to issue
     make_issue_comment(

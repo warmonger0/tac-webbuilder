@@ -59,6 +59,7 @@ from adw_modules.worktree_ops import (
     find_next_available_ports,
 )
 from adw_modules.worktree_setup import setup_worktree_complete
+from adw_modules.observability import log_phase_completion, get_phase_number
 
 
 
@@ -356,12 +357,25 @@ def main():
 
     # Mark workflow as completed with end time
     from datetime import datetime
+    end_time = datetime.now()
     state.update(
         status="completed",
-        end_time=datetime.now().isoformat()
+        end_time=end_time.isoformat()
     )
     state.save("adw_plan_iso")
     logger.info("✅ Planning workflow marked as completed in state")
+
+    # OBSERVABILITY: Log phase completion
+    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+    log_phase_completion(
+        adw_id=adw_id,
+        issue_number=int(issue_number),
+        phase_name="Plan",
+        phase_number=get_phase_number("Plan"),
+        success=True,
+        workflow_template="adw_plan_iso",
+        started_at=start_time,
+    )
 
     # Post final state summary to issue
     make_issue_comment(
