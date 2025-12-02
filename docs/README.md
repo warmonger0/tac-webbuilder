@@ -46,11 +46,12 @@ Documentation is organized into the following categories:
 
 ### Integrations & Advanced Topics
 
-- [Playwright MCP](playwright-mcp.md) - Model Context Protocol integration for end-to-end testing with browser automation
-- [ADW Optimization](adw-optimization.md) - Automated development workflow performance tuning and best practices
-- [ADW Documentation](ADW/) - Complete ADW system documentation
-- [Cost Optimization](Cost-Optimization/) - API cost optimization and estimation
-- [Webhooks](Webhooks/) - Webhook integration and setup guides
+- [Playwright MCP](testing/playwright-mcp.md) - Model Context Protocol integration for end-to-end testing with browser automation
+- [ADW Optimization](features/adw/optimization.md) - Automated development workflow performance tuning and best practices
+- [ADW Documentation](features/adw/) - Complete ADW system documentation
+- [Observability & Logging](features/observability-and-logging.md) - Hook events, pattern learning, cost tracking, and work logs (Panel 10)
+- [Cost Optimization](features/cost-optimization/) - API cost optimization and estimation
+- [Webhooks](features/webhooks/) - Webhook integration and setup guides
 
 ## Quick Links
 
@@ -67,10 +68,11 @@ Documentation is organized into the following categories:
 
 ### Advanced Topics
 - System architecture: [architecture.md](architecture.md)
-- ADW workflows: [adw-optimization.md](adw-optimization.md)
-- E2E testing: [playwright-mcp.md](playwright-mcp.md)
-- Testing guides: [Testing/](Testing/)
-- Cost optimization: [Cost-Optimization/](Cost-Optimization/)
+- Observability & logging: [features/observability-and-logging.md](features/observability-and-logging.md)
+- ADW workflows: [features/adw/optimization.md](features/adw/optimization.md)
+- E2E testing: [testing/playwright-mcp.md](testing/playwright-mcp.md)
+- Testing guides: [testing/](testing/)
+- Cost optimization: [features/cost-optimization/](features/cost-optimization/)
 
 ## Documentation Structure
 

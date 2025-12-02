@@ -55,6 +55,30 @@ export async function getSystemStatus(): Promise<any> {
 }
 
 /**
+ * Run pre-flight health checks before launching workflows.
+ *
+ * Checks for:
+ * - Uncommitted git changes (blocking)
+ * - Worktree availability (blocking)
+ * - Critical test failures (blocking)
+ * - Port availability (warning)
+ * - Disk space (warning)
+ * - Python environment (blocking)
+ *
+ * @param skipTests - Skip the test suite check for faster checks
+ * @returns Pre-flight check results with blocking failures and warnings
+ */
+export async function getPreflightChecks(skipTests: boolean = false): Promise<{
+  passed: boolean;
+  blocking_failures: Array<{ check: string; error: string; fix: string; failing_tests?: string[] }>;
+  warnings: Array<{ check: string; message: string; impact: string }>;
+  checks_run: Array<{ check: string; status: string; duration_ms: number; details?: string }>;
+  total_duration_ms: number;
+}> {
+  return fetchJSON<any>(`${API_BASE}/preflight-checks?skip_tests=${skipTests}`);
+}
+
+/**
  * Start the webhook service.
  *
  * @returns Service start response
@@ -124,6 +148,7 @@ export const systemClient = {
   getRoutes,
   getWebhookStatus,
   getSystemStatus,
+  getPreflightChecks,
   startWebhookService,
   restartCloudflare,
   getGitHubWebhookHealth,

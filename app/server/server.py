@@ -25,6 +25,7 @@ from routes import (
     data_routes,
     github_routes,
     issue_completion_routes,
+    observability_routes,
     queue_routes,
     system_routes,
     websocket_routes,
@@ -253,6 +254,10 @@ app.include_router(context_review_routes.router, prefix="/api/v1")
 # Initialize work log routes
 work_log_routes.init_work_log_routes()
 app.include_router(work_log_routes.router, prefix="/api/v1")
+
+# Initialize observability routes (task logs + user prompts)
+observability_routes.init_observability_routes()
+app.include_router(observability_routes.router, prefix="/api/v1")
 
 # Initialize webhook routes for workflow completion notifications
 github_poster = GitHubPoster()

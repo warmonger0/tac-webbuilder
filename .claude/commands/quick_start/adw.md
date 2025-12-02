@@ -117,10 +117,17 @@ Logs: `agents/{adw_id}/{phase}/raw_output.jsonl`
 uv run adw_cleanup_iso.py <issue-number> <adw-id>
 ./scripts/cleanup_archived_issue.sh <issue-number> <adw-id>
 
+# Cleanup closed ADW directories
+./scripts/cleanup_closed_adws.sh  # Archives agents/ dirs for closed GitHub issues
+
 # Programmatic cleanup
 python3 -c "from adw_modules.cleanup_operations import cleanup_shipped_issue; \
   cleanup_shipped_issue('33', '88405eb3')"
 ```
+
+**Cleanup Documentation:**
+- Quick reference: `docs/ADW_CLEANUP_PROCESS.md` (220 lines)
+- Includes: Manual archiving process, cleanup scripts, UI changes
 
 ## New Validate Phase (Nov 2025)
 

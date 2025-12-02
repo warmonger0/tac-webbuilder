@@ -36,7 +36,9 @@ from core.github_poster import GitHubPoster
 from core.nl_processor import process_request
 from core.pattern_predictor import predict_patterns_from_input, store_predicted_patterns
 from core.project_detector import detect_project_context
+from core.models.observability import UserPromptCreate
 from database import get_database_adapter
+from repositories.user_prompt_repository import UserPromptRepository
 
 from services.multi_phase_issue_handler import MultiPhaseIssueHandler
 
@@ -80,6 +82,9 @@ class GitHubIssueService:
             github_poster=GitHubPoster(),
             phase_queue_service=phase_queue_service
         ) if phase_queue_service else None
+
+        # Initialize user prompt repository for observability
+        self.user_prompt_repo = UserPromptRepository()
 
         logger.info(f"[INIT] GitHubIssueService initialized (webhook: {self.webhook_trigger_url}, repo: {self.github_repo})")
 
@@ -211,8 +216,33 @@ class GitHubIssueService:
             'issue': github_issue,
             'project_context': project_context,
             'cost_estimate': cost_estimate,
-            'predicted_patterns': predicted_patterns
+            'predicted_patterns': predicted_patterns,
+            'original_request': request  # Store original request for logging
         }
+
+        # OBSERVABILITY HOOK: Capture user prompt log
+        try:
+            user_prompt = UserPromptCreate(
+                request_id=request_id,
+                session_id=None,  # Could be populated from request header/cookie
+                nl_input=request.nl_input,
+                project_path=request.project_path,
+                auto_post=request.auto_post,
+                issue_title=github_issue.title,
+                issue_body=github_issue.body,
+                issue_type=None,  # Would need to be extracted from labels
+                complexity=project_context.complexity if project_context else None,
+                is_multi_phase=False,
+                phase_count=1,
+                estimated_cost_usd=(cost_estimate['min_cost'] + cost_estimate['max_cost']) / 2.0,
+                estimated_tokens=None,  # Could be estimated
+                model_name=None,  # Could track which model was used
+            )
+            self.user_prompt_repo.create(user_prompt)
+            logger.info(f"[OBSERVABILITY] Captured user prompt for request {request_id}")
+        except Exception as e:
+            # Don't fail request if logging fails
+            logger.error(f"[OBSERVABILITY] Failed to capture user prompt: {e}")
 
         logger.info(
             f"[SUCCESS] Request processed with cost estimate: {cost_estimate['level']} "
@@ -428,6 +458,19 @@ class GitHubIssueService:
 
             # Get GitHub URL
             github_url = f"https://github.com/{self.github_repo}/issues/{issue_number}"
+
+            # OBSERVABILITY HOOK: Update user prompt with GitHub info
+            try:
+                self.user_prompt_repo.update_github_info(
+                    request_id=request_id,
+                    issue_number=issue_number,
+                    issue_url=github_url,
+                    posted_at=datetime.now()
+                )
+                logger.info(f"[OBSERVABILITY] Updated user prompt {request_id} with GitHub info")
+            except Exception as e:
+                # Don't fail if logging update fails
+                logger.error(f"[OBSERVABILITY] Failed to update user prompt with GitHub info: {e}")
 
             # Clean up pending request
             del self.pending_requests[request_id]

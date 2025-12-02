@@ -13,6 +13,10 @@ A web application that converts natural language queries to SQL using AI, built 
 - 🔍 **Pre-Submission Health Checks** - Validates system health before creating GitHub issues
 - 💾 **Smart Persistence** - Project paths and tab selections persist across page refreshes
 - 📡 **Service Monitoring** - Tracks Backend API, Database, Webhook, Cloudflare Tunnel, and Frontend
+- 🔬 **Advanced Observability** - Hook events, pattern learning, cost tracking, and work log system
+- 📝 **Work Log Panel (Panel 10)** - Twitter-style 280-character session summaries with tags and linking
+- 🤖 **Pattern Learning** - Automatic detection of recurring workflow patterns for optimization
+- 💰 **Cost Intelligence** - Track API cost savings and automation ROI
 - ✅ **Comprehensive Test Coverage** - 33+ test cases with Vitest and React Testing Library
 
 ## Prerequisites

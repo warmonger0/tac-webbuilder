@@ -86,21 +86,21 @@ def run_preflight_checks(skip_tests: bool = False) -> dict[str, Any]:
             "impact": "May not be able to allocate ports for new workflows"
         })
 
-    # Check 3: Git repository state
+    # Check 3: Git repository state (BLOCKING - uncommitted changes prevent workflow launch)
     check_start = time.time()
     git_result = check_git_state()
     checks_run.append({
         "check": "git_state",
-        "status": "pass" if git_result["passed"] else "warn",
+        "status": "pass" if git_result["passed"] else "fail",
         "duration_ms": int((time.time() - check_start) * 1000),
         "details": git_result.get("summary")
     })
 
     if not git_result["passed"]:
-        warnings.append({
+        blocking_failures.append({
             "check": "Git State",
-            "message": git_result["error"],
-            "impact": git_result.get("impact", "May cause conflicts during workflow execution")
+            "error": git_result["error"],
+            "fix": "Run 'git add .' and 'git commit -m \"your message\"' OR 'git stash' to clear uncommitted changes"
         })
 
     # Check 4: Disk space
@@ -120,7 +120,24 @@ def run_preflight_checks(skip_tests: bool = False) -> dict[str, Any]:
             "impact": "May fail during dependency installation or builds"
         })
 
-    # Check 5: Python environment
+    # Check 5: Worktree availability (BLOCKING - need slots for new workflows)
+    check_start = time.time()
+    worktree_result = check_worktree_availability()
+    checks_run.append({
+        "check": "worktree_availability",
+        "status": "pass" if worktree_result["passed"] else "fail",
+        "duration_ms": int((time.time() - check_start) * 1000),
+        "details": worktree_result.get("summary")
+    })
+
+    if not worktree_result["passed"]:
+        blocking_failures.append({
+            "check": "Worktree Availability",
+            "error": worktree_result["error"],
+            "fix": worktree_result["fix"]
+        })
+
+    # Check 6: Python environment
     check_start = time.time()
     python_result = check_python_environment()
     checks_run.append({
@@ -409,6 +426,61 @@ def check_disk_space() -> dict[str, Any]:
             "passed": False,
             "error": f"Failed to check disk space: {str(e)}",
             "summary": "unknown"
+        }
+
+
+def check_worktree_availability() -> dict[str, Any]:
+    """
+    Check if there are available worktree slots (max 15 active worktrees).
+
+    Returns:
+        {
+            "passed": bool,
+            "error": str,
+            "fix": str,
+            "summary": str
+        }
+    """
+    try:
+        project_root = Path(__file__).parent.parent.parent
+
+        # Check worktree directory
+        worktree_dir = project_root / "trees"
+        if not worktree_dir.exists():
+            # No worktrees yet - all slots available
+            return {
+                "passed": True,
+                "summary": "0/15 worktrees active"
+            }
+
+        # Count active worktrees (directories starting with 'adw-' or being git worktrees)
+        active_worktrees = []
+        for item in worktree_dir.iterdir():
+            if item.is_dir() and (item.name.startswith('adw-') or (item / '.git').exists()):
+                active_worktrees.append(item.name)
+
+        active_count = len(active_worktrees)
+        max_worktrees = 15
+
+        if active_count >= max_worktrees:
+            return {
+                "passed": False,
+                "error": f"All worktree slots occupied ({active_count}/{max_worktrees})",
+                "fix": "Wait for running workflows to complete or manually clean up old worktrees in trees/ directory",
+                "summary": f"{active_count}/{max_worktrees} active"
+            }
+
+        return {
+            "passed": True,
+            "summary": f"{active_count}/{max_worktrees} active"
+        }
+
+    except Exception as e:
+        return {
+            "passed": False,
+            "error": f"Failed to check worktree availability: {str(e)}",
+            "fix": "Check trees/ directory permissions",
+            "summary": f"error: {str(e)}"
         }
 
 

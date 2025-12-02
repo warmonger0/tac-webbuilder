@@ -63,6 +63,12 @@ export * from './systemClient';
 export { systemClient } from './systemClient';
 
 // ============================================================================
+// Work Log Client - Chat session summaries
+// ============================================================================
+export * from './workLogClient';
+export { workLogClient } from './workLogClient';
+
+// ============================================================================
 // Legacy API namespace export for backward compatibility
 // ============================================================================
 import {
@@ -93,7 +99,13 @@ import {
   getQueueAll,
   getQueueByParent,
 } from './queueClient';
-import { getRoutes, getSystemStatus, getWebhookStatus } from './systemClient';
+import { getPreflightChecks, getRoutes, getSystemStatus, getWebhookStatus } from './systemClient';
+import {
+  createWorkLog,
+  deleteWorkLog,
+  getSessionWorkLogs,
+  getWorkLogs,
+} from './workLogClient';
 
 /**
  * Legacy API namespace object for components that use:
@@ -130,4 +142,10 @@ export const api = {
   getRoutes,
   getWebhookStatus,
   getSystemStatus,
+  getPreflightChecks,
+  // Work Log operations
+  getWorkLogs,
+  getSessionWorkLogs,
+  createWorkLog,
+  deleteWorkLog,
 };

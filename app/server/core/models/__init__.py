@@ -6,6 +6,7 @@ This package contains Pydantic models organized into focused modules:
 - responses.py: API response models
 - domain.py: Core domain/business logic models
 - workflow.py: Workflow execution and history models
+- observability.py: Observability models (task logs, user prompts)
 """
 
 from .domain import (
@@ -74,6 +75,16 @@ from .workflow import (
     WorkflowTrends,
     WorktreeHealthCheck,
 )
+from .observability import (
+    IssueProgress,
+    TaskLog,
+    TaskLogCreate,
+    TaskLogFilters,
+    UserPrompt,
+    UserPromptCreate,
+    UserPromptFilters,
+    UserPromptWithProgress,
+)
 
 __all__ = [
     # Domain models
@@ -136,4 +147,13 @@ __all__ = [
     "WorkflowTemplate",
     "WorkflowTrends",
     "WorktreeHealthCheck",
+    # Observability models
+    "IssueProgress",
+    "TaskLog",
+    "TaskLogCreate",
+    "TaskLogFilters",
+    "UserPrompt",
+    "UserPromptCreate",
+    "UserPromptFilters",
+    "UserPromptWithProgress",
 ]

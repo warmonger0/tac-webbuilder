@@ -194,6 +194,37 @@
     - Troubleshooting workflow status detection or progress calculation
     - Implementing real-time monitoring features or caching strategies
 
+### ADW Cleanup & Maintenance
+- `docs/ADW_CLEANUP_PROCESS.md` [220 lines] - Manual archiving, cleanup scripts, UI changes
+  - Conditions:
+    - Cleaning up closed issue ADW directories
+    - Working with ADW monitor cleanup features
+    - Archiving old workflow states to agents/_archived/
+    - Removing WorkflowDashboard "Current Workflow" tab references
+    - Troubleshooting ADW directory clutter
+    - Understanding cleanup scripts (scripts/cleanup_closed_adws.sh)
+    - Working with Panel 10 (LogPanel) for session tracking
+
+### Observability & Logging Features
+- `.claude/commands/references/observability.md` [~900 tokens] - Quick reference for hook events, pattern learning, cost tracking, work logs
+  - Conditions:
+    - Quick lookup of observability API endpoints
+    - Understanding observability database tables
+    - Working with Panel 10 (Work Log) component
+    - Checking pattern learning status
+    - Cost tracking queries
+- `docs/features/observability-and-logging.md` [566 lines, ~2,500 tokens] - Comprehensive observability documentation
+  - Conditions:
+    - Implementing hook event capture in ADW workflows
+    - Working with pattern learning and detection algorithms
+    - Implementing cost tracking and savings measurement
+    - Troubleshooting pattern learning or tool call tracking
+    - Working with `work_log`, `hook_events`, `operation_patterns`, `tool_calls`, `cost_savings_log` tables
+    - Understanding complete observability architecture
+    - Adding entries to Panel 10 (Work Log) via API or UI
+    - Designing new automation workflows based on detected patterns
+    - Setting up observability for new workflow types
+
 ### Analytics & Insights Features
 - `app_docs/feature-a7c948e2-insights-recommendations.md` - Phase 3D anomaly detection, optimization recommendations, workflow analytics insights, complexity detection, statistical thresholds
   - Conditions:

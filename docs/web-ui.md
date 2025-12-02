@@ -47,7 +47,94 @@ Open your browser to:
 
 ## User Interface
 
-### Main Request Form
+### Navigation Panel System
+
+The web UI features a **10-panel navigation system**, each serving a specific purpose:
+
+#### Panel 1: New Request Panel
+- Create natural language feature requests
+- Preview generated GitHub issues
+- Submit issues with configuration options
+- Project detection and repository selection
+- Pre-flight health checks before submission
+
+#### Panel 2: ADW's Panel
+- **Workflow Catalog** - Browse all available ADW workflows
+  - Recommended workflows (Complete SDLC, Zero Touch Execution, Stepwise Refinement)
+  - Entry point workflows (Plan, Patch)
+  - Phase workflows (Build, Test, Lint, Review, Document, Ship)
+  - Orchestrator workflows (multi-phase combinations)
+  - Automation workflows (triggers, webhooks)
+  - Category filtering and deprecation flags
+- **Current Workflow** - Monitor active workflow execution
+  - Real-time process status
+  - Live output streaming
+  - Debug mode toggle
+  - Process health indicators
+
+#### Panel 3: History Panel
+- View workflow execution history
+- Filter by workflow type, status, date range
+- Inspect workflow details and metrics
+- Execution timelines and duration analysis
+- Cost tracking per workflow
+
+#### Panel 4: API Routes Panel
+- Browse all available REST API endpoints
+- View endpoint documentation
+- Test endpoints with sample requests
+- Monitor API health status
+- Rate limiting and quota information
+
+#### Panel 5: Plans Panel
+- View generated implementation plans
+- Plan versioning and history
+- Approval workflow for plans
+- Plan comparison and diff views
+- Implementation tracking
+
+#### Panel 6: Patterns Panel
+- Detected workflow patterns
+- Pattern occurrence frequency
+- Automation confidence scores
+- Cost savings estimates
+- Pattern characteristics and signatures
+- Review and approve automation candidates
+
+#### Panel 7: Quality / Compliance Panel
+- Code quality metrics
+- Lint results and warnings
+- Type checking status
+- Test coverage reports
+- Security scan results
+- Compliance checks
+
+#### Panel 8: Review Panel
+- Code review status
+- Screenshot comparisons
+- Review comments and feedback
+- Approval workflow
+- Change summaries
+
+#### Panel 9: Data & Structure Panel
+- Database schema visualization
+- Table structures and relationships
+- Data export functionality
+- Query testing interface
+- Migration status
+
+#### Panel 10: Log Panel 🆕
+- **Work log entries** with Twitter-style 280-character summaries
+- **Session tracking** - Link logs to sessions, issues, workflows
+- **Tag management** - Categorize logs with custom tags
+- **Filtering** - Filter by session ID
+- **Pagination** - Browse historical logs
+- **CRUD operations** - Create, view, and delete log entries
+- **Metadata linking** - Connect to chat files, issue numbers, workflow IDs
+
+See [Observability & Logging](features/observability-and-logging.md) for complete documentation on Panel 10 and the observability infrastructure.
+
+### Main Request Form (Panel 1)
 
 The primary interface for creating feature requests.
 

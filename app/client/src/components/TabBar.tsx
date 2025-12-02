@@ -1,6 +1,6 @@
 interface TabBarProps {
-  activeTab: 'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data';
-  onChange: (tab: 'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data') => void;
+  activeTab: 'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data' | 'logs';
+  onChange: (tab: 'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data' | 'logs') => void;
 }
 
 export function TabBar({ activeTab, onChange }: TabBarProps) {
@@ -14,6 +14,7 @@ export function TabBar({ activeTab, onChange }: TabBarProps) {
     { id: 'quality' as const, label: '7. Quality / Compliance Panel' },
     { id: 'review' as const, label: '8. Review Panel' },
     { id: 'data' as const, label: '9. Data & Structure Panel' },
+    { id: 'logs' as const, label: '10. Log Panel' },
   ];
 
   return (

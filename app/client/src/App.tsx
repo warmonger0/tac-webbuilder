@@ -10,18 +10,19 @@ import { PatternsPanel } from './components/PatternsPanel';
 import { QualityPanel } from './components/QualityPanel';
 import { ReviewPanel } from './components/ReviewPanel';
 import { DataPanel } from './components/DataPanel';
+import { LogPanel } from './components/LogPanel';
 
 const queryClient = new QueryClient();
 const ACTIVE_TAB_STORAGE_KEY = 'tac-webbuilder-active-tab';
 
 function App() {
   const [activeTab, setActiveTab] = useState<
-    'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data'
+    'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data' | 'logs'
   >(() => {
     // Load active tab from localStorage on mount
     const savedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-    if (savedTab && ['request', 'workflows', 'history', 'routes', 'plans', 'patterns', 'quality', 'review', 'data'].includes(savedTab)) {
-      return savedTab as 'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data';
+    if (savedTab && ['request', 'workflows', 'history', 'routes', 'plans', 'patterns', 'quality', 'review', 'data', 'logs'].includes(savedTab)) {
+      return savedTab as 'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data' | 'logs';
     }
     return 'request';
   });
@@ -63,6 +64,7 @@ function App() {
           {activeTab === 'quality' && <QualityPanel />}
           {activeTab === 'review' && <ReviewPanel />}
           {activeTab === 'data' && <DataPanel />}
+          {activeTab === 'logs' && <LogPanel />}
         </main>
       </div>
     </QueryClientProvider>

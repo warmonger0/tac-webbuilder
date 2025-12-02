@@ -1,22 +1,31 @@
 # Backend Quick Start
 
 ## Tech Stack
-FastAPI + Python 3.10+ + SQLite + OpenAI/Anthropic APIs + Pydantic
+FastAPI + Python 3.10+ + SQLite/PostgreSQL + OpenAI/Anthropic APIs + Pydantic
 
 ## Key Directories
-- `app/server/core/` - Business logic (13 modules)
-- `app/server/tests/` - Test suite (5 test files)
-- `app/server/server.py` - FastAPI application
-- `app/server/main.py` - Entry point
+- `app/server/routes/` - API route modules (8 files, 36 endpoints)
+- `app/server/services/` - Business logic layer (7+ services)
+- `app/server/repositories/` - Data access layer (3 repositories)
+- `app/server/database/` - Database abstraction (SQLite/PostgreSQL adapters)
+- `app/server/core/` - Core business logic (13 modules)
+- `app/server/tests/` - Test suite (878 test functions across 50 files)
 
-## Core Modules
-- **server.py** - FastAPI app, endpoints
-- **llm_processor.py** - AI model integration
-- **nl_processor.py** - Natural language processing
-- **sql_processor.py** - SQL execution
-- **sql_security.py** - Multi-layer SQL injection prevention
-- **file_processor.py** - CSV/JSON upload handling
-- **data_models.py** - Pydantic models (20+)
+## API Routes (36 Endpoints)
+- **data_routes.py** - File upload, NL→SQL queries, exports
+- **workflow_routes.py** - Workflow management, history, analytics
+- **queue_routes.py** - Multi-phase workflow queue coordination
+- **github_routes.py** - Issue creation, preview, confirmation
+- **system_routes.py** - Health checks, service control, ADW monitoring
+- **work_log_routes.py** - Session logging (Panel 10) - NEW
+- **websocket_routes.py** - Real-time updates
+- **context_review_routes.py** - Context analysis
+
+## Database Support
+- **SQLite** (default) - Zero-config, single-file, development-friendly
+- **PostgreSQL** (production) - Connection pooling, production-ready
+- **Configuration:** Set `DB_TYPE` env var (sqlite | postgresql)
+- **Adapter Pattern:** `database/factory.py` provides unified interface
 
 ## Security Architecture
 **SQL Injection Prevention (4 layers):**
@@ -46,6 +55,15 @@ Always use: `execute_query_safely()`, `validate_identifier()`
 ### Database Schema
 Dynamic schema from uploaded files. Check: `core/file_processor.py`
 
+### Work Log API (Panel 10) - NEW
+- **Routes:** `routes/work_log_routes.py`
+- **Repository:** `repositories/work_log_repository.py`
+- **Endpoints:**
+  - `POST /api/v1/work-log` - Create 280-char session summary
+  - `GET /api/v1/work-log` - List entries (paginated)
+  - `DELETE /api/v1/work-log/{id}` - Delete entry
+- **Quick reference:** `.claude/commands/references/observability.md`
+
 ## Quick Commands
 ```bash
 cd app/server
@@ -58,5 +76,6 @@ uv run pytest tests/test_sql_injection.py -v  # Security tests
 ## When to Load Full Docs
 - **API details:** `docs/api.md` (2,400 tokens)
 - **Architecture:** `docs/architecture.md` (2,300 tokens)
+- **Observability (Work Logs, Pattern Learning):** `.claude/commands/references/observability.md` (900 tokens)
 - **Setup/troubleshooting:** `README.md` (1,300 tokens)
 - **Feature-specific:** Use `conditional_docs.md`

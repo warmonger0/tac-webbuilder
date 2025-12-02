@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { confirmAndPost, getCostEstimate, getPreview, getSystemStatus, submitRequest } from '../api/client';
+import { confirmAndPost, getCostEstimate, getPreflightChecks, getPreview, getSystemStatus, submitRequest } from '../api/client';
 import type { CostEstimate, GitHubIssue, ServiceHealth } from '../types';
 import { useDragAndDrop } from '../hooks/useDragAndDrop';
 import { useStaggeredLoad } from '../hooks/useStaggeredLoad';
@@ -200,8 +200,34 @@ export function useRequestForm(): UseRequestFormReturn {
       return;
     }
 
-    // Pre-flight health check
+    setIsLoading(true);
+    setError(null);
     setHealthWarning(null);
+
+    // PRE-FLIGHT CHECKS: Run BEFORE creating issue
+    try {
+      const preflightResult = await getPreflightChecks(true); // Skip tests for speed
+
+      if (!preflightResult.passed) {
+        // BLOCKING FAILURES - DO NOT SUBMIT
+        const failureMessages = preflightResult.blocking_failures.map(f =>
+          `❌ ${f.check}:\n   ${f.error}\n   💡 Fix: ${f.fix}`
+        ).join('\n\n');
+
+        setError(
+          `Cannot submit request - Pre-flight checks failed:\n\n${failureMessages}\n\n` +
+          `Please fix these issues before submitting.`
+        );
+        setIsLoading(false);
+        return;
+      }
+    } catch (err) {
+      setError(`Pre-flight check error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setIsLoading(false);
+      return;
+    }
+
+    // System health check (warnings only, not blocking)
     try {
       const healthStatus = await getSystemStatus();
       if (healthStatus.overall_status === 'error') {
@@ -227,8 +253,7 @@ export function useRequestForm(): UseRequestFormReturn {
       setHealthWarning('Unable to check system health. Proceeding anyway.');
     }
 
-    setIsLoading(true);
-    setError(null);
+    // Continue with submission (already set isLoading=true and error=null above)
     setSuccessMessage(null);
 
     try {
