@@ -5,15 +5,15 @@ interface TabBarProps {
 
 export function TabBar({ activeTab, onChange }: TabBarProps) {
   const tabs = [
-    { id: 'request' as const, label: 'New Request Panel' },
-    { id: 'workflows' as const, label: "ADW's Panel" },
-    { id: 'history' as const, label: 'History Panel' },
-    { id: 'routes' as const, label: 'API Routes Panel' },
-    { id: 'plans' as const, label: 'Plans Panel' },
-    { id: 'patterns' as const, label: 'Patterns Panel' },
-    { id: 'quality' as const, label: 'Quality / Compliance Panel' },
-    { id: 'review' as const, label: 'Review Panel' },
-    { id: 'data' as const, label: 'Data & Structure Panel' },
+    { id: 'request' as const, label: '1. New Request Panel' },
+    { id: 'workflows' as const, label: "2. ADW's Panel" },
+    { id: 'history' as const, label: '3. History Panel' },
+    { id: 'routes' as const, label: '4. API Routes Panel' },
+    { id: 'plans' as const, label: '5. Plans Panel' },
+    { id: 'patterns' as const, label: '6. Patterns Panel' },
+    { id: 'quality' as const, label: '7. Quality / Compliance Panel' },
+    { id: 'review' as const, label: '8. Review Panel' },
+    { id: 'data' as const, label: '9. Data & Structure Panel' },
   ];
 
   return (
