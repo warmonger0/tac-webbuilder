@@ -20,6 +20,13 @@ export function AdwMonitorCard() {
   const pollingState = useReliablePolling<{ workflows: AdwWorkflowStatus[]; summary: AdwMonitorSummary }>({
     fetchFn: getAdwMonitor,
     onSuccess: (data) => {
+      // DEBUG: Log received data
+      console.log('[AdwMonitorCard] Received data:', {
+        totalWorkflows: data.workflows.length,
+        summary: data.summary,
+        runningCount: data.workflows.filter(w => w.status === 'running').length
+      });
+
       setWorkflows(data.workflows);
       setSummary(data.summary);
       setError(null);
@@ -188,12 +195,10 @@ export function AdwMonitorCard() {
     );
   }
 
-  // Get current workflow (first RUNNING workflow, not just first in list)
-  // Priority: running > paused > most recent (completed/failed)
-  // This ensures we always show something when workflows exist
+  // Get current workflow (first RUNNING or PAUSED workflow only)
+  // Only show active workflows - completed/failed workflows are historical
   const currentWorkflow = workflows.find(w => w.status === 'running')
     || workflows.find(w => w.status === 'paused')
-    || workflows[0] // Fall back to most recent workflow
     || null;
 
   // Determine colors based on workflow status
