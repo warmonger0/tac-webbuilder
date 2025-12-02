@@ -193,7 +193,7 @@ export function RequestFormCore() {
           </div>
 
           {/* Right Column - Hopper Queue */}
-          <div className="lg:flex-grow lg:mr-4">
+          <div className="lg:flex-grow">
             {showHopperQueue ? (
               <ZteHopperQueueCard />
             ) : (
