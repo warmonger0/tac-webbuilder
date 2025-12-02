@@ -189,10 +189,11 @@ export function AdwMonitorCard() {
   }
 
   // Get current workflow (first RUNNING workflow, not just first in list)
-  // Filter for running workflows first, then fall back to paused
-  // Don't show completed/failed workflows as "current"
+  // Priority: running > paused > most recent (completed/failed)
+  // This ensures we always show something when workflows exist
   const currentWorkflow = workflows.find(w => w.status === 'running')
     || workflows.find(w => w.status === 'paused')
+    || workflows[0] // Fall back to most recent workflow
     || null;
 
   // Determine colors based on workflow status
