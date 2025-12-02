@@ -203,7 +203,7 @@ const workflowCatalog: WorkflowType[] = [
 ];
 
 export function AdwWorkflowCatalog() {
-  const [activeTab, setActiveTab] = useState<CatalogTab>('workflows');
+  const [activeTab, setActiveTab] = useState<CatalogTab>('current');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showDeprecated, setShowDeprecated] = useState(false);
 
