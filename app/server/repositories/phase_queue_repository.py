@@ -333,7 +333,10 @@ class PhaseQueueRepository:
                     (config_key,)
                 )
                 row = cursor.fetchone()
-                return row[0] if row else None
+                # Handle both tuple (SQLite) and dict (PostgreSQL RealDictCursor) formats
+                if row:
+                    return row["config_value"] if isinstance(row, dict) else row[0]
+                return None
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to get config value: {str(e)}")

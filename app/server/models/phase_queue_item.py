@@ -72,7 +72,11 @@ class PhaseQueueItem:
     @classmethod
     def from_db_row(cls, row) -> "PhaseQueueItem":
         """Create PhaseQueueItem from database row"""
-        phase_data = json.loads(row["phase_data"]) if row["phase_data"] else {}
+        # Handle both string (SQLite) and dict (PostgreSQL RealDictCursor) formats
+        if row["phase_data"]:
+            phase_data = json.loads(row["phase_data"]) if isinstance(row["phase_data"], str) else row["phase_data"]
+        else:
+            phase_data = {}
 
         # Safely access optional fields (may not exist in older database schemas)
         def safe_get(key, default=None):
