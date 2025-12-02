@@ -1,7 +1,4 @@
 import { useState } from 'react';
-import { CurrentWorkflowCard } from './CurrentWorkflowCard';
-
-type CatalogTab = 'workflows' | 'current';
 
 interface WorkflowType {
   id: string;
@@ -203,7 +200,6 @@ const workflowCatalog: WorkflowType[] = [
 ];
 
 export function AdwWorkflowCatalog() {
-  const [activeTab, setActiveTab] = useState<CatalogTab>('current');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showDeprecated, setShowDeprecated] = useState(false);
 
@@ -245,7 +241,7 @@ export function AdwWorkflowCatalog() {
       <div className="relative border-b border-slate-700/50">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10"></div>
         <div className="relative px-4 py-3">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="relative w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.5)]">
                 <div className="absolute -inset-1 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-lg blur-md animate-pulse"></div>
@@ -255,198 +251,162 @@ export function AdwWorkflowCatalog() {
               </div>
               <div>
                 <h2 className="text-lg font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-                  ADW Panel
+                  Workflow Catalog
                 </h2>
-                <p className="text-slate-400 text-xs">Workflows and monitoring</p>
+                <p className="text-slate-400 text-xs">Available ADW workflows</p>
               </div>
             </div>
-            {activeTab === 'workflows' && (
-              <label className="flex items-center text-sm text-slate-400">
-                <input
-                  type="checkbox"
-                  checked={showDeprecated}
-                  onChange={(e) => setShowDeprecated(e.target.checked)}
-                  className="mr-2 rounded"
-                />
-                Show deprecated
-              </label>
-            )}
-          </div>
-          {/* Tab Navigation */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('workflows')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'workflows'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
-                  : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
-              }`}
-            >
-              📚 Workflow Catalog
-            </button>
-            <button
-              onClick={() => setActiveTab('current')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'current'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
-                  : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
-              }`}
-            >
-              ⚡ Current Workflow
-            </button>
+            <label className="flex items-center text-sm text-slate-400">
+              <input
+                type="checkbox"
+                checked={showDeprecated}
+                onChange={(e) => setShowDeprecated(e.target.checked)}
+                className="mr-2 rounded"
+              />
+              Show deprecated
+            </label>
           </div>
         </div>
       </div>
 
-      {/* Tab Content */}
-      {activeTab === 'workflows' && (
-        <>
-          {/* Category Tabs */}
-          <div className="px-4 py-3 border-b border-slate-700/50 bg-slate-800/50">
-            <div className="flex flex-wrap gap-2">
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    selectedCategory === cat.id
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
-                      : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
-                  }`}
+      {/* Category Tabs */}
+      <div className="px-4 py-3 border-b border-slate-700/50 bg-slate-800/50">
+        <div className="flex flex-wrap gap-2">
+          {categories.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                selectedCategory === cat.id
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
+                  : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
+              }`}
+            >
+              {cat.icon} {cat.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Workflow Cards */}
+      <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
+        {/* Recommended Section */}
+        {recommendedWorkflows.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-emerald-400 font-semibold text-sm mb-3 flex items-center gap-2">
+              <span className="text-lg">⭐</span> RECOMMENDED WORKFLOWS
+            </h3>
+            <div className="grid grid-cols-1 gap-3">
+              {recommendedWorkflows.map(workflow => (
+                <div
+                  key={workflow.id}
+                  className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg border border-emerald-500/30 p-4 hover:border-emerald-500/50 transition-all shadow-lg hover:shadow-emerald-500/10"
                 >
-                  {cat.icon} {cat.label}
-                </button>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-white font-semibold">{workflow.name}</h4>
+                        <span className={`text-xs px-2 py-0.5 rounded border ${getCategoryBadgeColor(workflow.category)}`}>
+                          {workflow.category}
+                        </span>
+                      </div>
+                      <p className="text-slate-300 text-sm mb-2">{workflow.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {workflow.phases.map(phase => (
+                      <span key={phase} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded border border-blue-500/30">
+                        {phase}
+                      </span>
+                    ))}
+                  </div>
+
+                  {workflow.flags && workflow.flags.length > 0 && (
+                    <div className="mb-2">
+                      <span className="text-slate-400 text-xs">Optional flags: </span>
+                      <span className="text-slate-300 text-xs font-mono">{workflow.flags.join(' ')}</span>
+                    </div>
+                  )}
+
+                  <div className="bg-slate-950/50 rounded p-2 border border-slate-700/50">
+                    <code className="text-emerald-400 text-xs font-mono">{workflow.usage}</code>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
+        )}
 
-          {/* Workflow Cards */}
-          <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
-            {/* Recommended Section */}
-            {recommendedWorkflows.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-emerald-400 font-semibold text-sm mb-3 flex items-center gap-2">
-                  <span className="text-lg">⭐</span> RECOMMENDED WORKFLOWS
-                </h3>
-                <div className="grid grid-cols-1 gap-3">
-                  {recommendedWorkflows.map(workflow => (
-                    <div
-                      key={workflow.id}
-                      className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg border border-emerald-500/30 p-4 hover:border-emerald-500/50 transition-all shadow-lg hover:shadow-emerald-500/10"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="text-white font-semibold">{workflow.name}</h4>
-                            <span className={`text-xs px-2 py-0.5 rounded border ${getCategoryBadgeColor(workflow.category)}`}>
-                              {workflow.category}
-                            </span>
-                          </div>
-                          <p className="text-slate-300 text-sm mb-2">{workflow.description}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-1.5 mb-2">
-                        {workflow.phases.map(phase => (
-                          <span key={phase} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded border border-blue-500/30">
-                            {phase}
+        {/* Other Workflows Section */}
+        {otherWorkflows.length > 0 && (
+          <div>
+            <h3 className="text-slate-400 font-semibold text-sm mb-3 flex items-center gap-2">
+              {recommendedWorkflows.length > 0 ? 'OTHER WORKFLOWS' : 'WORKFLOWS'}
+            </h3>
+            <div className="grid grid-cols-1 gap-3">
+              {otherWorkflows.map(workflow => (
+                <div
+                  key={workflow.id}
+                  className={`bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg border p-4 transition-all ${
+                    workflow.deprecated
+                      ? 'border-red-500/30 opacity-60 hover:opacity-80'
+                      : 'border-slate-700/50 hover:border-slate-600'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-white font-semibold">{workflow.name}</h4>
+                        <span className={`text-xs px-2 py-0.5 rounded border ${getCategoryBadgeColor(workflow.category)}`}>
+                          {workflow.category}
+                        </span>
+                        {workflow.deprecated && (
+                          <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
+                            DEPRECATED
                           </span>
-                        ))}
+                        )}
                       </div>
-
-                      {workflow.flags && workflow.flags.length > 0 && (
-                        <div className="mb-2">
-                          <span className="text-slate-400 text-xs">Optional flags: </span>
-                          <span className="text-slate-300 text-xs font-mono">{workflow.flags.join(' ')}</span>
-                        </div>
-                      )}
-
-                      <div className="bg-slate-950/50 rounded p-2 border border-slate-700/50">
-                        <code className="text-emerald-400 text-xs font-mono">{workflow.usage}</code>
-                      </div>
+                      <p className="text-slate-300 text-sm mb-2">{workflow.description}</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                  </div>
 
-            {/* Other Workflows Section */}
-            {otherWorkflows.length > 0 && (
-              <div>
-                <h3 className="text-slate-400 font-semibold text-sm mb-3 flex items-center gap-2">
-                  {recommendedWorkflows.length > 0 ? 'OTHER WORKFLOWS' : 'WORKFLOWS'}
-                </h3>
-                <div className="grid grid-cols-1 gap-3">
-                  {otherWorkflows.map(workflow => (
-                    <div
-                      key={workflow.id}
-                      className={`bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg border p-4 transition-all ${
-                        workflow.deprecated
-                          ? 'border-red-500/30 opacity-60 hover:opacity-80'
-                          : 'border-slate-700/50 hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="text-white font-semibold">{workflow.name}</h4>
-                            <span className={`text-xs px-2 py-0.5 rounded border ${getCategoryBadgeColor(workflow.category)}`}>
-                              {workflow.category}
-                            </span>
-                            {workflow.deprecated && (
-                              <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
-                                DEPRECATED
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-slate-300 text-sm mb-2">{workflow.description}</p>
-                        </div>
-                      </div>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {workflow.phases.map(phase => (
+                      <span key={phase} className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded border border-purple-500/30">
+                        {phase}
+                      </span>
+                    ))}
+                  </div>
 
-                      <div className="flex flex-wrap gap-1.5 mb-2">
-                        {workflow.phases.map(phase => (
-                          <span key={phase} className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded border border-purple-500/30">
-                            {phase}
-                          </span>
-                        ))}
-                      </div>
-
-                      {workflow.flags && workflow.flags.length > 0 && (
-                        <div className="mb-2">
-                          <span className="text-slate-400 text-xs">Optional flags: </span>
-                          <span className="text-slate-300 text-xs font-mono">{workflow.flags.join(' ')}</span>
-                        </div>
-                      )}
-
-                      <div className="bg-slate-950/50 rounded p-2 border border-slate-700/50">
-                        <code className="text-cyan-400 text-xs font-mono">{workflow.usage}</code>
-                      </div>
+                  {workflow.flags && workflow.flags.length > 0 && (
+                    <div className="mb-2">
+                      <span className="text-slate-400 text-xs">Optional flags: </span>
+                      <span className="text-slate-300 text-xs font-mono">{workflow.flags.join(' ')}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                  )}
 
-            {filteredWorkflows.length === 0 && (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-slate-500/20 to-slate-500/20 rounded-2xl flex items-center justify-center">
-                  <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <div className="bg-slate-950/50 rounded p-2 border border-slate-700/50">
+                    <code className="text-cyan-400 text-xs font-mono">{workflow.usage}</code>
+                  </div>
                 </div>
-                <p className="text-lg font-semibold text-slate-300 mb-1">No workflows found</p>
-                <p className="text-slate-500 text-sm">Try selecting a different category or enabling deprecated workflows</p>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
-        </>
-      )}
+        )}
 
-      {activeTab === 'current' && (
-        <div className="flex-1 overflow-y-auto p-4">
-          <CurrentWorkflowCard />
-        </div>
-      )}
+        {filteredWorkflows.length === 0 && (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-slate-500/20 to-slate-500/20 rounded-2xl flex items-center justify-center">
+              <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-lg font-semibold text-slate-300 mb-1">No workflows found</p>
+            <p className="text-slate-500 text-sm">Try selecting a different category or enabling deprecated workflows</p>
+          </div>
+        )}
+      </div>
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {

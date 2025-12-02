@@ -4,7 +4,7 @@ import { RequestFormPreview } from './RequestFormPreview';
 import { ConfirmDialog } from './ConfirmDialog';
 import { SystemStatusPanel } from './SystemStatusPanel';
 import { ZteHopperQueueCard } from './ZteHopperQueueCard';
-import { AdwWorkflowCatalog } from './AdwWorkflowCatalog';
+import { CurrentWorkflowCard } from './CurrentWorkflowCard';
 import { FileUploadSection } from './request-form/FileUploadSection';
 import { ContextAnalysisButton } from './context-review/ContextAnalysisButton';
 import { ContextReviewPanel } from './context-review/ContextReviewPanel';
@@ -36,7 +36,6 @@ export function RequestFormCore() {
     healthWarning,
 
     // Staggered loading
-    showAdwMonitor,
     showHopperQueue,
 
     // Drag and drop
@@ -205,16 +204,16 @@ export function RequestFormCore() {
         </div>
 
         {/* Second Row: System Status & Current Workflow */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+        <div className="flex flex-col lg:flex-row gap-4 items-stretch">
           {/* System Status */}
-          <div className="lg:col-span-2 flex">
+          <div className="lg:w-1/2 lg:flex-shrink-0">
             <SystemStatusPanel />
           </div>
 
-          {/* ADW Workflow Catalog */}
-          <div className="lg:col-span-1 flex">
-            {showAdwMonitor ? (
-              <AdwWorkflowCatalog />
+          {/* Current Workflow */}
+          <div className="lg:flex-grow">
+            {showHopperQueue ? (
+              <CurrentWorkflowCard />
             ) : (
               <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 flex items-center justify-center min-h-[200px]">
                 <div className="text-slate-500 text-xs animate-pulse">●</div>
