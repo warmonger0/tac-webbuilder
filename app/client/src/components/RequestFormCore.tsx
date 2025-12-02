@@ -4,7 +4,7 @@ import { RequestFormPreview } from './RequestFormPreview';
 import { ConfirmDialog } from './ConfirmDialog';
 import { SystemStatusPanel } from './SystemStatusPanel';
 import { ZteHopperQueueCard } from './ZteHopperQueueCard';
-import { AdwMonitorCard } from './AdwMonitorCard';
+import { AdwWorkflowCatalog } from './AdwWorkflowCatalog';
 import { FileUploadSection } from './request-form/FileUploadSection';
 import { ContextAnalysisButton } from './context-review/ContextAnalysisButton';
 import { ContextReviewPanel } from './context-review/ContextReviewPanel';
@@ -211,10 +211,10 @@ export function RequestFormCore() {
             <SystemStatusPanel />
           </div>
 
-          {/* Current Workflow */}
+          {/* ADW Workflow Catalog */}
           <div className="lg:col-span-1 flex">
             {showAdwMonitor ? (
-              <AdwMonitorCard />
+              <AdwWorkflowCatalog />
             ) : (
               <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 flex items-center justify-center min-h-[200px]">
                 <div className="text-slate-500 text-xs animate-pulse">●</div>
