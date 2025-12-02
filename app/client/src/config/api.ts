@@ -41,7 +41,7 @@ export const apiConfig = {
     getUrl: (path: string, protocol?: string, host?: string) => {
       const wsProtocol = protocol || (window.location.protocol === 'https:' ? 'wss:' : 'ws:');
       const wsHost = host || window.location.hostname;
-      return `${wsProtocol}//${wsHost}:${BACKEND_PORT}${path}`;
+      return `${wsProtocol}//${wsHost}:${BACKEND_PORT}${API_BASE_PATH}${path}`;
     },
     workflows: () => apiConfig.websocket.getUrl('/ws/workflows'),
     routes: () => apiConfig.websocket.getUrl('/ws/routes'),

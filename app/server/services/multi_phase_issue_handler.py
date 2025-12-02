@@ -149,7 +149,7 @@ class MultiPhaseIssueHandler:
                 phase_data={
                     "title": phase.title,
                     "content": phase.content,
-                    "externalDocs": phase.externalDocs or [],
+                    "externalDocs": phase.external_docs or [],
                     "total_phases": len(request.phases)  # Store for just-in-time creation
                 },
                 depends_on_phase=depends_on_phase,
@@ -206,11 +206,11 @@ class MultiPhaseIssueHandler:
 {phase.content}
 
 """
-        if phase.externalDocs:
+        if phase.external_docs:
             phase_body += f"""
 ## Referenced Documents
 
-{chr(10).join(f'- `{doc}`' for doc in phase.externalDocs)}
+{chr(10).join(f'- `{doc}`' for doc in phase.external_docs)}
 
 """
 

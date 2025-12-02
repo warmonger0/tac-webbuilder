@@ -45,8 +45,10 @@ class PhaseQueueRepository:
             with self.adapter.get_connection() as conn:
                 # Get next queue_position (max + 1)
                 cursor = conn.cursor()
-                cursor.execute("SELECT COALESCE(MAX(queue_position), 0) + 1 FROM phase_queue")
-                next_position = cursor.fetchone()[0]
+                cursor.execute("SELECT COALESCE(MAX(queue_position), 0) + 1 AS next_pos FROM phase_queue")
+                row = cursor.fetchone()
+                # Handle both tuple (SQLite) and dict-like (PostgreSQL) row formats
+                next_position = row['next_pos'] if isinstance(row, dict) else row[0]
 
                 ph = self.adapter.placeholder()
                 cursor.execute(
@@ -74,6 +76,9 @@ class PhaseQueueRepository:
                 )
         except Exception as e:
             logger.error(f"[ERROR] Failed to insert phase: {str(e)}")
+            logger.error(f"[ERROR] Exception type: {type(e).__name__}")
+            logger.error(f"[ERROR] Exception repr: {repr(e)}")
+            logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
             raise
 
     def find_by_id(self, queue_id: str) -> PhaseQueueItem | None:
