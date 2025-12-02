@@ -203,6 +203,16 @@ def get_adw_state(adw_id: str) -> dict:
         logger.error(f"Error reading ADW state for {adw_id}: {e}")
         return {}
 
+def get_adw_monitor_data() -> dict:
+    """
+    Get ADW monitor data aggregated from all workflows.
+
+    Returns:
+        dict: ADW monitor data with workflows, summary, and last_updated
+    """
+    from core.adw_monitor import aggregate_adw_monitor_data
+    return aggregate_adw_monitor_data()
+
 # API VERSION ENDPOINT
 # This endpoint is not versioned to allow clients to discover available API versions
 @app.get("/api/version")
@@ -244,7 +254,7 @@ github_poster = GitHubPoster()
 queue_routes.init_webhook_routes(phase_queue_service, github_poster)
 app.include_router(queue_routes.webhook_router, prefix="/api/v1")
 
-websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state)
+websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state, get_adw_monitor_data)
 app.include_router(websocket_routes.router, prefix="/api/v1")
 
 if __name__ == "__main__":

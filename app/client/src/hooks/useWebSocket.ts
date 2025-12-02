@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { getRoutes, getWorkflowHistory, listWorkflows } from '../api/client';
-import type { HistoryAnalytics, Route, WorkflowExecution, WorkflowHistoryItem } from '../types';
+import { getAdwMonitor, getRoutes, getWorkflowHistory, listWorkflows } from '../api/client';
+import type { AdwMonitorSummary, AdwWorkflowStatus, HistoryAnalytics, Route, WorkflowExecution, WorkflowHistoryItem } from '../types';
 import { useReliableWebSocket } from './useReliableWebSocket';
 import { apiConfig } from '../config/api';
 import { intervals } from '../config/intervals';
@@ -189,6 +189,63 @@ export function useADWStateWebSocket(adwId: string | null) {
     isConnected: connectionState.isConnected,
     connectionQuality: connectionState.connectionQuality,
     lastUpdated: connectionState.lastUpdated,
+    reconnectAttempts: connectionState.reconnectAttempts,
+  };
+}
+
+interface ADWMonitorWebSocketMessage {
+  type: 'adw_monitor_update';
+  data: {
+    workflows: AdwWorkflowStatus[];
+    summary: AdwMonitorSummary;
+    last_updated: string;
+  };
+}
+
+export function useADWMonitorWebSocket() {
+  const [workflows, setWorkflows] = useState<AdwWorkflowStatus[]>([]);
+  const [summary, setSummary] = useState<AdwMonitorSummary>({
+    total: 0,
+    running: 0,
+    completed: 0,
+    failed: 0,
+    paused: 0,
+  });
+  const [lastUpdated, setLastUpdated] = useState<string>('');
+
+  const wsUrl = apiConfig.websocket.adwMonitor();
+
+  const connectionState = useReliableWebSocket<
+    ADWMonitorWebSocketMessage['data'],
+    ADWMonitorWebSocketMessage
+  >({
+    url: wsUrl,
+    queryKey: ['adw-monitor'],
+    queryFn: getAdwMonitor,
+    onMessage: (message: any) => {
+      // Handle both WebSocket message format and HTTP polling response format
+      if (message.type === 'adw_monitor_update') {
+        // WebSocket message format
+        setWorkflows(message.data.workflows);
+        setSummary(message.data.summary);
+        setLastUpdated(message.data.last_updated);
+        console.log('[WS] Received ADW monitor update:', message.data.workflows.length, 'workflows');
+      } else if (message.workflows) {
+        // HTTP polling response format
+        setWorkflows(message.workflows);
+        setSummary(message.summary);
+        setLastUpdated(message.last_updated);
+        console.log('[HTTP] Received ADW monitor update:', message.workflows.length, 'workflows');
+      }
+    },
+  });
+
+  return {
+    workflows,
+    summary,
+    lastUpdated,
+    isConnected: connectionState.isConnected,
+    connectionQuality: connectionState.connectionQuality,
     reconnectAttempts: connectionState.reconnectAttempts,
   };
 }

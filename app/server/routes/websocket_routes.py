@@ -41,7 +41,7 @@ async def _handle_websocket_connection(websocket: WebSocket, manager, initial_da
         manager.disconnect(websocket)
 
 
-def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func, get_workflow_history_data_func, get_adw_state_func):
+def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func, get_workflow_history_data_func, get_adw_state_func, get_adw_monitor_data_func):
     """
     Initialize WebSocket routes with service dependencies.
 
@@ -93,3 +93,13 @@ def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func
             "data": state_data
         }
         await _handle_websocket_connection(websocket, manager, initial_data, "ADW state")
+
+    @router.websocket("/ws/adw-monitor")
+    async def websocket_adw_monitor(websocket: WebSocket) -> None:
+        """WebSocket endpoint for real-time ADW monitor updates"""
+        monitor_data = get_adw_monitor_data_func()
+        initial_data = {
+            "type": "adw_monitor_update",
+            "data": monitor_data
+        }
+        await _handle_websocket_connection(websocket, manager, initial_data, "ADW monitor")

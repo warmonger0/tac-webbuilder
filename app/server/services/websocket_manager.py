@@ -56,6 +56,7 @@ class ConnectionManager:
         self.last_workflow_state: dict | None = None
         self.last_routes_state: dict | None = None
         self.last_history_state: dict | None = None
+        self.last_adw_monitor_state: str | None = None
 
     async def connect(self, websocket: WebSocket) -> None:
         """

@@ -32,6 +32,7 @@ class BackgroundTaskManager:
         workflow_watch_interval: float = 10.0,
         routes_watch_interval: float = 10.0,
         history_watch_interval: float = 10.0,
+        adw_monitor_watch_interval: float = 2.0,
     ):
         """
         Initialize the BackgroundTaskManager
@@ -42,12 +43,14 @@ class BackgroundTaskManager:
             workflow_watch_interval: Seconds between workflow checks (default: 10)
             routes_watch_interval: Seconds between routes checks (default: 10)
             history_watch_interval: Seconds between history checks (default: 10)
+            adw_monitor_watch_interval: Seconds between ADW monitor checks (default: 2)
         """
         self.websocket_manager = websocket_manager
         self.workflow_service = workflow_service
         self.workflow_watch_interval = workflow_watch_interval
         self.routes_watch_interval = routes_watch_interval
         self.history_watch_interval = history_watch_interval
+        self.adw_monitor_watch_interval = adw_monitor_watch_interval
 
         # Task references for cleanup
         self._tasks: list[asyncio.Task] = []
@@ -78,6 +81,7 @@ class BackgroundTaskManager:
             asyncio.create_task(self.watch_workflows()),
             asyncio.create_task(self.watch_routes()),
             asyncio.create_task(self.watch_workflow_history()),
+            asyncio.create_task(self.watch_adw_monitor()),
         ]
 
         logger.info(
@@ -242,4 +246,53 @@ class BackgroundTaskManager:
 
         except asyncio.CancelledError:
             logger.info("[BACKGROUND_TASKS] Workflow history watcher cancelled")
+            raise  # Re-raise to properly handle cancellation
+
+    async def watch_adw_monitor(self) -> None:
+        """
+        Background task to watch for ADW monitor changes and broadcast updates
+
+        This watcher:
+        - Checks every adw_monitor_watch_interval seconds (default: 2s for real-time feel)
+        - Only broadcasts if there are active WebSocket connections
+        - Only broadcasts if ADW monitor state has changed
+        - Tracks state changes to prevent redundant broadcasts
+        """
+        try:
+            while True:
+                try:
+                    # Only do work if there are active connections
+                    if len(self.websocket_manager.active_connections) > 0:
+                        from core.adw_monitor import aggregate_adw_monitor_data
+
+                        # Get latest ADW monitor data
+                        monitor_data = aggregate_adw_monitor_data()
+
+                        # Convert to JSON for comparison
+                        current_state = json.dumps(monitor_data, sort_keys=True)
+
+                        # Only broadcast if state changed
+                        if current_state != getattr(self.websocket_manager, 'last_adw_monitor_state', None):
+                            self.websocket_manager.last_adw_monitor_state = current_state
+                            await self.websocket_manager.broadcast(
+                                {
+                                    "type": "adw_monitor_update",
+                                    "data": monitor_data,
+                                }
+                            )
+                            logger.debug(
+                                f"[BACKGROUND_TASKS] Broadcasted ADW monitor update to "
+                                f"{len(self.websocket_manager.active_connections)} clients"
+                            )
+
+                    await asyncio.sleep(self.adw_monitor_watch_interval)
+
+                except Exception as e:
+                    logger.error(
+                        f"[BACKGROUND_TASKS] Error in ADW monitor watcher: {e}"
+                    )
+                    await asyncio.sleep(5)  # Back off on error
+
+        except asyncio.CancelledError:
+            logger.info("[BACKGROUND_TASKS] ADW monitor watcher cancelled")
             raise  # Re-raise to properly handle cancellation
