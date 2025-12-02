@@ -5,7 +5,7 @@ import { AdwMonitorCard } from './AdwMonitorCard';
 type AdwPanelTab = 'catalog' | 'current';
 
 export function WorkflowDashboard() {
-  const [activeTab, setActiveTab] = useState<AdwPanelTab>('catalog');
+  const [activeTab, setActiveTab] = useState<AdwPanelTab>('current');
 
   return (
     <div className="space-y-4">
