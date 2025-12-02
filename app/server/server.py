@@ -28,6 +28,7 @@ from routes import (
     queue_routes,
     system_routes,
     websocket_routes,
+    work_log_routes,
     workflow_routes,
 )
 from services.background_tasks import BackgroundTaskManager
@@ -248,6 +249,10 @@ app.include_router(issue_completion_routes.router, prefix="/api/v1")
 
 # Initialize context review routes
 app.include_router(context_review_routes.router, prefix="/api/v1")
+
+# Initialize work log routes
+work_log_routes.init_work_log_routes()
+app.include_router(work_log_routes.router, prefix="/api/v1")
 
 # Initialize webhook routes for workflow completion notifications
 github_poster = GitHubPoster()
