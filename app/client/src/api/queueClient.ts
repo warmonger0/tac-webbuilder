@@ -73,6 +73,7 @@ export interface AdwWorkflowStatus {
   last_error: string | null;
   is_process_active: boolean;
   phases_completed: string[];
+  total_phases: number;
 }
 
 export interface AdwMonitorSummary {

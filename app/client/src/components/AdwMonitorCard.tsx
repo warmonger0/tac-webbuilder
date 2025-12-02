@@ -16,6 +16,7 @@ export function AdwMonitorCard() {
   const [summary, setSummary] = useState<AdwMonitorSummary>({ total: 0, running: 0, completed: 0, failed: 0, paused: 0 });
   const [healthStatus, setHealthStatus] = useState<AdwHealthCheckResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [debugMode, setDebugMode] = useState<boolean>(false);
 
   const pollingState = useReliablePolling<{ workflows: AdwWorkflowStatus[]; summary: AdwMonitorSummary }>({
     fetchFn: getAdwMonitor,
@@ -62,6 +63,23 @@ export function AdwMonitorCard() {
   const formatCost = (cost: number | null) => {
     if (!cost) return '$0.00';
     return `$${cost.toFixed(2)}`;
+  };
+
+  const formatLastUpdated = (timestamp: string | null) => {
+    if (!timestamp) return 'Unknown';
+    try {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffSecs = Math.floor(diffMs / 1000);
+
+      if (diffSecs < 60) return `${diffSecs}s ago`;
+      if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}m ago`;
+      if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)}h ago`;
+      return `${Math.floor(diffSecs / 86400)}d ago`;
+    } catch {
+      return 'Unknown';
+    }
   };
 
   // Workflow phases for the pipeline visualization (imported from config)
@@ -274,14 +292,27 @@ export function AdwMonitorCard() {
                 <p className="text-slate-400 text-xs">{uiText.adwMonitor.currentWorkflowSubtitle}</p>
               </div>
             </div>
-            <ConnectionStatusIndicator
-              isConnected={pollingState.isPolling}
-              connectionQuality={pollingState.connectionQuality}
-              lastUpdated={pollingState.lastUpdated}
-              consecutiveErrors={pollingState.consecutiveErrors}
-              onRetry={pollingState.retry}
-              variant="compact"
-            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDebugMode(!debugMode)}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  debugMode
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
+                    : 'bg-slate-700/50 text-slate-400 border border-slate-600/50 hover:bg-slate-700 hover:text-slate-300'
+                }`}
+                title="Toggle debug mode to see process details and terminal commands"
+              >
+                {debugMode ? '⚙️ Debug' : '⚙️'}
+              </button>
+              <ConnectionStatusIndicator
+                isConnected={pollingState.isPolling}
+                connectionQuality={pollingState.connectionQuality}
+                lastUpdated={pollingState.lastUpdated}
+                consecutiveErrors={pollingState.consecutiveErrors}
+                onRetry={pollingState.retry}
+                variant="compact"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -376,6 +407,21 @@ export function AdwMonitorCard() {
                           }`}></span>
                           {currentWorkflow.status.toUpperCase()}
                         </div>
+                        {/* Process Active Badge - Real-time verification */}
+                        {currentWorkflow.is_process_active ? (
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30"
+                            title="Process is actively running (verified via ps aux)">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                            PROCESS ACTIVE
+                          </div>
+                        ) : currentWorkflow.status === 'running' ? (
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
+                            title="Marked as running but process not detected">
+                            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
+                            NO PROCESS
+                          </div>
+                        ) : null}
+
                         {/* Health Status Badge */}
                         {healthStatus && (
                           <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${
@@ -405,6 +451,92 @@ export function AdwMonitorCard() {
                     )}
                   </div>
                 </div>
+
+                {/* Debug Information Panel */}
+                {debugMode && (
+                  <div className="px-4 py-3 bg-slate-950/50 border-y border-slate-700/50">
+                    <div className="space-y-3">
+                      {/* Status Analysis */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-emerald-400 mb-2 flex items-center gap-2">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Status Verification
+                        </h4>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="bg-slate-800/50 rounded p-2">
+                            <span className="text-slate-400">Process Active:</span>
+                            <span className={`ml-2 font-mono ${currentWorkflow.is_process_active ? 'text-green-400' : 'text-red-400'}`}>
+                              {currentWorkflow.is_process_active ? 'true' : 'false'}
+                            </span>
+                          </div>
+                          <div className="bg-slate-800/50 rounded p-2">
+                            <span className="text-slate-400">Status:</span>
+                            <span className="ml-2 font-mono text-blue-400">{currentWorkflow.status}</span>
+                          </div>
+                          <div className="bg-slate-800/50 rounded p-2">
+                            <span className="text-slate-400">Phases Complete:</span>
+                            <span className="ml-2 font-mono text-purple-400">{currentWorkflow.phases_completed.length}/{currentWorkflow.total_phases}</span>
+                          </div>
+                          <div className="bg-slate-800/50 rounded p-2">
+                            <span className="text-slate-400">Progress:</span>
+                            <span className="ml-2 font-mono text-cyan-400">{currentWorkflow.phase_progress}%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Terminal Commands */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-emerald-400 mb-2 flex items-center gap-2">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Terminal Commands
+                        </h4>
+                        <div className="space-y-1.5">
+                          <div className="bg-slate-900/80 rounded p-2 font-mono text-xs">
+                            <div className="text-slate-500 mb-1"># Check if process is running</div>
+                            <code className="text-emerald-400">ps aux | grep {currentWorkflow.adw_id} | grep -v grep</code>
+                          </div>
+                          <div className="bg-slate-900/80 rounded p-2 font-mono text-xs">
+                            <div className="text-slate-500 mb-1"># View workflow state</div>
+                            <code className="text-cyan-400">cat agents/{currentWorkflow.adw_id}/adw_state.json | jq</code>
+                          </div>
+                          {currentWorkflow.issue_number && (
+                            <div className="bg-slate-900/80 rounded p-2 font-mono text-xs">
+                              <div className="text-slate-500 mb-1"># Check GitHub issue status</div>
+                              <code className="text-purple-400">gh issue view {currentWorkflow.issue_number}</code>
+                            </div>
+                          )}
+                          <div className="bg-slate-900/80 rounded p-2 font-mono text-xs">
+                            <div className="text-slate-500 mb-1"># Check worktree</div>
+                            <code className="text-yellow-400">ls -la trees/{currentWorkflow.adw_id}/</code>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Phase Directories */}
+                      {currentWorkflow.phases_completed.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-emerald-400 mb-2 flex items-center gap-2">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                            </svg>
+                            Completed Phase Directories
+                          </h4>
+                          <div className="flex flex-wrap gap-1.5">
+                            {currentWorkflow.phases_completed.map(phase => (
+                              <div key={phase} className="px-2 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded text-xs text-emerald-300 font-mono">
+                                {phase}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Animated Pipeline Visualization - VoltAgent Style */}
                 <div className="px-4 py-6 relative z-10">
@@ -774,12 +906,23 @@ export function AdwMonitorCard() {
                   {/* Progress Info - Below the circle */}
                   <div className="mt-4 pt-4 border-t border-slate-700/50 flex items-center justify-between text-sm">
                       <div className="flex items-center gap-4">
-                        {currentWorkflow.duration_seconds !== null && (
+                        {/* Last Activity / Start Time */}
+                        {currentWorkflow.start_time && (
                           <div className="flex items-center gap-1.5">
                             <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span className="text-slate-300">{formatDuration(currentWorkflow.duration_seconds)}</span>
+                            <span className="text-slate-300">
+                              {currentWorkflow.status === 'running' ? 'Started' : 'Last active'} {formatLastUpdated(currentWorkflow.start_time)}
+                            </span>
+                          </div>
+                        )}
+                        {currentWorkflow.duration_seconds !== null && (
+                          <div className="flex items-center gap-1.5">
+                            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span className="text-slate-300">{formatDuration(currentWorkflow.duration_seconds)} elapsed</span>
                           </div>
                         )}
                         {currentWorkflow.error_count > 0 && (

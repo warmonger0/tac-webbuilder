@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getAdwMonitor, getRoutes, getWorkflowHistory, listWorkflows } from '../api/client';
-import type { AdwMonitorSummary, AdwWorkflowStatus, HistoryAnalytics, Route, WorkflowExecution, WorkflowHistoryItem } from '../types';
+import type { AdwMonitorSummary, AdwWorkflowStatus } from '../api/client';
+import type { HistoryAnalytics, Route, WorkflowExecution, WorkflowHistoryItem } from '../types';
 import { useReliableWebSocket } from './useReliableWebSocket';
 import { apiConfig } from '../config/api';
 import { intervals } from '../config/intervals';
