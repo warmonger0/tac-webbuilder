@@ -38,35 +38,68 @@ class ContextReviewRepository:
             with self.adapter.get_connection() as conn:
                 cursor = conn.cursor()
                 ph = self.adapter.placeholder()
+                db_type = self.adapter.get_db_type()
 
-                cursor.execute(
-                    f"""
-                    INSERT INTO context_reviews (
-                        workflow_id, issue_number, change_description, project_path,
-                        analysis_timestamp, analysis_duration_seconds, agent_cost,
-                        status, result
+                # PostgreSQL requires RETURNING clause to get inserted ID
+                # Note: PostgreSQL adapter uses RealDictCursor, so rows are dicts
+                if db_type == "postgresql":
+                    cursor.execute(
+                        f"""
+                        INSERT INTO context_reviews (
+                            workflow_id, issue_number, change_description, project_path,
+                            analysis_timestamp, analysis_duration_seconds, agent_cost,
+                            status, result
+                        )
+                        VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                        RETURNING id
+                        """,
+                        (
+                            review.workflow_id,
+                            review.issue_number,
+                            review.change_description,
+                            review.project_path,
+                            review.analysis_timestamp or datetime.now(),
+                            review.analysis_duration_seconds,
+                            review.agent_cost,
+                            review.status,
+                            review.result,
+                        ),
                     )
-                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
-                    """,
-                    (
-                        review.workflow_id,
-                        review.issue_number,
-                        review.change_description,
-                        review.project_path,
-                        review.analysis_timestamp or datetime.now(),
-                        review.analysis_duration_seconds,
-                        review.agent_cost,
-                        review.status,
-                        review.result,
-                    ),
-                )
+                    result = cursor.fetchone()
+                    review_id = result["id"]  # Use column name for RealDictCursor
+                else:  # SQLite
+                    cursor.execute(
+                        f"""
+                        INSERT INTO context_reviews (
+                            workflow_id, issue_number, change_description, project_path,
+                            analysis_timestamp, analysis_duration_seconds, agent_cost,
+                            status, result
+                        )
+                        VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                        """,
+                        (
+                            review.workflow_id,
+                            review.issue_number,
+                            review.change_description,
+                            review.project_path,
+                            review.analysis_timestamp or datetime.now(),
+                            review.analysis_duration_seconds,
+                            review.agent_cost,
+                            review.status,
+                            review.result,
+                        ),
+                    )
+                    review_id = cursor.lastrowid
 
-                review_id = cursor.lastrowid
                 logger.info(f"[DB] Created context review {review_id}")
                 return review_id
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to create context review: {e}")
+            logger.error(f"[ERROR] Exception type: {type(e)}")
+            logger.error(f"[ERROR] Exception args: {e.args}")
+            import traceback
+            logger.error(f"[ERROR] Traceback: {traceback.format_exc()}")
             raise
 
     def get_review(self, review_id: int) -> ContextReview | None:
@@ -165,26 +198,53 @@ class ContextReviewRepository:
             with self.adapter.get_connection() as conn:
                 cursor = conn.cursor()
                 ph = self.adapter.placeholder()
+                db_type = self.adapter.get_db_type()
 
                 for suggestion in suggestions:
-                    cursor.execute(
-                        f"""
-                        INSERT INTO context_suggestions (
-                            review_id, suggestion_type, suggestion_text,
-                            confidence, priority, rationale
+                    # PostgreSQL requires RETURNING clause to get inserted ID
+                    # Note: PostgreSQL adapter uses RealDictCursor, so rows are dicts
+                    if db_type == "postgresql":
+                        cursor.execute(
+                            f"""
+                            INSERT INTO context_suggestions (
+                                review_id, suggestion_type, suggestion_text,
+                                confidence, priority, rationale
+                            )
+                            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                            RETURNING id
+                            """,
+                            (
+                                suggestion.review_id,
+                                suggestion.suggestion_type,
+                                suggestion.suggestion_text,
+                                suggestion.confidence,
+                                suggestion.priority,
+                                suggestion.rationale,
+                            ),
                         )
-                        VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
-                        """,
-                        (
-                            suggestion.review_id,
-                            suggestion.suggestion_type,
-                            suggestion.suggestion_text,
-                            suggestion.confidence,
-                            suggestion.priority,
-                            suggestion.rationale,
-                        ),
-                    )
-                    suggestion_ids.append(cursor.lastrowid)
+                        result = cursor.fetchone()
+                        suggestion_id = result["id"]  # Use column name for RealDictCursor
+                    else:  # SQLite
+                        cursor.execute(
+                            f"""
+                            INSERT INTO context_suggestions (
+                                review_id, suggestion_type, suggestion_text,
+                                confidence, priority, rationale
+                            )
+                            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                            """,
+                            (
+                                suggestion.review_id,
+                                suggestion.suggestion_type,
+                                suggestion.suggestion_text,
+                                suggestion.confidence,
+                                suggestion.priority,
+                                suggestion.rationale,
+                            ),
+                        )
+                        suggestion_id = cursor.lastrowid
+
+                    suggestion_ids.append(suggestion_id)
 
                 logger.info(f"[DB] Created {len(suggestion_ids)} suggestions")
                 return suggestion_ids
@@ -312,7 +372,8 @@ class ContextReviewRepository:
                         """,
                         (cache_key, result),
                     )
-                    cache_id = cursor.fetchone()[0]
+                    row = cursor.fetchone()
+                    cache_id = row["id"]  # Use column name for RealDictCursor
                 else:  # SQLite
                     cursor.execute(
                         f"""
