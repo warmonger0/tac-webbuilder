@@ -27,9 +27,9 @@ def get_history_analytics() -> dict:
             - workflows_by_status: Count by status
             - avg_cost: Average cost per workflow
             - total_cost: Total cost across all workflows
-            - avg_cost_per_completion: Average cost per successfully completed workflow
-            - cost_trend_7day: 7-day cost trend percentage (positive = increasing)
-            - cost_trend_30day: 30-day cost trend percentage (positive = increasing)
+            - avg_cost_per_completion: Average cost per workflow execution (includes completed and failed, reflects true system efficiency)
+            - cost_trend_7day: 7-day cost trend percentage (positive = increasing, includes both completed and failed workflows)
+            - cost_trend_30day: 30-day cost trend percentage (positive = increasing, includes both completed and failed workflows)
             - avg_tokens: Average tokens per workflow
             - avg_cache_efficiency: Average cache efficiency percentage
     """
@@ -100,11 +100,12 @@ def get_history_analytics() -> dict:
         avg_cost = cost_row["avg_cost"] if cost_row["avg_cost"] else 0.0
         total_cost = cost_row["total_cost"] if cost_row["total_cost"] else 0.0
 
-        # Average cost per successful completion (only completed workflows)
+        # Average cost per workflow execution (includes both completed and failed)
+        # This metric reflects true system efficiency by accounting for failed attempts
         cursor.execute("""
             SELECT AVG(actual_cost_total) as avg_cost_per_completion
             FROM workflow_history
-            WHERE status = 'completed'
+            WHERE (status = 'completed' OR status = 'failed')
               AND actual_cost_total IS NOT NULL
               AND actual_cost_total > 0
         """)
@@ -130,11 +131,11 @@ def get_history_analytics() -> dict:
             date_30days_ago = "datetime('now', '-30 days')"
             date_60days_ago = "datetime('now', '-60 days')"
 
-        # 7-day trend: Compare last 7 days vs previous 7 days
+        # 7-day trend: Compare last 7 days vs previous 7 days (includes completed and failed)
         cursor.execute(f"""
             SELECT AVG(actual_cost_total) as avg_cost
             FROM workflow_history
-            WHERE status = 'completed'
+            WHERE (status = 'completed' OR status = 'failed')
               AND actual_cost_total IS NOT NULL
               AND actual_cost_total > 0
               AND created_at >= {date_7days_ago}
@@ -147,7 +148,7 @@ def get_history_analytics() -> dict:
         cursor.execute(f"""
             SELECT AVG(actual_cost_total) as avg_cost
             FROM workflow_history
-            WHERE status = 'completed'
+            WHERE (status = 'completed' OR status = 'failed')
               AND actual_cost_total IS NOT NULL
               AND actual_cost_total > 0
               AND created_at >= {date_14days_ago}
@@ -165,11 +166,11 @@ def get_history_analytics() -> dict:
                 (avg_cost_7day_current - avg_cost_7day_previous) / avg_cost_7day_previous * 100
             )
 
-        # 30-day trend: Compare last 30 days vs previous 30 days
+        # 30-day trend: Compare last 30 days vs previous 30 days (includes completed and failed)
         cursor.execute(f"""
             SELECT AVG(actual_cost_total) as avg_cost
             FROM workflow_history
-            WHERE status = 'completed'
+            WHERE (status = 'completed' OR status = 'failed')
               AND actual_cost_total IS NOT NULL
               AND actual_cost_total > 0
               AND created_at >= {date_30days_ago}
@@ -182,7 +183,7 @@ def get_history_analytics() -> dict:
         cursor.execute(f"""
             SELECT AVG(actual_cost_total) as avg_cost
             FROM workflow_history
-            WHERE status = 'completed'
+            WHERE (status = 'completed' OR status = 'failed')
               AND actual_cost_total IS NOT NULL
               AND actual_cost_total > 0
               AND created_at >= {date_60days_ago}

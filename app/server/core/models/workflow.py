@@ -163,9 +163,9 @@ class WorkflowHistoryAnalytics(BaseModel):
     workflows_by_status: dict[str, int] = Field(default_factory=dict, description="Workflow count by status")
     avg_cost: float = Field(0.0, description="Average cost per workflow")
     total_cost: float = Field(0.0, description="Total cost across all workflows")
-    avg_cost_per_completion: float = Field(0.0, description="Average cost per successfully completed workflow")
-    cost_trend_7day: float = Field(0.0, description="7-day cost trend percentage (positive = increasing)")
-    cost_trend_30day: float = Field(0.0, description="30-day cost trend percentage (positive = increasing)")
+    avg_cost_per_completion: float = Field(0.0, description="Average cost per workflow execution (includes completed and failed, reflects true system efficiency)")
+    cost_trend_7day: float = Field(0.0, description="7-day cost trend percentage (positive = increasing, includes both completed and failed workflows)")
+    cost_trend_30day: float = Field(0.0, description="30-day cost trend percentage (positive = increasing, includes both completed and failed workflows)")
     avg_tokens: float = Field(0.0, description="Average tokens per workflow")
     avg_cache_efficiency: float = Field(0.0, description="Average cache efficiency percentage")
 

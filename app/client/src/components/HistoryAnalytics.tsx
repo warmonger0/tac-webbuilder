@@ -56,7 +56,7 @@ export function HistoryAnalytics({ analytics }: HistoryAnalyticsProps) {
       color: 'text-purple-600',
     },
     {
-      label: 'Avg Cost / Completion',
+      label: 'Avg Cost / Execution',
       value: formatCost(analytics.avg_cost_per_completion),
       color: 'text-emerald-600',
       subtitle: (
