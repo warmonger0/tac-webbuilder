@@ -115,28 +115,43 @@ def get_history_analytics() -> dict:
             else 0.0
         )
 
+        # Database-specific date functions
+        db_type = adapter.get_db_type()
+        if db_type == "postgresql":
+            # PostgreSQL uses NOW() and INTERVAL
+            date_7days_ago = "NOW() - INTERVAL '7 days'"
+            date_14days_ago = "NOW() - INTERVAL '14 days'"
+            date_30days_ago = "NOW() - INTERVAL '30 days'"
+            date_60days_ago = "NOW() - INTERVAL '60 days'"
+        else:
+            # SQLite uses datetime() function
+            date_7days_ago = "datetime('now', '-7 days')"
+            date_14days_ago = "datetime('now', '-14 days')"
+            date_30days_ago = "datetime('now', '-30 days')"
+            date_60days_ago = "datetime('now', '-60 days')"
+
         # 7-day trend: Compare last 7 days vs previous 7 days
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT AVG(actual_cost_total) as avg_cost
             FROM workflow_history
             WHERE status = 'completed'
               AND actual_cost_total IS NOT NULL
               AND actual_cost_total > 0
-              AND datetime(created_at) >= datetime('now', '-7 days')
+              AND created_at >= {date_7days_ago}
         """)
         cost_7day_current = cursor.fetchone()
         avg_cost_7day_current = (
             cost_7day_current["avg_cost"] if cost_7day_current["avg_cost"] else 0.0
         )
 
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT AVG(actual_cost_total) as avg_cost
             FROM workflow_history
             WHERE status = 'completed'
               AND actual_cost_total IS NOT NULL
               AND actual_cost_total > 0
-              AND datetime(created_at) >= datetime('now', '-14 days')
-              AND datetime(created_at) < datetime('now', '-7 days')
+              AND created_at >= {date_14days_ago}
+              AND created_at < {date_7days_ago}
         """)
         cost_7day_previous = cursor.fetchone()
         avg_cost_7day_previous = (
@@ -151,27 +166,27 @@ def get_history_analytics() -> dict:
             )
 
         # 30-day trend: Compare last 30 days vs previous 30 days
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT AVG(actual_cost_total) as avg_cost
             FROM workflow_history
             WHERE status = 'completed'
               AND actual_cost_total IS NOT NULL
               AND actual_cost_total > 0
-              AND datetime(created_at) >= datetime('now', '-30 days')
+              AND created_at >= {date_30days_ago}
         """)
         cost_30day_current = cursor.fetchone()
         avg_cost_30day_current = (
             cost_30day_current["avg_cost"] if cost_30day_current["avg_cost"] else 0.0
         )
 
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT AVG(actual_cost_total) as avg_cost
             FROM workflow_history
             WHERE status = 'completed'
               AND actual_cost_total IS NOT NULL
               AND actual_cost_total > 0
-              AND datetime(created_at) >= datetime('now', '-60 days')
-              AND datetime(created_at) < datetime('now', '-30 days')
+              AND created_at >= {date_60days_ago}
+              AND created_at < {date_30days_ago}
         """)
         cost_30day_previous = cursor.fetchone()
         avg_cost_30day_previous = (
