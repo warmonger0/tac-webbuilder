@@ -9,18 +9,7 @@ export function PlansPanel() {
           <span className="mr-2">🔄</span> In Progress
         </h3>
         <div className="space-y-2 pl-6">
-          <div className="flex items-start">
-            <input type="checkbox" className="mt-1 mr-3" disabled />
-            <div>
-              <div className="font-medium text-gray-900">Configuration Management System</div>
-              <div className="text-sm text-gray-600">3 hours - Medium Value</div>
-              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
-                <li>Port centralized YAML + env var config from tac-7</li>
-                <li>Pydantic-based type-safe configuration</li>
-                <li>Better deployment scenario support</li>
-              </ul>
-            </div>
-          </div>
+          <p className="text-gray-500 italic">No tasks currently in progress</p>
         </div>
       </div>
 
@@ -75,6 +64,19 @@ export function PlansPanel() {
           <span className="mr-2">✅</span> Recently Completed
         </h3>
         <div className="space-y-3 pl-6">
+          <div className="flex items-start">
+            <input type="checkbox" checked className="mt-1 mr-3" disabled />
+            <div>
+              <div className="font-medium text-gray-700">Configuration Management System</div>
+              <div className="text-sm text-gray-500">Completed 2025-12-02</div>
+              <ul className="text-sm text-gray-500 mt-1 list-disc pl-5">
+                <li>Pydantic-based config with YAML + env var support</li>
+                <li>5 config sections with type validation</li>
+                <li>23 passing tests, full documentation</li>
+              </ul>
+            </div>
+          </div>
+
           <div className="flex items-start">
             <input type="checkbox" checked className="mt-1 mr-3" disabled />
             <div>
