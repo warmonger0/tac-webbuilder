@@ -74,33 +74,48 @@ def create_worktree(adw_id: str, branch_name: str, logger: logging.Logger) -> Tu
 
 def validate_worktree(adw_id: str, state: ADWState) -> Tuple[bool, Optional[str]]:
     """Validate worktree exists in state, filesystem, and git.
-    
+
     Performs three-way validation to ensure consistency:
-    1. State has worktree_path
+    1. State has worktree_path (with git-based fallback if empty)
     2. Directory exists on filesystem
     3. Git knows about the worktree
-    
+
     Args:
         adw_id: The ADW ID to validate
         state: The ADW state object
-        
+
     Returns:
         Tuple of (is_valid, error_message)
     """
     # Check state has worktree_path
     worktree_path = state.get("worktree_path")
+
     if not worktree_path:
-        return False, "No worktree_path in state"
-    
+        # FALLBACK: Check if worktree exists in git but not in state
+        # This handles cases where state was recreated but worktree still exists
+        expected_path = get_worktree_path(adw_id)
+
+        # Check git worktree list
+        result = subprocess.run(["git", "worktree", "list"], capture_output=True, text=True)
+
+        if expected_path in result.stdout and os.path.exists(expected_path):
+            # Worktree exists in git and filesystem but not in state
+            # This is recoverable - update state and continue
+            state.update(worktree_path=expected_path)
+            state.save("worktree_recovery")
+            return True, None
+
+        return False, "No worktree_path in state and not found in git"
+
     # Check directory exists
     if not os.path.exists(worktree_path):
         return False, f"Worktree directory not found: {worktree_path}"
-    
+
     # Check git knows about it
     result = subprocess.run(["git", "worktree", "list"], capture_output=True, text=True)
     if worktree_path not in result.stdout:
         return False, "Worktree not registered with git"
-    
+
     return True, None
 
 
