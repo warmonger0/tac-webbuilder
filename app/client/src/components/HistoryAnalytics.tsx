@@ -10,17 +10,20 @@ export function HistoryAnalytics({ analytics }: HistoryAnalyticsProps) {
     return `${mins}m`;
   };
 
-  const formatCost = (cost: number) => {
+  const formatCost = (cost: number | undefined) => {
+    if (cost === undefined || cost === null) return '$0.000';
     return `$${cost.toFixed(3)}`;
   };
 
-  const formatTrend = (trend: number) => {
+  const formatTrend = (trend: number | undefined) => {
+    if (trend === undefined || trend === null) return '→';
     if (Math.abs(trend) < 0.1) return '→'; // No significant change
     if (trend > 0) return `↑${trend.toFixed(1)}%`; // Increasing
     return `↓${Math.abs(trend).toFixed(1)}%`; // Decreasing
   };
 
-  const getTrendColor = (trend: number) => {
+  const getTrendColor = (trend: number | undefined) => {
+    if (trend === undefined || trend === null) return 'text-gray-500';
     if (Math.abs(trend) < 0.1) return 'text-gray-500'; // No change
     if (trend > 0) return 'text-red-600'; // Increasing cost is bad (red)
     return 'text-green-600'; // Decreasing cost is good (green)

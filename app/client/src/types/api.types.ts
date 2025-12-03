@@ -307,9 +307,9 @@ export interface HistoryAnalytics {
   workflows_by_status: Record<string, number>;
   avg_cost: number;
   total_cost: number;
-  avg_cost_per_completion: number;
-  cost_trend_7day: number;
-  cost_trend_30day: number;
+  avg_cost_per_completion?: number; // Optional - may not be present in older responses
+  cost_trend_7day?: number; // Optional - may not be present in older responses
+  cost_trend_30day?: number; // Optional - may not be present in older responses
   avg_tokens: number;
   avg_cache_efficiency: number;
 }
