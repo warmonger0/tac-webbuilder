@@ -23,6 +23,20 @@ export function PlansPanel() {
           <div className="flex items-start">
             <input type="checkbox" className="mt-1 mr-3" disabled />
             <div>
+              <div className="font-medium text-gray-900">Average Cost Per Completion Metric</div>
+              <div className="text-sm text-gray-600">4-6 hours - Medium Priority</div>
+              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
+                <li>Add metric display to History panel (Panel 3)</li>
+                <li>7-day and 30-day trend comparisons</li>
+                <li>Phase cost breakdown with visual indicators</li>
+                <li>Loading states and error handling</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex items-start">
+            <input type="checkbox" className="mt-1 mr-3" disabled />
+            <div>
               <div className="font-medium text-gray-900">CLI Interface</div>
               <div className="text-sm text-gray-600">8 hours - Low Priority</div>
               <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
