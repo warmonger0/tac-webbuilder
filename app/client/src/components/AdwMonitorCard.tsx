@@ -21,12 +21,12 @@ export function AdwMonitorCard() {
   const pollingState = useReliablePolling<{ workflows: AdwWorkflowStatus[]; summary: AdwMonitorSummary }>({
     fetchFn: getAdwMonitor,
     onSuccess: (data) => {
-      // DEBUG: Log received data
-      console.log('[AdwMonitorCard] Received data:', {
-        totalWorkflows: data.workflows.length,
-        summary: data.summary,
-        runningCount: data.workflows.filter(w => w.status === 'running').length
-      });
+      // DEBUG: Log received data (disabled in production)
+      // console.log('[AdwMonitorCard] Received data:', {
+      //   totalWorkflows: data.workflows.length,
+      //   summary: data.summary,
+      //   runningCount: data.workflows.filter(w => w.status === 'running').length
+      // });
 
       setWorkflows(data.workflows);
       setSummary(data.summary);

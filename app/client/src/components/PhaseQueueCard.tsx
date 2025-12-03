@@ -39,6 +39,7 @@ interface PhaseQueueCardProps {
 const STATUS_COLORS = phaseQueueStatusColors;
 
 export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   const { phase_number, phase_data, status, issue_number, queue_id, adw_id, pr_number } = queueItem;
   const statusStyle = STATUS_COLORS[status];
   const [isExecuting, setIsExecuting] = useState(false);

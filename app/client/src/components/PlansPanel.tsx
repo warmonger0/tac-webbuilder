@@ -23,18 +23,6 @@ export function PlansPanel() {
           <div className="flex items-start">
             <input type="checkbox" className="mt-1 mr-3" disabled />
             <div>
-              <div className="font-medium text-gray-900">Address ESLint Warnings</div>
-              <div className="text-sm text-gray-600">Variable - Low Priority</div>
-              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
-                <li>132 warnings about code complexity, max-lines, console.log</li>
-                <li>Non-blocking, style preferences</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="flex items-start">
-            <input type="checkbox" className="mt-1 mr-3" disabled />
-            <div>
               <div className="font-medium text-gray-900">CLI Interface</div>
               <div className="text-sm text-gray-600">8 hours - Low Priority</div>
               <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
@@ -52,6 +40,20 @@ export function PlansPanel() {
           <span className="mr-2">✅</span> Recently Completed
         </h3>
         <div className="space-y-3 pl-6">
+          <div className="flex items-start">
+            <input type="checkbox" checked className="mt-1 mr-3" disabled />
+            <div>
+              <div className="font-medium text-gray-700">ESLint Cleanup</div>
+              <div className="text-sm text-gray-500">Completed 2025-12-02</div>
+              <ul className="text-sm text-gray-500 mt-1 list-disc pl-5">
+                <li>Fixed 25 warnings (console.log, naming, imports)</li>
+                <li>Reduced from 134 to 109 warnings (0 errors)</li>
+                <li>Updated config for test files</li>
+                <li>Remaining warnings are acceptable technical debt</li>
+              </ul>
+            </div>
+          </div>
+
           <div className="flex items-start">
             <input type="checkbox" checked className="mt-1 mr-3" disabled />
             <div>

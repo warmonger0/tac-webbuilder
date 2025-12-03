@@ -126,7 +126,7 @@ export default tseslint.config(
   },
   {
     // Test files have relaxed rules
-    files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}'],
+    files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/test/**/*.{ts,tsx}', '**/*.d.ts'],
     rules: {
       'max-lines': 'off',
       'max-lines-per-function': 'off',

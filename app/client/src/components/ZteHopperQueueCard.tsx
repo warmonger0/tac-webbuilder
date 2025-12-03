@@ -60,10 +60,10 @@ export function ZteHopperQueueCard() {
     .filter(p => p.status === 'completed' || p.status === 'failed' || p.status === 'blocked')
     .sort((a, b) => b.phase_number - a.phase_number);
 
-  // Debug logging
-  console.log('[ZteHopperQueue] Total phases:', phases.length);
-  console.log('[ZteHopperQueue] In progress:', inProgressPhases.length, inProgressPhases.map(p => `#${p.phase_number}(${p.status})`));
-  console.log('[ZteHopperQueue] Completed:', completedPhases.length);
+  // Debug logging (disabled in production)
+  // console.log('[ZteHopperQueue] Total phases:', phases.length);
+  // console.log('[ZteHopperQueue] In progress:', inProgressPhases.length, inProgressPhases.map(p => `#${p.phase_number}(${p.status})`));
+  // console.log('[ZteHopperQueue] Completed:', completedPhases.length);
 
   return (
     <div className="relative h-full">
