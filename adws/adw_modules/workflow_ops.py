@@ -663,8 +663,9 @@ def generate_branch_name(
     output = response.output.strip()
 
     # Look for branch name pattern: <type>-issue-<number>-adw-<id>-<description>
+    # Updated pattern to capture multi-word descriptions (e.g., "avg-cost-metric-history-panel")
     import re
-    branch_pattern = r'((?:patch|bug|feature|chore)-issue-\d+-adw-[a-f0-9]+-[\w-]+)'
+    branch_pattern = r'((?:patch|bug|feature|chore)-issue-\d+-adw-[a-f0-9]+-[\w-]+(?:-[\w]+)*)'
     match = re.search(branch_pattern, output)
 
     if match:
