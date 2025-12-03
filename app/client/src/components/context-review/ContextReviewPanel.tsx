@@ -5,8 +5,8 @@
  * additional files and context to improve workflow accuracy.
  */
 
-import { useState, useEffect } from 'react';
-import { Sparkles, FileCode, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, FileCode, Loader2, Sparkles } from 'lucide-react';
 
 export interface ContextSuggestion {
   id: number;

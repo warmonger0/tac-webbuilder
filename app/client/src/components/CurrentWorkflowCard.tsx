@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getAdwMonitor, type AdwWorkflowStatus } from '../api/client';
+import { type AdwWorkflowStatus, getAdwMonitor } from '../api/client';
 import { phaseSvgIconMap, workflowPhases } from '../config/workflows';
 
 export function CurrentWorkflowCard() {

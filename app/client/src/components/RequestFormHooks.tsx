@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { confirmAndPost, getCostEstimate, getPreflightChecks, getPreview, getSystemStatus, submitRequest } from '../api/client';
 import type { CostEstimate, GitHubIssue, ServiceHealth } from '../types';
-import { useDragAndDrop, type DragHandlers } from '../hooks/useDragAndDrop';
+import { type DragHandlers, useDragAndDrop } from '../hooks/useDragAndDrop';
 import { useStaggeredLoad } from '../hooks/useStaggeredLoad';
 import { parsePhases, type PhaseParseResult } from '../utils/phaseParser';
 import { PhaseDetectionHandler } from './request-form/PhaseDetectionHandler';

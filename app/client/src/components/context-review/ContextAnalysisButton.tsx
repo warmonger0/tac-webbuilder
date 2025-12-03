@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 
 interface ContextAnalysisButtonProps {
   changeDescription: string;
