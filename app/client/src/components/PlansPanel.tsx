@@ -68,6 +68,50 @@ export function PlansPanel() {
           <div className="flex items-start">
             <input type="checkbox" className="mt-1 mr-3" disabled />
             <div>
+              <div className="font-medium text-orange-700">⚠️ Pydantic Model Sync Validation</div>
+              <div className="text-sm text-gray-600">3-4 hours - MEDIUM Priority - Infrastructure</div>
+              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
+                <li>Add runtime validation in development mode to catch Pydantic/database mismatches</li>
+                <li>Create validation script (scripts/validate_data_models.py) for CI/CD</li>
+                <li>Add checklist to ADW review phase for data flow validation</li>
+                <li>Would have caught missing WorkflowHistoryAnalytics fields immediately</li>
+                <li>Prevents silent field filtering during JSON serialization</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex items-start">
+            <input type="checkbox" className="mt-1 mr-3" disabled />
+            <div>
+              <div className="font-medium text-blue-700">🔧 Refactor Analytics to Return Pydantic Models</div>
+              <div className="text-sm text-gray-600">4-6 hours - MEDIUM Priority - Refactor</div>
+              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
+                <li>Change analytics.py to return WorkflowHistoryAnalytics model directly</li>
+                <li>Eliminates dict → Pydantic conversion step (fail fast on missing fields)</li>
+                <li>Type safety: IDE/mypy catches mismatches at development time</li>
+                <li>Apply pattern to all data layers (repositories, queries)</li>
+                <li>Single source of truth: Pydantic model defines what's returned</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex items-start">
+            <input type="checkbox" className="mt-1 mr-3" disabled />
+            <div>
+              <div className="font-medium text-blue-700">📝 Add ADW Review Phase Validation Check</div>
+              <div className="text-sm text-gray-600">1-2 hours - MEDIUM Priority - Enhancement</div>
+              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
+                <li>Add automated check: if analytics.py modified, warn if models/workflow.py unchanged</li>
+                <li>Include data flow checklist in review phase documentation</li>
+                <li>Validate: Database → Pydantic → TypeScript → Component chain</li>
+                <li>Catches serialization mismatches before deployment</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex items-start">
+            <input type="checkbox" className="mt-1 mr-3" disabled />
+            <div>
               <div className="font-medium text-gray-900">CLI Interface</div>
               <div className="text-sm text-gray-600">8 hours - Low Priority - Feature</div>
               <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
