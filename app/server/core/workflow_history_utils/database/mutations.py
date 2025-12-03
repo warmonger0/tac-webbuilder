@@ -93,8 +93,18 @@ def insert_workflow_history(
         ]
 
         # Get existing columns from database to validate fields before inserting
-        cursor.execute("PRAGMA table_info(workflow_history)")
-        existing_columns = {row["name"] for row in cursor.fetchall()}
+        db_type = adapter.get_db_type()
+        if db_type == "postgresql":
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'workflow_history'
+            """)
+            existing_columns = {row["column_name"] for row in cursor.fetchall()}
+        else:
+            # SQLite
+            cursor.execute("PRAGMA table_info(workflow_history)")
+            existing_columns = {row["name"] for row in cursor.fetchall()}
 
         # Map field names from code schema to database schema
         # Note: Currently no mapping needed - code and DB use same names
@@ -220,8 +230,18 @@ def update_workflow_history(
         cursor = conn.cursor()
 
         # Get existing columns from database to validate fields before updating
-        cursor.execute("PRAGMA table_info(workflow_history)")
-        existing_columns = {row["name"] for row in cursor.fetchall()}
+        db_type = adapter.get_db_type()
+        if db_type == "postgresql":
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'workflow_history'
+            """)
+            existing_columns = {row["column_name"] for row in cursor.fetchall()}
+        else:
+            # SQLite
+            cursor.execute("PRAGMA table_info(workflow_history)")
+            existing_columns = {row["name"] for row in cursor.fetchall()}
 
         # Convert dicts and lists to JSON strings
         json_fields = [
