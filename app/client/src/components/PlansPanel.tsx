@@ -51,13 +51,15 @@ export function PlansPanel() {
           <div className="flex items-start">
             <input type="checkbox" className="mt-1 mr-3" disabled />
             <div>
-              <div className="font-medium text-orange-700">⚠️ Lint Errors Blocking Workflows</div>
-              <div className="text-sm text-gray-600">Variable - Medium Priority</div>
+              <div className="font-medium text-red-700">🐛 Implement Hybrid Lint Loop (External + LLM Fallback)</div>
+              <div className="text-sm text-gray-600">3-4 hours - HIGH Priority - Architecture Fix</div>
               <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
-                <li>167 lint errors caused workflow #140 to fail at Phase 4</li>
-                <li>Need to investigate if these are baseline errors or new</li>
-                <li>Consider: make lint warnings vs errors, or fix systematically</li>
-                <li>Blocked: loading spinner feature implementation</li>
+                <li><strong>Current:</strong> Single external lint run → If errors exist → Kill workflow</li>
+                <li><strong>Proposed:</strong> External loop (3 attempts) → LLM fallback → Continue</li>
+                <li>External loop: Fast/cheap, fixes simple repetitive errors (ruff --fix, eslint --fix)</li>
+                <li>LLM fallback: Handle nuanced/contextual errors that need understanding</li>
+                <li>Don't kill workflow - reduce workload first, then let LLM finish</li>
+                <li><strong>Impact:</strong> 167 errors blocked workflow #140 - this would fix it</li>
               </ul>
             </div>
           </div>
