@@ -19,6 +19,7 @@ interface PollingState {
   lastUpdated: Date | null;
   consecutiveErrors: number;
   currentInterval: number;
+  isFetching: boolean;
 }
 
 /**
@@ -46,6 +47,7 @@ export function useReliablePolling<T>({
     lastUpdated: null,
     consecutiveErrors: 0,
     currentInterval: interval,
+    isFetching: false,
   });
 
   const intervalRef = useRef<NodeJS.Timeout>();
@@ -123,6 +125,9 @@ export function useReliablePolling<T>({
       return;
     }
 
+    // Set isFetching to true at start of fetch operation
+    setState((prev) => ({ ...prev, isFetching: true }));
+
     try {
       const data = await fetchFnRef.current();
 
@@ -136,6 +141,7 @@ export function useReliablePolling<T>({
         lastUpdated: new Date(),
         consecutiveErrors: 0,
         currentInterval: interval,
+        isFetching: false,
       });
 
       onSuccessRef.current(data);
@@ -150,6 +156,7 @@ export function useReliablePolling<T>({
         connectionQuality: updateConnectionQuality(consecutiveErrorsRef.current, lastSuccessTimeRef.current),
         consecutiveErrors: consecutiveErrorsRef.current,
         currentInterval: adaptedInterval,
+        isFetching: false,
       }));
 
       console.error('[Polling] Error fetching data:', error);

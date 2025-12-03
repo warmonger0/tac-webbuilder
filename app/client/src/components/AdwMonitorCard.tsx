@@ -304,6 +304,14 @@ export function AdwMonitorCard() {
               >
                 {debugMode ? '⚙️ Debug' : '⚙️'}
               </button>
+              {pollingState.isFetching && (
+                <div
+                  className="w-4 h-4 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+                  title="Refreshing workflow data"
+                  role="status"
+                  aria-label="Refreshing workflow data"
+                />
+              )}
               <ConnectionStatusIndicator
                 isConnected={pollingState.isPolling}
                 connectionQuality={pollingState.connectionQuality}
