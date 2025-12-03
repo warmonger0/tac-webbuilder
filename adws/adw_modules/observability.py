@@ -2,6 +2,10 @@
 ADW Observability Module
 
 Helper functions for logging ADW workflow execution to the observability system.
+
+Logs to both:
+- Backend API (for database storage)
+- JSONL files (for structured logging and analysis)
 """
 
 import logging
@@ -13,10 +17,15 @@ import json
 from datetime import datetime
 from typing import Optional, Literal
 
+from adw_modules.structured_logger import get_adw_logger
+
 logger = logging.getLogger(__name__)
 
 # Backend API base URL
 BACKEND_BASE_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
+
+# Get structured logger instance
+structured_logger = get_adw_logger()
 
 
 def log_task_completion(
@@ -98,6 +107,27 @@ def log_task_completion(
     if cost_usd is not None:
         payload["cost_usd"] = cost_usd
 
+    # Write to structured JSONL logs (zero-overhead, non-blocking)
+    try:
+        structured_logger.log_phase(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            phase_name=phase_name,
+            phase_number=phase_number,
+            phase_status=phase_status,
+            message=log_message,
+            workflow_template=workflow_template,
+            started_at=started_at,
+            completed_at=completed_at,
+            duration_seconds=duration_seconds,
+            tokens_used=tokens_used,
+            cost_usd=cost_usd,
+            error_message=error_message,
+        )
+    except Exception as e:
+        logger.debug(f"[STRUCTURED_LOG] Failed to write structured log: {e}")
+
+    # Make API call to backend (for database storage)
     try:
         # Make POST request
         req = urllib.request.Request(

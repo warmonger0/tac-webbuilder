@@ -19,18 +19,6 @@ export function PlansPanel() {
           <span className="mr-2">📋</span> Planned Optional Enhancements
         </h3>
         <div className="space-y-3 pl-6">
-          <div className="flex items-start">
-            <input type="checkbox" className="mt-1 mr-3" disabled />
-            <div>
-              <div className="font-medium text-gray-900">Enhanced Structured Logging</div>
-              <div className="text-sm text-gray-600">4 hours - Medium Value</div>
-              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
-                <li>Add JSONL output to observability.py</li>
-                <li>Pydantic JSON serialization for debugging</li>
-                <li>Per-workflow log isolation improvements</li>
-              </ul>
-            </div>
-          </div>
 
           <div className="flex items-start">
             <input type="checkbox" className="mt-1 mr-3" disabled />
@@ -64,6 +52,20 @@ export function PlansPanel() {
           <span className="mr-2">✅</span> Recently Completed
         </h3>
         <div className="space-y-3 pl-6">
+          <div className="flex items-start">
+            <input type="checkbox" checked className="mt-1 mr-3" disabled />
+            <div>
+              <div className="font-medium text-gray-700">Enhanced Structured Logging</div>
+              <div className="text-sm text-gray-500">Completed 2025-12-02</div>
+              <ul className="text-sm text-gray-500 mt-1 list-disc pl-5">
+                <li>JSONL output with 6 event types (Workflow, Phase, System, DB, HTTP, Metrics)</li>
+                <li>Per-workflow log isolation in separate files</li>
+                <li>Pydantic validation and serialization</li>
+                <li>13 passing tests, comprehensive documentation</li>
+              </ul>
+            </div>
+          </div>
+
           <div className="flex items-start">
             <input type="checkbox" checked className="mt-1 mr-3" disabled />
             <div>
