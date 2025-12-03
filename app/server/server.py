@@ -256,8 +256,8 @@ work_log_routes.init_work_log_routes()
 app.include_router(work_log_routes.router, prefix="/api/v1")
 
 # Initialize observability routes (task logs + user prompts)
-observability_routes.init_observability_routes()
-app.include_router(observability_routes.router, prefix="/api/v1")
+observability_router = observability_routes.init_observability_routes()
+app.include_router(observability_router, prefix="/api/v1")
 
 # Initialize webhook routes for workflow completion notifications
 github_poster = GitHubPoster()

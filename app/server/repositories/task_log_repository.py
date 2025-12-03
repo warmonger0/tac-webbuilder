@@ -68,9 +68,9 @@ class TaskLogRepository:
                 result = cursor.fetchone()
                 conn.commit()
 
-                task_id = result[0]
-                captured_at = result[1]
-                created_at = result[2]
+                task_id = result['id']
+                captured_at = result['captured_at']
+                created_at = result['created_at']
 
                 logger.info(
                     f"Created task log {task_id} for issue #{task_log.issue_number} "
@@ -152,22 +152,22 @@ class TaskLogRepository:
                 for row in rows:
                     logs.append(
                         TaskLog(
-                            id=row[0],
-                            adw_id=row[1],
-                            issue_number=row[2],
-                            workflow_template=row[3],
-                            phase_name=row[4],
-                            phase_number=row[5],
-                            phase_status=row[6],
-                            log_message=row[7],
-                            error_message=row[8],
-                            started_at=row[9],
-                            completed_at=row[10],
-                            duration_seconds=row[11],
-                            tokens_used=row[12],
-                            cost_usd=row[13],
-                            captured_at=row[14],
-                            created_at=row[15],
+                            id=row['id'],
+                            adw_id=row['adw_id'],
+                            issue_number=row['issue_number'],
+                            workflow_template=row['workflow_template'],
+                            phase_name=row['phase_name'],
+                            phase_number=row['phase_number'],
+                            phase_status=row['phase_status'],
+                            log_message=row['log_message'],
+                            error_message=row['error_message'],
+                            started_at=row['started_at'],
+                            completed_at=row['completed_at'],
+                            duration_seconds=row['duration_seconds'],
+                            tokens_used=row['tokens_used'],
+                            cost_usd=row['cost_usd'],
+                            captured_at=row['captured_at'],
+                            created_at=row['created_at'],
                         )
                     )
 
@@ -208,22 +208,22 @@ class TaskLogRepository:
                 for row in rows:
                     logs.append(
                         TaskLog(
-                            id=row[0],
-                            adw_id=row[1],
-                            issue_number=row[2],
-                            workflow_template=row[3],
-                            phase_name=row[4],
-                            phase_number=row[5],
-                            phase_status=row[6],
-                            log_message=row[7],
-                            error_message=row[8],
-                            started_at=row[9],
-                            completed_at=row[10],
-                            duration_seconds=row[11],
-                            tokens_used=row[12],
-                            cost_usd=row[13],
-                            captured_at=row[14],
-                            created_at=row[15],
+                            id=row['id'],
+                            adw_id=row['adw_id'],
+                            issue_number=row['issue_number'],
+                            workflow_template=row['workflow_template'],
+                            phase_name=row['phase_name'],
+                            phase_number=row['phase_number'],
+                            phase_status=row['phase_status'],
+                            log_message=row['log_message'],
+                            error_message=row['error_message'],
+                            started_at=row['started_at'],
+                            completed_at=row['completed_at'],
+                            duration_seconds=row['duration_seconds'],
+                            tokens_used=row['tokens_used'],
+                            cost_usd=row['cost_usd'],
+                            captured_at=row['captured_at'],
+                            created_at=row['created_at'],
                         )
                     )
 
@@ -264,22 +264,22 @@ class TaskLogRepository:
                 for row in rows:
                     logs.append(
                         TaskLog(
-                            id=row[0],
-                            adw_id=row[1],
-                            issue_number=row[2],
-                            workflow_template=row[3],
-                            phase_name=row[4],
-                            phase_number=row[5],
-                            phase_status=row[6],
-                            log_message=row[7],
-                            error_message=row[8],
-                            started_at=row[9],
-                            completed_at=row[10],
-                            duration_seconds=row[11],
-                            tokens_used=row[12],
-                            cost_usd=row[13],
-                            captured_at=row[14],
-                            created_at=row[15],
+                            id=row['id'],
+                            adw_id=row['adw_id'],
+                            issue_number=row['issue_number'],
+                            workflow_template=row['workflow_template'],
+                            phase_name=row['phase_name'],
+                            phase_number=row['phase_number'],
+                            phase_status=row['phase_status'],
+                            log_message=row['log_message'],
+                            error_message=row['error_message'],
+                            started_at=row['started_at'],
+                            completed_at=row['completed_at'],
+                            duration_seconds=row['duration_seconds'],
+                            tokens_used=row['tokens_used'],
+                            cost_usd=row['cost_usd'],
+                            captured_at=row['captured_at'],
+                            created_at=row['created_at'],
                         )
                     )
 
@@ -317,14 +317,14 @@ class TaskLogRepository:
                     return None
 
                 return IssueProgress(
-                    issue_number=row[0],
-                    adw_id=row[1],
-                    workflow_template=row[2],
-                    total_phases=row[3],
-                    completed_phases=row[4],
-                    failed_phases=row[5],
-                    latest_phase=row[6],
-                    last_activity=row[7],
+                    issue_number=row['issue_number'],
+                    adw_id=row['adw_id'],
+                    workflow_template=row['workflow_template'],
+                    total_phases=row['total_phases'],
+                    completed_phases=row['completed_phases'],
+                    failed_phases=row['failed_phases'],
+                    latest_phase=row['latest_phase'],
+                    last_activity=row['last_activity'],
                 )
         except Exception as e:
             logger.error(f"Failed to get progress for issue #{issue_number}: {e}")
@@ -362,22 +362,22 @@ class TaskLogRepository:
                     return None
 
                 return TaskLog(
-                    id=row[0],
-                    adw_id=row[1],
-                    issue_number=row[2],
-                    workflow_template=row[3],
-                    phase_name=row[4],
-                    phase_number=row[5],
-                    phase_status=row[6],
-                    log_message=row[7],
-                    error_message=row[8],
-                    started_at=row[9],
-                    completed_at=row[10],
-                    duration_seconds=row[11],
-                    tokens_used=row[12],
-                    cost_usd=row[13],
-                    captured_at=row[14],
-                    created_at=row[15],
+                    id=row['id'],
+                    adw_id=row['adw_id'],
+                    issue_number=row['issue_number'],
+                    workflow_template=row['workflow_template'],
+                    phase_name=row['phase_name'],
+                    phase_number=row['phase_number'],
+                    phase_status=row['phase_status'],
+                    log_message=row['log_message'],
+                    error_message=row['error_message'],
+                    started_at=row['started_at'],
+                    completed_at=row['completed_at'],
+                    duration_seconds=row['duration_seconds'],
+                    tokens_used=row['tokens_used'],
+                    cost_usd=row['cost_usd'],
+                    captured_at=row['captured_at'],
+                    created_at=row['created_at'],
                 )
         except Exception as e:
             logger.error(f"Failed to get latest task log for issue #{issue_number}: {e}")
