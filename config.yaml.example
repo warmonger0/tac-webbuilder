@@ -1,0 +1,61 @@
+# tac-webbuilder Configuration File
+#
+# This is an example configuration file. Copy to config.yaml and customize.
+# Environment variables take precedence over these settings.
+# Use TWB_ prefix for env vars: TWB_SERVER__BACKEND_PORT=9000
+
+# Server Configuration
+server:
+  backend_port: 8000           # Backend API port
+  frontend_port: 5173          # Frontend dev server port
+  frontend_url: null           # Auto-computed if not provided
+  webhook_trigger_url: "http://localhost:8001"  # Webhook trigger URL
+
+# GitHub Integration
+github:
+  pat: null                    # GitHub Personal Access Token (RECOMMENDED: use env var)
+  repo: "warmonger0/tac-webbuilder"  # GitHub repository (owner/repo format)
+  webhook_id: "580534779"      # GitHub webhook ID
+
+# Database Configuration
+database:
+  type: "sqlite"               # Database type: sqlite or postgresql
+
+  # PostgreSQL settings (only used when type: postgresql)
+  postgres_host: "localhost"
+  postgres_port: 5432
+  postgres_db: "tac_webbuilder"
+  postgres_user: "tac_user"
+  postgres_password: null      # RECOMMENDED: use env var TWB_DB__POSTGRES_PASSWORD
+  postgres_pool_min: 1         # Connection pool minimum
+  postgres_pool_max: 10        # Connection pool maximum
+
+# LLM API Configuration
+llm:
+  openai_api_key: null         # RECOMMENDED: use env var TWB_LLM__OPENAI_API_KEY
+  anthropic_api_key: null      # RECOMMENDED: use env var TWB_LLM__ANTHROPIC_API_KEY
+
+# Cloudflare Configuration
+cloudflare:
+  tunnel_token: null           # RECOMMENDED: use env var TWB_CLOUDFLARE__TUNNEL_TOKEN
+
+# Environment Variable Examples:
+#
+# For nested config sections (from AppConfig), use double underscores:
+#   export TWB_SERVER__BACKEND_PORT=9000
+#   export TWB_SERVER__FRONTEND_PORT=5174
+#   export TWB_GITHUB__PAT="ghp_xxxxxxxxxxxx"
+#   export TWB_GITHUB__REPO="owner/repo"
+#   export TWB_DB__TYPE=postgresql
+#   export TWB_DB__POSTGRES_PASSWORD="secret"
+#   export TWB_LLM__OPENAI_API_KEY="sk-xxxx"
+#   export TWB_LLM__ANTHROPIC_API_KEY="sk-ant-xxxx"
+#   export TWB_CLOUDFLARE__TUNNEL_TOKEN="xxx"
+#
+# Or use individual config class env vars (single underscore):
+#   export TWB_SERVER_BACKEND_PORT=9000
+#   export TWB_GITHUB_PAT="ghp_xxxxxxxxxxxx"
+#   export TWB_DB_TYPE=postgresql
+#   export TWB_LLM_OPENAI_API_KEY="sk-xxxx"
+#
+# Note: Double underscores (__) are for nested config in AppConfig
