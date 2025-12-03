@@ -27,7 +27,12 @@ from core.workflow_history import (
     resync_all_completed_workflows,
     resync_workflow_cost,
 )
-from fastapi import APIRouter, HTTPException
+from core.workflow_history_utils.database.analytics import (
+    get_cost_per_completion_metrics,
+    get_cost_trend_comparison,
+    get_phase_cost_breakdown,
+)
+from fastapi import APIRouter, HTTPException, Query
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +227,46 @@ async def _get_workflows_batch_handler(workflow_ids: list[str]) -> list[Workflow
     return workflows
 
 
+async def _get_cost_per_completion_handler(period: str, include_breakdown: bool) -> dict:
+    """Handler for cost per completion metrics endpoint."""
+    # Parse period to days
+    period_map = {"7d": 7, "30d": 30, "all": None}
+    days = period_map.get(period)
+
+    if days is None and period != "all":
+        raise HTTPException(status_code=400, detail=f"Invalid period: {period}")
+
+    logger.info(f"[METRICS] Fetching cost per completion metrics: period={period}, include_breakdown={include_breakdown}")
+
+    try:
+        # Get current period metrics
+        current_metrics = get_cost_per_completion_metrics(days=days)
+
+        # Get trend comparison (only for time-bounded periods)
+        trend_data = None
+        if days is not None:
+            trend_data = get_cost_trend_comparison(current_days=days)
+
+        # Get phase breakdown if requested
+        phase_breakdown = None
+        if include_breakdown:
+            phase_breakdown = get_phase_cost_breakdown(days=days)
+
+        response = {
+            "period": period,
+            "current_period": current_metrics,
+            "trend": trend_data,
+            "phase_breakdown": phase_breakdown
+        }
+
+        logger.info(f"[METRICS] Successfully retrieved cost per completion metrics for period={period}")
+        return response
+
+    except Exception as e:
+        logger.error(f"[METRICS] Failed to retrieve cost per completion metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve metrics: {str(e)}") from e
+
+
 def _register_workflow_basic_queries(router_obj, workflow_service, get_routes_data_func, get_workflow_history_data_func):
     """Register basic workflow query endpoints."""
 
@@ -337,6 +382,21 @@ def _register_workflow_analytics_queries(router_obj, workflow_service):
             logger.error(f"[ERROR] Failed to retrieve workflow catalog: {str(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
             return WorkflowCatalogResponse(workflows=[], total=0)
+
+    @router_obj.get("/workflow/metrics/cost-per-completion")
+    async def get_cost_per_completion_metrics(
+        period: str = Query("7d", regex="^(7d|30d|all)$"),
+        include_breakdown: bool = Query(True)
+    ) -> dict:
+        """Get average cost per successful completion metrics with trend comparison and phase breakdown."""
+        try:
+            return await _get_cost_per_completion_handler(period, include_breakdown)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to retrieve cost per completion metrics: {str(e)}")
+            logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=f"Failed to retrieve metrics: {str(e)}") from e
 
 
 def _register_workflow_mutation_routes(router_obj):

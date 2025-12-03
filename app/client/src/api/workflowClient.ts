@@ -9,6 +9,7 @@
  */
 
 import type {
+  CostPerCompletionMetrics,
   CostResponse,
   HistoryFilters,
   HistoryItem,
@@ -106,6 +107,22 @@ export async function fetchWorkflowCosts(
 }
 
 /**
+ * Fetch cost per completion metrics with trend comparison and phase breakdown.
+ *
+ * @param period - Time period ('7d', '30d', or 'all')
+ * @param includeBreakdown - Whether to include phase cost breakdown
+ * @returns Cost per completion metrics with trend and breakdown data
+ */
+export async function getCostPerCompletionMetrics(
+  period: '7d' | '30d' | 'all' = '7d',
+  includeBreakdown: boolean = true
+): Promise<CostPerCompletionMetrics> {
+  return fetchJSON<CostPerCompletionMetrics>(
+    `${API_BASE}/workflow/metrics/cost-per-completion?period=${period}&include_breakdown=${includeBreakdown}`
+  );
+}
+
+/**
  * Workflow client namespace for organized access to all workflow operations.
  */
 export const workflowClient = {
@@ -114,4 +131,5 @@ export const workflowClient = {
   getWorkflowHistory,
   fetchWorkflowsBatch,
   fetchWorkflowCosts,
+  getCostPerCompletionMetrics,
 };

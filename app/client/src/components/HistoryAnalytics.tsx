@@ -1,4 +1,5 @@
 import type { HistoryAnalytics as HistoryAnalyticsType } from '../types';
+import { TrendIndicator } from './TrendIndicator';
 
 interface HistoryAnalyticsProps {
   analytics: HistoryAnalyticsType;
@@ -36,17 +37,37 @@ export function HistoryAnalytics({ analytics }: HistoryAnalyticsProps) {
       value: formatDuration(analytics.avg_duration_seconds),
       color: 'text-purple-600',
     },
+    {
+      label: 'Avg Cost/Success',
+      value: `$${(analytics.avg_cost_per_successful_completion ?? 0).toFixed(3)}`,
+      color: 'text-green-600',
+      trend: analytics.cost_trend_7d !== undefined && analytics.cost_trend_7d !== null
+        ? {
+            percentChange: analytics.cost_trend_7d,
+            direction: analytics.cost_trend_7d > 1 ? 'up' as const : analytics.cost_trend_7d < -1 ? 'down' as const : 'neutral' as const
+          }
+        : undefined,
+    },
   ];
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
       <h3 className="text-lg font-bold text-gray-900 mb-4">Analytics Summary</h3>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         {stats.map((stat) => (
           <div key={stat.label} className="text-center">
             <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
             <p className="text-xs text-gray-600 mt-1">{stat.label}</p>
+            {stat.trend && (
+              <div className="mt-1">
+                <TrendIndicator
+                  percentChange={stat.trend.percentChange}
+                  trend={stat.trend.direction}
+                  invertColors={true}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>

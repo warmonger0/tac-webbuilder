@@ -1,9 +1,18 @@
 {
-  "adw_id": "de7c977b",
-  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/de7c977b",
-  "created_at": "2025-11-28T11:39:58.987301",
+  "adw_id": "90a2412d",
+  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/90a2412d",
+  "created_at": "2025-12-02T20:05:43.140460",
   "changed_files": [
     ".adw-context.json",
-    ".mcp.json"
+    ".mcp.json",
+    "app/server/core/workflow_history_utils/database/analytics.py",
+    "app/server/routes/workflow_routes.py",
+    "app/client/src/types/api.types.ts",
+    "app/client/src/api/workflowClient.ts",
+    "app/client/src/utils/trendCalculations.ts",
+    "app/client/src/components/TrendIndicator.tsx",
+    "app/client/src/components/CostPerCompletionMetric.tsx",
+    "app/client/src/components/HistoryAnalytics.tsx",
+    ".claude/commands/e2e/test_cost_per_completion_metric.md"
   ]
 }

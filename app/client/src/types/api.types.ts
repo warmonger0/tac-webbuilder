@@ -309,6 +309,42 @@ export interface HistoryAnalytics {
   total_cost: number;
   avg_tokens: number;
   avg_cache_efficiency: number;
+  // Cost per completion metrics
+  avg_cost_per_successful_completion?: number;
+  cost_per_completion_7d?: number;
+  cost_trend_7d?: number;
+}
+
+export interface CostPerCompletionMetrics {
+  period: '7d' | '30d' | 'all';
+  current_period: {
+    avg_cost: number;
+    completion_count: number;
+    total_cost: number;
+    start_date: string | null;
+    end_date: string | null;
+  };
+  trend: {
+    current_period: {
+      avg_cost: number;
+      completion_count: number;
+      total_cost: number;
+      start_date: string | null;
+      end_date: string | null;
+    };
+    previous_period: {
+      avg_cost: number;
+      completion_count: number;
+    };
+    percent_change: number;
+    trend: 'up' | 'down' | 'neutral';
+  } | null;
+  phase_breakdown?: Array<{
+    phase: string;
+    total_cost: number;
+    workflow_count: number;
+    percent_of_total: number;
+  }> | null;
 }
 
 export interface HistoryFilters {
