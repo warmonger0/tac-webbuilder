@@ -16,15 +16,57 @@ export function PlansPanel() {
       {/* Planned Section */}
       <div className="mb-8">
         <h3 className="text-lg font-semibold text-purple-700 mb-3 flex items-center">
-          <span className="mr-2">📋</span> Planned Optional Enhancements
+          <span className="mr-2">📋</span> Planned Fixes & Enhancements
         </h3>
         <div className="space-y-3 pl-6">
 
           <div className="flex items-start">
             <input type="checkbox" className="mt-1 mr-3" disabled />
             <div>
+              <div className="font-medium text-red-700">🐛 Pre-flight Check Before Issue Creation</div>
+              <div className="text-sm text-gray-600">2-3 hours - HIGH Priority - Bug Fix</div>
+              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
+                <li>Run pre-flight checks BEFORE creating GitHub issue</li>
+                <li>Check git status, worktrees, disk space in Panel 1 submit handler</li>
+                <li>Show validation errors to user before issue creation</li>
+                <li>Prevents failed issues with error comments (Issue #140)</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex items-start">
+            <input type="checkbox" className="mt-1 mr-3" disabled />
+            <div>
+              <div className="font-medium text-red-700">🐛 Panel 2 Not Updating with Current Workflow</div>
+              <div className="text-sm text-gray-600">1-2 hours - HIGH Priority - Bug Fix</div>
+              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
+                <li>Current Workflow panel doesn't update after successful submission</li>
+                <li>Shows old completed workflow (#135) instead of new one (#140)</li>
+                <li>Hard refresh doesn't fix it - data fetching or state issue</li>
+                <li>Check polling interval, websocket connection, or API response</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex items-start">
+            <input type="checkbox" className="mt-1 mr-3" disabled />
+            <div>
+              <div className="font-medium text-orange-700">⚠️ Lint Errors Blocking Workflows</div>
+              <div className="text-sm text-gray-600">Variable - Medium Priority</div>
+              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
+                <li>167 lint errors caused workflow #140 to fail at Phase 4</li>
+                <li>Need to investigate if these are baseline errors or new</li>
+                <li>Consider: make lint warnings vs errors, or fix systematically</li>
+                <li>Blocked: loading spinner feature implementation</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex items-start">
+            <input type="checkbox" className="mt-1 mr-3" disabled />
+            <div>
               <div className="font-medium text-gray-900">Average Cost Per Completion Metric</div>
-              <div className="text-sm text-gray-600">4-6 hours - Medium Priority</div>
+              <div className="text-sm text-gray-600">4-6 hours - Medium Priority - Feature</div>
               <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
                 <li>Add metric display to History panel (Panel 3)</li>
                 <li>7-day and 30-day trend comparisons</li>
@@ -38,7 +80,7 @@ export function PlansPanel() {
             <input type="checkbox" className="mt-1 mr-3" disabled />
             <div>
               <div className="font-medium text-gray-900">CLI Interface</div>
-              <div className="text-sm text-gray-600">8 hours - Low Priority</div>
+              <div className="text-sm text-gray-600">8 hours - Low Priority - Feature</div>
               <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
                 <li>Port from tac-7 for power users</li>
                 <li>Terminal access to core features</li>
