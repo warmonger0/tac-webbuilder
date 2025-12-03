@@ -6,8 +6,8 @@ Extends the observability models with additional context and metadata.
 """
 
 from datetime import datetime
-from typing import Any, Dict, Literal, Optional
 from enum import Enum
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -41,12 +41,12 @@ class BaseLogEvent(BaseModel):
 
     # Context
     message: str = Field(description="Human-readable log message")
-    context: Dict[str, Any] = Field(default_factory=dict, description="Additional context data")
+    context: dict[str, Any] = Field(default_factory=dict, description="Additional context data")
 
     # Correlation
-    correlation_id: Optional[str] = Field(None, description="Correlation ID for tracking related events")
-    session_id: Optional[str] = Field(None, description="User session ID")
-    request_id: Optional[str] = Field(None, description="HTTP request ID")
+    correlation_id: str | None = Field(None, description="Correlation ID for tracking related events")
+    session_id: str | None = Field(None, description="User session ID")
+    request_id: str | None = Field(None, description="HTTP request ID")
 
     class Config:
         json_schema_extra = {
@@ -67,7 +67,7 @@ class WorkflowLogEvent(BaseLogEvent):
     # Workflow Identification
     adw_id: str = Field(description="ADW workflow ID")
     issue_number: int = Field(description="GitHub issue number")
-    workflow_template: Optional[str] = Field(None, description="Workflow template name")
+    workflow_template: str | None = Field(None, description="Workflow template name")
 
     # Workflow Status
     workflow_status: Literal["started", "in_progress", "completed", "failed", "cancelled"] = Field(
@@ -75,21 +75,21 @@ class WorkflowLogEvent(BaseLogEvent):
     )
 
     # Phase Info (if applicable)
-    phase_name: Optional[str] = Field(None, description="Current phase name")
-    phase_number: Optional[int] = Field(None, description="Current phase number")
-    phase_status: Optional[Literal["started", "completed", "failed", "skipped"]] = Field(
+    phase_name: str | None = Field(None, description="Current phase name")
+    phase_number: int | None = Field(None, description="Current phase number")
+    phase_status: Literal["started", "completed", "failed", "skipped"] | None = Field(
         None, description="Phase status"
     )
 
     # Metrics
-    duration_seconds: Optional[float] = Field(None, description="Duration in seconds")
-    tokens_used: Optional[int] = Field(None, description="Tokens consumed")
-    cost_usd: Optional[float] = Field(None, description="Cost in USD")
+    duration_seconds: float | None = Field(None, description="Duration in seconds")
+    tokens_used: int | None = Field(None, description="Tokens consumed")
+    cost_usd: float | None = Field(None, description="Cost in USD")
 
     # Error Info
-    error_message: Optional[str] = Field(None, description="Error message if failed")
-    error_type: Optional[str] = Field(None, description="Error type/class")
-    stack_trace: Optional[str] = Field(None, description="Stack trace if available")
+    error_message: str | None = Field(None, description="Error message if failed")
+    error_type: str | None = Field(None, description="Error type/class")
+    stack_trace: str | None = Field(None, description="Stack trace if available")
 
     class Config:
         json_schema_extra = {
@@ -121,31 +121,31 @@ class PhaseLogEvent(BaseLogEvent):
     issue_number: int
     phase_name: str
     phase_number: int
-    workflow_template: Optional[str] = None
+    workflow_template: str | None = None
 
     # Phase Details
     phase_status: Literal["started", "completed", "failed", "skipped"]
-    phase_type: Optional[str] = Field(None, description="Type of phase (plan, build, test, etc.)")
+    phase_type: str | None = Field(None, description="Type of phase (plan, build, test, etc.)")
 
     # Execution Details
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    duration_seconds: Optional[float] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    duration_seconds: float | None = None
 
     # Metrics
-    tokens_used: Optional[int] = None
-    cost_usd: Optional[float] = None
-    cache_hits: Optional[int] = Field(None, description="Number of cache hits")
-    cache_efficiency: Optional[float] = Field(None, description="Cache efficiency percentage")
+    tokens_used: int | None = None
+    cost_usd: float | None = None
+    cache_hits: int | None = Field(None, description="Number of cache hits")
+    cache_efficiency: float | None = Field(None, description="Cache efficiency percentage")
 
     # Quality Metrics
-    lint_errors: Optional[int] = Field(None, description="Number of lint errors")
-    test_pass_rate: Optional[float] = Field(None, description="Test pass rate percentage")
+    lint_errors: int | None = Field(None, description="Number of lint errors")
+    test_pass_rate: float | None = Field(None, description="Test pass rate percentage")
 
     # Error Info
-    error_message: Optional[str] = None
-    error_type: Optional[str] = None
-    retry_count: Optional[int] = Field(None, description="Number of retries attempted")
+    error_message: str | None = None
+    error_type: str | None = None
+    retry_count: int | None = Field(None, description="Number of retries attempted")
 
 
 class SystemLogEvent(BaseLogEvent):
@@ -161,13 +161,13 @@ class SystemLogEvent(BaseLogEvent):
     )
 
     # Performance Metrics
-    duration_ms: Optional[float] = Field(None, description="Operation duration in milliseconds")
-    memory_usage_mb: Optional[float] = Field(None, description="Memory usage in MB")
-    cpu_usage_percent: Optional[float] = Field(None, description="CPU usage percentage")
+    duration_ms: float | None = Field(None, description="Operation duration in milliseconds")
+    memory_usage_mb: float | None = Field(None, description="Memory usage in MB")
+    cpu_usage_percent: float | None = Field(None, description="CPU usage percentage")
 
     # Error Info
-    error_message: Optional[str] = None
-    error_type: Optional[str] = None
+    error_message: str | None = None
+    error_type: str | None = None
 
 
 class DatabaseLogEvent(BaseLogEvent):
@@ -180,16 +180,16 @@ class DatabaseLogEvent(BaseLogEvent):
     table: str = Field(description="Database table name")
 
     # Query Details
-    query: Optional[str] = Field(None, description="SQL query (sanitized)")
-    params_count: Optional[int] = Field(None, description="Number of parameters")
+    query: str | None = Field(None, description="SQL query (sanitized)")
+    params_count: int | None = Field(None, description="Number of parameters")
 
     # Performance
     duration_ms: float = Field(description="Query duration in milliseconds")
-    rows_affected: Optional[int] = Field(None, description="Number of rows affected")
+    rows_affected: int | None = Field(None, description="Number of rows affected")
 
     # Result
     status: Literal["success", "failure"] = Field(description="Operation status")
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 class HTTPLogEvent(BaseLogEvent):
@@ -201,16 +201,16 @@ class HTTPLogEvent(BaseLogEvent):
     status_code: int = Field(description="HTTP status code")
 
     # Client Info
-    client_ip: Optional[str] = Field(None, description="Client IP address")
-    user_agent: Optional[str] = Field(None, description="User agent string")
+    client_ip: str | None = Field(None, description="Client IP address")
+    user_agent: str | None = Field(None, description="User agent string")
 
     # Performance
     duration_ms: float = Field(description="Request duration in milliseconds")
-    response_size_bytes: Optional[int] = Field(None, description="Response size in bytes")
+    response_size_bytes: int | None = Field(None, description="Response size in bytes")
 
     # Error Info (for 4xx/5xx)
-    error_message: Optional[str] = None
-    error_type: Optional[str] = None
+    error_message: str | None = None
+    error_type: str | None = None
 
 
 class MetricsLogEvent(BaseLogEvent):
@@ -222,16 +222,16 @@ class MetricsLogEvent(BaseLogEvent):
     metric_unit: str = Field(description="Unit of measurement")
 
     # Dimensions
-    dimensions: Dict[str, str] = Field(
+    dimensions: dict[str, str] = Field(
         default_factory=dict,
         description="Metric dimensions (tags)"
     )
 
     # Aggregation
-    aggregation_type: Optional[Literal["sum", "avg", "min", "max", "count"]] = Field(
+    aggregation_type: Literal["sum", "avg", "min", "max", "count"] | None = Field(
         None, description="Type of aggregation"
     )
-    sample_count: Optional[int] = Field(None, description="Number of samples")
+    sample_count: int | None = Field(None, description="Number of samples")
 
 
 # Type alias for any log event

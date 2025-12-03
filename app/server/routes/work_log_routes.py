@@ -5,7 +5,6 @@ Endpoints for creating and managing work log entries.
 """
 
 import logging
-from typing import List
 
 from core.models.work_log import (
     WorkLogEntry,
@@ -76,8 +75,8 @@ def init_work_log_routes(repository: WorkLogRepository | None = None):
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail="Failed to retrieve work log entries")
 
-    @router.get("/session/{session_id}", response_model=List[WorkLogEntry])
-    async def get_session_work_logs(session_id: str) -> List[WorkLogEntry]:
+    @router.get("/session/{session_id}", response_model=list[WorkLogEntry])
+    async def get_session_work_logs(session_id: str) -> list[WorkLogEntry]:
         """
         Get all work log entries for a specific session.
 

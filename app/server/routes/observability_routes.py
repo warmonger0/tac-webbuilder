@@ -5,7 +5,6 @@ Endpoints for task logs and user prompts.
 """
 
 import logging
-from typing import List
 
 from core.models.observability import (
     IssueProgress,
@@ -57,7 +56,7 @@ def init_observability_routes(
             logger.error(f"Error creating user prompt log: {e}")
             raise HTTPException(status_code=500, detail="Failed to create user prompt log")
 
-    @router.get("/user-prompts", response_model=List[UserPrompt])
+    @router.get("/user-prompts", response_model=list[UserPrompt])
     async def get_user_prompts(
         session_id: str | None = None,
         issue_number: int | None = None,
@@ -65,7 +64,7 @@ def init_observability_routes(
         is_multi_phase: bool | None = None,
         limit: int = Query(50, ge=1, le=1000),
         offset: int = Query(0, ge=0),
-    ) -> List[UserPrompt]:
+    ) -> list[UserPrompt]:
         """
         Get user prompts with optional filtering.
 
@@ -94,13 +93,13 @@ def init_observability_routes(
             logger.error(f"Error retrieving user prompts: {e}")
             raise HTTPException(status_code=500, detail="Failed to retrieve user prompts")
 
-    @router.get("/user-prompts/with-progress", response_model=List[UserPromptWithProgress])
+    @router.get("/user-prompts/with-progress", response_model=list[UserPromptWithProgress])
     async def get_user_prompts_with_progress(
         session_id: str | None = None,
         issue_number: int | None = None,
         limit: int = Query(50, ge=1, le=1000),
         offset: int = Query(0, ge=0),
-    ) -> List[UserPromptWithProgress]:
+    ) -> list[UserPromptWithProgress]:
         """
         Get user prompts with linked task progress.
 
@@ -167,7 +166,7 @@ def init_observability_routes(
             logger.error(f"Error creating task log: {e}")
             raise HTTPException(status_code=500, detail="Failed to create task log")
 
-    @router.get("/task-logs", response_model=List[TaskLog])
+    @router.get("/task-logs", response_model=list[TaskLog])
     async def get_task_logs(
         issue_number: int | None = None,
         adw_id: str | None = None,
@@ -175,7 +174,7 @@ def init_observability_routes(
         phase_status: str | None = None,
         limit: int = Query(50, ge=1, le=1000),
         offset: int = Query(0, ge=0),
-    ) -> List[TaskLog]:
+    ) -> list[TaskLog]:
         """
         Get task logs with optional filtering.
 
@@ -204,8 +203,8 @@ def init_observability_routes(
             logger.error(f"Error retrieving task logs: {e}")
             raise HTTPException(status_code=500, detail="Failed to retrieve task logs")
 
-    @router.get("/task-logs/issue/{issue_number}", response_model=List[TaskLog])
-    async def get_task_logs_by_issue(issue_number: int) -> List[TaskLog]:
+    @router.get("/task-logs/issue/{issue_number}", response_model=list[TaskLog])
+    async def get_task_logs_by_issue(issue_number: int) -> list[TaskLog]:
         """
         Get all task logs for a specific issue.
 
@@ -221,8 +220,8 @@ def init_observability_routes(
             logger.error(f"Error retrieving task logs for issue #{issue_number}: {e}")
             raise HTTPException(status_code=500, detail="Failed to retrieve task logs for issue")
 
-    @router.get("/task-logs/adw/{adw_id}", response_model=List[TaskLog])
-    async def get_task_logs_by_adw(adw_id: str) -> List[TaskLog]:
+    @router.get("/task-logs/adw/{adw_id}", response_model=list[TaskLog])
+    async def get_task_logs_by_adw(adw_id: str) -> list[TaskLog]:
         """
         Get all task logs for a specific ADW workflow.
 

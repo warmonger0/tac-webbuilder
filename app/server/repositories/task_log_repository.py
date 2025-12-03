@@ -5,7 +5,6 @@ Handles database operations for ADW task/phase logs.
 """
 
 import logging
-from typing import List, Optional
 
 from core.models.observability import IssueProgress, TaskLog, TaskLogCreate, TaskLogFilters
 from database.factory import get_database_adapter
@@ -99,7 +98,7 @@ class TaskLogRepository:
             logger.error(f"Failed to create task log: {e}")
             raise
 
-    def get_all(self, filters: Optional[TaskLogFilters] = None) -> List[TaskLog]:
+    def get_all(self, filters: TaskLogFilters | None = None) -> list[TaskLog]:
         """
         Get all task logs with optional filtering and pagination.
 
@@ -177,7 +176,7 @@ class TaskLogRepository:
             logger.error(f"Failed to get task logs: {e}")
             raise
 
-    def get_by_issue(self, issue_number: int) -> List[TaskLog]:
+    def get_by_issue(self, issue_number: int) -> list[TaskLog]:
         """
         Get all task logs for a specific issue.
 
@@ -233,7 +232,7 @@ class TaskLogRepository:
             logger.error(f"Failed to get task logs for issue #{issue_number}: {e}")
             raise
 
-    def get_by_adw_id(self, adw_id: str) -> List[TaskLog]:
+    def get_by_adw_id(self, adw_id: str) -> list[TaskLog]:
         """
         Get all task logs for a specific ADW workflow.
 
@@ -289,7 +288,7 @@ class TaskLogRepository:
             logger.error(f"Failed to get task logs for ADW {adw_id}: {e}")
             raise
 
-    def get_issue_progress(self, issue_number: int) -> Optional[IssueProgress]:
+    def get_issue_progress(self, issue_number: int) -> IssueProgress | None:
         """
         Get progress summary for an issue.
 
@@ -330,7 +329,7 @@ class TaskLogRepository:
             logger.error(f"Failed to get progress for issue #{issue_number}: {e}")
             raise
 
-    def get_latest_by_issue(self, issue_number: int) -> Optional[TaskLog]:
+    def get_latest_by_issue(self, issue_number: int) -> TaskLog | None:
         """
         Get the most recent task log for an issue.
 

@@ -6,7 +6,6 @@ Handles database operations for user prompt logs.
 
 import logging
 from datetime import datetime
-from typing import List, Optional
 
 from core.models.observability import (
     UserPrompt,
@@ -112,7 +111,7 @@ class UserPromptRepository:
             logger.error(f"Failed to create user prompt log: {e}")
             raise
 
-    def get_all(self, filters: Optional[UserPromptFilters] = None) -> List[UserPrompt]:
+    def get_all(self, filters: UserPromptFilters | None = None) -> list[UserPrompt]:
         """
         Get all user prompts with optional filtering and pagination.
 
@@ -196,7 +195,7 @@ class UserPromptRepository:
             logger.error(f"Failed to get user prompts: {e}")
             raise
 
-    def get_by_request_id(self, request_id: str) -> Optional[UserPrompt]:
+    def get_by_request_id(self, request_id: str) -> UserPrompt | None:
         """
         Get user prompt by request ID.
 
@@ -253,7 +252,7 @@ class UserPromptRepository:
             logger.error(f"Failed to get user prompt by request_id {request_id}: {e}")
             raise
 
-    def get_with_progress(self, filters: Optional[UserPromptFilters] = None) -> List[UserPromptWithProgress]:
+    def get_with_progress(self, filters: UserPromptFilters | None = None) -> list[UserPromptWithProgress]:
         """
         Get user prompts with linked task progress.
 

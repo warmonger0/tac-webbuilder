@@ -8,7 +8,6 @@ environment variables taking precedence.
 
 import os
 from pathlib import Path
-from typing import Optional
 
 import yaml
 from pydantic import Field, field_validator
@@ -28,7 +27,7 @@ class ServerConfig(BaseSettings):
         default=5173,
         description="Frontend development server port",
     )
-    frontend_url: Optional[str] = Field(
+    frontend_url: str | None = Field(
         default=None,
         description="Frontend URL (auto-computed if not provided)",
     )
@@ -51,7 +50,7 @@ class GitHubConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="TWB_GITHUB_")
 
-    pat: Optional[str] = Field(
+    pat: str | None = Field(
         default=None,
         description="GitHub Personal Access Token",
     )
@@ -100,7 +99,7 @@ class DatabaseConfig(BaseSettings):
         default="tac_user",
         description="PostgreSQL user",
     )
-    postgres_password: Optional[str] = Field(
+    postgres_password: str | None = Field(
         default=None,
         description="PostgreSQL password",
     )
@@ -136,11 +135,11 @@ class LLMConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="TWB_LLM_")
 
-    openai_api_key: Optional[str] = Field(
+    openai_api_key: str | None = Field(
         default=None,
         description="OpenAI API key",
     )
-    anthropic_api_key: Optional[str] = Field(
+    anthropic_api_key: str | None = Field(
         default=None,
         description="Anthropic API key",
     )
@@ -151,7 +150,7 @@ class CloudflareConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="TWB_CLOUDFLARE_")
 
-    tunnel_token: Optional[str] = Field(
+    tunnel_token: str | None = Field(
         default=None,
         description="Cloudflare tunnel token",
     )
@@ -198,7 +197,7 @@ class AppConfig(BaseSettings):
         if not yaml_path.exists():
             raise FileNotFoundError(f"Config file not found: {yaml_path}")
 
-        with open(yaml_path, "r") as f:
+        with open(yaml_path) as f:
             yaml_data = yaml.safe_load(f) or {}
 
         # Convert nested YAML data into environment variables temporarily
@@ -233,7 +232,7 @@ class AppConfig(BaseSettings):
                     os.environ.pop(key, None)
 
     @classmethod
-    def load(cls, yaml_path: Optional[Path | str] = None) -> "AppConfig":
+    def load(cls, yaml_path: Path | str | None = None) -> "AppConfig":
         """
         Load configuration with automatic fallback.
 
@@ -264,10 +263,10 @@ class AppConfig(BaseSettings):
 
 
 # Singleton config instance
-_config: Optional[AppConfig] = None
+_config: AppConfig | None = None
 
 
-def get_config(yaml_path: Optional[Path | str] = None, force_reload: bool = False) -> AppConfig:
+def get_config(yaml_path: Path | str | None = None, force_reload: bool = False) -> AppConfig:
     """
     Get the application configuration singleton.
 
@@ -285,7 +284,7 @@ def get_config(yaml_path: Optional[Path | str] = None, force_reload: bool = Fals
 
 
 # Convenience function for backward compatibility
-def load_config(yaml_path: Optional[Path | str] = None) -> AppConfig:
+def load_config(yaml_path: Path | str | None = None) -> AppConfig:
     """
     Load application configuration.
 

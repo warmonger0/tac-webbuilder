@@ -8,8 +8,6 @@ Tests API endpoints for work log management:
 - Deleting entries
 """
 
-from datetime import datetime
-from unittest.mock import patch
 
 import pytest
 

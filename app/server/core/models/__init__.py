@@ -19,6 +19,16 @@ from .domain import (
     ServiceHealth,
     TableSchema,
 )
+from .observability import (
+    IssueProgress,
+    TaskLog,
+    TaskLogCreate,
+    TaskLogFilters,
+    UserPrompt,
+    UserPromptCreate,
+    UserPromptFilters,
+    UserPromptWithProgress,
+)
 from .queue import (
     ChildIssueInfo,
     Phase,
@@ -74,16 +84,6 @@ from .workflow import (
     WorkflowTemplate,
     WorkflowTrends,
     WorktreeHealthCheck,
-)
-from .observability import (
-    IssueProgress,
-    TaskLog,
-    TaskLogCreate,
-    TaskLogFilters,
-    UserPrompt,
-    UserPromptCreate,
-    UserPromptFilters,
-    UserPromptWithProgress,
 )
 
 __all__ = [

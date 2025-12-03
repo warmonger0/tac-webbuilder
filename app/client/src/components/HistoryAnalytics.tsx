@@ -10,6 +10,22 @@ export function HistoryAnalytics({ analytics }: HistoryAnalyticsProps) {
     return `${mins}m`;
   };
 
+  const formatCost = (cost: number) => {
+    return `$${cost.toFixed(3)}`;
+  };
+
+  const formatTrend = (trend: number) => {
+    if (Math.abs(trend) < 0.1) return '→'; // No significant change
+    if (trend > 0) return `↑${trend.toFixed(1)}%`; // Increasing
+    return `↓${Math.abs(trend).toFixed(1)}%`; // Decreasing
+  };
+
+  const getTrendColor = (trend: number) => {
+    if (Math.abs(trend) < 0.1) return 'text-gray-500'; // No change
+    if (trend > 0) return 'text-red-600'; // Increasing cost is bad (red)
+    return 'text-green-600'; // Decreasing cost is good (green)
+  };
+
   const stats = [
     {
       label: 'Total Workflows',
@@ -36,17 +52,34 @@ export function HistoryAnalytics({ analytics }: HistoryAnalyticsProps) {
       value: formatDuration(analytics.avg_duration_seconds),
       color: 'text-purple-600',
     },
+    {
+      label: 'Avg Cost / Completion',
+      value: formatCost(analytics.avg_cost_per_completion),
+      color: 'text-emerald-600',
+      subtitle: (
+        <div className="flex items-center justify-center gap-2 text-[10px] mt-1">
+          <span className={getTrendColor(analytics.cost_trend_7day)}>
+            7d: {formatTrend(analytics.cost_trend_7day)}
+          </span>
+          <span className="text-gray-300">|</span>
+          <span className={getTrendColor(analytics.cost_trend_30day)}>
+            30d: {formatTrend(analytics.cost_trend_30day)}
+          </span>
+        </div>
+      ),
+    },
   ];
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
       <h3 className="text-lg font-bold text-gray-900 mb-4">Analytics Summary</h3>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {stats.map((stat) => (
           <div key={stat.label} className="text-center">
             <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
             <p className="text-xs text-gray-600 mt-1">{stat.label}</p>
+            {stat.subtitle && stat.subtitle}
           </div>
         ))}
       </div>

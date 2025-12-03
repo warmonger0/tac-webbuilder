@@ -48,19 +48,6 @@ export function PlansPanel() {
             </div>
           </div>
 
-          <div className="flex items-start">
-            <input type="checkbox" className="mt-1 mr-3" disabled />
-            <div>
-              <div className="font-medium text-gray-900">Average Cost Per Completion Metric</div>
-              <div className="text-sm text-gray-600">4-6 hours - Medium Priority - Feature</div>
-              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
-                <li>Add metric display to History panel (Panel 3)</li>
-                <li>7-day and 30-day trend comparisons</li>
-                <li>Phase cost breakdown with visual indicators</li>
-                <li>Loading states and error handling</li>
-              </ul>
-            </div>
-          </div>
 
           <div className="flex items-start">
             <input type="checkbox" className="mt-1 mr-3" disabled />
@@ -85,11 +72,27 @@ export function PlansPanel() {
           <div className="flex items-start">
             <input type="checkbox" checked className="mt-1 mr-3" disabled />
             <div>
+              <div className="font-medium text-gray-700">Average Cost Per Completion Metric</div>
+              <div className="text-sm text-gray-500">Completed 2025-12-03</div>
+              <ul className="text-sm text-gray-500 mt-1 list-disc pl-5">
+                <li>Added to History Analytics panel (Panel 3)</li>
+                <li>Shows avg cost for successfully completed workflows only</li>
+                <li>7-day and 30-day trend comparison with visual indicators</li>
+                <li>Green arrows (↓) for cost reduction, red (↑) for increases</li>
+                <li>Backend: Enhanced analytics.py with trend calculations</li>
+                <li>Frontend: Added 6th stat card with responsive grid layout</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex items-start">
+            <input type="checkbox" checked className="mt-1 mr-3" disabled />
+            <div>
               <div className="font-medium text-gray-700">Hybrid Lint Loop (External + LLM Fallback)</div>
               <div className="text-sm text-gray-500">Completed 2025-12-03</div>
               <ul className="text-sm text-gray-500 mt-1 list-disc pl-5">
                 <li>3-attempt external loop with ruff/eslint auto-fix</li>
-                <li>LLM fallback stub for remaining errors (<50)</li>
+                <li>LLM fallback stub for remaining errors (&lt;50)</li>
                 <li>Changed exit behavior: sys.exit(1) → sys.exit(0) (always continue)</li>
                 <li>Tracks error reduction across attempts</li>
                 <li>Would have saved workflow #140 from lint blocking</li>

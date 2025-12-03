@@ -5,17 +5,13 @@ Service for writing structured logs to JSONL files with per-workflow isolation.
 Provides zero-overhead logging with Pydantic serialization.
 """
 
-import json
 import logging
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Optional
 
 from core.models.structured_logs import (
-    BaseLogEvent,
     DatabaseLogEvent,
     HTTPLogEvent,
     LogEvent,
@@ -56,7 +52,7 @@ class StructuredLogger:
 
     def __init__(
         self,
-        log_dir: Optional[Path] = None,
+        log_dir: Path | None = None,
         enable_console: bool = False,
         enable_file: bool = True,
     ):
@@ -88,7 +84,7 @@ class StructuredLogger:
                 logger.warning(f"Failed to create log directory {self.log_dir}: {e}")
                 self.enable_file = False
 
-    def _get_log_file(self, adw_id: Optional[str] = None, suffix: str = "general") -> Path:
+    def _get_log_file(self, adw_id: str | None = None, suffix: str = "general") -> Path:
         """
         Get the appropriate log file path.
 
@@ -164,16 +160,16 @@ class StructuredLogger:
         message: str,
         workflow_status: str,
         level: LogLevel = LogLevel.INFO,
-        workflow_template: Optional[str] = None,
-        phase_name: Optional[str] = None,
-        phase_number: Optional[int] = None,
-        phase_status: Optional[str] = None,
-        duration_seconds: Optional[float] = None,
-        tokens_used: Optional[int] = None,
-        cost_usd: Optional[float] = None,
-        error_message: Optional[str] = None,
-        error_type: Optional[str] = None,
-        correlation_id: Optional[str] = None,
+        workflow_template: str | None = None,
+        phase_name: str | None = None,
+        phase_number: int | None = None,
+        phase_status: str | None = None,
+        duration_seconds: float | None = None,
+        tokens_used: int | None = None,
+        cost_usd: float | None = None,
+        error_message: str | None = None,
+        error_type: str | None = None,
+        correlation_id: str | None = None,
         **context,
     ) -> bool:
         """
@@ -232,14 +228,14 @@ class StructuredLogger:
         phase_status: str,
         message: str,
         level: LogLevel = LogLevel.INFO,
-        workflow_template: Optional[str] = None,
-        started_at: Optional[datetime] = None,
-        completed_at: Optional[datetime] = None,
-        duration_seconds: Optional[float] = None,
-        tokens_used: Optional[int] = None,
-        cost_usd: Optional[float] = None,
-        error_message: Optional[str] = None,
-        correlation_id: Optional[str] = None,
+        workflow_template: str | None = None,
+        started_at: datetime | None = None,
+        completed_at: datetime | None = None,
+        duration_seconds: float | None = None,
+        tokens_used: int | None = None,
+        cost_usd: float | None = None,
+        error_message: str | None = None,
+        correlation_id: str | None = None,
         **context,
     ) -> bool:
         """
@@ -296,8 +292,8 @@ class StructuredLogger:
         status: str,
         message: str,
         level: LogLevel = LogLevel.INFO,
-        duration_ms: Optional[float] = None,
-        error_message: Optional[str] = None,
+        duration_ms: float | None = None,
+        error_message: str | None = None,
         **context,
     ) -> bool:
         """
@@ -339,9 +335,9 @@ class StructuredLogger:
         status: str,
         message: str,
         level: LogLevel = LogLevel.DEBUG,
-        query: Optional[str] = None,
-        rows_affected: Optional[int] = None,
-        error_message: Optional[str] = None,
+        query: str | None = None,
+        rows_affected: int | None = None,
+        error_message: str | None = None,
         **context,
     ) -> bool:
         """
@@ -387,9 +383,9 @@ class StructuredLogger:
         duration_ms: float,
         message: str,
         level: LogLevel = LogLevel.INFO,
-        client_ip: Optional[str] = None,
-        error_message: Optional[str] = None,
-        request_id: Optional[str] = None,
+        client_ip: str | None = None,
+        error_message: str | None = None,
+        request_id: str | None = None,
         **context,
     ) -> bool:
         """
@@ -433,7 +429,7 @@ class StructuredLogger:
         metric_value: float,
         metric_unit: str,
         message: str,
-        dimensions: Optional[dict] = None,
+        dimensions: dict | None = None,
         **context,
     ) -> bool:
         """
@@ -466,7 +462,7 @@ class StructuredLogger:
 
 
 # Singleton instance
-_structured_logger: Optional[StructuredLogger] = None
+_structured_logger: StructuredLogger | None = None
 
 
 def get_structured_logger() -> StructuredLogger:

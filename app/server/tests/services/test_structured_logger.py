@@ -6,8 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
-
-from core.models.structured_logs import LogLevel, LogSource
+from core.models.structured_logs import LogLevel
 from services.structured_logger import StructuredLogger, get_structured_logger
 
 
@@ -54,7 +53,7 @@ class TestStructuredLogger:
         assert log_file.exists()
 
         # Read and parse log entry
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             log_entry = json.loads(f.read().strip())
 
         assert log_entry["adw_id"] == "adw-test123"
@@ -88,7 +87,7 @@ class TestStructuredLogger:
         log_file = temp_log_dir / "workflow_adw-phase123.jsonl"
         assert log_file.exists()
 
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             log_entry = json.loads(f.read().strip())
 
         assert log_entry["phase_name"] == "Build"
@@ -113,7 +112,7 @@ class TestStructuredLogger:
         log_file = temp_log_dir / f"general_{date_str}.jsonl"
         assert log_file.exists()
 
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             log_entry = json.loads(f.read().strip())
 
         assert log_entry["component"] == "database"
@@ -183,11 +182,11 @@ class TestStructuredLogger:
         assert log_file2.exists()
 
         # Verify contents
-        with open(log_file1, "r") as f:
+        with open(log_file1) as f:
             entry1 = json.loads(f.read().strip())
             assert entry1["adw_id"] == "adw-workflow1"
 
-        with open(log_file2, "r") as f:
+        with open(log_file2) as f:
             entry2 = json.loads(f.read().strip())
             assert entry2["adw_id"] == "adw-workflow2"
 
@@ -209,7 +208,7 @@ class TestStructuredLogger:
         assert log_file.exists()
 
         # Count lines (should be 3)
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             lines = f.readlines()
             assert len(lines) == 3
 
@@ -234,7 +233,7 @@ class TestStructuredLogger:
         assert success is True
 
         log_file = temp_log_dir / "workflow_adw-error123.jsonl"
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             entry = json.loads(f.read().strip())
 
         assert entry["level"] == "error"
@@ -255,7 +254,7 @@ class TestStructuredLogger:
         assert success is True
 
         log_file = temp_log_dir / "workflow_adw-context123.jsonl"
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             entry = json.loads(f.read().strip())
 
         assert entry["context"]["custom_field"] == "custom_value"

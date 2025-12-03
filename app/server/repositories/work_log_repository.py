@@ -6,8 +6,6 @@ Handles database operations for work log entries.
 
 import json
 import logging
-from datetime import datetime
-from typing import List, Optional
 
 from core.models.work_log import WorkLogEntry, WorkLogEntryCreate
 from database.factory import get_database_adapter
@@ -106,7 +104,7 @@ class WorkLogRepository:
             logger.error(f"Failed to create work log entry: {e}")
             raise
 
-    def get_all(self, limit: int = 50, offset: int = 0) -> List[WorkLogEntry]:
+    def get_all(self, limit: int = 50, offset: int = 0) -> list[WorkLogEntry]:
         """
         Get all work log entries with pagination.
 
@@ -154,7 +152,7 @@ class WorkLogRepository:
             logger.error(f"Failed to get work log entries: {e}")
             raise
 
-    def get_by_session(self, session_id: str) -> List[WorkLogEntry]:
+    def get_by_session(self, session_id: str) -> list[WorkLogEntry]:
         """
         Get all work log entries for a specific session.
 

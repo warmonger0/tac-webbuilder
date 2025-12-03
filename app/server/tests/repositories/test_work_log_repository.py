@@ -14,7 +14,6 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from core.models.work_log import WorkLogEntry, WorkLogEntryCreate
 from repositories.work_log_repository import WorkLogRepository
 

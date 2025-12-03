@@ -27,6 +27,9 @@ def get_history_analytics() -> dict:
             - workflows_by_status: Count by status
             - avg_cost: Average cost per workflow
             - total_cost: Total cost across all workflows
+            - avg_cost_per_completion: Average cost per successfully completed workflow
+            - cost_trend_7day: 7-day cost trend percentage (positive = increasing)
+            - cost_trend_30day: 30-day cost trend percentage (positive = increasing)
             - avg_tokens: Average tokens per workflow
             - avg_cache_efficiency: Average cache efficiency percentage
     """
@@ -97,6 +100,91 @@ def get_history_analytics() -> dict:
         avg_cost = cost_row["avg_cost"] if cost_row["avg_cost"] else 0.0
         total_cost = cost_row["total_cost"] if cost_row["total_cost"] else 0.0
 
+        # Average cost per successful completion (only completed workflows)
+        cursor.execute("""
+            SELECT AVG(actual_cost_total) as avg_cost_per_completion
+            FROM workflow_history
+            WHERE status = 'completed'
+              AND actual_cost_total IS NOT NULL
+              AND actual_cost_total > 0
+        """)
+        completion_cost_row = cursor.fetchone()
+        avg_cost_per_completion = (
+            completion_cost_row["avg_cost_per_completion"]
+            if completion_cost_row["avg_cost_per_completion"]
+            else 0.0
+        )
+
+        # 7-day trend: Compare last 7 days vs previous 7 days
+        cursor.execute("""
+            SELECT AVG(actual_cost_total) as avg_cost
+            FROM workflow_history
+            WHERE status = 'completed'
+              AND actual_cost_total IS NOT NULL
+              AND actual_cost_total > 0
+              AND datetime(created_at) >= datetime('now', '-7 days')
+        """)
+        cost_7day_current = cursor.fetchone()
+        avg_cost_7day_current = (
+            cost_7day_current["avg_cost"] if cost_7day_current["avg_cost"] else 0.0
+        )
+
+        cursor.execute("""
+            SELECT AVG(actual_cost_total) as avg_cost
+            FROM workflow_history
+            WHERE status = 'completed'
+              AND actual_cost_total IS NOT NULL
+              AND actual_cost_total > 0
+              AND datetime(created_at) >= datetime('now', '-14 days')
+              AND datetime(created_at) < datetime('now', '-7 days')
+        """)
+        cost_7day_previous = cursor.fetchone()
+        avg_cost_7day_previous = (
+            cost_7day_previous["avg_cost"] if cost_7day_previous["avg_cost"] else 0.0
+        )
+
+        # Calculate 7-day trend percentage
+        cost_trend_7day = 0.0
+        if avg_cost_7day_previous > 0:
+            cost_trend_7day = (
+                (avg_cost_7day_current - avg_cost_7day_previous) / avg_cost_7day_previous * 100
+            )
+
+        # 30-day trend: Compare last 30 days vs previous 30 days
+        cursor.execute("""
+            SELECT AVG(actual_cost_total) as avg_cost
+            FROM workflow_history
+            WHERE status = 'completed'
+              AND actual_cost_total IS NOT NULL
+              AND actual_cost_total > 0
+              AND datetime(created_at) >= datetime('now', '-30 days')
+        """)
+        cost_30day_current = cursor.fetchone()
+        avg_cost_30day_current = (
+            cost_30day_current["avg_cost"] if cost_30day_current["avg_cost"] else 0.0
+        )
+
+        cursor.execute("""
+            SELECT AVG(actual_cost_total) as avg_cost
+            FROM workflow_history
+            WHERE status = 'completed'
+              AND actual_cost_total IS NOT NULL
+              AND actual_cost_total > 0
+              AND datetime(created_at) >= datetime('now', '-60 days')
+              AND datetime(created_at) < datetime('now', '-30 days')
+        """)
+        cost_30day_previous = cursor.fetchone()
+        avg_cost_30day_previous = (
+            cost_30day_previous["avg_cost"] if cost_30day_previous["avg_cost"] else 0.0
+        )
+
+        # Calculate 30-day trend percentage
+        cost_trend_30day = 0.0
+        if avg_cost_30day_previous > 0:
+            cost_trend_30day = (
+                (avg_cost_30day_current - avg_cost_30day_previous) / avg_cost_30day_previous * 100
+            )
+
         # Token analytics
         cursor.execute("""
             SELECT
@@ -120,6 +208,9 @@ def get_history_analytics() -> dict:
             "workflows_by_status": status_counts,
             "avg_cost": avg_cost,
             "total_cost": total_cost,
+            "avg_cost_per_completion": avg_cost_per_completion,
+            "cost_trend_7day": cost_trend_7day,
+            "cost_trend_30day": cost_trend_30day,
             "avg_tokens": avg_tokens,
             "avg_cache_efficiency": avg_cache_efficiency,
         }

@@ -33,10 +33,10 @@ from core.data_models import (
     SubmitRequestResponse,
 )
 from core.github_poster import GitHubPoster
+from core.models.observability import UserPromptCreate
 from core.nl_processor import process_request
 from core.pattern_predictor import predict_patterns_from_input, store_predicted_patterns
 from core.project_detector import detect_project_context
-from core.models.observability import UserPromptCreate
 from database import get_database_adapter
 from repositories.user_prompt_repository import UserPromptRepository
 
