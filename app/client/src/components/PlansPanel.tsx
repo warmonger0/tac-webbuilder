@@ -52,6 +52,22 @@ export function PlansPanel() {
           <div className="flex items-start">
             <input type="checkbox" className="mt-1 mr-3" disabled />
             <div>
+              <div className="font-medium text-red-700">🐛 Post-Implementation Error Checking Phase</div>
+              <div className="text-sm text-gray-600">4-6 hours - HIGH Priority - Enhancement</div>
+              <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
+                <li>Add new ADW workflow phase after implementation completes</li>
+                <li>Automated error diagnosis and continued monitoring</li>
+                <li>Visual inspection step to verify UI changes are working</li>
+                <li>Currently: Average Cost Per Completion metric implemented but visual not showing</li>
+                <li>Would catch database/UI sync issues immediately</li>
+                <li>Phase would include: Screenshot capture, visual regression, console error checks</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex items-start">
+            <input type="checkbox" className="mt-1 mr-3" disabled />
+            <div>
               <div className="font-medium text-gray-900">CLI Interface</div>
               <div className="text-sm text-gray-600">8 hours - Low Priority - Feature</div>
               <ul className="text-sm text-gray-600 mt-1 list-disc pl-5">
