@@ -9,7 +9,7 @@ export function PlansPanel() {
           <span className="mr-2">🔄</span> In Progress
         </h3>
         <div className="space-y-2 pl-6">
-          <p className="text-gray-500 italic">Ready for Session 6: Pattern Review System</p>
+          <p className="text-gray-500 italic">Ready for Session 7: Daily Pattern Analysis</p>
         </div>
       </div>
 
@@ -288,6 +288,26 @@ export function PlansPanel() {
           <span className="mr-2">✅</span> Recently Completed
         </h3>
         <div className="space-y-3 pl-6">
+          <div className="flex items-start">
+            <input type="checkbox" checked className="mt-1 mr-3" disabled />
+            <div>
+              <div className="font-medium text-gray-700">Session 6: Pattern Review System (CLI + Web UI)</div>
+              <div className="text-sm text-gray-500">Completed 2025-12-06 (~4 hours + bonus frontend)</div>
+              <ul className="text-sm text-gray-500 mt-1 list-disc pl-5">
+                <li>Created pattern_approvals + pattern_review_history tables (audit trail)</li>
+                <li>Created PatternReviewService (~290 lines) - approve, reject, statistics</li>
+                <li>Created review_patterns.py CLI (~400 lines) - interactive review tool</li>
+                <li>Created 6 REST API endpoints for pattern review (routes/pattern_review_routes.py)</li>
+                <li>BONUS: Created ReviewPanel (Panel 8) - full web UI for pattern review (~370 lines)</li>
+                <li>BONUS: Created patternReviewClient.ts - TypeScript API client (~140 lines)</li>
+                <li>8 sample test patterns populated for review</li>
+                <li>Impact score sorting (confidence × occurrences × savings)</li>
+                <li>Safety layer: Manual approval before automation (Sessions 12-13)</li>
+                <li>Both CLI and web UI functional for pattern review</li>
+              </ul>
+            </div>
+          </div>
+
           <div className="flex items-start">
             <input type="checkbox" checked className="mt-1 mr-3" disabled />
             <div>
