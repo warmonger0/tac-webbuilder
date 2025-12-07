@@ -244,7 +244,12 @@ class PatternReviewService:
             """
             )
 
-            stats = {row[0]: row[1] for row in cursor.fetchall()}
+            # Handle both SQLite (tuple) and PostgreSQL (dict) rows
+            rows = cursor.fetchall()
+            if rows and isinstance(rows[0], dict):
+                stats = {row['status']: row['count'] for row in rows}
+            else:
+                stats = {row[0]: row[1] for row in rows}
 
             logger.info(f"[{self.__class__.__name__}] Review statistics: {stats}")
             return stats
@@ -254,7 +259,7 @@ class PatternReviewService:
         Convert database row to PatternReviewItem model.
 
         Args:
-            row: Database row tuple
+            row: Database row (dict for PostgreSQL, tuple for SQLite)
 
         Returns:
             PatternReviewItem object
@@ -262,30 +267,59 @@ class PatternReviewService:
         if not row:
             return None
 
+        # Handle both PostgreSQL (dict) and SQLite (tuple)
+        if isinstance(row, dict):
+            # PostgreSQL with RealDictCursor
+            example_sessions_raw = row.get('example_sessions')
+            pattern_id = row.get('pattern_id')
+        else:
+            # SQLite with tuple
+            example_sessions_raw = row[11]
+            pattern_id = row[1]
+
         # Parse example_sessions JSON if present
         example_sessions = None
-        if row[11]:  # example_sessions column
+        if example_sessions_raw:
             try:
-                example_sessions = json.loads(row[11])
+                example_sessions = json.loads(example_sessions_raw)
             except (json.JSONDecodeError, TypeError):
                 logger.warning(
-                    f"[{self.__class__.__name__}] Failed to parse example_sessions for pattern {row[1]}"
+                    f"[{self.__class__.__name__}] Failed to parse example_sessions for pattern {pattern_id}"
                 )
                 example_sessions = []
 
-        return PatternReviewItem(
-            id=row[0],
-            pattern_id=row[1],
-            status=row[2],
-            reviewed_by=row[3],
-            reviewed_at=row[4],
-            approval_notes=row[5],
-            confidence_score=row[6],
-            occurrence_count=row[7],
-            estimated_savings_usd=row[8],
-            tool_sequence=row[9],
-            pattern_context=row[10],
-            example_sessions=example_sessions,
-            created_at=row[12],
-            updated_at=row[13],
-        )
+        # Build model using column names (works for both dict and tuple with column access)
+        if isinstance(row, dict):
+            return PatternReviewItem(
+                id=row.get('id'),
+                pattern_id=row.get('pattern_id'),
+                status=row.get('status'),
+                reviewed_by=row.get('reviewed_by'),
+                reviewed_at=str(row.get('reviewed_at')) if row.get('reviewed_at') else None,
+                approval_notes=row.get('approval_notes'),
+                confidence_score=row.get('confidence_score'),
+                occurrence_count=row.get('occurrence_count'),
+                estimated_savings_usd=row.get('estimated_savings_usd'),
+                tool_sequence=row.get('tool_sequence'),
+                pattern_context=row.get('pattern_context'),
+                example_sessions=example_sessions,
+                created_at=str(row.get('created_at')) if row.get('created_at') else None,
+                updated_at=str(row.get('updated_at')) if row.get('updated_at') else None,
+            )
+        else:
+            return PatternReviewItem(
+                id=row[0],
+                pattern_id=row[1],
+                status=row[2],
+                reviewed_by=row[3],
+                reviewed_at=row[4],
+                approval_notes=row[5],
+                confidence_score=row[6],
+                occurrence_count=row[7],
+                estimated_savings_usd=row[8],
+                tool_sequence=row[9],
+                pattern_context=row[10],
+                example_sessions=example_sessions,
+                created_at=row[12],
+                updated_at=row[13],
+            )

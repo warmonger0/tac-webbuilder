@@ -17,7 +17,6 @@ import {
 export function ReviewPanel() {
   const queryClient = useQueryClient();
   const [selectedPattern, setSelectedPattern] = useState<PatternReview | null>(null);
-  const [reviewerName, setReviewerName] = useState('web-reviewer');
   const [notes, setNotes] = useState('');
   const [reason, setReason] = useState('');
   const [comment, setComment] = useState('');
@@ -74,7 +73,7 @@ export function ReviewPanel() {
     if (confirm(`Approve pattern "${selectedPattern.pattern_id}"?`)) {
       approveMutation.mutate({
         patternId: selectedPattern.pattern_id,
-        request: { reviewer: reviewerName, notes },
+        request: { notes },
       });
     }
   };
@@ -88,7 +87,7 @@ export function ReviewPanel() {
     if (confirm(`Reject pattern "${selectedPattern.pattern_id}"?`)) {
       rejectMutation.mutate({
         patternId: selectedPattern.pattern_id,
-        request: { reviewer: reviewerName, reason },
+        request: { reason },
       });
     }
   };
@@ -97,7 +96,7 @@ export function ReviewPanel() {
     if (!selectedPattern || !comment.trim()) return;
     commentMutation.mutate({
       patternId: selectedPattern.pattern_id,
-      request: { reviewer: reviewerName, comment },
+      request: { comment },
     });
   };
 
@@ -130,20 +129,6 @@ export function ReviewPanel() {
           </div>
         </div>
       )}
-
-      {/* Reviewer Name */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Reviewer Name
-        </label>
-        <input
-          type="text"
-          value={reviewerName}
-          onChange={(e) => setReviewerName(e.target.value)}
-          className="w-64 px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-          placeholder="Your name"
-        />
-      </div>
 
       {isLoading && <div className="text-gray-600">Loading patterns...</div>}
       {error && <div className="text-red-600">Error loading patterns: {String(error)}</div>}

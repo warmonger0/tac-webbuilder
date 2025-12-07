@@ -36,19 +36,16 @@ class PatternReviewResponse(BaseModel):
 
 class ApproveRequest(BaseModel):
     """Request to approve a pattern."""
-    reviewer: str = Field(..., description="Name of the reviewer")
     notes: Optional[str] = Field(None, description="Optional approval notes")
 
 
 class RejectRequest(BaseModel):
     """Request to reject a pattern."""
-    reviewer: str = Field(..., description="Name of the reviewer")
     reason: str = Field(..., description="Reason for rejection (required)")
 
 
 class CommentRequest(BaseModel):
     """Request to add a comment to a pattern."""
-    reviewer: str = Field(..., description="Name of the commenter")
     comment: str = Field(..., description="Comment text")
 
 
@@ -171,7 +168,7 @@ async def approve_pattern(pattern_id: str, request: ApproveRequest):
 
     Args:
         pattern_id: Pattern identifier
-        request: Approval request with reviewer name and optional notes
+        request: Approval request with optional notes
 
     Returns:
         Updated pattern details
@@ -179,14 +176,14 @@ async def approve_pattern(pattern_id: str, request: ApproveRequest):
     try:
         pattern = pattern_review_service.approve_pattern(
             pattern_id=pattern_id,
-            reviewer=request.reviewer,
+            reviewer="system",  # Auto-populated
             notes=request.notes
         )
 
         if not pattern:
             raise HTTPException(status_code=404, detail=f"Pattern not found: {pattern_id}")
 
-        logger.info(f"Pattern {pattern_id} approved by {request.reviewer}")
+        logger.info(f"Pattern {pattern_id} approved by system")
 
         return PatternReviewResponse(
             pattern_id=pattern.pattern_id,
@@ -217,7 +214,7 @@ async def reject_pattern(pattern_id: str, request: RejectRequest):
 
     Args:
         pattern_id: Pattern identifier
-        request: Rejection request with reviewer name and reason
+        request: Rejection request with reason
 
     Returns:
         Updated pattern details
@@ -225,14 +222,14 @@ async def reject_pattern(pattern_id: str, request: RejectRequest):
     try:
         pattern = pattern_review_service.reject_pattern(
             pattern_id=pattern_id,
-            reviewer=request.reviewer,
+            reviewer="system",  # Auto-populated
             reason=request.reason
         )
 
         if not pattern:
             raise HTTPException(status_code=404, detail=f"Pattern not found: {pattern_id}")
 
-        logger.info(f"Pattern {pattern_id} rejected by {request.reviewer}: {request.reason}")
+        logger.info(f"Pattern {pattern_id} rejected by system: {request.reason}")
 
         return PatternReviewResponse(
             pattern_id=pattern.pattern_id,
@@ -263,7 +260,7 @@ async def add_comment(pattern_id: str, request: CommentRequest):
 
     Args:
         pattern_id: Pattern identifier
-        request: Comment request with reviewer name and comment text
+        request: Comment request with comment text
 
     Returns:
         Success message
@@ -280,22 +277,23 @@ async def add_comment(pattern_id: str, request: CommentRequest):
 
         with adapter.get_connection() as conn:
             cursor = conn.cursor()
+            placeholder = adapter.placeholder()
             cursor.execute(
-                """
+                f"""
                 INSERT INTO pattern_review_history (pattern_id, action, reviewer, notes)
-                VALUES (?, 'commented', ?, ?)
+                VALUES ({placeholder}, 'commented', {placeholder}, {placeholder})
             """,
-                (pattern_id, request.reviewer, request.comment)
+                (pattern_id, "system", request.comment)
             )
             conn.commit()
 
-        logger.info(f"Comment added to pattern {pattern_id} by {request.reviewer}")
+        logger.info(f"Comment added to pattern {pattern_id} by system")
 
         return {
             "status": "success",
             "message": f"Comment added to pattern {pattern_id}",
             "pattern_id": pattern_id,
-            "reviewer": request.reviewer
+            "reviewer": "system"
         }
     except HTTPException:
         raise

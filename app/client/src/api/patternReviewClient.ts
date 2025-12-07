@@ -27,17 +27,14 @@ export interface PatternReview {
 }
 
 export interface ApproveRequest {
-  reviewer: string;
   notes?: string;
 }
 
 export interface RejectRequest {
-  reviewer: string;
   reason: string;
 }
 
 export interface CommentRequest {
-  reviewer: string;
   comment: string;
 }
 
