@@ -1,7 +1,7 @@
 """
 Database Adapter Factory
 
-Selects the appropriate database adapter based on environment configuration.
+Provides PostgreSQL database adapter (SQLite support has been removed).
 """
 
 import os
@@ -18,26 +18,18 @@ _adapter: Union[DatabaseAdapter, None] = None
 
 def get_database_adapter() -> DatabaseAdapter:
     """
-    Get the configured database adapter.
+    Get the PostgreSQL database adapter.
 
-    Returns database adapter based on DB_TYPE environment variable:
-    - 'sqlite' (default): SQLiteAdapter
-    - 'postgresql': PostgreSQLAdapter
+    Note: SQLite support has been removed. This now only returns PostgreSQLAdapter.
 
     Returns:
-        DatabaseAdapter: Configured adapter instance
+        DatabaseAdapter: PostgreSQL adapter instance
     """
     global _adapter
 
     if _adapter is None:
-        db_type = os.getenv("DB_TYPE", "sqlite").lower()
-
-        if db_type == "postgresql":
-            from .postgres_adapter import PostgreSQLAdapter
-            _adapter = PostgreSQLAdapter()
-        else:
-            from .sqlite_adapter import SQLiteAdapter
-            _adapter = SQLiteAdapter()
+        from .postgres_adapter import PostgreSQLAdapter
+        _adapter = PostgreSQLAdapter()
 
     return _adapter
 

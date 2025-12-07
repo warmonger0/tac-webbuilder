@@ -35,27 +35,24 @@ def get_workflow_by_adw_id(adw_id: str) -> dict | None:
 
             # No field name mapping needed - database and code use same names
 
-            # Parse JSON fields
+            # Parse JSON fields (PostgreSQL may return pre-parsed dicts/lists or strings)
             json_fields = [
                 "structured_input", "cost_breakdown", "token_breakdown",
                 "phase_durations", "retry_reasons", "error_phase_distribution",
-                "anomaly_flags", "optimization_recommendations"  # Phase 3D
+                "anomaly_flags", "optimization_recommendations"
             ]
             for field in json_fields:
                 if result.get(field):
-                    try:
-                        # Handle both string (SQLite/PostgreSQL TEXT) and already-parsed (PostgreSQL JSON/JSONB)
-                        if isinstance(result[field], str):
+                    # PostgreSQL can return already-parsed objects, only parse if string
+                    if isinstance(result[field], str):
+                        try:
                             result[field] = json.loads(result[field])
-                        # else: already a dict/list from PostgreSQL JSON column, keep as-is
-                    except json.JSONDecodeError:
-                        logger.warning(f"[DB] Failed to parse JSON for {field} in ADW {adw_id}")
-                        result[field] = None
-                    except TypeError as e:
-                        logger.warning(f"[DB] TypeError parsing JSON for {field} in ADW {adw_id}: {e} (type: {type(result[field])})")
-                        result[field] = None
+                        except json.JSONDecodeError:
+                            logger.warning(f"[DB] Failed to parse JSON for {field} in ADW {adw_id}")
+                            result[field] = None
+                    # else: already parsed dict/list, keep as-is
                 else:
-                    # Default to empty arrays for Phase 3D fields
+                    # Default to empty arrays for certain fields
                     if field in ["anomaly_flags", "optimization_recommendations"]:
                         result[field] = []
             return result
@@ -106,30 +103,27 @@ def _build_where_clauses(
 
 
 def _process_workflow_row(row: dict) -> dict:
-    """Process a single workflow row from database."""
+    """Process a single workflow row from PostgreSQL database."""
     result = dict(row)
 
-    # Parse JSON fields
+    # Parse JSON fields (PostgreSQL may return pre-parsed dicts/lists or strings)
     json_fields = [
         "structured_input", "cost_breakdown", "token_breakdown",
         "phase_durations", "retry_reasons", "error_phase_distribution",
-        "anomaly_flags", "optimization_recommendations"  # Phase 3D
+        "anomaly_flags", "optimization_recommendations"
     ]
     for field in json_fields:
         if result.get(field):
-            # Check if already parsed (PostgreSQL JSONB returns dict/list directly)
-            if isinstance(result[field], (dict, list)):
-                # Already parsed, no action needed
-                pass
-            else:
-                # String, need to parse
+            # PostgreSQL can return already-parsed objects, only parse if string
+            if isinstance(result[field], str):
                 try:
                     result[field] = json.loads(result[field])
                 except json.JSONDecodeError:
                     logger.warning(f"[DB] Failed to parse JSON for {field}")
                     result[field] = None
+            # else: already parsed dict/list, keep as-is
         elif field in ["anomaly_flags", "optimization_recommendations"]:
-            # Default to empty arrays for Phase 3D fields
+            # Default to empty arrays for certain fields
             result[field] = []
 
     # Convert datetime objects to ISO format strings (PostgreSQL returns datetime objects)
