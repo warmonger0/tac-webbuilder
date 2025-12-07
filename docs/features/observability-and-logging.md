@@ -218,7 +218,116 @@ AND p.potential_monthly_savings >= 0.50
 ORDER BY p.potential_monthly_savings DESC;
 ```
 
-### 3. Tool Call Tracking
+### 3. Pattern Review Workflow
+
+Before detected patterns are automated, they go through manual review for safety and validation.
+
+#### Review Criteria
+
+Patterns are categorized based on confidence, occurrence count, and estimated savings:
+
+- **Auto-Approve (>99%):** Well-known patterns, 200+ occurrences, $5000+ annual savings
+- **Manual Review (95-99%):** Novel patterns, 100-200 occurrences, $1000-5000 annual savings
+- **Auto-Reject (<95%):** Suspicious patterns, destructive operations, low occurrence count
+
+#### Database Schema
+
+**Pattern Approvals**
+```sql
+CREATE TABLE pattern_approvals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern_id TEXT UNIQUE NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending', 'approved', 'rejected', 'auto-approved', 'auto-rejected')),
+    reviewed_by TEXT,
+    reviewed_at TIMESTAMP,
+    approval_notes TEXT,
+    confidence_score REAL NOT NULL,
+    occurrence_count INTEGER NOT NULL,
+    estimated_savings_usd REAL NOT NULL,
+    tool_sequence TEXT NOT NULL,
+    pattern_context TEXT,
+    example_sessions TEXT,  -- JSON array of session IDs
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Pattern Review History**
+```sql
+CREATE TABLE pattern_review_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern_id TEXT NOT NULL,
+    action TEXT NOT NULL CHECK(action IN ('approved', 'rejected', 'flagged', 'commented')),
+    reviewer TEXT NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### CLI Usage
+
+**Show Statistics**
+```bash
+python scripts/review_patterns.py --stats
+```
+
+**Review All Pending Patterns**
+```bash
+python scripts/review_patterns.py
+python scripts/review_patterns.py --limit 10
+```
+
+**Review Specific Pattern**
+```bash
+python scripts/review_patterns.py --pattern-id test-retry-pattern
+```
+
+**Custom Reviewer Name**
+```bash
+python scripts/review_patterns.py --reviewer "Jane Smith"
+```
+
+#### Review Actions
+
+During interactive review, you can:
+
+- **[a] Approve:** Pattern will be queued for automation (optional notes)
+- **[r] Reject:** Pattern blocked from automation (reason required)
+- **[s] Skip:** Review pattern later
+- **[d] Details:** Show full JSON pattern data
+- **[q] Quit:** Exit review session
+
+#### Impact Score Calculation
+
+Patterns are prioritized by impact score for review:
+
+```
+Impact Score = Confidence × Occurrence Count × Estimated Savings (USD)
+```
+
+**Example:**
+- Confidence: 98% (0.98)
+- Occurrences: 250
+- Estimated Savings: $2,500
+- **Impact Score: 612,500**
+
+Higher impact patterns are shown first for review.
+
+#### Integration
+
+Approved patterns feed into Sessions 12-13 (Closed-loop learning, workflow generation). The review system acts as a safety gate between pattern detection and automated workflow generation.
+
+#### Audit Trail
+
+All review actions are logged in `pattern_review_history` table, providing full transparency:
+- Who reviewed the pattern
+- What action was taken
+- When the review occurred
+- Why the decision was made (notes/reason)
+
+This ensures accountability and allows pattern review decisions to be audited or reversed if needed.
+
+### 4. Tool Call Tracking
 
 #### Database Schema
 ```sql

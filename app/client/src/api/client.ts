@@ -69,6 +69,12 @@ export * from './workLogClient';
 export { workLogClient } from './workLogClient';
 
 // ============================================================================
+// Pattern Review Client - Pattern approval and review
+// ============================================================================
+export * from './patternReviewClient';
+export { patternReviewClient } from './patternReviewClient';
+
+// ============================================================================
 // Legacy API namespace export for backward compatibility
 // ============================================================================
 import {
