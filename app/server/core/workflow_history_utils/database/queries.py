@@ -44,9 +44,15 @@ def get_workflow_by_adw_id(adw_id: str) -> dict | None:
             for field in json_fields:
                 if result.get(field):
                     try:
-                        result[field] = json.loads(result[field])
+                        # Handle both string (SQLite/PostgreSQL TEXT) and already-parsed (PostgreSQL JSON/JSONB)
+                        if isinstance(result[field], str):
+                            result[field] = json.loads(result[field])
+                        # else: already a dict/list from PostgreSQL JSON column, keep as-is
                     except json.JSONDecodeError:
                         logger.warning(f"[DB] Failed to parse JSON for {field} in ADW {adw_id}")
+                        result[field] = None
+                    except TypeError as e:
+                        logger.warning(f"[DB] TypeError parsing JSON for {field} in ADW {adw_id}: {e} (type: {type(result[field])})")
                         result[field] = None
                 else:
                     # Default to empty arrays for Phase 3D fields
