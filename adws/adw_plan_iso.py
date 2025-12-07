@@ -60,6 +60,10 @@ from adw_modules.worktree_ops import (
 )
 from adw_modules.worktree_setup import setup_worktree_complete
 from adw_modules.observability import log_phase_completion, get_phase_number
+from adw_modules.integration_checklist import (
+    generate_integration_checklist,
+    format_checklist_markdown
+)
 
 
 
@@ -310,6 +314,40 @@ def main():
     make_issue_comment(
         issue_number,
         format_issue_message(adw_id, "ops", f"✅ Plan file validated in worktree: {plan_file_path}"),
+    )
+
+    # Generate integration checklist
+    logger.info("[Plan] Generating integration checklist...")
+    integration_checklist = generate_integration_checklist(
+        nl_input=issue.title,
+        issue_body=issue.body,
+        issue_labels=[label.name for label in issue.labels]
+    )
+
+    # Format as markdown for PR comment
+    checklist_markdown = format_checklist_markdown(integration_checklist)
+
+    # Save to state file for Ship phase validation
+    state.update(
+        integration_checklist=integration_checklist.to_dict(),
+        integration_checklist_markdown=checklist_markdown
+    )
+    state.save("adw_plan_iso")
+
+    # Log summary
+    required_items = integration_checklist.get_required_items()
+    logger.info(
+        f"[Plan] Integration checklist generated: "
+        f"{len(required_items)} required items, "
+        f"{len(integration_checklist.get_all_items())} total items"
+    )
+    make_issue_comment(
+        issue_number,
+        format_issue_message(
+            adw_id, "ops",
+            f"✅ Integration checklist generated: {len(required_items)} required items, "
+            f"{len(integration_checklist.get_all_items())} total items"
+        ),
     )
 
     # Create commit message

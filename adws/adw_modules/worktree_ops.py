@@ -10,6 +10,7 @@ import logging
 import socket
 from typing import Tuple, Optional
 from adw_modules.state import ADWState
+from adw_modules.port_pool import get_port_pool
 
 
 def create_worktree(adw_id: str, branch_name: str, logger: logging.Logger) -> Tuple[str, Optional[str]]:
@@ -196,28 +197,22 @@ def setup_worktree_environment(worktree_path: str, backend_port: int, frontend_p
 # Port management functions
 
 def get_ports_for_adw(adw_id: str) -> Tuple[int, int]:
-    """Deterministically assign ports based on ADW ID.
-    
+    """Reserve ports from the port pool for an ADW workflow.
+
+    Uses the PortPool reservation system to allocate unique backend/frontend
+    port pairs. Supports up to 100 concurrent workflows.
+
     Args:
         adw_id: The ADW ID
-        
+
     Returns:
         Tuple of (backend_port, frontend_port)
+
+    Raises:
+        RuntimeError: If port pool is exhausted (all 100 slots allocated)
     """
-    # Convert first 8 chars of ADW ID to index (0-14)
-    # Using base 36 conversion and modulo to get consistent mapping
-    try:
-        # Take first 8 alphanumeric chars and convert from base 36
-        id_chars = ''.join(c for c in adw_id[:8] if c.isalnum())
-        index = int(id_chars, 36) % 15
-    except ValueError:
-        # Fallback to simple hash if conversion fails
-        index = hash(adw_id) % 15
-    
-    backend_port = 9100 + index
-    frontend_port = 9200 + index
-    
-    return backend_port, frontend_port
+    pool = get_port_pool()
+    return pool.reserve(adw_id)
 
 
 def is_port_available(port: int) -> bool:
@@ -239,27 +234,44 @@ def is_port_available(port: int) -> bool:
 
 
 def find_next_available_ports(adw_id: str, max_attempts: int = 15) -> Tuple[int, int]:
-    """Find available ports starting from deterministic assignment.
-    
+    """Find available ports using the port pool reservation system.
+
+    This function is now a wrapper around get_ports_for_adw() for backward
+    compatibility. The PortPool automatically handles availability.
+
     Args:
         adw_id: The ADW ID
-        max_attempts: Maximum number of attempts (default 15)
-        
+        max_attempts: Deprecated, kept for backward compatibility
+
     Returns:
         Tuple of (backend_port, frontend_port)
-        
+
     Raises:
-        RuntimeError: If no available ports found
+        RuntimeError: If port pool is exhausted
     """
-    base_backend, base_frontend = get_ports_for_adw(adw_id)
-    base_index = base_backend - 9100
-    
-    for offset in range(max_attempts):
-        index = (base_index + offset) % 15
-        backend_port = 9100 + index
-        frontend_port = 9200 + index
-        
-        if is_port_available(backend_port) and is_port_available(frontend_port):
-            return backend_port, frontend_port
-    
-    raise RuntimeError("No available ports in the allocated range")
+    # PortPool automatically handles availability, so just reserve from pool
+    return get_ports_for_adw(adw_id)
+
+
+def release_ports_for_adw(adw_id: str, logger: Optional[logging.Logger] = None) -> bool:
+    """Release ports allocated to an ADW workflow back to the pool.
+
+    Should be called during cleanup phase to free ports for reuse.
+
+    Args:
+        adw_id: The ADW ID
+        logger: Optional logger instance
+
+    Returns:
+        True if ports were released, False if not allocated
+    """
+    pool = get_port_pool()
+    released = pool.release(adw_id)
+
+    if logger:
+        if released:
+            logger.info(f"Released ports for {adw_id}")
+        else:
+            logger.warning(f"No port allocation found for {adw_id}")
+
+    return released

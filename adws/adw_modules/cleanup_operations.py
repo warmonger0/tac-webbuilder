@@ -15,7 +15,7 @@ import logging
 from typing import Dict, Any, Optional
 
 from .doc_cleanup import cleanup_adw_documentation
-from .worktree_ops import remove_worktree
+from .worktree_ops import remove_worktree, release_ports_for_adw
 from .state import ADWState
 
 
@@ -101,6 +101,9 @@ def cleanup_shipped_issue(
                     if success:
                         result["worktree_removed"] = True
                         logger.info(f"Worktree removed: {worktree_path}")
+
+                        # Release ports back to pool
+                        release_ports_for_adw(adw_id, logger)
                     else:
                         result["errors"].append(f"Worktree removal failed: {error}")
                 else:
@@ -205,6 +208,9 @@ def cleanup_worktree_only(
                     result["worktree_removed"] = True
                     result["summary"] = f"Removed worktree: {worktree_path}"
                     logger.info(result["summary"])
+
+                    # Release ports back to pool
+                    release_ports_for_adw(adw_id, logger)
                 else:
                     result["success"] = False
                     result["errors"].append(f"Failed to remove worktree: {error}")

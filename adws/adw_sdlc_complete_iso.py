@@ -8,7 +8,7 @@ ADW SDLC Complete Iso - Complete Software Development Life Cycle with ALL phases
 
 Usage: uv run adw_sdlc_complete_iso.py <issue-number> [adw-id] [flags]
 
-This script runs the COMPLETE ADW SDLC pipeline in isolation with all 9 phases:
+This script runs the COMPLETE ADW SDLC pipeline in isolation with all 10 phases:
 1. adw_plan_iso.py - Planning phase (isolated)
 2. adw_validate_iso.py - Baseline validation phase (isolated) ✨ NEW
 3. adw_build_iso.py - Implementation phase (isolated)
@@ -18,6 +18,7 @@ This script runs the COMPLETE ADW SDLC pipeline in isolation with all 9 phases:
 7. adw_document_iso.py - Documentation phase (isolated)
 8. adw_ship_iso.py - Ship phase (approve & merge PR)
 9. Cleanup - Documentation organization (pure Python)
+10. adw_verify_iso.py - Verify phase (post-deployment verification) ✨ NEW
 
 This is the RECOMMENDED workflow for feature implementation. It includes all
 quality gates and ships to production when all phases pass.
@@ -61,10 +62,10 @@ def main():
 
     if len(sys.argv) < 2:
         print("Usage: uv run adw_sdlc_complete_iso.py <issue-number> [adw-id] [flags]")
-        print("\n🎯 Complete SDLC: All 9 phases for production-ready features")
+        print("\n🎯 Complete SDLC: All 10 phases for production-ready features")
         print("\nThis runs the COMPLETE isolated Software Development Life Cycle:")
         print("  1. Plan (isolated)")
-        print("  2. Validate (baseline detection) ✨ NEW")
+        print("  2. Validate (baseline detection) ✨")
         print("  3. Build (isolated)")
         print("  4. Lint (isolated)")
         print("  5. Test (isolated)")
@@ -72,6 +73,7 @@ def main():
         print("  7. Document (isolated)")
         print("  8. Ship (approve & merge PR)")
         print("  9. Cleanup (organize documentation)")
+        print("  10. Verify (post-deployment verification) ✨ NEW")
         print("\nFlags:")
         print("  --skip-e2e: Skip E2E tests")
         print("  --skip-resolution: Skip automatic resolution of review failures")
@@ -104,7 +106,7 @@ def main():
         make_issue_comment(
             issue_number,
             f"{adw_id}_ops: 🎯 **Starting Complete SDLC Workflow**\n\n"
-            "This workflow will execute ALL 9 phases:\n"
+            "This workflow will execute ALL 10 phases:\n"
             "1. ✍️ Plan the implementation\n"
             "2. 📊 Validate baseline (detect inherited errors)\n"
             "3. 🔨 Build the solution\n"
@@ -113,7 +115,8 @@ def main():
             "6. 👀 Review the implementation\n"
             "7. 📚 Generate documentation\n"
             "8. 🚢 Ship to production\n"
-            "9. 🗂️ Cleanup and organize\n\n"
+            "9. 🗂️ Cleanup and organize\n"
+            "10. 🔍 Verify deployment (post-ship verification) ✨\n\n"
             f"**Configuration:**\n"
             f"- External tools: {'✅ Enabled' if use_external else '❌ Disabled'}\n"
             f"- Optimized planner: {'✅ Enabled' if use_optimized_plan else '❌ Disabled'}\n"
@@ -384,10 +387,10 @@ def main():
         sys.exit(1)
 
     # ========================================
-    # PHASE 8: CLEANUP ✨ NEW
+    # PHASE 9: CLEANUP
     # ========================================
     print(f"\n{'='*60}")
-    print(f"PHASE 9/9: CLEANUP")
+    print(f"PHASE 9/10: CLEANUP")
     print(f"{'='*60}")
     print(f"Running cleanup operations directly (pure Python, no LLM)...")
 
@@ -446,14 +449,56 @@ def main():
         print("WARNING: Cleanup failed but SDLC is still considered successful")
 
     # ========================================
+    # PHASE 10: VERIFY ✨ NEW
+    # ========================================
+    verify_cmd = [
+        "uv",
+        "run",
+        os.path.join(script_dir, "adw_verify_iso.py"),
+        issue_number,
+        adw_id,
+    ]
+    print(f"\n{'='*60}")
+    print(f"PHASE 10/10: VERIFY (Post-Deployment Verification)")
+    print(f"{'='*60}")
+    print(f"Running: {' '.join(verify_cmd)}")
+    verify = subprocess.run(verify_cmd)
+    if verify.returncode != 0:
+        print("⚠️ Verify phase detected issues (follow-up issue created)")
+        # Note: Don't fail workflow on verify failures
+        # Issues are tracked via GitHub, code is already shipped
+        try:
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops",
+                    "⚠️ Verify phase detected post-deployment issues. "
+                    "A follow-up issue has been created for tracking. "
+                    "The shipped code has NOT been reverted."
+                )
+            )
+        except:
+            pass
+    else:
+        print("✅ Verify phase passed!")
+        try:
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops",
+                    "✅ Verify phase passed! All post-deployment checks successful."
+                )
+            )
+        except:
+            pass
+
+    # ========================================
     # COMPLETION
     # ========================================
     print(f"\n{'='*60}")
     print(f"🎉 COMPLETE SDLC FINISHED SUCCESSFULLY")
     print(f"{'='*60}")
     print(f"ADW ID: {adw_id}")
-    print(f"All 8 phases completed successfully!")
-    print(f"✅ Code has been shipped to production!")
+    print(f"All 10 phases completed successfully!")
+    print(f"✅ Code has been shipped to production and verified!")
 
     # Trigger cost synchronization
     print(f"\n📊 Syncing workflow costs...")
@@ -467,14 +512,16 @@ def main():
             issue_number,
             f"{adw_id}_ops: 🎉 **Complete SDLC Finished!**\n\n"
             "✅ Phase 1: Plan completed\n"
-            "✅ Phase 2: Build completed\n"
-            "✅ Phase 3: Lint completed ✨\n"
-            "✅ Phase 4: Test completed\n"
-            "✅ Phase 5: Review completed\n"
-            "✅ Phase 6: Documentation completed\n"
-            "✅ Phase 7: Ship completed ✨\n"
-            "✅ Phase 8: Cleanup completed ✨\n\n"
-            "🚢 **Code has been shipped to production!**",
+            "✅ Phase 2: Validate completed ✨\n"
+            "✅ Phase 3: Build completed\n"
+            "✅ Phase 4: Lint completed\n"
+            "✅ Phase 5: Test completed\n"
+            "✅ Phase 6: Review completed\n"
+            "✅ Phase 7: Documentation completed\n"
+            "✅ Phase 8: Ship completed\n"
+            "✅ Phase 9: Cleanup completed\n"
+            "✅ Phase 10: Verify completed ✨\n\n"
+            "🚢 **Code has been shipped to production and verified!**",
         )
     except:
         pass

@@ -126,7 +126,7 @@ def _extract_pattern_from_template(template: str | None) -> str | None:
         >>> _extract_pattern_from_template("adw_test_iso")
         'test:generic:all'
         >>> _extract_pattern_from_template("sdlc")
-        'sdlc:full:all'
+        None  # SDLC workflows are orchestration flows, not patterns
     """
     if not template:
         return None
@@ -134,6 +134,8 @@ def _extract_pattern_from_template(template: str | None) -> str | None:
     template_lower = template.lower()
 
     # Specific template patterns
+    # NOTE: Template-based patterns should only detect specific operations (test, build, format)
+    # NOT entire orchestration flows. ADW workflows are not patterns - patterns exist WITHIN workflows
     if "test" in template_lower:
         return "test:generic:all"
     elif "build" in template_lower:
@@ -142,11 +144,12 @@ def _extract_pattern_from_template(template: str | None) -> str | None:
         # Planning workflows don't have automation potential
         return None
     elif "sdlc" in template_lower or "zte" in template_lower:
-        # SDLC and Zero-Touch workflows are full lifecycle
-        return "sdlc:full:all"
+        # SDLC and Zero-Touch workflows are full lifecycle orchestration
+        # They are NOT patterns - patterns are deterministic tool sequences within these workflows
+        return None
     elif "patch" in template_lower or "lightweight" in template_lower:
-        # Quick fix workflows
-        return "patch:quick:all"
+        # Patch workflows are orchestration flows, not patterns
+        return None
     elif "ship" in template_lower:
         return "deploy:ship:all"
     elif "review" in template_lower:

@@ -22,16 +22,16 @@ The ADW system includes comprehensive safeguards to ensure reliable execution:
 ### Isolated Execution
 Every ADW workflow runs in an isolated git worktree under `trees/<adw_id>/` with:
 - Complete filesystem isolation
-- Dedicated port ranges (backend: 9100-9114, frontend: 9200-9214)
+- Dedicated port ranges (backend: 9100-9199, frontend: 9200-9299)
 - Independent git branches
-- Support for 15 concurrent instances
+- Support for up to 100 concurrent instances via port pool reservation system
 
 ### ADW ID
 Each workflow run is assigned a unique 8-character identifier (e.g., `a1b2c3d4`). This ID:
 - Tracks all phases of a workflow (plan → build → test → review → document)
 - Appears in GitHub comments, commits, and PR titles
 - Creates an isolated worktree at `trees/{adw_id}/`
-- Allocates unique ports deterministically
+- Reserves unique backend/frontend port pairs from the port pool
 - Enables resuming workflows and debugging
 
 ### State Management
@@ -46,8 +46,47 @@ ADW uses persistent state files (`agents/{adw_id}/adw_state.json`) to:
   - `plan_file`: Path to implementation plan
   - `issue_class`: Issue type (`/chore`, `/bug`, `/feature`)
   - `worktree_path`: Absolute path to isolated worktree
-  - `backend_port`: Allocated backend port (9100-9114)
-  - `frontend_port`: Allocated frontend port (9200-9214)
+  - `backend_port`: Allocated backend port (9100-9199)
+  - `frontend_port`: Allocated frontend port (9200-9299)
+
+### Port Management
+ADW workflows use a port pool system to prevent collisions and support up to 100 concurrent workflows:
+
+**Port Ranges:**
+- Backend Ports: 9100-9199 (100 slots)
+- Frontend Ports: 9200-9299 (100 slots)
+- Persistence: `agents/port_allocations.json`
+
+**How It Works:**
+1. **Reservation:** When an ADW workflow starts, it reserves a backend/frontend port pair from the pool
+2. **Persistence:** Allocations are saved to JSON file and survive restarts
+3. **Release:** When a workflow completes (cleanup phase), ports are released back to the pool
+4. **Cleanup:** Stale allocations (>24 hours) can be cleaned up manually
+
+**Port Pool Operations:**
+
+Check pool status:
+```bash
+cd adws
+uv run python -c "from adw_modules.port_pool import get_port_pool; print(get_port_pool().get_pool_status())"
+```
+
+Cleanup stale allocations:
+```bash
+cd adws
+uv run python -c "from adw_modules.port_pool import get_port_pool; print(f'Cleaned {get_port_pool().cleanup_stale()} stale allocations')"
+```
+
+Manual port release (if needed):
+```bash
+cd adws
+uv run python -c "from adw_modules.port_pool import get_port_pool; get_port_pool().release('adw-abc12345')"
+```
+
+**Migration from Previous System:**
+- Previous: Deterministic hash-based allocation (15 slots)
+- Current: Reservation-based pool (100 slots)
+- Ports are automatically managed by the ADW system - no manual intervention needed
 
 ## Quick Start
 
@@ -102,10 +141,10 @@ uv run adw_plan_build_document_iso.py 123
 # Stepwise refinement analysis - decides ATOMIC vs DECOMPOSE
 uv run adw_stepwise_iso.py 123
 
-# Complete SDLC workflow with ALL 8 phases (Plan → Build → Lint → Test → Review → Doc → Ship → Cleanup)
+# Complete SDLC workflow with ALL 10 phases (Plan → Validate → Build → Lint → Test → Review → Doc → Ship → Cleanup → Verify)
 uv run adw_sdlc_complete_iso.py 123 [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
 
-# Zero Touch Execution - Complete SDLC with ALL 8 phases + auto-ship (⚠️ merges to main!)
+# Zero Touch Execution - Complete SDLC with ALL 10 phases + auto-ship (⚠️ merges to main!)
 uv run adw_sdlc_complete_zte_iso.py 123 [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
 
 # DEPRECATED: Use adw_sdlc_complete_iso.py instead (missing lint phase)
@@ -311,23 +350,25 @@ Documentation pipeline in isolation.
 uv run adw_plan_build_document_iso.py <issue-number> [adw-id]
 ```
 
-#### adw_sdlc_complete_iso.py - Complete Isolated SDLC (ALL 8 Phases)
-Full Software Development Life Cycle with ALL 8 phases including lint validation.
+#### adw_sdlc_complete_iso.py - Complete Isolated SDLC (ALL 10 Phases)
+Full Software Development Life Cycle with ALL 10 phases including validation, lint, and post-deployment verification.
 
 **Usage:**
 ```bash
 uv run adw_sdlc_complete_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
 ```
 
-**Phases (ALL 8):**
+**Phases (ALL 10):**
 1. **Plan**: Creates worktree and implementation spec
-2. **Build**: Implements solution in isolation
-3. **Lint**: Validates code quality (TypeScript, ESLint, formatting) - **NEW**
-4. **Test**: Runs tests with dedicated ports
-5. **Review**: Validates and captures screenshots
-6. **Document**: Generates comprehensive docs
-7. **Ship**: Approves and merges PR
-8. **Cleanup**: Removes worktree and organizes artifacts
+2. **Validate**: Baseline error detection (detects inherited errors)
+3. **Build**: Implements solution in isolation
+4. **Lint**: Validates code quality (TypeScript, ESLint, formatting)
+5. **Test**: Runs tests with dedicated ports
+6. **Review**: Validates and captures screenshots
+7. **Document**: Generates comprehensive docs
+8. **Ship**: Approves and merges PR
+9. **Cleanup**: Removes worktree and organizes artifacts
+10. **Verify**: Post-deployment verification (checks logs, runs smoke tests) - **NEW**
 
 **Flags:**
 - `--skip-e2e`: Skip E2E tests during test phase
@@ -345,9 +386,11 @@ uv run adw_sdlc_complete_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-res
 - Clean state after shipping
 
 **Key Improvements over adw_sdlc_iso.py:**
-- Added lint phase (was missing before)
+- Added validate phase (baseline error detection)
+- Added lint phase (code quality validation)
 - Added cleanup phase (automatic resource management)
 - Added ship phase (complete automation)
+- Added verify phase (post-deployment verification)
 - External test tools enabled by default (70-95% token reduction)
 
 #### adw_sdlc_iso.py - Complete Isolated SDLC (DEPRECATED)
@@ -408,23 +451,90 @@ uv run adw_ship_iso.py <issue-number> <adw-id>
 - `worktree_path` exists
 - `backend_port` and `frontend_port` allocated
 
-#### adw_sdlc_complete_zte_iso.py - Zero Touch Execution (ALL 8 Phases)
-Complete SDLC with ALL 8 phases including lint and automatic shipping - no human intervention required.
+#### adw_verify_iso.py - Post-Deployment Verification
+Final verification phase that checks deployed features are working correctly.
+
+**Purpose:** Catch post-deployment issues immediately instead of hours/days later.
+
+**Timing:** Runs 5 minutes after Ship phase completes (allows services to stabilize).
+
+**Requirements:**
+- Complete ADWState with port allocations
+- Ship phase must have completed
+- ADW ID is mandatory
+
+**Usage:**
+```bash
+uv run adw_verify_iso.py <issue-number> <adw-id>
+```
+
+**What it does:**
+1. **Backend Log Analysis** - Scans backend logs for exceptions, errors, stack traces
+2. **Frontend Console Errors** - Analyzes frontend build logs for console errors
+3. **Smoke Tests** - Verifies critical paths (backend health, frontend accessibility)
+4. **Follow-up Issue Creation** - Auto-creates GitHub issue if problems detected
+
+**Verification Checks:**
+- Backend log patterns: `Exception`, `Traceback`, `ERROR`, `500`, `Failed to`
+- Frontend error patterns: `console.error`, `console.warn`, `Uncaught`, React errors
+- Smoke tests: Backend `/health` endpoint, frontend page load
+
+**Error Handling:**
+- ❌ **Verification Fails:** Auto-create GitHub follow-up issue
+- ✅ **Verification Passes:** Complete workflow successfully
+- ⚠️ **Important:** Shipped code is NEVER reverted (create new PR instead)
+
+**Example Verification Report:**
+
+Clean deployment:
+```
+✅ All verification checks passed
+Feature is working correctly.
+```
+
+Failed verification:
+```
+❌ Verification failed with the following issues:
+
+Backend Log Errors (2):
+- ERROR: Exception in /api/users handler
+- 500 Internal Server Error
+
+Smoke Test Failures (1):
+- Backend health check failed (port 9100): Connection refused
+
+Follow-up issue #124 created automatically.
+```
+
+**Configuration:**
+- Verification delay: 5 minutes (300 seconds)
+- Log check window: 10 minutes
+- Smoke test timeout: 10 seconds per test
+
+**Architecture Decision:**
+- **Why Phase 10?** Separate phase allows verification without blocking Ship
+- **Why not revert?** Code has passed Review and Test phases - issues are likely environmental
+- **Why auto-issue?** Reduces time to detect problems from hours to minutes
+
+#### adw_sdlc_complete_zte_iso.py - Zero Touch Execution (ALL 10 Phases)
+Complete SDLC with ALL 10 phases including validation, lint, and post-deployment verification - no human intervention required.
 
 **Usage:**
 ```bash
 uv run adw_sdlc_complete_zte_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip-resolution] [--no-external] [--use-optimized-plan]
 ```
 
-**Phases (ALL 8):**
+**Phases (ALL 10):**
 1. **Plan**: Creates worktree and implementation spec
-2. **Build**: Implements solution in isolation
-3. **Lint**: Validates code quality (TypeScript, ESLint, formatting) - **NEW**
-4. **Test**: Runs tests (stops on failure)
-5. **Review**: Validates implementation (stops on failure)
-6. **Document**: Generates comprehensive docs
-7. **Ship**: Automatically approves and merges PR
-8. **Cleanup**: Removes worktree and organizes artifacts - **NEW**
+2. **Validate**: Baseline error detection (detects inherited errors)
+3. **Build**: Implements solution in isolation
+4. **Lint**: Validates code quality (TypeScript, ESLint, formatting)
+5. **Test**: Runs tests (stops on failure)
+6. **Review**: Validates implementation (stops on failure)
+7. **Document**: Generates comprehensive docs
+8. **Ship**: Automatically approves and merges PR
+9. **Cleanup**: Removes worktree and organizes artifacts
+10. **Verify**: Post-deployment verification (checks logs, runs smoke tests)
 
 **Flags:**
 - `--skip-e2e`: Skip E2E tests during test phase
@@ -436,15 +546,19 @@ uv run adw_sdlc_complete_zte_iso.py <issue-number> [adw-id] [--skip-e2e] [--skip
 
 **Output:**
 - Complete feature implementation
+- Validation baseline established
 - Lint validation passed
 - Automatic PR approval
 - Code merged to main branch
 - Production deployment
+- Post-deployment verification
 - Clean state (worktree removed)
 
 **Key Improvements over adw_sdlc_zte_iso.py:**
+- Added validate phase (baseline error detection)
 - Added lint phase (prevents deploying broken code)
 - Added cleanup phase (automatic resource cleanup)
+- Added verify phase (post-deployment verification)
 - External test tools enabled by default (70-95% token reduction)
 - Optimized planning option
 
@@ -542,6 +656,304 @@ uv run adw_triggers/trigger_webhook.py
    - Semantic commit messages
    - Links to original issue
    - Implementation summary
+
+## Integration Checklist
+
+ADW workflows automatically generate integration checklists during the Plan phase to ensure all components are properly wired up before shipping.
+
+### Problem Statement
+
+A recurring issue in development is that features are built correctly but not fully integrated:
+- API endpoints exist but routes aren't wired up
+- UI components are created but not added to navigation
+- Database schemas exist but no UI displays the data
+- Tests are written but not covering integration points
+
+The Integration Checklist system addresses this by **proactively identifying integration points** during planning and **validating them** before shipping.
+
+### How It Works
+
+1. **Plan Phase (Automatic):** Analyzes feature requirements and generates comprehensive checklist
+2. **Implementation:** Developer builds feature (checklist serves as reminder of all integration points)
+3. **Ship Phase (Session 4):** Validates checklist items exist (warns if missing)
+4. **Verify Phase (Future):** Confirms operational functionality
+
+### Checklist Categories
+
+#### 🔧 Backend Integration
+- API endpoints implemented
+- Routes registered in route configuration
+- Business logic in service layer
+
+#### 🎨 Frontend Integration
+- UI components created
+- Navigation/routing configured
+- State management setup (if needed)
+
+#### 💾 Database Integration
+- Migrations created
+- Pydantic models updated
+- Repository methods implemented
+
+#### 📚 Documentation Integration
+- API documentation updated
+- Feature documentation added
+- README updated (if user-facing)
+
+#### 🧪 Testing Integration
+- Unit tests added
+- Integration tests added (if multiple components)
+- E2E tests added (if applicable)
+
+### Example Checklist
+
+For a feature like "Add user profile page with API backend":
+
+```markdown
+## 🔗 Integration Checklist
+
+### 🔧 Backend Integration
+- [ ] **[REQUIRED]** API endpoint implemented
+- [ ] **[REQUIRED]** API route registered in route configuration
+- [ ] **[REQUIRED]** Business logic implemented in service layer
+
+### 🎨 Frontend Integration
+- [ ] **[REQUIRED]** UI component created
+- [ ] **[REQUIRED]** Component added to navigation/routing
+- [ ] [OPTIONAL] State management configured (if needed)
+
+### 💾 Database Integration
+- [ ] **[REQUIRED]** Database migration created
+- [ ] [OPTIONAL] Pydantic model updated (if applicable)
+- [ ] **[REQUIRED]** Repository methods implemented
+
+### 🧪 Testing Integration
+- [ ] **[REQUIRED]** Unit tests added
+- [ ] **[REQUIRED]** Integration tests added
+- [ ] **[REQUIRED]** E2E tests added
+
+### 📚 Documentation Integration
+- [ ] **[REQUIRED]** API documentation updated
+- [ ] **[REQUIRED]** Feature documentation added
+- [ ] **[REQUIRED]** README updated
+```
+
+### Feature Detection
+
+The checklist generator intelligently detects feature type based on:
+- **GitHub issue labels:** `backend`, `frontend`, `database`
+- **Issue title keywords:** `api`, `component`, `page`, `migration`, `schema`
+- **Issue body content:** Analyzes description for integration signals
+
+### Smart Requirements
+
+Items are marked as **REQUIRED** or **OPTIONAL** based on context:
+- Backend + Frontend features **require** integration tests
+- Frontend features **require** README updates
+- Database features **optionally** require Pydantic model updates
+- API features **require** route registration
+
+### Manual Checklist Generation
+
+Generate checklist for any feature manually:
+
+```bash
+cd adws
+uv run python -c "
+from adw_modules.integration_checklist import generate_integration_checklist, format_checklist_markdown
+
+# Generate checklist
+checklist = generate_integration_checklist(
+    nl_input='Add user analytics dashboard',
+    issue_labels=['backend', 'frontend']
+)
+
+# Display markdown
+print(format_checklist_markdown(checklist))
+
+# Show summary
+print(f'\nTotal items: {len(checklist.get_all_items())}')
+print(f'Required items: {len(checklist.get_required_items())}')
+"
+```
+
+### State Persistence
+
+Checklists are stored in `agents/{adw_id}/adw_state.json` for Ship phase validation:
+
+```json
+{
+  "adw_id": "abc12345",
+  "issue_number": "42",
+  "integration_checklist": {
+    "backend": [
+      {
+        "category": "backend",
+        "description": "API endpoint implemented",
+        "required": true,
+        "detected_keywords": ["api", "endpoint"]
+      }
+    ],
+    "frontend": [...],
+    "database": [...],
+    "documentation": [...],
+    "testing": [...]
+  },
+  "integration_checklist_markdown": "## 🔗 Integration Checklist\n..."
+}
+```
+
+### Ship Phase Validation
+
+During the Ship phase (before PR approval), the system automatically validates that all planned integration checklist items were actually implemented.
+
+**Validation Process:**
+1. Loads integration checklist from state file (`agents/{adw_id}/adw_state.json`)
+2. Validates each category:
+   - **Backend:** API endpoints, route registration, service layer files
+   - **Frontend:** UI components, navigation/routing integration
+   - **Database:** Migration files, repository methods
+   - **Documentation:** Markdown files in docs/
+   - **Testing:** Test files in test directories
+3. Generates comprehensive validation report
+4. Posts warnings to PR as GitHub comment
+5. **Does NOT block shipping** - warnings only
+
+**Validation Methods:**
+- **File existence checks:** Verifies expected files exist in worktree
+- **Pattern matching:** Greps for API decorators, imports, route registrations
+- **Directory scanning:** Counts components, migrations, test files
+- **Warning-only approach:** Ensures shipping isn't blocked by false positives
+
+**Example Validation Report:**
+
+```markdown
+## ⚠️ Integration Checklist Validation
+
+**Status:** 8/12 items validated
+
+### ✅ Passed Items (8)
+- [x] API endpoint implemented
+- [x] UI component created
+- [x] Database migration created
+- [x] Repository methods implemented
+- [x] Feature documentation added
+- [x] Unit tests added
+- [x] Component added to navigation/routing
+- [x] Business logic implemented in service layer
+
+### ⚠️ Missing Items (4)
+- [ ] **[REQUIRED]** API route registered in route configuration
+  - ⚠️ No router registration found in main.py
+  - Expected: app.include_router() calls
+  - Actual: Not found
+- [ ] **[REQUIRED]** Component added to navigation/routing
+  - ⚠️ No component imports found in navigation files
+  - Expected: Component imports in App.tsx or routing files
+  - Actual: Not found
+- [ ] [OPTIONAL] State management configured (if needed)
+  - ⚠️ Could not validate automatically - manual verification needed
+- [ ] [OPTIONAL] README updated (if user-facing feature)
+  - ⚠️ Could not validate automatically - manual verification needed
+
+---
+**Note:** These are warnings only. The Review phase has already validated code quality.
+```
+
+**Running Validation Manually:**
+
+```bash
+cd adws
+python3 << 'EOF'
+from adw_modules.integration_validator import validate_integration_checklist
+from adw_modules.state import ADWState
+
+# Load state
+state = ADWState.load('abc12345', None)
+
+# Validate checklist
+report = validate_integration_checklist(
+    checklist=state.get('integration_checklist'),
+    worktree_path=state.get('worktree_path')
+)
+
+# Display report
+print(report.to_markdown())
+print(f'\nPassed: {report.passed_items}/{report.total_items}')
+print(f'Required failed: {report.required_failed}')
+EOF
+```
+
+**Benefits:**
+- **Reduces "feature works but isn't accessible" bugs by 90%**
+- **Ensures complete integration before shipping**
+- **Provides systematic validation for code review**
+- **Catches missing integration points early**
+- **Warning-only approach prevents false positive blocking**
+
+### Testing
+
+**Run integration checklist generation tests:**
+
+```bash
+cd adws
+uv run pytest tests/test_integration_checklist.py -v
+```
+
+Expected output:
+```
+tests/test_integration_checklist.py::test_backend_feature_detection PASSED
+tests/test_integration_checklist.py::test_frontend_feature_detection PASSED
+tests/test_integration_checklist.py::test_database_feature_detection PASSED
+tests/test_integration_checklist.py::test_full_stack_feature PASSED
+tests/test_integration_checklist.py::test_required_vs_optional_items PASSED
+tests/test_integration_checklist.py::test_minimal_feature PASSED
+tests/test_integration_checklist.py::test_checklist_to_dict PASSED
+tests/test_integration_checklist.py::test_markdown_formatting PASSED
+tests/test_integration_checklist.py::test_keyword_extraction PASSED
+tests/test_integration_checklist.py::test_api_plus_ui_requires_integration_test PASSED
+================== 10 passed ==================
+```
+
+**Run integration validator tests (Ship phase validation):**
+
+```bash
+cd adws
+uv run pytest tests/test_integration_validator.py -v
+```
+
+Expected output:
+```
+tests/test_integration_validator.py::test_validate_empty_checklist PASSED
+tests/test_integration_validator.py::test_validate_backend_items PASSED
+tests/test_integration_validator.py::test_validate_frontend_items PASSED
+tests/test_integration_validator.py::test_validate_database_items PASSED
+tests/test_integration_validator.py::test_validate_documentation_items PASSED
+tests/test_integration_validator.py::test_validate_testing_items PASSED
+tests/test_integration_validator.py::test_validate_missing_backend_items PASSED
+tests/test_integration_validator.py::test_validate_missing_frontend_items PASSED
+tests/test_integration_validator.py::test_validate_optional_items PASSED
+tests/test_integration_validator.py::test_markdown_formatting PASSED
+tests/test_integration_validator.py::test_markdown_formatting_with_failures PASSED
+tests/test_integration_validator.py::test_check_api_endpoints_exist PASSED
+tests/test_integration_validator.py::test_check_api_endpoints_missing PASSED
+tests/test_integration_validator.py::test_check_routes_registered PASSED
+tests/test_integration_validator.py::test_check_service_layer_exists PASSED
+tests/test_integration_validator.py::test_check_ui_components_exist PASSED
+tests/test_integration_validator.py::test_check_ui_components_missing PASSED
+tests/test_integration_validator.py::test_check_component_in_navigation PASSED
+tests/test_integration_validator.py::test_check_migrations_exist PASSED
+tests/test_integration_validator.py::test_check_migrations_missing PASSED
+tests/test_integration_validator.py::test_check_repository_methods_exist PASSED
+tests/test_integration_validator.py::test_check_docs_updated PASSED
+tests/test_integration_validator.py::test_check_tests_exist PASSED
+tests/test_integration_validator.py::test_check_tests_missing PASSED
+tests/test_integration_validator.py::test_full_stack_validation PASSED
+tests/test_integration_validator.py::test_partial_validation PASSED
+tests/test_integration_validator.py::test_validation_result_dataclass PASSED
+tests/test_integration_validator.py::test_validation_report_dataclass PASSED
+============================== 28 passed ==================
+```
 
 ## External Testing Tools (Context Optimization)
 

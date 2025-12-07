@@ -52,6 +52,7 @@ from adw_modules.data_types import ADWStateData
 from adw_modules.doc_cleanup import cleanup_adw_documentation
 from adw_modules.success_operations import close_issue_on_success
 from adw_modules.observability import log_phase_completion, get_phase_number
+from adw_modules.integration_validator import validate_integration_checklist
 
 # Agent name constant
 AGENT_SHIPPER = "shipper"
@@ -451,6 +452,43 @@ def main():
             format_issue_message(adw_id, AGENT_SHIPPER, f"❌ Failed to get repository info: {e}")
         )
         sys.exit(1)
+
+    # Step 4.5: Validate integration checklist (if exists)
+    integration_checklist = state.get("integration_checklist")
+    if integration_checklist:
+        logger.info("[Ship] Validating integration checklist...")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_SHIPPER, "🔍 Validating integration checklist...")
+        )
+
+        validation_report = validate_integration_checklist(
+            checklist=integration_checklist,
+            worktree_path=worktree_path
+        )
+
+        # Log validation results
+        logger.info(
+            f"[Ship] Checklist validation: "
+            f"{validation_report.passed_items}/{validation_report.total_items} passed"
+        )
+
+        if validation_report.failed_items > 0:
+            logger.warning(
+                f"[Ship] {validation_report.required_failed} required items failed validation, "
+                f"{validation_report.optional_failed} optional items failed"
+            )
+
+        # Post validation report as PR comment
+        validation_markdown = validation_report.to_markdown()
+        make_issue_comment(
+            issue_number,
+            f"{adw_id}_{AGENT_SHIPPER}: {validation_markdown}"
+        )
+
+        logger.info("[Ship] Integration checklist validation complete")
+    else:
+        logger.info("[Ship] No integration checklist found in state - skipping validation")
 
     # Step 5: Ship via GitHub PR merge
     logger.info(f"Shipping {branch_name} via GitHub PR merge...")

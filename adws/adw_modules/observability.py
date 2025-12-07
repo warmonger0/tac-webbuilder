@@ -254,6 +254,7 @@ PHASE_NUMBERS = {
     "Document": 7,
     "Ship": 8,
     "Cleanup": 9,
+    "Verify": 10,
 }
 
 
@@ -265,6 +266,6 @@ def get_phase_number(phase_name: str) -> int:
         phase_name: Phase name (case-insensitive)
 
     Returns:
-        Phase number (1-9), or 0 if not found
+        Phase number (1-10), or 0 if not found
     """
     return PHASE_NUMBERS.get(phase_name.title(), 0)

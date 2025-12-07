@@ -78,6 +78,49 @@ Automatically detect recurring workflow patterns to:
 - Track pattern evolution over time
 - Build confidence scores for automation
 
+#### What Patterns Represent
+
+Patterns are **deterministic tool orchestration sequences** that occur within ADW phases. When the LLM repeatedly performs the same tool routing for the same type of problem, that's a pattern worth extracting.
+
+**Example Patterns**
+
+**Test-Import-Fix Pattern:**
+```
+Sequence: Bash(pytest) → Read(test_file) → Grep(imports) → Edit(add_import) → Bash(pytest)
+Trigger: ModuleNotFoundError in pytest output
+Handler: Auto-add missing import from common libraries
+Savings: ~2,000 tokens per occurrence (skip LLM orchestration)
+```
+
+**Type-Annotation Pattern:**
+```
+Sequence: Bash(tsc) → Read(type_file) → Edit(add_property) → Bash(tsc)
+Trigger: "Property 'X' is missing in type 'Y'"
+Handler: Auto-add missing property with inferred type
+Savings: ~1,500 tokens per occurrence
+```
+
+**Lint-Line-Length Pattern:**
+```
+Sequence: Bash(ruff) → Read(file) → Edit(break_line) → Bash(ruff)
+Trigger: E501 line too long error
+Handler: Auto-format long lines (already handled by pre-commit)
+Savings: ~500 tokens per occurrence
+```
+
+**What Patterns Are NOT**
+
+- ❌ Full ADW workflows (e.g., "sdlc:full:all")
+- ❌ Individual phases (e.g., "test:complete:phase")
+- ❌ Single tool calls (e.g., "bash:pytest:run")
+- ❌ Non-deterministic sequences (different resolution each time)
+
+Patterns must be:
+- **Repeatable** (same sequence)
+- **Deterministic** (same input → same output)
+- **Valuable** (saves significant tokens)
+- **Automatable** (can be a function, not requiring LLM reasoning)
+
 #### Database Schema
 
 **Operation Patterns**
