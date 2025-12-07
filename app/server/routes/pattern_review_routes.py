@@ -62,6 +62,32 @@ class ReviewStatistics(BaseModel):
     total: int = 0
 
 
+@router.get("/statistics", response_model=ReviewStatistics)
+async def get_review_statistics():
+    """
+    Get pattern review statistics.
+
+    Returns:
+        Count of patterns by status
+    """
+    try:
+        stats = pattern_review_service.get_review_statistics()
+
+        total = sum(stats.values())
+
+        return ReviewStatistics(
+            pending=stats.get("pending", 0),
+            approved=stats.get("approved", 0),
+            rejected=stats.get("rejected", 0),
+            auto_approved=stats.get("auto-approved", 0),
+            auto_rejected=stats.get("auto-rejected", 0),
+            total=total
+        )
+    except Exception as e:
+        logger.error(f"Error fetching review statistics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/pending", response_model=List[PatternReviewResponse])
 async def get_pending_patterns(limit: int = 20):
     """
@@ -275,30 +301,4 @@ async def add_comment(pattern_id: str, request: CommentRequest):
         raise
     except Exception as e:
         logger.error(f"Error adding comment to pattern {pattern_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/statistics", response_model=ReviewStatistics)
-async def get_review_statistics():
-    """
-    Get pattern review statistics.
-
-    Returns:
-        Count of patterns by status
-    """
-    try:
-        stats = pattern_review_service.get_review_statistics()
-
-        total = sum(stats.values())
-
-        return ReviewStatistics(
-            pending=stats.get("pending", 0),
-            approved=stats.get("approved", 0),
-            rejected=stats.get("rejected", 0),
-            auto_approved=stats.get("auto-approved", 0),
-            auto_rejected=stats.get("auto-rejected", 0),
-            total=total
-        )
-    except Exception as e:
-        logger.error(f"Error fetching review statistics: {e}")
         raise HTTPException(status_code=500, detail=str(e))

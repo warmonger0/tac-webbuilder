@@ -73,12 +73,13 @@ class PatternReviewService:
             cursor = conn.cursor()
 
             # Order by impact score: confidence * occurrences * savings
+            placeholder = self.adapter.placeholder()
             cursor.execute(
-                """
+                f"""
                 SELECT * FROM pattern_approvals
                 WHERE status = 'pending'
                 ORDER BY (confidence_score * occurrence_count * estimated_savings_usd) DESC
-                LIMIT ?
+                LIMIT {placeholder}
             """,
                 (limit,),
             )
@@ -104,8 +105,9 @@ class PatternReviewService:
         with self.adapter.get_connection() as conn:
             cursor = conn.cursor()
 
+            placeholder = self.adapter.placeholder()
             cursor.execute(
-                "SELECT * FROM pattern_approvals WHERE pattern_id = ?", (pattern_id,)
+                f"SELECT * FROM pattern_approvals WHERE pattern_id = {placeholder}", (pattern_id,)
             )
             row = cursor.fetchone()
 
@@ -135,14 +137,15 @@ class PatternReviewService:
             cursor = conn.cursor()
 
             # Update pattern status
+            placeholder = self.adapter.placeholder()
             cursor.execute(
-                """
+                f"""
                 UPDATE pattern_approvals
                 SET status = 'approved',
-                    reviewed_by = ?,
+                    reviewed_by = {placeholder},
                     reviewed_at = CURRENT_TIMESTAMP,
-                    approval_notes = ?
-                WHERE pattern_id = ?
+                    approval_notes = {placeholder}
+                WHERE pattern_id = {placeholder}
             """,
                 (reviewer, notes, pattern_id),
             )
@@ -155,9 +158,9 @@ class PatternReviewService:
 
             # Add to review history
             cursor.execute(
-                """
+                f"""
                 INSERT INTO pattern_review_history (pattern_id, action, reviewer, notes)
-                VALUES (?, 'approved', ?, ?)
+                VALUES ({placeholder}, 'approved', {placeholder}, {placeholder})
             """,
                 (pattern_id, reviewer, notes),
             )
@@ -187,14 +190,15 @@ class PatternReviewService:
             cursor = conn.cursor()
 
             # Update pattern status
+            placeholder = self.adapter.placeholder()
             cursor.execute(
-                """
+                f"""
                 UPDATE pattern_approvals
                 SET status = 'rejected',
-                    reviewed_by = ?,
+                    reviewed_by = {placeholder},
                     reviewed_at = CURRENT_TIMESTAMP,
-                    approval_notes = ?
-                WHERE pattern_id = ?
+                    approval_notes = {placeholder}
+                WHERE pattern_id = {placeholder}
             """,
                 (reviewer, f"REJECTED: {reason}", pattern_id),
             )
@@ -207,9 +211,9 @@ class PatternReviewService:
 
             # Add to review history
             cursor.execute(
-                """
+                f"""
                 INSERT INTO pattern_review_history (pattern_id, action, reviewer, notes)
-                VALUES (?, 'rejected', ?, ?)
+                VALUES ({placeholder}, 'rejected', {placeholder}, {placeholder})
             """,
                 (pattern_id, reviewer, reason),
             )
