@@ -27,6 +27,8 @@ dist/
 # Database
 *.db
 *.db.backup
+*.db.session*  # Milestone snapshots (local only, not pushed to GitHub)
+*.db.baseline  # Baseline state (local only)
 *.sqlite
 *.sqlite3
 
