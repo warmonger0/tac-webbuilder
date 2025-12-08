@@ -1,6 +1,27 @@
-# Observability & Logging Quick Reference
+# Observability & Analytics Quick Reference
 
-## Four Integrated Systems
+## What's New (Sessions 7-14)
+**Major enhancements to observability and analytics:**
+- **Session 7:** Daily Pattern Analysis CLI + `pattern_approvals` table
+- **Session 8A:** Plans Panel backend + `planned_features` table for roadmap tracking
+- **Session 9:** Cost Attribution Analytics CLI (cost breakdown by ADW, session, phase)
+- **Session 10:** Error Analytics CLI (error frequency, categorization, root causes)
+- **Session 11:** Latency Analytics CLI (performance bottlenecks, percentiles)
+- **Session 12:** Closed-Loop ROI Tracking (pattern detection → approval → implementation → actual savings)
+- **Session 13:** Confidence Updating System (auto-update confidence scores based on outcomes)
+- **Session 14:** Auto-Archiving System (session documentation cleanup)
+
+**Key CLI Tools:**
+```bash
+python scripts/analyze_daily_patterns.py --report     # Discover automation patterns
+python scripts/cost_attribution.py --days 7           # Cost breakdown analytics
+python scripts/error_analytics.py --report            # Error frequency & causes
+python scripts/latency_analytics.py --threshold 5000  # Performance bottlenecks
+python scripts/roi_tracker.py --report                # Pattern ROI tracking
+python scripts/confidence_updater.py --auto           # Update confidence scores
+```
+
+## Four Core Observability Systems
 
 ### 1. Hook Events (Automated Capture)
 **Table:** `hook_events`
@@ -176,6 +197,42 @@ CREATE TABLE work_log (
     workflow_id TEXT,
     tags TEXT,  -- JSON array
     created_at TEXT DEFAULT (datetime('now'))
+);
+```
+
+### pattern_approvals Table (Session 7)
+```sql
+CREATE TABLE pattern_approvals (
+    id SERIAL PRIMARY KEY,
+    pattern_id TEXT UNIQUE NOT NULL,
+    tool_sequence TEXT NOT NULL,
+    confidence_score REAL,
+    occurrence_count INTEGER,
+    estimated_savings_usd REAL,
+    status TEXT DEFAULT 'pending',  -- pending, approved, rejected, auto-approved, auto-rejected
+    pattern_context TEXT,
+    example_sessions TEXT,  -- JSON array
+    created_at TIMESTAMP DEFAULT NOW(),
+    reviewed_at TIMESTAMP,
+    reviewed_by TEXT
+);
+```
+
+### planned_features Table (Session 8A)
+```sql
+CREATE TABLE planned_features (
+    id SERIAL PRIMARY KEY,
+    session_number INTEGER UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT DEFAULT 'pending',  -- pending, in_progress, completed, cancelled
+    estimated_hours REAL,
+    actual_hours REAL,
+    priority INTEGER DEFAULT 3,
+    dependencies TEXT,  -- JSON array of session numbers
+    created_at TIMESTAMP DEFAULT NOW(),
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP
 );
 ```
 

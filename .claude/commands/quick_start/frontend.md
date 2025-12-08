@@ -15,8 +15,9 @@ React 18.3 + Vite + TypeScript + Tailwind CSS + TanStack Query
 - **Panel 2: WorkflowDashboard** - Real-time ADW monitoring (Catalog view)
 - **Panel 3: HistoryView** - Workflow execution history
 - **Panel 4: RoutesView** - API route visualization
-- **Panel 5-9:** Placeholder panels (future features)
-- **Panel 10: LogPanel** - Work log and session summaries (NEW)
+- **Panel 5: PlansPanel** - Roadmap tracking (database-driven) - COMPLETE (Session 8B)
+- **Panel 6-9:** Placeholder panels (future features)
+- **Panel 10: LogPanel** - Work log and session summaries - COMPLETE
 
 ## State Management
 - **React Hooks** - Local component state (useState, useEffect)
@@ -50,5 +51,6 @@ bun run build        # Build for production
 ## When to Load Full Docs
 - **Component architecture:** `docs/web-ui.md` (2,200 tokens)
 - **Complete architecture:** `docs/architecture.md` (2,300 tokens)
+- **Panel 5 / Plans Panel:** `.claude/commands/references/planned_features.md` (600 tokens)
 - **Panel 10 / Work Logs:** `.claude/commands/references/observability.md` (900 tokens)
 - **Feature-specific:** Use `conditional_docs.md` for feature mappings

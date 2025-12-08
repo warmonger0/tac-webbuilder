@@ -23,7 +23,7 @@ from services.planned_features_service import PlannedFeaturesService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/planned-features", tags=["planned-features"])
+router = APIRouter(prefix="/api/v1/planned-features", tags=["planned-features"])
 
 
 @router.get("/", response_model=List[PlannedFeature])

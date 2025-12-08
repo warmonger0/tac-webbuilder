@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run
 # /// script
-# dependencies = ["fastapi", "uvicorn", "python-dotenv", "anthropic", "pydantic"]
+# dependencies = ["fastapi", "uvicorn", "python-dotenv", "anthropic", "pydantic", "psycopg2-binary"]
 # ///
 
 """

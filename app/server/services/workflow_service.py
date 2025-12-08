@@ -102,7 +102,12 @@ class WorkflowService:
                 f"[WORKFLOW_SERVICE] Initial sync complete: {synced_count} workflows"
             )
         except Exception as e:
-            logger.error(f"[WORKFLOW_SERVICE] Initial sync failed: {e}")
+            # Database connection errors are expected in Uvicorn reloader process
+            error_msg = str(e)
+            if "connection" in error_msg.lower() or "password" in error_msg.lower():
+                logger.debug(f"[WORKFLOW_SERVICE] Initial sync skipped (connection unavailable)")
+            else:
+                logger.error(f"[WORKFLOW_SERVICE] Initial sync failed: {e}")
 
         # Main sync loop
         while not self._stop_background_sync.is_set():
@@ -124,7 +129,13 @@ class WorkflowService:
                     logger.debug("[WORKFLOW_SERVICE] Background sync: no changes")
 
             except Exception as e:
-                logger.error(f"[WORKFLOW_SERVICE] Background sync error: {e}")
+                # Database connection errors are expected in Uvicorn reloader process
+                # Log at debug level for connection errors, error level for others
+                error_msg = str(e)
+                if "connection" in error_msg.lower() or "password" in error_msg.lower():
+                    logger.debug(f"[WORKFLOW_SERVICE] Background sync skipped (connection unavailable): {e}")
+                else:
+                    logger.error(f"[WORKFLOW_SERVICE] Background sync error: {e}")
                 # Continue running despite errors
 
         logger.info("[WORKFLOW_SERVICE] Background sync worker stopped")

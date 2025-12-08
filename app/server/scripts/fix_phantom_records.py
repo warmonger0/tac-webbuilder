@@ -17,7 +17,8 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.workflow_history_utils.database import DB_PATH, _db_adapter
+from core.workflow_history_utils.database import DB_PATH, init_db
+from core.workflow_history_utils.database.schema import _get_adapter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,7 +44,9 @@ def fix_phantom_records(dry_run: bool = False) -> dict:
         'details': []
     }
 
-    with _db_adapter.get_connection() as conn:
+    adapter = _get_adapter()
+    ph = adapter.placeholder()
+    with adapter.get_connection() as conn:
         cursor = conn.cursor()
 
         # Find all phantom records
@@ -101,11 +104,11 @@ def fix_phantom_records(dry_run: bool = False) -> dict:
                     f"end_time={end_time}"
                 )
             else:
-                cursor.execute("""
+                cursor.execute(f"""
                     UPDATE workflow_history
-                    SET end_time = ?,
+                    SET end_time = {ph},
                         updated_at = CURRENT_TIMESTAMP
-                    WHERE adw_id = ?
+                    WHERE adw_id = {ph}
                 """, (end_time, adw_id))
 
                 logger.info(

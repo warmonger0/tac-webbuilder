@@ -1,31 +1,32 @@
 # Backend Quick Start
 
 ## Tech Stack
-FastAPI + Python 3.10+ + SQLite/PostgreSQL + OpenAI/Anthropic APIs + Pydantic
+FastAPI + Python 3.10+ + PostgreSQL + OpenAI/Anthropic APIs + Pydantic
 
 ## Key Directories
-- `app/server/routes/` - API route modules (8 files, 36 endpoints)
-- `app/server/services/` - Business logic layer (7+ services)
-- `app/server/repositories/` - Data access layer (3 repositories)
-- `app/server/database/` - Database abstraction (SQLite/PostgreSQL adapters)
+- `app/server/routes/` - API route modules (9 files, 40+ endpoints)
+- `app/server/services/` - Business logic layer (10+ services)
+- `app/server/repositories/` - Data access layer (5 repositories)
+- `app/server/database/` - Database abstraction (PostgreSQL-only, SQLite removed)
 - `app/server/core/` - Core business logic (13 modules)
-- `app/server/tests/` - Test suite (878 test functions across 50 files)
+- `app/server/tests/` - Test suite (878+ test functions across 50+ files)
 
-## API Routes (36 Endpoints)
+## API Routes (40+ Endpoints)
 - **data_routes.py** - File upload, NL→SQL queries, exports
 - **workflow_routes.py** - Workflow management, history, analytics
 - **queue_routes.py** - Multi-phase workflow queue coordination
 - **github_routes.py** - Issue creation, preview, confirmation
 - **system_routes.py** - Health checks, service control, ADW monitoring
-- **work_log_routes.py** - Session logging (Panel 10) - NEW
+- **work_log_routes.py** - Session logging (Panel 10)
+- **planned_features_routes.py** - Roadmap tracking (Panel 5) - NEW (Session 8A)
 - **websocket_routes.py** - Real-time updates
 - **context_review_routes.py** - Context analysis
 
 ## Database Support
-- **SQLite** (default) - Zero-config, single-file, development-friendly
-- **PostgreSQL** (production) - Connection pooling, production-ready
-- **Configuration:** Set `DB_TYPE` env var (sqlite | postgresql)
-- **Adapter Pattern:** `database/factory.py` provides unified interface
+- **PostgreSQL** (only) - Production-ready, connection pooling, advanced features
+- **SQLite removed:** As of Session 3, codebase is PostgreSQL-only
+- **Configuration:** Set `POSTGRES_*` env vars (see `.env.example`)
+- **Database Adapter:** `database/get_database_adapter.py` provides unified interface
 
 ## Security Architecture
 **SQL Injection Prevention (4 layers):**
@@ -55,7 +56,7 @@ Always use: `execute_query_safely()`, `validate_identifier()`
 ### Database Schema
 Dynamic schema from uploaded files. Check: `core/file_processor.py`
 
-### Work Log API (Panel 10) - NEW
+### Work Log API (Panel 10)
 - **Routes:** `routes/work_log_routes.py`
 - **Repository:** `repositories/work_log_repository.py`
 - **Endpoints:**
@@ -63,6 +64,26 @@ Dynamic schema from uploaded files. Check: `core/file_processor.py`
   - `GET /api/v1/work-log` - List entries (paginated)
   - `DELETE /api/v1/work-log/{id}` - Delete entry
 - **Quick reference:** `.claude/commands/references/observability.md`
+
+### Planned Features API (Panel 5) - NEW (Session 8A)
+- **Routes:** `routes/planned_features_routes.py`
+- **Service:** `services/planned_features_service.py`
+- **Repository:** `repositories/planned_features_repository.py`
+- **Endpoints:**
+  - `POST /api/v1/planned-features` - Create roadmap item
+  - `GET /api/v1/planned-features` - List all features
+  - `GET /api/v1/planned-features/{id}` - Get by ID
+  - `PUT /api/v1/planned-features/{id}` - Update feature
+  - `DELETE /api/v1/planned-features/{id}` - Delete feature
+- **Quick reference:** `.claude/commands/references/planned_features.md`
+
+### Analytics Services (Sessions 7, 9-13)
+- **Pattern Review:** `services/pattern_review_service.py` - Pattern approval workflow
+- **Cost Attribution:** CLI-based analytics (no service layer yet)
+- **Error Analytics:** CLI-based analytics (no service layer yet)
+- **Latency Analytics:** CLI-based analytics (no service layer yet)
+- **ROI Tracking:** CLI-based analytics (no service layer yet)
+- **Confidence Updates:** CLI-based system (no service layer yet)
 
 ## Quick Commands
 ```bash

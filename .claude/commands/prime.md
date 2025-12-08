@@ -6,8 +6,8 @@
 ## Four Core Features
 1. **ADW Automation** - 9-phase SDLC workflows in isolated git worktrees (Claude Code CLI)
 2. **NL → GitHub Issues** - Natural language → Structured issues with auto-routing
-3. **Observability & Pattern Learning** - Hook events, cost tracking, automation detection
-4. **10-Panel Dashboard** - Real-time workflow monitoring and control
+3. **Observability & Analytics** - Pattern analysis, cost attribution, error/latency tracking, ROI metrics
+4. **10-Panel Dashboard** - Real-time workflow monitoring, roadmap tracking, and control
 
 ## Quick Architecture
 - **Worktree isolation:** Up to 15 concurrent ADWs in `trees/{adw_id}/`
@@ -26,9 +26,9 @@
 **10-Panel System:**
 - Panel 1: Request Form | Panel 6: Patterns (stub)
 - Panel 2: ADW Dashboard | Panel 7: Quality (stub)
-- Panel 3: History | Panel 8: Review (stub)
+- Panel 3: History | Panel 8: Review (active, needs fixes)
 - Panel 4: Routes | Panel 9: Data (stub)
-- Panel 5: Plans (stub) | Panel 10: Work Log (NEW)
+- Panel 5: Plans (complete, database-driven) | Panel 10: Work Log (complete)
 
 → Read `.claude/commands/quick_start/frontend.md` [~300 tokens]
 
@@ -44,10 +44,19 @@
 
 → Read `.claude/commands/quick_start/adw.md` [~400 tokens]
 
-### Observability & Pattern Learning
-**Hook events, pattern detection, cost tracking, work logs**
+### Plans Panel (Session 8A/8B)
+**Database-driven roadmap tracking with session management**
+**Panel 5:** View/edit planned features, track session progress, manage roadmap
+
+→ Read `.claude/commands/references/planned_features.md` [~600 tokens]
+→ Full doc: `docs/features/planned-features-system.md` [~1,500 tokens]
+
+### Observability & Analytics
+**Pattern analysis, cost attribution, error/latency analytics, ROI tracking**
+**New in Sessions 7-14:** Daily pattern analysis, cost attribution, error analytics, latency analytics, closed-loop ROI tracking, confidence updating, auto-archiving
 
 → Read `.claude/commands/references/observability.md` [~900 tokens]
+→ Read `.claude/commands/references/analytics.md` [~800 tokens] (Sessions 9-11)
 → Full doc: `docs/features/observability-and-logging.md` [~2,500 tokens]
 
 ### Documentation
@@ -75,6 +84,15 @@ cd adws/ && uv run adw_sdlc_complete_iso.py 123  # Full SDLC
 # Tests
 cd app/server && uv run pytest         # 878 tests
 cd app/client && bun test              # 149 tests
+
+# CLI Tools (Sessions 7-14)
+python scripts/analyze_daily_patterns.py --report     # Pattern analysis
+python scripts/archive_sessions.py --archive          # Archive session docs
+python scripts/cost_attribution.py --days 7           # Cost analytics
+python scripts/error_analytics.py --report            # Error analysis
+python scripts/latency_analytics.py --threshold 5000  # Latency analysis
+python scripts/roi_tracker.py --report                # ROI tracking
+python scripts/confidence_updater.py --auto           # Update confidence scores
 ```
 
 ## After Loading Quick Start
