@@ -513,6 +513,77 @@ curl http://localhost:8002/health
 
 ---
 
+### Issue: Current Workflow not updating / showing old workflow
+
+**Symptoms:**
+- Current Workflow card shows old/completed workflow instead of latest
+- Failed workflows not appearing in UI
+- Phase count always shows "/9 phases" regardless of workflow
+- Status doesn't update when workflow fails or changes
+
+**Root Causes:**
+This was a multi-layer bug fixed in commit `ba2a2ce`:
+1. Frontend didn't prioritize failed workflows
+2. Frontend used hardcoded phase count
+3. Backend returned hardcoded total_phases
+4. Webhook didn't create state files for preflight failures
+5. Failed workflows were completely invisible to ADW monitor
+
+**Solution:**
+```bash
+# Verify you have the fix (commit ba2a2ce or later)
+git log --oneline | grep "Fix current workflow display"
+
+# If not, pull latest:
+git pull origin main
+
+# Restart backend to pick up changes
+cd app/server
+./scripts/start_web_backend.sh
+
+# Restart frontend
+cd app/client
+bun run dev
+
+# For failed workflows (preflight errors), check state file was created:
+ls -la agents/adw-*/adw_state.json
+# Should see state files for all workflows including failed ones
+
+# Verify WebSocket is sending workflow updates:
+# Open browser DevTools → Network → WS tab
+# Look for adw-monitor events with workflow arrays
+```
+
+**Verification:**
+1. Try starting a workflow (even if it fails preflight)
+2. Current Workflow card should show the attempt
+3. Failed workflows appear with red "FAILED" badge
+4. Phase counts reflect actual workflow phases (not always /9)
+5. Status updates in real-time via WebSocket
+
+**For Preflight Failures:**
+If workflow fails due to uncommitted changes:
+```bash
+# Check what's uncommitted
+git status
+
+# Either commit changes:
+git add .
+git commit -m "your message"
+
+# Or stash them:
+git stash
+
+# Then retry workflow
+```
+
+**Related Documentation:**
+- Session doc: `docs/Archive/sessions/SESSION_2025_12_08_CURRENT_WORKFLOW_DISPLAY_FIX.md`
+- WebSocket migration: Sessions 15-16
+- ADW monitor: `app/server/core/adw_monitor.py`
+
+---
+
 ### Issue: TypeScript errors
 
 **Symptoms:**
