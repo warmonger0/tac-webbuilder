@@ -14,7 +14,7 @@
 - **Port allocation:** Backend 9100-9114, Frontend 9200-9214
 - **9-phase SDLC:** Plan → Validate → Build → Lint → Test → Review → Document → Ship → Cleanup
 - **Cost optimization:** 60-80% savings via external test tools
-- **Dual database:** SQLite (dev) + PostgreSQL (production)
+- **Database:** PostgreSQL only (production-grade, required for observability)
 - **Security:** Multi-layer SQL injection prevention
 
 ## What Are You Working On?
@@ -33,8 +33,8 @@
 → Read `.claude/commands/quick_start/frontend.md` [~300 tokens]
 
 ### Backend (app/server/)
-**Tech:** FastAPI + Python + SQLite/PostgreSQL + OpenAI/Anthropic
-**36 endpoints:** GitHub, workflows, queue, work-log, system, websocket
+**Tech:** FastAPI + Python + PostgreSQL + OpenAI/Anthropic
+**36 endpoints:** GitHub, workflows, queue, work-log, system, websocket, observability
 
 → Read `.claude/commands/quick_start/backend.md` [~300 tokens]
 
@@ -98,13 +98,23 @@ cd app/server && uv run pytest         # 878 tests
 cd app/client && bun test              # 149 tests
 
 # CLI Tools (Sessions 7-14)
-python scripts/analyze_daily_patterns.py --report     # Pattern analysis
-python scripts/archive_sessions.py --archive          # Archive session docs
-python scripts/cost_attribution.py --days 7           # Cost analytics
-python scripts/error_analytics.py --report            # Error analysis
-python scripts/latency_analytics.py --threshold 5000  # Latency analysis
-python scripts/roi_tracker.py --report                # ROI tracking
-python scripts/confidence_updater.py --auto           # Update confidence scores
+./scripts/run_analytics.sh analyze_daily_patterns.py --report  # Pattern analysis (auto-credentials)
+./scripts/run_analytics.sh analyze_errors.py --report          # Error analysis
+./scripts/run_analytics.sh analyze_costs.py --report           # Cost analytics
+./scripts/health_check.sh                                      # Full system health check
+```
+
+## Health Checks & Observability (Session 18)
+```bash
+# Multi-layer health check system
+./scripts/health_check.sh              # Terminal: 7 sections including observability
+curl localhost:8000/api/v1/preflight-checks  # API: 9 checks before ADW launch
+# Panel 1 UI: Automatic display of all preflight checks
+
+# 3 New Observability Checks:
+# - observability_database: PostgreSQL connection + tables
+# - hook_events_recording: Verify events being captured
+# - pattern_analysis_system: Analytics scripts functional
 ```
 
 ## After Loading Quick Start

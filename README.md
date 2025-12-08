@@ -26,6 +26,9 @@ A web application that converts natural language queries to SQL using AI, built 
 - Node.js 18+
 - Bun (or your preferred npm tool: npm, yarn, etc.)
 - OpenAI API key and/or Anthropic API key
+- **PostgreSQL** (required for observability, pattern learning, and analytics)
+  - Docker recommended: `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=changeme postgres:15-alpine`
+  - Or use provided docker-compose.yml
 
 ## Setup
 
@@ -72,6 +75,25 @@ The script will:
 - Start the backend on http://localhost:8000
 - Start the frontend on http://localhost:5173
 - Handle graceful shutdown when you exit
+
+### Health Checks
+
+Verify system health with comprehensive checks:
+
+```bash
+# Terminal-based health check (7 sections including observability)
+./scripts/health_check.sh
+
+# API endpoint (9 pre-flight checks before ADW workflows)
+curl localhost:8000/api/v1/preflight-checks
+
+# Panel 1 UI - Automatic display of all health checks
+```
+
+**3-Layer Observability Health Checks:**
+1. **Observability Database** - PostgreSQL connection + required tables
+2. **Hook Events Recording** - Verify pattern capture is working
+3. **Pattern Analysis System** - Analytics scripts functional
 
 ## Manual Start (Alternative)
 
