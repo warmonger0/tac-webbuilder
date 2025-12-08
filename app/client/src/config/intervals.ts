@@ -6,7 +6,7 @@
 export const intervals = {
   // WebSocket Configuration
   websocket: {
-    pollingInterval: 3000,              // Default polling interval (ms)
+    pollingInterval: 60000,             // Fallback polling interval when WebSocket disconnected (ms) - reduced from 3s to 60s to prevent log spam
     maxReconnectDelay: 30000,           // Max reconnect delay (ms)
     maxReconnectAttempts: 10,           // Max reconnect attempts
     qualityUpdateInterval: 5000,        // Quality update interval (ms)
