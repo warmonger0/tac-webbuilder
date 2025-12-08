@@ -321,7 +321,7 @@ def determine_status(adw_id: str, state: dict[str, Any]) -> str:
     return "queued"
 
 
-def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | None, float, list[str]]:
+def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | None, float, list[str], int]:
     """
     Calculate the current phase and overall progress percentage.
 
@@ -333,7 +333,7 @@ def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | 
         state: The workflow state dictionary
 
     Returns:
-        tuple: (current_phase, progress_percentage, completed_phases_list)
+        tuple: (current_phase, progress_percentage, completed_phases_list, total_phases)
     """
     # Standard SDLC phases (9 total)
     phases = ["plan", "validate", "build", "lint", "test", "review", "doc", "ship", "cleanup"]
@@ -343,14 +343,14 @@ def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | 
     adw_dir = agents_dir / adw_id
 
     if not adw_dir.exists():
-        return None, 0.0, []
+        return None, 0.0, [], total_phases
 
     # Get list of subdirectories in the agent directory
     try:
         subdirs = [d.name.lower() for d in adw_dir.iterdir() if d.is_dir()]
     except Exception as e:
         logger.error(f"Error reading agent directory for {adw_id}: {e}")
-        return None, 0.0, []
+        return None, 0.0, [], total_phases
 
     # Count completed phases (directories that match phase names)
     completed_phases = []
@@ -406,7 +406,7 @@ def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | 
     # Cap at 100%
     progress = min(base_progress, 100.0)
 
-    return current_phase, round(progress, 1), completed_phases
+    return current_phase, round(progress, 1), completed_phases, total_phases
 
 
 def extract_cost_data(state: dict[str, Any]) -> tuple[float | None, float | None]:
@@ -552,8 +552,8 @@ def build_workflow_status(state: dict[str, Any], running_processes: dict[str, bo
         # Determine status
         status = determine_status(adw_id, state)
 
-        # Calculate phase progress
-        current_phase, progress, completed_phases = calculate_phase_progress(adw_id, state)
+        # Calculate phase progress (now returns total_phases dynamically)
+        current_phase, progress, completed_phases, total_phases = calculate_phase_progress(adw_id, state)
 
         # Extract costs
         current_cost, estimated_cost = extract_cost_data(state)
@@ -599,7 +599,7 @@ def build_workflow_status(state: dict[str, Any], running_processes: dict[str, bo
             "last_error": last_error,
             "is_process_active": is_active,
             "phases_completed": completed_phases,
-            "total_phases": 9,  # Standard SDLC has 9 phases
+            "total_phases": total_phases,  # Dynamically calculated from workflow
         }
 
         return workflow_status

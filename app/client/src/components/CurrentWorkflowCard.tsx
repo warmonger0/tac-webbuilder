@@ -7,10 +7,11 @@ export function CurrentWorkflowCard() {
   // Use WebSocket for real-time updates instead of polling
   const { workflows, isConnected } = useADWMonitorWebSocket();
 
-  // Select current workflow (prioritize running > paused > most recent)
+  // Select current workflow (prioritize failed > running > paused > most recent)
   const workflow = useMemo(() => {
     if (!workflows.length) return null;
-    return workflows.find(w => w.status === 'running')
+    return workflows.find(w => w.status === 'failed')
+      || workflows.find(w => w.status === 'running')
       || workflows.find(w => w.status === 'paused')
       || workflows[0];
   }, [workflows]);
@@ -171,6 +172,7 @@ export function CurrentWorkflowCard() {
                   workflow.status === 'running' ? 'bg-emerald-500/20 text-emerald-300' :
                   workflow.status === 'paused' ? 'bg-yellow-500/20 text-yellow-300' :
                   workflow.status === 'completed' ? 'bg-blue-500/20 text-blue-300' :
+                  workflow.status === 'failed' ? 'bg-red-500/20 text-red-300' :
                   'bg-slate-700 text-slate-400'
                 }`}>
                   {workflow.status.toUpperCase()}
@@ -345,7 +347,7 @@ export function CurrentWorkflowCard() {
 
         {/* Progress Footer */}
         <div className="mt-4 pt-4 border-t border-slate-700/50 flex items-center justify-center gap-2 text-sm">
-          <span className="text-slate-400">{workflow.phases_completed.length} / {workflowPhases.length} phases completed</span>
+          <span className="text-slate-400">{workflow.phases_completed.length} / {workflow.total_phases} phases completed</span>
           {workflow.current_phase && (
             <>
               <span className="text-slate-600">•</span>

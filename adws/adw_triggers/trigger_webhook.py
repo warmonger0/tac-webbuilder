@@ -296,6 +296,44 @@ async def process_webhook_background(
         if not can_proceed:
             print(f"❌ Pre-flight check failed: {preflight_error}")
             error_logger.warning(f"Pre-flight check failed for issue #{issue_number}: {preflight_error}")
+
+            # Create state file for failed workflow so it appears in ADW monitor
+            if not provided_adw_id:
+                adw_id = make_adw_id()
+            else:
+                adw_id = provided_adw_id
+
+            # Build GitHub URL for this issue
+            repo_url = get_repo_url()
+            repo_path = extract_repo_path(repo_url)
+            github_url = f"https://github.com/{repo_path}/issues/{issue_number}"
+
+            # Determine model_used based on model_set
+            model_mapping = {
+                "base": "sonnet",
+                "heavy": "opus",
+                "lightweight": "haiku"
+            }
+            model_used = model_mapping.get(model_set, "sonnet")
+
+            # Create minimal state file for failed workflow
+            state = ADWState(adw_id)
+            state.update(
+                adw_id=adw_id,
+                issue_number=str(issue_number),
+                model_set=model_set,
+                status="failed",
+                workflow_template=workflow,
+                model_used=model_used,
+                start_time=datetime.now().isoformat(),
+                end_time=datetime.now().isoformat(),
+                nl_input=content_to_check[:500],
+                github_url=github_url,
+                last_error=f"Preflight check failed: {preflight_error}"
+            )
+            state.save("webhook_trigger")
+            print(f"💾 Created state file for failed workflow {adw_id} (issue #{issue_number})")
+
             try:
                 make_issue_comment(
                     str(issue_number),
@@ -305,6 +343,7 @@ async def process_webhook_background(
                     f"- Active worktrees: {count_active_worktrees()}/15\n"
                     f"- Disk usage: {get_disk_usage()*100:.1f}%\n\n"
                     f"The workflow will automatically retry when resources are available.\n\n"
+                    f"ADW ID: `{adw_id}` (for tracking)\n\n"
                     f"{ADW_BOT_IDENTIFIER}",
                 )
             except Exception as e:
