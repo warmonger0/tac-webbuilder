@@ -154,6 +154,57 @@ def run_preflight_checks(skip_tests: bool = False) -> dict[str, Any]:
             "fix": python_result["fix"]
         })
 
+    # Check 7: Observability - Database Connection
+    check_start = time.time()
+    db_result = check_observability_database()
+    checks_run.append({
+        "check": "observability_database",
+        "status": "pass" if db_result["passed"] else "fail",
+        "duration_ms": int((time.time() - check_start) * 1000),
+        "details": db_result.get("summary")
+    })
+
+    if not db_result["passed"]:
+        blocking_failures.append({
+            "check": "Observability Database",
+            "error": db_result["error"],
+            "fix": db_result["fix"]
+        })
+
+    # Check 8: Observability - Hook Events Recording
+    check_start = time.time()
+    hooks_result = check_hook_events_recording()
+    checks_run.append({
+        "check": "hook_events_recording",
+        "status": "pass" if hooks_result["passed"] else "warn",
+        "duration_ms": int((time.time() - check_start) * 1000),
+        "details": hooks_result.get("summary")
+    })
+
+    if not hooks_result["passed"]:
+        warnings.append({
+            "check": "Hook Events Recording",
+            "message": hooks_result["error"],
+            "impact": hooks_result.get("impact", "Pattern learning and cost optimization may not work")
+        })
+
+    # Check 9: Observability - Pattern Analysis System
+    check_start = time.time()
+    pattern_result = check_pattern_analysis_system()
+    checks_run.append({
+        "check": "pattern_analysis_system",
+        "status": "pass" if pattern_result["passed"] else "warn",
+        "duration_ms": int((time.time() - check_start) * 1000),
+        "details": pattern_result.get("summary")
+    })
+
+    if not pattern_result["passed"]:
+        warnings.append({
+            "check": "Pattern Analysis System",
+            "message": pattern_result["error"],
+            "impact": pattern_result.get("impact", "Analytics and pattern discovery unavailable")
+        })
+
     total_duration = int((time.time() - start_time) * 1000)
 
     passed = len(blocking_failures) == 0
@@ -533,4 +584,207 @@ def check_python_environment() -> dict[str, Any]:
             "error": f"Failed to check Python environment: {str(e)}",
             "fix": "Check Python and uv installation",
             "summary": f"error: {str(e)}"
+        }
+
+
+def check_observability_database() -> dict[str, Any]:
+    """
+    Check PostgreSQL connection and observability tables.
+
+    Returns:
+        {
+            "passed": bool,
+            "error": str,
+            "fix": str,
+            "summary": str
+        }
+    """
+    try:
+        from database import get_database_adapter
+
+        adapter = get_database_adapter()
+        db_type = adapter.get_db_type()
+
+        # Check if using PostgreSQL
+        if db_type != "postgresql":
+            return {
+                "passed": False,
+                "error": f"Using {db_type} instead of PostgreSQL",
+                "fix": "Set DB_TYPE=postgresql in .env and ensure PostgreSQL is running",
+                "summary": f"Wrong DB: {db_type}"
+            }
+
+        # Check database connection
+        with adapter.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Verify observability tables exist
+            cursor.execute("""
+                SELECT tablename FROM pg_catalog.pg_tables
+                WHERE schemaname = 'public'
+                AND tablename IN ('hook_events', 'operation_patterns', 'pattern_approvals')
+            """)
+            tables = cursor.fetchall()
+            table_names = [row['tablename'] if isinstance(row, dict) else row[0] for row in tables]
+
+        missing_tables = []
+        for required_table in ['hook_events', 'operation_patterns', 'pattern_approvals']:
+            if required_table not in table_names:
+                missing_tables.append(required_table)
+
+        if missing_tables:
+            return {
+                "passed": False,
+                "error": f"Missing observability tables: {', '.join(missing_tables)}",
+                "fix": "Run database migrations to create observability tables",
+                "summary": f"Missing tables: {len(missing_tables)}"
+            }
+
+        return {
+            "passed": True,
+            "summary": f"PostgreSQL connected, {len(table_names)} tables"
+        }
+
+    except Exception as e:
+        return {
+            "passed": False,
+            "error": f"Database connection failed: {str(e)}",
+            "fix": "Check PostgreSQL is running and credentials in .env are correct",
+            "summary": f"Connection error"
+        }
+
+
+def check_hook_events_recording() -> dict[str, Any]:
+    """
+    Check if hook events are being recorded to the database.
+
+    Returns:
+        {
+            "passed": bool,
+            "error": str,
+            "impact": str,
+            "summary": str
+        }
+    """
+    try:
+        from database import get_database_adapter
+        from datetime import datetime, timedelta
+
+        adapter = get_database_adapter()
+
+        with adapter.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Check for recent hook events (last 7 days)
+            seven_days_ago = (datetime.now() - timedelta(days=7)).isoformat()
+            cursor.execute(
+                "SELECT COUNT(*) as count FROM hook_events WHERE timestamp > %s",
+                (seven_days_ago,)
+            )
+            result = cursor.fetchone()
+            recent_count = result['count'] if isinstance(result, dict) else result[0]
+
+            # Check total hook events
+            cursor.execute("SELECT COUNT(*) as count FROM hook_events")
+            result = cursor.fetchone()
+            total_count = result['count'] if isinstance(result, dict) else result[0]
+
+        if total_count == 0:
+            return {
+                "passed": False,
+                "error": "No hook events recorded (hooks may not be configured for PostgreSQL)",
+                "impact": "Pattern learning, cost optimization, and analytics are not capturing data",
+                "summary": "0 events recorded"
+            }
+
+        if recent_count == 0:
+            return {
+                "passed": False,
+                "error": f"No recent hook events (last 7 days) - found {total_count} historical events",
+                "impact": "Hooks may have stopped working or are configured for SQLite instead of PostgreSQL",
+                "summary": f"{total_count} total, 0 recent"
+            }
+
+        return {
+            "passed": True,
+            "summary": f"{recent_count} events (7d), {total_count} total"
+        }
+
+    except Exception as e:
+        return {
+            "passed": False,
+            "error": f"Failed to check hook events: {str(e)}",
+            "impact": "Cannot verify observability data collection",
+            "summary": "Check failed"
+        }
+
+
+def check_pattern_analysis_system() -> dict[str, Any]:
+    """
+    Check if pattern analysis scripts are available and can connect to database.
+
+    Returns:
+        {
+            "passed": bool,
+            "error": str,
+            "impact": str,
+            "summary": str
+        }
+    """
+    try:
+        import os
+
+        project_root = Path(__file__).parent.parent.parent
+        script_path = project_root / "scripts" / "analyze_daily_patterns.py"
+
+        # Check if script exists
+        if not script_path.exists():
+            return {
+                "passed": False,
+                "error": "Pattern analysis script not found",
+                "impact": "Cannot run automated pattern discovery",
+                "summary": "Script missing"
+            }
+
+        # Check if PostgreSQL credentials are available
+        required_env_vars = ['POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_DB',
+                             'POSTGRES_USER', 'POSTGRES_PASSWORD']
+        missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+
+        if missing_vars:
+            return {
+                "passed": False,
+                "error": f"Missing environment variables for analytics: {', '.join(missing_vars)}",
+                "impact": "Analytics scripts cannot connect to PostgreSQL",
+                "summary": f"{len(missing_vars)} env vars missing"
+            }
+
+        # Check if pattern review service is importable
+        try:
+            from services.pattern_review_service import PatternReviewService
+            service = PatternReviewService()
+
+            # Quick sanity check - can we query pattern_approvals?
+            patterns = service.get_all_patterns(limit=1)
+            pattern_count = len(patterns) if patterns else 0
+
+            return {
+                "passed": True,
+                "summary": f"Pattern system OK, {pattern_count} patterns"
+            }
+
+        except Exception as e:
+            return {
+                "passed": False,
+                "error": f"Pattern review service error: {str(e)}",
+                "impact": "Pattern approval and learning system unavailable",
+                "summary": "Service error"
+            }
+
+    except Exception as e:
+        return {
+            "passed": False,
+            "error": f"Failed to check pattern analysis: {str(e)}",
+            "impact": "Cannot verify pattern discovery system",
+            "summary": "Check failed"
         }

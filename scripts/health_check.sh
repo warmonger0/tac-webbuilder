@@ -227,12 +227,78 @@ check_database
 echo ""
 
 # 6. Check WebSocket Connections
-echo -e "${BLUE}[6/6] WebSocket Endpoints${NC}"
+echo -e "${BLUE}[6/7] WebSocket Endpoints${NC}"
 echo -e "${GREEN}✅ WebSocket endpoints are registered (cannot test with HTTP)${NC}"
 echo -e "${BLUE}   - /ws/workflows${NC}"
 echo -e "${BLUE}   - /ws/workflow-history${NC}"
 echo -e "${BLUE}   - /ws/routes${NC}"
 echo -e "${YELLOW}   Note: WebSocket endpoints require upgrade protocol and cannot be tested with curl${NC}"
+echo ""
+
+# 7. Check Observability System
+echo -e "${BLUE}[7/7] Observability System${NC}"
+
+# Source .env for PostgreSQL credentials
+if [ -f "app/server/.env" ]; then
+    export $(grep -v '^#' app/server/.env | grep -E '^POSTGRES_' | xargs) 2>/dev/null
+fi
+
+# Check database type
+if [ "$DB_TYPE" != "postgresql" ] && [ -z "$POSTGRES_HOST" ]; then
+    echo -e "${RED}❌ PostgreSQL not configured (using SQLite fallback)${NC}"
+    echo -e "${YELLOW}   Observability features require PostgreSQL${NC}"
+    OVERALL_HEALTH=1
+else
+    echo -e "${GREEN}✅ PostgreSQL configured: $POSTGRES_USER@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DB${NC}"
+
+    # Check if PostgreSQL is accessible
+    if command -v docker &> /dev/null; then
+        if docker exec tac-webbuilder-postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1" > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ PostgreSQL connection successful${NC}"
+
+            # Check observability tables
+            tables=$(docker exec tac-webbuilder-postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename IN ('hook_events', 'operation_patterns', 'pattern_approvals');" 2>/dev/null | wc -l)
+
+            if [ "$tables" -ge 3 ]; then
+                echo -e "${GREEN}✅ Observability tables present (hook_events, operation_patterns, pattern_approvals)${NC}"
+
+                # Check hook events count
+                hook_count=$(docker exec tac-webbuilder-postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT COUNT(*) FROM hook_events;" 2>/dev/null | tr -d ' ')
+
+                if [ "$hook_count" -gt 0 ]; then
+                    echo -e "${GREEN}✅ Hook events recording: $hook_count events captured${NC}"
+                else
+                    echo -e "${YELLOW}⚠️  No hook events recorded yet (hooks may need PostgreSQL env vars)${NC}"
+                    echo -e "${YELLOW}   Pattern learning and cost optimization require hook events${NC}"
+                    OVERALL_HEALTH=1
+                fi
+
+                # Check pattern approvals
+                pattern_count=$(docker exec tac-webbuilder-postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT COUNT(*) FROM pattern_approvals;" 2>/dev/null | tr -d ' ')
+                echo -e "${BLUE}   Pattern approvals: $pattern_count patterns${NC}"
+
+            else
+                echo -e "${RED}❌ Missing observability tables (found $tables/3)${NC}"
+                echo -e "${YELLOW}   Run database migrations to create required tables${NC}"
+                OVERALL_HEALTH=1
+            fi
+        else
+            echo -e "${RED}❌ PostgreSQL connection failed${NC}"
+            echo -e "${YELLOW}   Check if PostgreSQL container is running: docker ps | grep postgres${NC}"
+            OVERALL_HEALTH=1
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Docker not found, cannot verify PostgreSQL connection${NC}"
+    fi
+
+    # Check analytics scripts
+    if [ -f "scripts/analyze_daily_patterns.py" ]; then
+        echo -e "${GREEN}✅ Pattern analysis scripts available${NC}"
+    else
+        echo -e "${RED}❌ Pattern analysis scripts missing${NC}"
+        OVERALL_HEALTH=1
+    fi
+fi
 echo ""
 
 # Summary

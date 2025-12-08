@@ -19,7 +19,6 @@ Arguments:
 
 import argparse
 import json
-import sqlite3
 import sys
 import os
 import hashlib
@@ -27,8 +26,22 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Optional
 
-# Database path
-DB_PATH = Path(__file__).parent.parent.parent / "app" / "server" / "db" / "workflow_history.db"
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    POSTGRES_AVAILABLE = True
+except ImportError:
+    POSTGRES_AVAILABLE = False
+
+# PostgreSQL connection parameters from environment
+# These should match the values in app/server/.env
+POSTGRES_CONFIG = {
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": int(os.getenv("POSTGRES_PORT", "5432")),
+    "database": os.getenv("POSTGRES_DB", "tac_webbuilder"),
+    "user": os.getenv("POSTGRES_USER", "tac_user"),
+    "password": os.getenv("POSTGRES_PASSWORD", "changeme"),
+}
 
 
 def generate_event_id() -> str:
@@ -88,7 +101,7 @@ def detect_source_app() -> str:
 
 def send_to_database(event_data: Dict) -> bool:
     """
-    Send event to SQLite database.
+    Send event to PostgreSQL database.
 
     Args:
         event_data: Complete event data
@@ -96,21 +109,20 @@ def send_to_database(event_data: Dict) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    try:
-        # Ensure database exists
-        if not DB_PATH.exists():
-            print(f"Warning: Database not found at {DB_PATH}", file=sys.stderr)
-            return False
+    if not POSTGRES_AVAILABLE:
+        print("Warning: psycopg2 not available, skipping database logging", file=sys.stderr)
+        return False
 
-        # Connect and insert
-        conn = sqlite3.connect(str(DB_PATH))
+    try:
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(**POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         cursor.execute("""
             INSERT INTO hook_events (
                 event_id, event_type, source_app, session_id, workflow_id,
                 timestamp, payload, tool_name, chat_history, processed
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             event_data["event_id"],
             event_data["event_type"],
@@ -125,6 +137,7 @@ def send_to_database(event_data: Dict) -> bool:
         ))
 
         conn.commit()
+        cursor.close()
         conn.close()
         return True
 

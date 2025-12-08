@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import {
   workLogClient,
   WorkLogEntryCreate,
@@ -22,6 +23,7 @@ export function LogPanel() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('workLogs');
   const [filterIssueNumber, setFilterIssueNumber] = useState<string>('');
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   // Work Logs state
   const [limit] = useState(50);
@@ -60,6 +62,11 @@ export function LogPanel() {
       queryClient.invalidateQueries({ queryKey: ['work-logs'] });
       setShowCreateForm(false);
       resetForm();
+      setMutationError(null);
+    },
+    onError: (error: Error) => {
+      console.error('[LogPanel] Create mutation failed:', error);
+      setMutationError(`Failed to create work log: ${error.message}`);
     },
   });
 
@@ -68,6 +75,11 @@ export function LogPanel() {
     mutationFn: (entryId: number) => workLogClient.deleteWorkLog(entryId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-logs'] });
+      setMutationError(null);
+    },
+    onError: (error: Error) => {
+      console.error('[LogPanel] Delete mutation failed:', error);
+      setMutationError(`Failed to delete work log: ${error.message}`);
     },
   });
 
@@ -86,7 +98,7 @@ export function LogPanel() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.summary.length > 280) {
-      alert('Summary must be 280 characters or less');
+      toast.error('Summary must be 280 characters or less');
       return;
     }
     createMutation.mutate(formData);
@@ -141,6 +153,25 @@ export function LogPanel() {
           </button>
         )}
       </div>
+
+      {/* Error Banner */}
+      {mutationError && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-red-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <p className="text-sm text-red-700 flex-1">{mutationError}</p>
+            <button
+              onClick={() => setMutationError(null)}
+              className="ml-2 text-red-400 hover:text-red-600 font-bold text-lg leading-none"
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="mb-6">
@@ -424,9 +455,28 @@ export function LogPanel() {
                       </div>
                       <button
                         onClick={() => {
-                          if (confirm('Delete this entry?')) {
-                            deleteMutation.mutate(entry.id);
-                          }
+                          toast((t) => (
+                            <div>
+                              <p className="mb-3">Delete this entry?</p>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    deleteMutation.mutate(entry.id);
+                                    toast.dismiss(t.id);
+                                  }}
+                                  className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                                >
+                                  Delete
+                                </button>
+                                <button
+                                  onClick={() => toast.dismiss(t.id)}
+                                  className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ), { duration: Infinity, icon: '🗑️' });
                         }}
                         className="text-red-600 hover:text-red-800 text-sm ml-2"
                       >

@@ -6,6 +6,7 @@
  */
 
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { executePhase } from '../api/client';
 import { WorkflowStateDisplay } from './WorkflowStateDisplay';
 import { apiConfig } from '../config/api';
@@ -67,12 +68,11 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
     try {
       const result = await executePhase(queue_id);
       console.log('Phase execution started:', result);
-      // Optionally show success toast/notification
-      alert(`✅ ${result.message}\n\nADW ID: ${result.adw_id}\nIssue: #${result.issue_number}`);
+      toast.success(`${result.message}\n\nADW ID: ${result.adw_id}\nIssue: #${result.issue_number}`, { duration: 5000 });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to execute phase';
       console.error('Failed to execute phase:', error);
-      alert(`❌ Failed to execute phase:\n\n${errorMsg}`);
+      toast.error(`Failed to execute phase:\n\n${errorMsg}`, { duration: 6000 });
     } finally {
       setIsExecuting(false);
     }
