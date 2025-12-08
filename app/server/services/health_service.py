@@ -107,11 +107,11 @@ class HealthService:
 
     def __init__(
         self,
+        frontend_url: str,
+        backend_port: str,
         db_path: str = "db/database.db",
         webhook_url: str = "http://localhost:8001/webhook-status",
         cloudflare_tunnel_name: str | None = None,
-        frontend_url: str,
-        backend_port: str,
         app_start_time: datetime | None = None,
         github_repo: str = "warmonger0/tac-webbuilder"
     ):

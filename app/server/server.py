@@ -133,9 +133,9 @@ service_controller = ServiceController(
     github_webhook_id=os.environ.get("GITHUB_WEBHOOK_ID", "580534779")
 )
 health_service = HealthService(
-    webhook_url="http://localhost:8001/webhook-status",
     frontend_url=f"http://localhost:{os.environ.get('FRONTEND_PORT')}",
     backend_port=os.environ.get("BACKEND_PORT"),
+    webhook_url="http://localhost:8001/webhook-status",
     app_start_time=app_start_time,
     github_repo="warmonger0/tac-webbuilder"
 )
