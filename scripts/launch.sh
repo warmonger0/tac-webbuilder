@@ -1,11 +1,29 @@
 #!/bin/bash
 
-# Source port configuration if exists
-[ -f ".ports.env" ] && source .ports.env
+# SINGLE SOURCE OF TRUTH: .ports.env
+# All port configuration MUST be in .ports.env - no fallbacks allowed
+if [ ! -f ".ports.env" ]; then
+    echo "❌ ERROR: .ports.env not found!"
+    echo "   Copy .ports.env.sample to .ports.env and configure your ports."
+    exit 1
+fi
 
-# Port configuration with fallbacks
-SERVER_PORT=${BACKEND_PORT:-8000}
-CLIENT_PORT=${FRONTEND_PORT:-5173}
+source .ports.env
+
+# Validate required variables are set
+if [ -z "$BACKEND_PORT" ] || [ -z "$FRONTEND_PORT" ]; then
+    echo "❌ ERROR: BACKEND_PORT and FRONTEND_PORT must be set in .ports.env"
+    exit 1
+fi
+
+# Export for child processes (server.py, Vite, etc.)
+export BACKEND_PORT
+export FRONTEND_PORT
+export VITE_BACKEND_URL
+
+# Use configured ports
+SERVER_PORT=$BACKEND_PORT
+CLIENT_PORT=$FRONTEND_PORT
 WEBHOOK_PORT=${PORT:-8001}
 
 # Colors for output
