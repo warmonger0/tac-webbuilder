@@ -19,7 +19,7 @@ FastAPI + Python 3.10+ + PostgreSQL + OpenAI/Anthropic APIs + Pydantic
 - **system_routes.py** - Health checks, service control, ADW monitoring
 - **work_log_routes.py** - Session logging (Panel 10)
 - **planned_features_routes.py** - Roadmap tracking (Panel 5) - NEW (Session 8A)
-- **websocket_routes.py** - Real-time updates
+- **websocket_routes.py** - Real-time updates (workflows, routes, history, ADW monitor, queue)
 - **context_review_routes.py** - Context analysis
 
 ## Database Support
@@ -76,6 +76,18 @@ Dynamic schema from uploaded files. Check: `core/file_processor.py`
   - `PUT /api/v1/planned-features/{id}` - Update feature
   - `DELETE /api/v1/planned-features/{id}` - Delete feature
 - **Quick reference:** `.claude/commands/references/planned_features.md`
+
+### WebSocket Real-Time Updates (Sessions 15-16)
+- **Routes:** `routes/websocket_routes.py`
+- **Background Tasks:** `services/background_tasks.py` (5 watchers, 2s intervals)
+- **Endpoints:**
+  - `/ws/workflows` - Real-time workflow status updates
+  - `/ws/routes` - Real-time route updates
+  - `/ws/workflow-history` - Real-time history updates
+  - `/ws/adw-monitor` - Real-time ADW monitoring
+  - `/ws/queue` - Real-time queue updates (NEW in Session 16)
+- **Performance:** Broadcast only on state change, <2s latency
+- **Architecture:** Background watchers check every 2s, compare state via JSON, broadcast to connected clients
 
 ### Analytics Services (Sessions 7, 9-13)
 - **Pattern Review:** `services/pattern_review_service.py` - Pattern approval workflow

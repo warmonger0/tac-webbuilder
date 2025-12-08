@@ -22,7 +22,26 @@ React 18.3 + Vite + TypeScript + Tailwind CSS + TanStack Query
 ## State Management
 - **React Hooks** - Local component state (useState, useEffect)
 - **TanStack Query** - Server state, caching, mutations
-- **WebSocket** - Real-time updates via 5 specialized hooks
+- **WebSocket** - Real-time updates via 5 specialized hooks (see below)
+
+## WebSocket Real-Time Updates (Sessions 15-16)
+**5 specialized hooks in `src/hooks/useWebSocket.ts`:**
+- `useWorkflowsWebSocket()` - Real-time workflow status
+- `useRoutesWebSocket()` - Real-time route updates
+- `useWorkflowHistoryWebSocket()` - Real-time history updates
+- `useADWMonitorWebSocket()` - Real-time ADW monitoring
+- `useQueueWebSocket()` - Real-time queue updates (NEW in Session 16)
+
+**Base hook:** `useReliableWebSocket()` handles reconnection + HTTP polling fallback
+
+**Components using WebSocket:**
+- ✅ CurrentWorkflowCard - Replaced 3s polling
+- ✅ AdwMonitorCard - Replaced 2-10s polling
+- ✅ ZteHopperQueueCard - Replaced 10s polling
+- ✅ RoutesView - Already using WebSocket
+- ✅ WorkflowHistoryView - Already using WebSocket
+
+**Performance:** <2s latency vs 3-10s polling, reduced network traffic
 
 ## Common Tasks
 

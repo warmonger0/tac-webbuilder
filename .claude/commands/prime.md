@@ -59,6 +59,18 @@
 → Read `.claude/commands/references/analytics.md` [~800 tokens] (Sessions 9-11)
 → Full doc: `docs/features/observability-and-logging.md` [~2,500 tokens]
 
+### WebSocket Real-Time Updates
+**Migration from HTTP polling to WebSocket for real-time dashboard updates**
+**Status:** 5/6 components migrated (Sessions 15-16)
+- ✅ CurrentWorkflowCard - Real-time workflow status
+- ✅ AdwMonitorCard - Real-time ADW monitoring
+- ✅ ZteHopperQueueCard - Real-time queue updates
+- ✅ RoutesView - Real-time route updates
+- ✅ WorkflowHistoryView - Real-time history updates
+- 🟢 SystemStatusPanel - Polling OK (status rarely changes)
+
+**Performance:** <2s latency (vs 3-10s polling), reduced network traffic, broadcast only on state change
+
 ### Documentation
 **Adding or updating docs**
 
