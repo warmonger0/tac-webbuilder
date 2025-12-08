@@ -42,7 +42,10 @@ export function PreflightCheckPanel() {
       }
       return response.json();
     },
-    refetchInterval: intervals.components.preflightChecks.autoRefreshInterval,
+    // No auto-refresh - preflight checks should only run on-demand or before workflow launch
+    refetchInterval: false,
+    // Only fetch when component mounts, not on every window focus
+    refetchOnWindowFocus: false,
   });
 
   const getStatusIcon = (status: string) => {
