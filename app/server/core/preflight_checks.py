@@ -734,7 +734,7 @@ def check_pattern_analysis_system() -> dict[str, Any]:
     try:
         import os
 
-        project_root = Path(__file__).parent.parent.parent
+        project_root = Path(__file__).parent.parent.parent.parent  # Go up 4 levels to project root
         script_path = project_root / "scripts" / "analyze_daily_patterns.py"
 
         # Check if script exists
@@ -765,12 +765,11 @@ def check_pattern_analysis_system() -> dict[str, Any]:
             service = PatternReviewService()
 
             # Quick sanity check - can we query pattern_approvals?
-            patterns = service.get_all_patterns(limit=1)
-            pattern_count = len(patterns) if patterns else 0
+            patterns = service.get_pending_patterns(limit=1)
 
             return {
                 "passed": True,
-                "summary": f"Pattern system OK, {pattern_count} patterns"
+                "summary": f"Pattern system OK"
             }
 
         except Exception as e:
