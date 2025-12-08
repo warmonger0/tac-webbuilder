@@ -32,6 +32,9 @@ dist/
 *.sqlite
 *.sqlite3
 
+# Cost estimates (transient data, changes on every issue creation)
+app/server/app/db/cost_estimates_by_issue.json
+
 # Docker
 docker-compose.override.yml
 
