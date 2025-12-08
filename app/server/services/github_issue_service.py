@@ -36,6 +36,7 @@ from core.github_poster import GitHubPoster
 from core.models.observability import UserPromptCreate
 from core.nl_processor import process_request
 from core.pattern_predictor import predict_patterns_from_input, store_predicted_patterns
+from core.preflight_checks import run_preflight_checks
 from core.project_detector import detect_project_context
 from database import get_database_adapter
 from repositories.user_prompt_repository import UserPromptRepository
@@ -412,7 +413,7 @@ class GitHubIssueService:
         Confirm and post the GitHub issue.
 
         Workflow:
-        1. Pre-flight check: Verify webhook trigger is online
+        1. Pre-flight checks: Verify system state (git, webhook, ports, etc.)
         2. Retrieve pending request and cost estimate
         3. Post issue to GitHub
         4. Save cost estimate for workflow tracking
@@ -425,9 +426,30 @@ class GitHubIssueService:
             ConfirmResponse with issue number and GitHub URL
 
         Raises:
-            HTTPException: If webhook offline, request_id not found, or posting fails
+            HTTPException: If pre-flight checks fail, request_id not found, or posting fails
         """
         try:
+            # Pre-flight checks: Run ALL checks before creating GitHub issue
+            logger.info("[PRE-FLIGHT] Running pre-flight checks before creating GitHub issue...")
+            preflight_result = run_preflight_checks(skip_tests=True)
+
+            if not preflight_result["passed"]:
+                # Build detailed error message
+                error_details = []
+                for failure in preflight_result["blocking_failures"]:
+                    error_details.append(f"  - {failure['check']}: {failure['error']}")
+                    if failure.get('fix'):
+                        error_details.append(f"    Fix: {failure['fix']}")
+
+                error_msg = (
+                    "❌ Cannot Start ADW Workflow - Pre-flight Checks Failed\n\n"
+                    "Blocking Issues:\n" + "\n".join(error_details)
+                )
+                logger.error(f"[PRE-FLIGHT] Failed: {error_msg}")
+                raise HTTPException(400, error_msg)
+
+            logger.info(f"[PRE-FLIGHT] ✅ All checks passed in {preflight_result['total_duration_ms']}ms")
+
             # Pre-flight check: Ensure webhook trigger is online
             await self.check_webhook_trigger_health()
             logger.info("[SUCCESS] Webhook trigger health check passed")
