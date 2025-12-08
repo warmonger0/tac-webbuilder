@@ -1,54 +1,18 @@
 import { useState } from 'react';
-import {
-  type AdwHealthCheckResponse,
-  type AdwMonitorSummary,
-  type AdwWorkflowStatus,
-  getAdwMonitor
-} from '../api/client';
-import { useReliablePolling } from '../hooks/useReliablePolling';
+import type { AdwWorkflowStatus } from '../api/client';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
-import { intervals } from '../config/intervals';
 import { phaseSvgIconMap, workflowPhases, workflowTypeLabels } from '../config/workflows';
 import { uiText } from '../config/ui';
+import { useADWMonitorWebSocket } from '../hooks/useWebSocket';
 
 export function AdwMonitorCard() {
-  const [workflows, setWorkflows] = useState<AdwWorkflowStatus[]>([]);
-  const [summary, setSummary] = useState<AdwMonitorSummary>({ total: 0, running: 0, completed: 0, failed: 0, paused: 0 });
-  const [healthStatus, setHealthStatus] = useState<AdwHealthCheckResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Use WebSocket for real-time updates instead of polling
+  const { workflows, summary: _summary, isConnected, connectionQuality, lastUpdated: wsLastUpdated, reconnectAttempts } = useADWMonitorWebSocket();
+
   const [debugMode, setDebugMode] = useState<boolean>(false);
 
-  const pollingState = useReliablePolling<{ workflows: AdwWorkflowStatus[]; summary: AdwMonitorSummary }>({
-    fetchFn: getAdwMonitor,
-    onSuccess: (data) => {
-      // DEBUG: Log received data (disabled in production)
-      // console.log('[AdwMonitorCard] Received data:', {
-      //   totalWorkflows: data.workflows.length,
-      //   summary: data.summary,
-      //   runningCount: data.workflows.filter(w => w.status === 'running').length
-      // });
-
-      setWorkflows(data.workflows);
-      setSummary(data.summary);
-      setError(null);
-
-      // Note: Removed cascade health check fetch for performance.
-      // Health checks can be added on-demand via separate UI action if needed.
-      setHealthStatus(null);
-    },
-    onError: (err) => {
-      setError(err.message);
-    },
-    enabled: true,
-    // Dynamic interval: active polling for running workflows, idle polling otherwise
-    interval: summary.running > 0
-      ? intervals.components.adwMonitor.activePollingInterval
-      : intervals.components.adwMonitor.idlePollingInterval,
-    adaptiveInterval: true,
-  });
-
-  // Note: Removed useEffect that forced polling restart on interval changes.
-  // The useReliablePolling hook now handles dynamic intervals internally without restarting.
+  // Note: Health checks removed for performance.
+  // Can be added on-demand via separate UI action if needed.
 
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return 'N/A';
@@ -165,7 +129,7 @@ export function AdwMonitorCard() {
     const currentPhase = workflow.current_phase?.toLowerCase() || '';
 
     // Check if this phase is completed
-    if (workflow.phases_completed.some(p => p.toLowerCase().includes(lowerPhase))) {
+    if (workflow.phases_completed.some((p: string) => p.toLowerCase().includes(lowerPhase))) {
       return 'completed';
     }
     // Check if this is the current phase
@@ -176,7 +140,8 @@ export function AdwMonitorCard() {
     return 'pending';
   };
 
-  if (!pollingState.isPolling && workflows.length === 0) {
+  // Show loading state only when not connected and no workflows yet
+  if (!isConnected && workflows.length === 0) {
     return (
       <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg shadow-xl border border-slate-200 p-8">
         <div className="flex items-center justify-center h-48">
@@ -190,24 +155,8 @@ export function AdwMonitorCard() {
                 </svg>
               </div>
             </div>
-            <p className="text-slate-600 font-medium">Loading workflows...</p>
+            <p className="text-slate-600 font-medium">Connecting to ADW monitor...</p>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-gradient-to-br from-red-50 to-rose-100 rounded-lg shadow-xl border border-red-200 p-8">
-        <div className="flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-rose-600 rounded-full flex items-center justify-center mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <p className="text-red-700 font-semibold mb-2">Unable to load workflows</p>
-          <p className="text-red-600 text-sm">{error}</p>
         </div>
       </div>
     );
@@ -305,11 +254,11 @@ export function AdwMonitorCard() {
                 {debugMode ? '⚙️ Debug' : '⚙️'}
               </button>
               <ConnectionStatusIndicator
-                isConnected={pollingState.isPolling}
-                connectionQuality={pollingState.connectionQuality}
-                lastUpdated={pollingState.lastUpdated}
-                consecutiveErrors={pollingState.consecutiveErrors}
-                onRetry={pollingState.retry}
+                isConnected={isConnected}
+                connectionQuality={connectionQuality}
+                lastUpdated={wsLastUpdated ? new Date(wsLastUpdated) : null}
+                consecutiveErrors={reconnectAttempts}
+                onRetry={() => {/* WebSocket auto-reconnects */}}
                 variant="compact"
               />
             </div>
@@ -427,22 +376,6 @@ export function AdwMonitorCard() {
                             {currentWorkflow.error_count} ERROR{currentWorkflow.error_count > 1 ? 'S' : ''}
                           </div>
                         ) : null}
-
-                        {/* Health Status Badge */}
-                        {healthStatus && (
-                          <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${
-                            healthStatus.overall_health === 'ok' ? 'bg-green-500/20 text-green-300' :
-                            healthStatus.overall_health === 'warning' ? 'bg-yellow-500/20 text-yellow-300' :
-                            'bg-red-500/20 text-red-300'
-                          }`} title={healthStatus.warnings.join(', ')}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                              healthStatus.overall_health === 'ok' ? 'bg-green-400' :
-                              healthStatus.overall_health === 'warning' ? 'bg-yellow-400' :
-                              'bg-red-400'
-                            }`}></span>
-                            {healthStatus.overall_health === 'ok' ? '🟢' : healthStatus.overall_health === 'warning' ? '🟡' : '🔴'} HEALTH
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
