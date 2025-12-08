@@ -110,8 +110,8 @@ class HealthService:
         db_path: str = "db/database.db",
         webhook_url: str = "http://localhost:8001/webhook-status",
         cloudflare_tunnel_name: str | None = None,
-        frontend_url: str = "http://localhost:5173",
-        backend_port: str = "8000",
+        frontend_url: str,
+        backend_port: str,
         app_start_time: datetime | None = None,
         github_repo: str = "warmonger0/tac-webbuilder"
     ):
@@ -124,9 +124,8 @@ class HealthService:
                         (default: "http://localhost:8001/webhook-status")
             cloudflare_tunnel_name: Name of the Cloudflare tunnel to check, or None
                                    if no tunnel is configured (default: None)
-            frontend_url: URL of the frontend application
-                         (default: "http://localhost:5173")
-            backend_port: Port number for the backend API (default: "8000")
+            frontend_url: URL of the frontend application (REQUIRED - no default)
+            backend_port: Port number for the backend API (REQUIRED - no default)
             app_start_time: When the application started (for uptime calculation)
             github_repo: GitHub repository for webhook checks
 
@@ -429,7 +428,9 @@ class HealthService:
     async def check_frontend(self) -> ServiceHealth:
         """Check the health of the Frontend application"""
         try:
-            frontend_port = os.environ.get("FRONTEND_PORT", "5173")
+            frontend_port = os.environ.get("FRONTEND_PORT")
+            if not frontend_port:
+                raise RuntimeError("FRONTEND_PORT not set in environment")
             with urllib.request.urlopen(f"http://localhost:{frontend_port}", timeout=2) as response:
                 return ServiceHealth(
                     name="Frontend",

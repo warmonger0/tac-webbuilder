@@ -99,7 +99,11 @@ app = FastAPI(
 )
 
 # CORS configuration for frontend
-frontend_port = os.environ.get("FRONTEND_PORT", "5173")
+# FRONTEND_PORT must be set in environment (from .ports.env via launch.sh)
+frontend_port = os.environ.get("FRONTEND_PORT")
+if not frontend_port:
+    raise RuntimeError("FRONTEND_PORT environment variable not set - run via launch.sh")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[f"http://localhost:{frontend_port}"],  # Vite dev server
@@ -130,8 +134,8 @@ service_controller = ServiceController(
 )
 health_service = HealthService(
     webhook_url="http://localhost:8001/webhook-status",
-    frontend_url=f"http://localhost:{os.environ.get('FRONTEND_PORT', '5173')}",
-    backend_port=os.environ.get("BACKEND_PORT", "8000"),
+    frontend_url=f"http://localhost:{os.environ.get('FRONTEND_PORT')}",
+    backend_port=os.environ.get("BACKEND_PORT"),
     app_start_time=app_start_time,
     github_repo="warmonger0/tac-webbuilder"
 )
@@ -315,10 +319,14 @@ app.include_router(websocket_routes.router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
+    backend_port = os.environ.get("BACKEND_PORT")
+    if not backend_port:
+        raise RuntimeError("BACKEND_PORT environment variable not set - run via launch.sh")
+
     uvicorn.run(
         "server:app",
         host="0.0.0.0",
-        port=int(os.environ.get("BACKEND_PORT", "8000")),
+        port=int(backend_port),
         reload=True,
         reload_excludes=[
             "tests/*",
