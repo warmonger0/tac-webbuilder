@@ -1,51 +1,34 @@
-import { useEffect, useState } from "react";
-import { getQueueAll, getQueueConfig, type PhaseQueueItem, setQueuePaused } from "../api/client";
+import { useState } from "react";
+import { setQueuePaused } from "../api/client";
 import { PhaseQueueList } from "./PhaseQueueCard";
 import { QueuePauseToggle } from "./QueuePauseToggle";
-import { intervals } from '../config/intervals';
+import { useQueueWebSocket } from "../hooks/useWebSocket";
 
 type TabType = "in-progress" | "completed";
 
 export function ZteHopperQueueCard() {
   const [activeTab, setActiveTab] = useState<TabType>("in-progress");
-  const [phases, setPhases] = useState<PhaseQueueItem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
-  const [configLoading, setConfigLoading] = useState(true);
 
-  // Fetch queue and config on mount and poll for updates
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [queueData, configData] = await Promise.all([
-          getQueueAll(),
-          getQueueConfig()
-        ]);
-        setPhases(queueData.phases);
-        setIsPaused(configData.paused);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch queue');
-      } finally {
-        setLoading(false);
-        setConfigLoading(false);
-      }
-    };
+  // Use WebSocket hook for real-time updates
+  const { phases, paused: isPaused, isConnected } = useQueueWebSocket();
 
-    // Initial fetch
-    fetchData();
+  // Local state for tracking pause status updates
+  const [localIsPaused, setLocalIsPaused] = useState(isPaused);
 
-    // Poll every 10 seconds for updates
-    const interval = setInterval(fetchData, intervals.components.hopperQueue.pollingInterval);
+  // Sync local pause state with WebSocket data
+  if (isPaused !== localIsPaused) {
+    setLocalIsPaused(isPaused);
+  }
 
-    return () => clearInterval(interval);
-  }, []); // Empty deps = run once on mount, cleanup on unmount
+  // Loading is true when not connected
+  const loading = !isConnected && phases.length === 0;
+  const configLoading = !isConnected;
 
   const handleTogglePause = async (paused: boolean) => {
     try {
       const response = await setQueuePaused(paused);
-      setIsPaused(response.paused);
+      setLocalIsPaused(response.paused);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update pause state');
       throw err; // Re-throw to let the toggle component handle it
@@ -73,7 +56,7 @@ export function ZteHopperQueueCard() {
         {/* Pause/Play Toggle - Attached to right side, outside card */}
         <div className="absolute -right-14 top-1/2 -translate-y-1/2">
           <QueuePauseToggle
-            isPaused={isPaused}
+            isPaused={localIsPaused}
             onToggle={handleTogglePause}
             disabled={configLoading || loading}
           />

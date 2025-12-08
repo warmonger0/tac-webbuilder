@@ -33,6 +33,7 @@ class BackgroundTaskManager:
         routes_watch_interval: float = 10.0,
         history_watch_interval: float = 10.0,
         adw_monitor_watch_interval: float = 2.0,
+        queue_watch_interval: float = 2.0,
     ):
         """
         Initialize the BackgroundTaskManager
@@ -44,6 +45,7 @@ class BackgroundTaskManager:
             routes_watch_interval: Seconds between routes checks (default: 10)
             history_watch_interval: Seconds between history checks (default: 10)
             adw_monitor_watch_interval: Seconds between ADW monitor checks (default: 2)
+            queue_watch_interval: Seconds between queue checks (default: 2)
         """
         self.websocket_manager = websocket_manager
         self.workflow_service = workflow_service
@@ -51,6 +53,7 @@ class BackgroundTaskManager:
         self.routes_watch_interval = routes_watch_interval
         self.history_watch_interval = history_watch_interval
         self.adw_monitor_watch_interval = adw_monitor_watch_interval
+        self.queue_watch_interval = queue_watch_interval
 
         # Task references for cleanup
         self._tasks: list[asyncio.Task] = []
@@ -82,6 +85,7 @@ class BackgroundTaskManager:
             asyncio.create_task(self.watch_routes()),
             asyncio.create_task(self.watch_workflow_history()),
             asyncio.create_task(self.watch_adw_monitor()),
+            asyncio.create_task(self.watch_queue()),
         ]
 
         logger.info(
@@ -295,4 +299,54 @@ class BackgroundTaskManager:
 
         except asyncio.CancelledError:
             logger.info("[BACKGROUND_TASKS] ADW monitor watcher cancelled")
+            raise  # Re-raise to properly handle cancellation
+
+    async def watch_queue(self) -> None:
+        """
+        Background task to watch for queue changes and broadcast updates
+
+        This watcher:
+        - Checks every queue_watch_interval seconds (default: 2s for real-time feel)
+        - Only broadcasts if there are active WebSocket connections
+        - Only broadcasts if queue state has changed
+        - Tracks state changes to prevent redundant broadcasts
+        """
+        try:
+            while True:
+                try:
+                    # Only do work if there are active connections
+                    if len(self.websocket_manager.active_connections) > 0:
+                        # Import here to avoid circular dependencies
+                        from server import get_queue_data
+
+                        # Get latest queue data
+                        queue_data = get_queue_data()
+
+                        # Convert to JSON for comparison
+                        current_state = json.dumps(queue_data, sort_keys=True)
+
+                        # Only broadcast if state changed
+                        if current_state != getattr(self.websocket_manager, 'last_queue_state', None):
+                            self.websocket_manager.last_queue_state = current_state
+                            await self.websocket_manager.broadcast(
+                                {
+                                    "type": "queue_update",
+                                    "data": queue_data,
+                                }
+                            )
+                            logger.debug(
+                                f"[BACKGROUND_TASKS] Broadcasted queue update to "
+                                f"{len(self.websocket_manager.active_connections)} clients"
+                            )
+
+                    await asyncio.sleep(self.queue_watch_interval)
+
+                except Exception as e:
+                    logger.error(
+                        f"[BACKGROUND_TASKS] Error in queue watcher: {e}"
+                    )
+                    await asyncio.sleep(5)  # Back off on error
+
+        except asyncio.CancelledError:
+            logger.info("[BACKGROUND_TASKS] Queue watcher cancelled")
             raise  # Re-raise to properly handle cancellation

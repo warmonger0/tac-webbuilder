@@ -48,6 +48,7 @@ export const apiConfig = {
     workflowHistory: () => apiConfig.websocket.getUrl('/ws/workflow-history'),
     adwState: (adwId: string) => apiConfig.websocket.getUrl(`/ws/adw-state/${adwId}`),
     adwMonitor: () => apiConfig.websocket.getUrl('/ws/adw-monitor'),
+    queue: () => apiConfig.websocket.getUrl('/ws/queue'),
   },
 
   // REST API endpoints (relative to basePath)

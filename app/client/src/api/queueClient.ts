@@ -179,6 +179,24 @@ export async function getQueueConfig(): Promise<QueueConfigResponse> {
 }
 
 /**
+ * Get full queue data including phases and configuration (for WebSocket fallback).
+ * Combines getQueueAll and getQueueConfig into a single call.
+ *
+ * @returns Queue data with phases, total count, and paused state
+ */
+export async function getQueueData(): Promise<{ phases: PhaseQueueItem[]; total: number; paused: boolean }> {
+  const [queueData, configData] = await Promise.all([
+    getQueueAll(),
+    getQueueConfig()
+  ]);
+  return {
+    phases: queueData.phases,
+    total: queueData.total,
+    paused: configData.paused
+  };
+}
+
+/**
  * Set queue paused state.
  *
  * @param paused - True to pause queue, false to resume

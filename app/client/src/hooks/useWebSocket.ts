@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { type AdwMonitorSummary, type AdwWorkflowStatus, getAdwMonitor, getRoutes, getWorkflowHistory, listWorkflows } from '../api/client';
+import { getQueueData, type PhaseQueueItem } from '../api/queueClient';
 import type { HistoryAnalytics, Route, WorkflowExecution, WorkflowHistoryItem } from '../types';
 import { useReliableWebSocket } from './useReliableWebSocket';
 import { apiConfig } from '../config/api';
@@ -244,6 +245,53 @@ export function useADWMonitorWebSocket() {
     workflows,
     summary,
     lastUpdated,
+    isConnected: connectionState.isConnected,
+    connectionQuality: connectionState.connectionQuality,
+    reconnectAttempts: connectionState.reconnectAttempts,
+  };
+}
+
+interface QueueWebSocketMessage {
+  type: 'queue_update';
+  data: {
+    phases: PhaseQueueItem[];
+    total: number;
+    paused: boolean;
+  };
+}
+
+export function useQueueWebSocket() {
+  const [phases, setPhases] = useState<PhaseQueueItem[]>([]);
+  const [paused, setPaused] = useState<boolean>(false);
+
+  const wsUrl = apiConfig.websocket.queue();
+
+  const connectionState = useReliableWebSocket<
+    { phases: PhaseQueueItem[]; total: number; paused: boolean },
+    QueueWebSocketMessage
+  >({
+    url: wsUrl,
+    queryKey: ['queue'],
+    queryFn: getQueueData,
+    onMessage: (message: any) => {
+      // Handle both WebSocket message format and HTTP polling response format
+      if (message.type === 'queue_update') {
+        // WebSocket message format
+        setPhases(message.data.phases);
+        setPaused(message.data.paused);
+        console.log('[WS] Received queue update:', message.data.phases.length, 'phases');
+      } else if (message.phases) {
+        // HTTP polling response format
+        setPhases(message.phases);
+        setPaused(message.paused || false);
+        console.log('[HTTP] Received queue update:', message.phases.length, 'phases');
+      }
+    },
+  });
+
+  return {
+    phases,
+    paused,
     isConnected: connectionState.isConnected,
     connectionQuality: connectionState.connectionQuality,
     reconnectAttempts: connectionState.reconnectAttempts,
