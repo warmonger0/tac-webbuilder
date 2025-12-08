@@ -299,3 +299,287 @@ class AdwHealthCheckResponse(BaseModel):
     checks: dict[str, Any] = Field(..., description="Individual health checks (ports, worktree, state_file, process)")
     warnings: list[str] = Field(default_factory=list, description="All warning messages")
     checked_at: str = Field(..., description="Timestamp of health check (ISO format)")
+
+
+# Planned Features Models (Panel 5)
+class PlannedFeature(BaseModel):
+    """Planned feature or session model."""
+    id: int | None = None
+    item_type: str = Field(..., description="Type: 'session', 'feature', 'bug', 'enhancement'")
+    title: str = Field(..., description="Feature or session title")
+    description: str | None = Field(None, description="Detailed description")
+    status: str = Field(..., description="Status: 'planned', 'in_progress', 'completed', 'cancelled'")
+    priority: str | None = Field(None, description="Priority: 'high', 'medium', 'low'")
+    estimated_hours: float | None = Field(None, description="Estimated hours to complete")
+    actual_hours: float | None = Field(None, description="Actual hours spent")
+    session_number: int | None = Field(None, description="Session number (for session items)")
+    github_issue_number: int | None = Field(None, description="Related GitHub issue number")
+    parent_id: int | None = Field(None, description="Parent feature ID for hierarchical features")
+    tags: list[str] = Field(default_factory=list, description="Tags for categorization")
+    completion_notes: str | None = Field(None, description="Notes added when completed")
+    created_at: str | None = Field(None, description="Creation timestamp (ISO format)")
+    updated_at: str | None = Field(None, description="Last update timestamp (ISO format)")
+    started_at: str | None = Field(None, description="Start timestamp (ISO format)")
+    completed_at: str | None = Field(None, description="Completion timestamp (ISO format)")
+
+    class Config:
+        from_attributes = True
+
+
+class PlannedFeatureCreate(BaseModel):
+    """Model for creating a new planned feature."""
+    item_type: str = Field(..., description="Type: 'session', 'feature', 'bug', 'enhancement'")
+    title: str = Field(..., description="Feature or session title")
+    description: str | None = Field(None, description="Detailed description")
+    status: str = Field("planned", description="Initial status (default: 'planned')")
+    priority: str | None = Field(None, description="Priority: 'high', 'medium', 'low'")
+    estimated_hours: float | None = Field(None, description="Estimated hours to complete")
+    session_number: int | None = Field(None, description="Session number (for session items)")
+    github_issue_number: int | None = Field(None, description="Related GitHub issue number")
+    parent_id: int | None = Field(None, description="Parent feature ID")
+    tags: list[str] = Field(default_factory=list, description="Tags for categorization")
+
+
+class PlannedFeatureUpdate(BaseModel):
+    """Model for updating a planned feature."""
+    title: str | None = Field(None, description="Feature or session title")
+    description: str | None = Field(None, description="Detailed description")
+    status: str | None = Field(None, description="Status: 'planned', 'in_progress', 'completed', 'cancelled'")
+    priority: str | None = Field(None, description="Priority: 'high', 'medium', 'low'")
+    estimated_hours: float | None = Field(None, description="Estimated hours to complete")
+    actual_hours: float | None = Field(None, description="Actual hours spent")
+    github_issue_number: int | None = Field(None, description="Related GitHub issue number")
+    tags: list[str] | None = Field(None, description="Tags for categorization")
+    completion_notes: str | None = Field(None, description="Notes added when completed")
+
+
+# Cost Analytics Models
+class PhaseBreakdownResponse(BaseModel):
+    """Response model for phase cost breakdown."""
+    phase_costs: dict[str, float] = Field(..., description="Cost by phase name")
+    phase_percentages: dict[str, float] = Field(..., description="Percentage by phase name")
+    phase_counts: dict[str, int] = Field(..., description="Occurrence count by phase name")
+    total: float = Field(..., description="Total cost across all phases")
+    average_per_workflow: float = Field(..., description="Average cost per workflow")
+    workflow_count: int = Field(..., description="Number of workflows analyzed")
+
+
+class WorkflowBreakdownResponse(BaseModel):
+    """Response model for workflow type cost breakdown."""
+    by_type: dict[str, float] = Field(..., description="Total cost by workflow type")
+    count_by_type: dict[str, int] = Field(..., description="Workflow count by type")
+    average_by_type: dict[str, float] = Field(..., description="Average cost by type")
+
+
+class TimeSeriesDataPointResponse(BaseModel):
+    """Single data point in time series."""
+    date: str = Field(..., description="Date (ISO format)")
+    cost: float = Field(..., description="Total cost for this date")
+    workflow_count: int = Field(..., description="Number of workflows on this date")
+
+
+class TrendAnalysisResponse(BaseModel):
+    """Response model for cost trend analysis."""
+    daily_costs: list[TimeSeriesDataPointResponse] = Field(..., description="Daily cost data points")
+    moving_average: list[float] = Field(..., description="7-day moving average")
+    trend_direction: str = Field(..., description="Trend direction: increasing, decreasing, stable")
+    percentage_change: float = Field(..., description="Overall percentage change")
+    total_cost: float = Field(..., description="Total cost in period")
+    average_daily_cost: float = Field(..., description="Average cost per day")
+
+
+class OptimizationOpportunityResponse(BaseModel):
+    """Response model for optimization opportunity."""
+    category: str = Field(..., description="Category: phase, workflow_type, outlier")
+    description: str = Field(..., description="Description of the opportunity")
+    current_cost: float = Field(..., description="Current cost")
+    target_cost: float = Field(..., description="Target cost")
+    estimated_savings: float = Field(..., description="Estimated monthly savings")
+    recommendation: str = Field(..., description="Actionable recommendation")
+    priority: str = Field(..., description="Priority: high, medium, low")
+
+
+# Error Analytics Models
+class ErrorSummary(BaseModel):
+    """Summary statistics for workflow errors."""
+    total_workflows: int = Field(..., description="Total number of workflows analyzed")
+    failed_workflows: int = Field(..., description="Number of failed workflows")
+    failure_rate: float = Field(..., description="Failure rate percentage (0-100)")
+    top_errors: list[tuple[str, int]] = Field(..., description="Top error patterns with counts")
+    most_problematic_phase: str | None = Field(None, description="Phase with most failures")
+    error_categories: dict[str, int] = Field(default_factory=dict, description="Error count by category")
+
+
+class PhaseErrorBreakdown(BaseModel):
+    """Error analysis broken down by workflow phase."""
+    phase_error_counts: dict[str, int] = Field(..., description="Error count by phase name")
+    phase_failure_rates: dict[str, float] = Field(..., description="Failure rate by phase (0-100)")
+    total_errors: int = Field(..., description="Total number of errors across all phases")
+    most_error_prone_phase: str | None = Field(None, description="Phase with highest error rate")
+
+
+class ErrorPattern(BaseModel):
+    """Detected error pattern with metadata."""
+    pattern_name: str = Field(..., description="Pattern name (e.g., 'Import Error', 'Connection Error')")
+    pattern_category: str = Field(..., description="Error category")
+    occurrences: int = Field(..., description="Number of times this pattern occurred")
+    example_message: str = Field(..., description="Example error message")
+    affected_workflows: list[str] = Field(default_factory=list, description="List of affected ADW IDs")
+    recommendation: str = Field(..., description="Actionable debugging recommendation")
+    severity: str = Field(..., description="Severity: high, medium, low")
+
+
+class ErrorTrendDataPoint(BaseModel):
+    """Single data point in error trend analysis."""
+    date: str = Field(..., description="Date (ISO format)")
+    error_count: int = Field(..., description="Number of errors on this date")
+    failure_rate: float = Field(..., description="Failure rate percentage for this date")
+    workflow_count: int = Field(..., description="Total workflows on this date")
+
+
+class ErrorTrends(BaseModel):
+    """Error trend data over time."""
+    daily_errors: list[ErrorTrendDataPoint] = Field(..., description="Daily error trends")
+    trend_direction: str = Field(..., description="Trend direction: increasing, decreasing, stable")
+    percentage_change: float = Field(..., description="Overall percentage change in error rate")
+    average_daily_failures: float = Field(..., description="Average failures per day")
+
+
+class DebugRecommendation(BaseModel):
+    """Debugging recommendation based on error analysis."""
+    issue: str = Field(..., description="Issue description")
+    severity: str = Field(..., description="Severity: high, medium, low")
+    root_cause: str = Field(..., description="Likely root cause")
+    solution: str = Field(..., description="Recommended solution")
+    estimated_fix_time: str = Field(..., description="Estimated time to fix")
+    affected_count: int = Field(..., description="Number of workflows affected")
+
+
+# Latency Analytics Models
+class PhaseStatsResponse(BaseModel):
+    """Statistics for a single phase."""
+    p50: float = Field(..., description="Median latency (50th percentile) in seconds")
+    p95: float = Field(..., description="95th percentile latency in seconds")
+    p99: float = Field(..., description="99th percentile latency in seconds")
+    average: float = Field(..., description="Average latency in seconds")
+    min: float = Field(..., description="Minimum latency in seconds")
+    max: float = Field(..., description="Maximum latency in seconds")
+    std_dev: float = Field(..., description="Standard deviation in seconds")
+    sample_count: int = Field(..., description="Number of workflows analyzed")
+
+
+class PhaseLatencyBreakdownResponse(BaseModel):
+    """Latency breakdown by workflow phase."""
+    phase_latencies: dict[str, PhaseStatsResponse] = Field(..., description="Latency stats by phase name")
+    total_duration_avg: float = Field(..., description="Average total workflow duration in seconds")
+
+
+class LatencySummaryResponse(BaseModel):
+    """Overall latency summary statistics."""
+    total_workflows: int = Field(..., description="Total number of workflows analyzed")
+    average_duration_seconds: float = Field(..., description="Average workflow duration in seconds")
+    p50_duration: float = Field(..., description="Median workflow duration (50th percentile) in seconds")
+    p95_duration: float = Field(..., description="95th percentile workflow duration in seconds")
+    p99_duration: float = Field(..., description="99th percentile workflow duration in seconds")
+    slowest_phase: str = Field(..., description="Phase with highest average latency")
+    slowest_phase_avg: float = Field(..., description="Average latency of slowest phase in seconds")
+
+
+class BottleneckResponse(BaseModel):
+    """Identified performance bottleneck."""
+    phase: str = Field(..., description="Phase name")
+    p95_latency: float = Field(..., description="95th percentile latency for this phase in seconds")
+    threshold: float = Field(..., description="Threshold used for bottleneck detection in seconds")
+    percentage_over_threshold: float = Field(..., description="Estimated percentage of workflows exceeding threshold")
+    affected_workflows: int = Field(..., description="Estimated number of affected workflows")
+    recommendation: str = Field(..., description="Optimization recommendation for this bottleneck")
+    estimated_speedup: str = Field(..., description="Estimated speedup potential (e.g., '30-40% faster')")
+
+
+class TimeSeriesLatencyDataPointResponse(BaseModel):
+    """Single data point in latency time series."""
+    date: str = Field(..., description="Date (ISO format)")
+    duration: float = Field(..., description="Average duration for this date in seconds")
+    workflow_count: int = Field(..., description="Number of workflows on this date")
+
+
+class TrendDataResponse(BaseModel):
+    """Latency trend analysis over time."""
+    daily_latencies: list[TimeSeriesLatencyDataPointResponse] = Field(..., description="Daily latency data points")
+    moving_average: list[float] = Field(..., description="7-day moving average of latencies")
+    trend_direction: str = Field(..., description="Trend direction: increasing, decreasing, stable")
+    percentage_change: float = Field(..., description="Overall percentage change in latency")
+    average_daily_duration: float = Field(..., description="Average duration per day in seconds")
+
+
+class OptimizationRecommendationResponse(BaseModel):
+    """Optimization recommendation for improving latency."""
+    target: str = Field(..., description="Target phase or component for optimization")
+    current_latency: float = Field(..., description="Current average latency in seconds")
+    target_latency: float = Field(..., description="Target latency after optimization in seconds")
+    improvement_percentage: float = Field(..., description="Expected improvement percentage")
+    actions: list[str] = Field(..., description="List of specific optimization actions")
+
+
+# ROI Tracking Models (Session 12)
+class PatternExecution(BaseModel):
+    """Individual pattern execution instance for ROI tracking."""
+    id: int | None = Field(None, description="Execution record ID")
+    pattern_id: str = Field(..., description="Reference to pattern being executed")
+    workflow_id: int | None = Field(None, description="Reference to workflow where pattern was executed")
+    execution_time_seconds: float = Field(..., description="Actual execution time in seconds")
+    estimated_time_seconds: float = Field(..., description="Estimated execution time in seconds")
+    actual_cost: float = Field(..., description="Actual cost in USD")
+    estimated_cost: float = Field(..., description="Estimated cost in USD")
+    success: bool = Field(..., description="Whether execution completed successfully")
+    error_message: str | None = Field(None, description="Error details if execution failed")
+    executed_at: str | None = Field(None, description="Execution timestamp (ISO format)")
+
+
+class PatternROISummary(BaseModel):
+    """Aggregated ROI metrics for a pattern."""
+    pattern_id: str = Field(..., description="Pattern identifier")
+    total_executions: int = Field(0, description="Total number of executions")
+    successful_executions: int = Field(0, description="Number of successful executions")
+    success_rate: float = Field(0.0, description="Success rate (0.0 to 1.0)")
+    total_time_saved_seconds: float = Field(0.0, description="Total time saved across all successful executions")
+    total_cost_saved_usd: float = Field(0.0, description="Total cost saved across all successful executions")
+    average_time_saved_seconds: float = Field(0.0, description="Average time saved per successful execution")
+    average_cost_saved_usd: float = Field(0.0, description="Average cost saved per successful execution")
+    roi_percentage: float = Field(0.0, description="Return on investment percentage: (savings / investment) * 100")
+    last_updated: str | None = Field(None, description="Last update timestamp (ISO format)")
+
+
+class ROIReport(BaseModel):
+    """Comprehensive ROI report for a pattern."""
+    pattern_id: str = Field(..., description="Pattern identifier")
+    pattern_name: str = Field(..., description="Human-readable pattern name")
+    approval_date: str = Field(..., description="Pattern approval date (ISO format)")
+    executions: list[PatternExecution] = Field(default_factory=list, description="List of execution records")
+    summary: PatternROISummary = Field(..., description="Aggregated ROI summary")
+    effectiveness_rating: str = Field(..., description="Effectiveness rating: excellent, good, acceptable, poor, failed")
+    recommendation: str = Field(..., description="Actionable recommendation based on performance")
+
+
+# Confidence Update Models (Session 13)
+class ConfidenceUpdate(BaseModel):
+    """Record of a confidence score update for a pattern."""
+    id: int | None = Field(None, description="Update record ID")
+    pattern_id: str = Field(..., description="Pattern identifier")
+    old_confidence: float = Field(..., description="Previous confidence score (0.0-1.0)")
+    new_confidence: float = Field(..., description="New confidence score (0.0-1.0)")
+    adjustment_reason: str = Field(..., description="Human-readable explanation for adjustment")
+    roi_data: dict[str, Any] = Field(default_factory=dict, description="Snapshot of ROI metrics at time of update")
+    updated_by: str = Field("system", description="Who/what triggered the update")
+    updated_at: str | None = Field(None, description="Timestamp when confidence was updated (ISO format)")
+
+
+class StatusChangeRecommendation(BaseModel):
+    """Recommendation for pattern status change based on performance."""
+    pattern_id: str = Field(..., description="Pattern identifier")
+    current_status: str = Field(..., description="Current pattern status (approved, pending, rejected)")
+    recommended_status: str = Field(..., description="Recommended new status")
+    reason: str = Field(..., description="Explanation for the recommendation")
+    severity: str = Field(..., description="Recommendation severity: high, medium, low")
+    confidence_score: float | None = Field(None, description="Current confidence score")
+    roi_percentage: float | None = Field(None, description="Current ROI percentage")

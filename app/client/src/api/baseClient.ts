@@ -31,8 +31,15 @@ export async function fetchJSON<T>(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`API Error: ${response.status} ${error}`);
+    // Try to parse error as JSON (FastAPI format), fallback to text
+    let errorMessage: string;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.detail || JSON.stringify(errorData);
+    } catch {
+      errorMessage = await response.text();
+    }
+    throw new Error(`API Error: ${response.status} - ${errorMessage}`);
   }
 
   return response.json();

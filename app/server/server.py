@@ -21,13 +21,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Import route modules
 from routes import (
+    confidence_update_routes,
     context_review_routes,
+    cost_analytics_routes,
     data_routes,
+    error_analytics_routes,
     github_routes,
     issue_completion_routes,
+    latency_analytics_routes,
     observability_routes,
     pattern_review_routes,
+    planned_features_routes,
     queue_routes,
+    roi_tracking_routes,
     system_routes,
     websocket_routes,
     work_log_routes,
@@ -258,6 +264,24 @@ app.include_router(work_log_routes.router, prefix="/api/v1")
 
 # Initialize pattern review routes
 app.include_router(pattern_review_routes.router, prefix="/api/v1")
+
+# Initialize planned features routes (Panel 5)
+app.include_router(planned_features_routes.router)
+
+# Initialize cost analytics routes
+app.include_router(cost_analytics_routes.router)
+
+# Initialize error analytics routes
+app.include_router(error_analytics_routes.router)
+
+# Initialize latency analytics routes
+app.include_router(latency_analytics_routes.router)
+
+# Initialize ROI tracking routes (Session 12)
+app.include_router(roi_tracking_routes.router)
+
+# Initialize confidence update routes (Session 13)
+app.include_router(confidence_update_routes.router)
 
 # Initialize observability routes (task logs + user prompts)
 observability_router = observability_routes.init_observability_routes()

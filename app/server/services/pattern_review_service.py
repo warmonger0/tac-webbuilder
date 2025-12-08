@@ -251,6 +251,172 @@ class PatternReviewService:
             logger.info(f"[{self.__class__.__name__}] Review statistics: {stats}")
             return stats
 
+    def create_pattern(self, pattern_data: Dict[str, any]) -> str:
+        """
+        Insert new pattern into pattern_approvals.
+
+        Args:
+            pattern_data: Dictionary with pattern fields:
+                - pattern_id: Unique pattern identifier
+                - status: Pattern status (pending, auto-approved, auto-rejected)
+                - tool_sequence: Sequence of tools (e.g., "Read→Edit→Write")
+                - confidence_score: Confidence score (0.0 to 1.0)
+                - occurrence_count: Number of times pattern appeared
+                - estimated_savings_usd: Estimated cost savings
+                - pattern_context: Description of the pattern
+                - example_sessions: List of session IDs
+
+        Returns:
+            pattern_id of created pattern
+        """
+        with self.adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            placeholder = self.adapter.placeholder()
+
+            cursor.execute(
+                f"""
+                INSERT INTO pattern_approvals
+                    (pattern_id, status, tool_sequence, confidence_score,
+                     occurrence_count, estimated_savings_usd, pattern_context,
+                     example_sessions)
+                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder},
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder})
+            """,
+                (
+                    pattern_data['pattern_id'],
+                    pattern_data['status'],
+                    pattern_data['tool_sequence'],
+                    pattern_data['confidence_score'],
+                    pattern_data['occurrence_count'],
+                    pattern_data['estimated_savings_usd'],
+                    pattern_data['pattern_context'],
+                    json.dumps(pattern_data['example_sessions'])
+                ),
+            )
+
+            conn.commit()
+
+            logger.info(
+                f"[{self.__class__.__name__}] Created pattern {pattern_data['pattern_id']}"
+            )
+            return pattern_data['pattern_id']
+
+    def update_occurrence_count(self, pattern_id: str, new_count: int) -> bool:
+        """
+        Update occurrence count for existing pattern.
+
+        Args:
+            pattern_id: Pattern identifier
+            new_count: New occurrence count
+
+        Returns:
+            True if updated successfully, False if pattern not found
+        """
+        with self.adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            placeholder = self.adapter.placeholder()
+
+            cursor.execute(
+                f"""
+                UPDATE pattern_approvals
+                SET occurrence_count = {placeholder}
+                WHERE pattern_id = {placeholder}
+            """,
+                (new_count, pattern_id),
+            )
+
+            if cursor.rowcount == 0:
+                logger.warning(
+                    f"[{self.__class__.__name__}] Pattern not found: {pattern_id}"
+                )
+                return False
+
+            conn.commit()
+
+            logger.info(
+                f"[{self.__class__.__name__}] Updated occurrence count for pattern {pattern_id}: {new_count}"
+            )
+            return True
+
+    def update_confidence_score(
+        self,
+        pattern_id: str,
+        new_confidence: float,
+        reason: str,
+        roi_data: Optional[Dict] = None
+    ) -> bool:
+        """
+        Update pattern confidence score and log to history (Session 13).
+
+        Args:
+            pattern_id: Pattern identifier
+            new_confidence: New confidence score (0.0-1.0)
+            reason: Explanation for the adjustment
+            roi_data: Optional ROI performance snapshot (JSON)
+
+        Returns:
+            True if updated successfully, False otherwise
+        """
+        with self.adapter.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get current confidence
+            placeholder = self.adapter.placeholder()
+            cursor.execute(
+                f"""
+                SELECT confidence_score FROM pattern_approvals
+                WHERE pattern_id = {placeholder}
+            """,
+                (pattern_id,),
+            )
+
+            row = cursor.fetchone()
+            if not row:
+                logger.warning(
+                    f"[{self.__class__.__name__}] Pattern not found: {pattern_id}"
+                )
+                return False
+
+            old_confidence = row['confidence_score']
+
+            # Update pattern_approvals
+            cursor.execute(
+                f"""
+                UPDATE pattern_approvals
+                SET confidence_score = {placeholder},
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE pattern_id = {placeholder}
+            """,
+                (new_confidence, pattern_id),
+            )
+
+            # Log to confidence history
+            roi_data_json = json.dumps(roi_data) if roi_data else json.dumps({})
+            cursor.execute(
+                f"""
+                INSERT INTO pattern_confidence_history (
+                    pattern_id, old_confidence, new_confidence,
+                    adjustment_reason, roi_data, updated_by
+                ) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+            """,
+                (
+                    pattern_id,
+                    old_confidence,
+                    new_confidence,
+                    reason,
+                    roi_data_json,
+                    'system',
+                ),
+            )
+
+            conn.commit()
+
+            logger.info(
+                f"[{self.__class__.__name__}] Updated confidence for pattern {pattern_id}: "
+                f"{old_confidence:.3f} -> {new_confidence:.3f} ({new_confidence - old_confidence:+.3f})"
+            )
+            return True
+
     def _row_to_model(self, row) -> PatternReviewItem:
         """
         Convert PostgreSQL database row to PatternReviewItem model.

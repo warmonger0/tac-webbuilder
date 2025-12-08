@@ -269,3 +269,94 @@ def get_phase_number(phase_name: str) -> int:
         Phase number (1-10), or 0 if not found
     """
     return PHASE_NUMBERS.get(phase_name.title(), 0)
+
+
+def track_pattern_execution(
+    pattern_id: str,
+    workflow_id: Optional[int],
+    execution_time_seconds: float,
+    estimated_time_seconds: float,
+    actual_cost: float,
+    estimated_cost: float,
+    success: bool,
+    error_message: Optional[str] = None,
+) -> bool:
+    """
+    Track pattern execution for ROI analysis (Session 12).
+
+    This function records pattern execution metrics to enable closed-loop ROI tracking.
+    It's designed to be **zero-overhead** - failures are logged but don't block workflows.
+
+    Args:
+        pattern_id: Pattern identifier being executed
+        workflow_id: Workflow ID where pattern was executed (optional)
+        execution_time_seconds: Actual execution time in seconds
+        estimated_time_seconds: Estimated execution time from pattern approval
+        actual_cost: Actual cost in USD
+        estimated_cost: Estimated cost from pattern approval
+        success: Whether execution completed successfully
+        error_message: Error details if execution failed
+
+    Returns:
+        True if tracking succeeded, False otherwise (never raises exceptions)
+
+    Example:
+        >>> track_pattern_execution(
+        ...     pattern_id="test-retry-automation",
+        ...     workflow_id=123,
+        ...     execution_time_seconds=45.2,
+        ...     estimated_time_seconds=60.0,
+        ...     actual_cost=0.012,
+        ...     estimated_cost=0.015,
+        ...     success=True
+        ... )
+        True
+    """
+    api_url = f"{BACKEND_BASE_URL}/api/roi-tracking/executions"
+
+    # Build payload
+    payload = {
+        "pattern_id": pattern_id,
+        "workflow_id": workflow_id,
+        "execution_time_seconds": execution_time_seconds,
+        "estimated_time_seconds": estimated_time_seconds,
+        "actual_cost": actual_cost,
+        "estimated_cost": estimated_cost,
+        "success": success,
+        "executed_at": datetime.now().isoformat(),
+    }
+
+    if error_message:
+        payload["error_message"] = error_message
+
+    # Make API call to backend (for ROI tracking)
+    try:
+        req = urllib.request.Request(
+            api_url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status in (200, 201):
+                time_saved = estimated_time_seconds - execution_time_seconds
+                cost_saved = estimated_cost - actual_cost
+                logger.info(
+                    f"[ROI_TRACKING] Recorded execution for pattern {pattern_id}: "
+                    f"{'success' if success else 'failed'}, "
+                    f"time_saved={time_saved:.1f}s, cost_saved=${cost_saved:.4f}"
+                )
+                return True
+            else:
+                logger.warning(
+                    f"[ROI_TRACKING] Unexpected response {response.status} tracking pattern execution"
+                )
+                return False
+
+    except urllib.error.URLError as e:
+        logger.debug(f"[ROI_TRACKING] Backend API not available for pattern tracking: {e}")
+        return False
+    except Exception as e:
+        logger.debug(f"[ROI_TRACKING] Failed to track pattern execution: {e}")
+        return False

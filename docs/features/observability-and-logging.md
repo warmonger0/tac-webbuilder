@@ -327,7 +327,342 @@ All review actions are logged in `pattern_review_history` table, providing full 
 
 This ensures accountability and allows pattern review decisions to be audited or reversed if needed.
 
-### 4. Tool Call Tracking
+### 4. Daily Pattern Analysis
+
+The daily pattern analysis system automatically discovers automation patterns from hook events, calculates metrics, and populates the pattern review system for approval.
+
+#### Overview
+
+The analysis system runs as a scheduled batch job (typically daily) to:
+- Extract tool sequences from `hook_events` table
+- Identify repeated patterns across multiple sessions
+- Calculate confidence scores using statistical analysis
+- Estimate cost savings for each pattern
+- Auto-classify patterns based on thresholds
+- Deduplicate against existing patterns
+- Notify reviewers of new patterns requiring approval
+
+#### How It Works
+
+1. **Extraction**: Query `hook_events` table for configurable time window (default: last 24 hours)
+2. **Pattern Discovery**: Group tool sequences by session, identify repeated patterns
+3. **Metrics Calculation**: Calculate confidence scores, occurrence counts, estimated savings
+4. **Auto-Classification**:
+   - **Auto-approve**: >99% confidence + 200+ occurrences + $5000+ savings
+   - **Auto-reject**: <95% confidence OR destructive operations
+   - **Pending**: 95-99% confidence (manual review required)
+5. **Deduplication**: Check existing patterns, update occurrence counts
+6. **Notification**: Alert reviewers of new pending patterns
+
+#### Analysis Script
+
+**Location**: `scripts/analyze_daily_patterns.py`
+
+**Manual Execution**:
+```bash
+# Analyze last 24 hours (default)
+python scripts/analyze_daily_patterns.py
+
+# Analyze last 48 hours
+python scripts/analyze_daily_patterns.py --hours 48
+
+# Customize minimum occurrences threshold
+python scripts/analyze_daily_patterns.py --min-occurrences 5
+
+# Dry run (no database changes)
+python scripts/analyze_daily_patterns.py --dry-run --verbose
+
+# Generate markdown report
+python scripts/analyze_daily_patterns.py --report
+
+# Send notifications for new pending patterns
+python scripts/analyze_daily_patterns.py --notify
+```
+
+**Automated Execution**:
+
+The cron wrapper script runs analysis daily at 2 AM:
+
+```bash
+# Install cron job
+chmod +x scripts/cron/daily_pattern_analysis.sh
+
+# Add to crontab
+crontab -e
+# Add: 0 2 * * * /path/to/tac-webbuilder/scripts/cron/daily_pattern_analysis.sh
+```
+
+**Cron wrapper** (`scripts/cron/daily_pattern_analysis.sh`):
+- Sets up database environment variables
+- Runs analysis with reporting and notifications
+- Logs output to `logs/pattern_analysis_YYYYMMDD.log`
+- Cleans up old logs (keeps last 30 days)
+- Sends email alerts on failure (if configured)
+
+#### Configuration
+
+**Analysis Thresholds** (in `analyze_daily_patterns.py`):
+
+```python
+# Auto-approve criteria
+confidence > 0.99 and occurrences > 200 and savings > 5000
+
+# Auto-reject criteria
+confidence < 0.95 or has_destructive_operations
+
+# Pending review criteria
+0.95 <= confidence <= 0.99
+```
+
+**Destructive Operations** (auto-rejected):
+- Delete, Remove, Drop, Truncate, ForceDelete
+- DeleteFile, RemoveFile, DropTable, TruncateTable
+
+#### Confidence Score Calculation
+
+```python
+def calculate_confidence(occurrences, total_sessions):
+    """Statistical confidence based on frequency and occurrence count."""
+    frequency = occurrences / total_sessions
+
+    # Boost confidence for high occurrence counts
+    if occurrences >= 100:
+        confidence = min(0.99, frequency * 1.2)
+    elif occurrences >= 50:
+        confidence = min(0.97, frequency * 1.15)
+    elif occurrences >= 10:
+        confidence = min(0.95, frequency * 1.1)
+    else:
+        confidence = frequency
+
+    return confidence
+```
+
+#### Estimated Savings Calculation
+
+```python
+def estimate_savings(pattern, occurrences):
+    """Estimate cost savings if pattern is automated."""
+    # Average time per tool execution
+    avg_time_per_tool = 30  # seconds
+
+    # Parse tool sequence
+    tools = pattern.split('→')
+    pattern_time_seconds = len(tools) * avg_time_per_tool
+
+    # Assume $100/hour AI cost (conservative)
+    cost_per_second = 100.0 / 3600.0
+
+    # Savings if automated
+    savings_per_occurrence = pattern_time_seconds * cost_per_second
+    total_savings = savings_per_occurrence * occurrences
+
+    return total_savings
+```
+
+#### Output Format
+
+**Console Output**:
+```
+================================================================================
+DAILY PATTERN ANALYSIS SUMMARY
+================================================================================
+Analysis Window:     24 hours
+Total Sessions:      145
+Patterns Discovered: 12
+  - New Patterns:    8
+  - Updated:         4
+
+Classification:
+  - Auto-Approved:   2
+  - Pending Review:  7
+  - Auto-Rejected:   3
+
+Estimated Total Savings: $12,450.00
+================================================================================
+```
+
+**Report Generation** (`--report` flag):
+
+Generates markdown report in `logs/pattern_analysis_YYYYMMDD_HHMMSS.md`:
+
+```markdown
+# Daily Pattern Analysis Report
+
+**Generated:** 2025-12-07T10:00:00
+**Analysis Window:** 24 hours
+
+## Summary
+- Total Sessions: 145
+- Patterns Discovered: 12
+- New Patterns: 8
+- Updated Patterns: 4
+
+## Classification
+- Auto-Approved: 2
+- Pending Review: 7
+- Auto-Rejected: 3
+
+## Impact
+- Estimated Total Savings: $12,450.00
+```
+
+#### Notification System
+
+When new patterns require manual review, notifications are logged to `logs/pattern_notifications.log`:
+
+```
+[2025-12-07T10:00:00]
+New Patterns Requiring Review
+==============================
+Date: 2025-12-07T10:00:00
+
+7 new patterns discovered that require manual approval.
+
+Pattern: Read→Edit→Write
+Confidence: 97.5%
+Occurrences: 150
+Estimated Savings: $3,750.00
+---
+
+Pattern: Test→Fix→Test
+Confidence: 96.2%
+Occurrences: 85
+Estimated Savings: $2,125.00
+---
+...
+
+Review via CLI: python scripts/review_patterns.py
+Review via Web UI: http://localhost:5173 (Panel 8)
+```
+
+**Future Enhancement**: Email/Slack notifications (infrastructure ready).
+
+#### Review Workflow Integration
+
+After daily analysis discovers new patterns:
+
+1. **CLI Review**:
+   ```bash
+   python scripts/review_patterns.py --stats
+   python scripts/review_patterns.py  # Interactive review
+   ```
+
+2. **Web UI Review** (Future - Panel 8):
+   - Navigate to Panel 8 (Review Panel)
+   - Review pending patterns
+   - Approve/reject with notes
+
+3. **Automated Workflows** (Future - Sessions 12+):
+   - Auto-approved patterns ready for workflow generation
+   - Pending patterns require manual review
+   - Auto-rejected patterns logged for audit
+
+#### Database Integration
+
+**Service Methods** (in `pattern_review_service.py`):
+
+```python
+# Create new pattern
+service.create_pattern({
+    'pattern_id': 'abc123',
+    'status': 'pending',
+    'tool_sequence': 'Read→Edit→Write',
+    'confidence_score': 0.97,
+    'occurrence_count': 150,
+    'estimated_savings_usd': 3750.0,
+    'pattern_context': 'Sequence of 3 tools: Read, Edit, Write',
+    'example_sessions': ['session-1', 'session-2', ...]
+})
+
+# Update occurrence count for existing pattern
+service.update_occurrence_count('abc123', new_count=175)
+```
+
+#### Testing
+
+Run comprehensive test suite:
+
+```bash
+cd /Users/Warmonger0/tac/tac-webbuilder
+POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_DB=tac_webbuilder \
+POSTGRES_USER=tac_user POSTGRES_PASSWORD=changeme \
+DB_TYPE=postgresql python -m pytest scripts/tests/test_daily_pattern_analysis.py -v
+```
+
+**Test Coverage** (13 tests):
+- ✅ Extract tool sequences from hook events
+- ✅ Find repeated patterns
+- ✅ Calculate confidence (high/low occurrences)
+- ✅ Estimate savings
+- ✅ Auto-classify (high confidence, low confidence, pending, destructive)
+- ✅ Save new pattern
+- ✅ Update existing pattern
+- ✅ Calculate metrics
+- ✅ Full analysis workflow
+
+#### Best Practices
+
+**Analysis Frequency**:
+- ✅ **Do**: Run daily during off-peak hours (2 AM)
+- ✅ **Do**: Generate reports for trending analysis
+- ❌ **Don't**: Run too frequently (hourly) - creates noise
+- ❌ **Don't**: Analyze windows shorter than 12 hours
+
+**Pattern Classification**:
+- ✅ **Do**: Review pending patterns promptly
+- ✅ **Do**: Document rejection reasons
+- ✅ **Do**: Monitor auto-approved patterns
+- ❌ **Don't**: Lower confidence thresholds without justification
+- ❌ **Don't**: Ignore high-savings patterns
+
+**Maintenance**:
+- ✅ **Do**: Monitor log files for errors
+- ✅ **Do**: Archive old analysis reports (30+ days)
+- ✅ **Do**: Review notification queue regularly
+- ❌ **Don't**: Disable notifications for pending patterns
+- ❌ **Don't**: Ignore cron job failures
+
+#### Troubleshooting
+
+**No patterns discovered**:
+1. Check hook_events table has data: `SELECT COUNT(*) FROM hook_events WHERE timestamp >= NOW() - INTERVAL '24 hours'`
+2. Verify PreToolUse events exist: `SELECT COUNT(*) FROM hook_events WHERE event_type = 'PreToolUse'`
+3. Check minimum occurrence threshold (default: 2)
+4. Review session_id population in hook_events
+
+**Analysis script fails**:
+1. Check database connection: `echo $POSTGRES_HOST $POSTGRES_PORT`
+2. Verify database credentials
+3. Check logs: `tail -f logs/pattern_analysis_YYYYMMDD.log`
+4. Run with `--verbose` flag for detailed output
+
+**Patterns not auto-classifying correctly**:
+1. Review confidence calculation logic
+2. Check threshold values in `auto_classify()` method
+3. Verify occurrence counts and savings calculations
+4. Test with `--dry-run` flag first
+
+**Cron job not running**:
+1. Verify crontab entry: `crontab -l`
+2. Check script permissions: `ls -la scripts/cron/daily_pattern_analysis.sh`
+3. Review cron logs: `/var/log/cron` or `grep CRON /var/log/syslog`
+4. Test script manually first
+
+#### Performance Metrics
+
+**Typical Performance** (1000 sessions/day):
+- Analysis time: ~10-30 seconds
+- Patterns discovered: 5-15 per day
+- Database impact: Minimal (read-heavy, few writes)
+- Log size: ~100-500 KB per day
+
+**Scaling Considerations**:
+- 10,000+ sessions/day: Consider partitioning hook_events table
+- 100+ patterns/day: Batch notification system
+- Large tool sequences (20+ tools): May need sequence length limits
+
+### 5. Tool Call Tracking
 
 #### Database Schema
 ```sql
@@ -367,7 +702,7 @@ Track every tool invocation to:
 - Debug tool failures
 - Calculate ROI of optimizations
 
-### 4. Cost Savings Tracking
+### 6. Cost Savings Tracking
 
 #### Database Schema
 ```sql
@@ -419,7 +754,7 @@ GROUP BY optimization_type
 ORDER BY total_cost_saved_usd DESC;
 ```
 
-### 5. Work Log System (Panel 10)
+### 7. Work Log System (Panel 10)
 
 #### Overview
 **Manual logging system** for tracking chat session summaries with a 280-character limit (Twitter-style). Unlike the automated hook events, work logs are manually created to document key decisions, outcomes, and session context.
