@@ -37,10 +37,12 @@ export function useReliableWebSocket<T, M = any>({
   queryFn,
   onMessage,
   enabled = true,
-  pollingInterval = intervals.websocket.pollingInterval,
+  pollingInterval = intervals.websocket.pollingInterval, // Kept for backwards compat but not used
   maxReconnectDelay = intervals.websocket.maxReconnectDelay,
   maxReconnectAttempts = intervals.websocket.maxReconnectAttempts,
 }: ReliableWebSocketOptions<T, M>) {
+  // Disable unused parameter warning
+  void pollingInterval;
   const [state, setState] = useState<ConnectionState>({
     isConnected: false,
     connectionQuality: 'disconnected',
@@ -68,12 +70,13 @@ export function useReliableWebSocket<T, M = any>({
     queryFnRef.current = queryFn;
   }, [queryFn]);
 
-  // Fallback polling when WebSocket is disconnected
+  // Fallback polling DISABLED - WebSocket only
+  // If WebSocket fails, show error state instead of falling back to HTTP polling
   const { data: polledData } = useQuery({
     queryKey,
     queryFn: () => queryFnRef.current(),
-    refetchInterval: state.isConnected ? false : pollingInterval,
-    enabled: enabled && !state.isConnected,
+    refetchInterval: false, // DISABLED: No polling fallback
+    enabled: false, // DISABLED: WebSocket-only mode
   });
 
   // Handle polled data
