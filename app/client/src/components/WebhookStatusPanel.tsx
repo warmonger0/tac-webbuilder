@@ -1,8 +1,6 @@
-import { useState } from 'react';
-import { getWebhookStatus } from '../api/client';
-import { useReliablePolling } from '../hooks/useReliablePolling';
+import { useState, useEffect } from 'react';
+import { useWebhookStatusWebSocket } from '../hooks/useWebSocket';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
-import { intervals } from '../config/intervals';
 import { thresholds } from '../config/thresholds';
 
 interface WebhookStatus {
@@ -34,23 +32,20 @@ export function WebhookStatusPanel() {
   const [status, setStatus] = useState<WebhookStatus>({ status: 'unknown' });
   const [error, setError] = useState<string | null>(null);
 
-  const pollingState = useReliablePolling<WebhookStatus>({
-    fetchFn: getWebhookStatus,
-    onSuccess: (data) => {
-      setStatus(data);
+  // Use WebSocket for real-time updates instead of polling
+  const { webhookStatus, isConnected, connectionQuality, lastUpdated } = useWebhookStatusWebSocket();
+
+  // Update status when WebSocket data changes
+  useEffect(() => {
+    if (webhookStatus) {
+      setStatus(webhookStatus);
       setError(null);
-    },
-    onError: (err) => {
-      setError(err.message);
-      setStatus({ status: 'error' });
-    },
-    enabled: true,
-    interval: intervals.components.systemStatus.pollingInterval,
-    adaptiveInterval: true,
-  });
+    }
+  }, [webhookStatus]);
 
   const fetchStatus = () => {
-    pollingState.retry();
+    // WebSocket will automatically reconnect, no manual action needed
+    window.location.reload();
   };
 
   const getStatusColor = (status: string) => {
@@ -99,16 +94,16 @@ export function WebhookStatusPanel() {
           <h2 className="text-xl font-bold text-gray-900">Workflow Status</h2>
           <div className="flex items-center gap-3">
             <ConnectionStatusIndicator
-              isConnected={pollingState.isPolling}
-              connectionQuality={pollingState.connectionQuality}
-              lastUpdated={pollingState.lastUpdated}
-              consecutiveErrors={pollingState.consecutiveErrors}
-              onRetry={pollingState.retry}
+              isConnected={isConnected}
+              connectionQuality={connectionQuality}
+              lastUpdated={lastUpdated}
+              consecutiveErrors={0}
+              onRetry={fetchStatus}
               variant="compact"
             />
             <button
               onClick={fetchStatus}
-              disabled={!pollingState.isPolling}
+              disabled={!isConnected}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm font-medium"
             >
               Refresh

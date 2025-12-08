@@ -300,3 +300,83 @@ export function useQueueWebSocket() {
     reconnectAttempts: connectionState.reconnectAttempts,
   };
 }
+
+interface SystemStatusWebSocketMessage {
+  type: 'system_status_update';
+  data: any; // SystemStatusResponse type
+}
+
+export function useSystemStatusWebSocket() {
+  const [systemStatus, setSystemStatus] = useState<any>(null);
+
+  const wsUrl = apiConfig.websocket.systemStatus();
+
+  const connectionState = useReliableWebSocket<any, SystemStatusWebSocketMessage>({
+    url: wsUrl,
+    queryKey: ['system-status'],
+    queryFn: async () => {
+      const { getSystemStatus } = await import('../api/client');
+      return getSystemStatus();
+    },
+    onMessage: (message: any) => {
+      // Handle both WebSocket message format and HTTP polling response format
+      if (message.type === 'system_status_update') {
+        // WebSocket message format
+        setSystemStatus(message.data);
+        if (DEBUG_WS) console.log('[WS] Received system status update');
+      } else if (message.overall_status) {
+        // HTTP polling response format
+        setSystemStatus(message);
+        if (DEBUG_WS) console.log('[HTTP] Received system status update');
+      }
+    },
+  });
+
+  return {
+    systemStatus,
+    isConnected: connectionState.isConnected,
+    connectionQuality: connectionState.connectionQuality,
+    lastUpdated: connectionState.lastUpdated,
+    reconnectAttempts: connectionState.reconnectAttempts,
+  };
+}
+
+interface WebhookStatusWebSocketMessage {
+  type: 'webhook_status_update';
+  data: any; // Webhook status type
+}
+
+export function useWebhookStatusWebSocket() {
+  const [webhookStatus, setWebhookStatus] = useState<any>(null);
+
+  const wsUrl = apiConfig.websocket.webhookStatus();
+
+  const connectionState = useReliableWebSocket<any, WebhookStatusWebSocketMessage>({
+    url: wsUrl,
+    queryKey: ['webhook-status'],
+    queryFn: async () => {
+      const { getWebhookStatus } = await import('../api/client');
+      return getWebhookStatus();
+    },
+    onMessage: (message: any) => {
+      // Handle both WebSocket message format and HTTP polling response format
+      if (message.type === 'webhook_status_update') {
+        // WebSocket message format
+        setWebhookStatus(message.data);
+        if (DEBUG_WS) console.log('[WS] Received webhook status update');
+      } else if (message.status) {
+        // HTTP polling response format
+        setWebhookStatus(message);
+        if (DEBUG_WS) console.log('[HTTP] Received webhook status update');
+      }
+    },
+  });
+
+  return {
+    webhookStatus,
+    isConnected: connectionState.isConnected,
+    connectionQuality: connectionState.connectionQuality,
+    lastUpdated: connectionState.lastUpdated,
+    reconnectAttempts: connectionState.reconnectAttempts,
+  };
+}

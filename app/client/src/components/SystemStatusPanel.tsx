@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { getSystemStatus, redeliverGitHubWebhook, restartCloudflare, startWebhookService } from '../api/client';
+import React, { useState, useEffect } from 'react';
+import { redeliverGitHubWebhook, restartCloudflare, startWebhookService } from '../api/client';
 import type { ServiceHealth, SystemStatusResponse } from '../types';
-import { useReliablePolling } from '../hooks/useReliablePolling';
+import { useSystemStatusWebSocket } from '../hooks/useWebSocket';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 import { PreflightCheckPanel } from './PreflightCheckPanel';
 import { intervals } from '../config/intervals';
@@ -13,23 +13,21 @@ export function SystemStatusPanel() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  const pollingState = useReliablePolling<SystemStatusResponse>({
-    fetchFn: getSystemStatus,
-    onSuccess: (data) => {
-      setStatus(data);
-      setError(null);
-    },
-    onError: (err) => {
-      setError(err.message);
-    },
-    enabled: true,
-    interval: intervals.components.systemStatus.pollingInterval,
-    adaptiveInterval: true,
-  });
+  // Use WebSocket for real-time updates instead of polling
+  const { systemStatus, isConnected, connectionQuality, lastUpdated } = useSystemStatusWebSocket();
 
-  // Manual refresh function
+  // Update status when WebSocket data changes
+  useEffect(() => {
+    if (systemStatus) {
+      setStatus(systemStatus);
+      setError(null);
+    }
+  }, [systemStatus]);
+
+  // Manual refresh function (re-connects WebSocket)
   const fetchStatus = () => {
-    pollingState.retry();
+    // WebSocket will automatically reconnect, no manual action needed
+    window.location.reload();
   };
 
   const getStatusColor = (serviceStatus: string) => {
@@ -254,16 +252,16 @@ export function SystemStatusPanel() {
             <h2 className="text-xl font-bold text-white">System Status</h2>
             <div className="flex items-center gap-3">
               <ConnectionStatusIndicator
-                isConnected={pollingState.isPolling}
-                connectionQuality={pollingState.connectionQuality}
-                lastUpdated={pollingState.lastUpdated}
-                consecutiveErrors={pollingState.consecutiveErrors}
-                onRetry={pollingState.retry}
+                isConnected={isConnected}
+                connectionQuality={connectionQuality}
+                lastUpdated={lastUpdated}
+                consecutiveErrors={0}
+                onRetry={fetchStatus}
                 variant="compact"
               />
               <button
                 onClick={fetchStatus}
-                disabled={!pollingState.isPolling}
+                disabled={!isConnected}
                 className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all text-sm font-medium shadow-lg"
               >
                 Refresh

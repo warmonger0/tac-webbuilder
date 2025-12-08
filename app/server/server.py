@@ -244,6 +244,35 @@ def get_queue_data() -> dict:
         "paused": paused
     }
 
+async def get_system_status_data() -> dict:
+    """
+    Get system status data for WebSocket broadcast.
+
+    Returns:
+        dict: System status with all service health information
+    """
+    from routes.system_routes import _get_system_status_handler
+    status = await _get_system_status_handler(health_service)
+    return status.model_dump()
+
+def get_webhook_status_data() -> dict:
+    """
+    Get webhook status data for WebSocket broadcast.
+
+    Returns:
+        dict: Webhook service status from external webhook service
+    """
+    import urllib.request
+    import json
+    webhook_port = os.environ.get("WEBHOOK_PORT", "8001")
+
+    try:
+        with urllib.request.urlopen(f"http://localhost:{webhook_port}/webhook-status", timeout=2) as response:
+            return json.loads(response.read().decode())
+    except Exception as e:
+        logger.error(f"Error fetching webhook status: {e}")
+        return {"status": "error", "message": str(e)}
+
 # API VERSION ENDPOINT
 # This endpoint is not versioned to allow clients to discover available API versions
 @app.get("/api/version")
@@ -314,7 +343,7 @@ github_poster = GitHubPoster()
 queue_routes.init_webhook_routes(phase_queue_service, github_poster)
 app.include_router(queue_routes.webhook_router, prefix="/api/v1")
 
-websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state, get_adw_monitor_data, get_queue_data)
+websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state, get_adw_monitor_data, get_queue_data, get_system_status_data, get_webhook_status_data)
 app.include_router(websocket_routes.router, prefix="/api/v1")
 
 if __name__ == "__main__":

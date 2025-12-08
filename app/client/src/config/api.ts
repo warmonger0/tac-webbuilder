@@ -49,6 +49,8 @@ export const apiConfig = {
     adwState: (adwId: string) => apiConfig.websocket.getUrl(`/ws/adw-state/${adwId}`),
     adwMonitor: () => apiConfig.websocket.getUrl('/ws/adw-monitor'),
     queue: () => apiConfig.websocket.getUrl('/ws/queue'),
+    systemStatus: () => apiConfig.websocket.getUrl('/ws/system-status'),
+    webhookStatus: () => apiConfig.websocket.getUrl('/ws/webhook-status'),
   },
 
   // REST API endpoints (relative to basePath)
