@@ -7,13 +7,14 @@ export function CurrentWorkflowCard() {
   // Use WebSocket for real-time updates instead of polling
   const { workflows, isConnected } = useADWMonitorWebSocket();
 
-  // Select current workflow (prioritize failed > running > paused > most recent)
+  // Select current workflow (prioritize failed > running > paused) - ONLY show active workflows
   const workflow = useMemo(() => {
     if (!workflows.length) return null;
+    // Only return workflows that are actively in progress, never completed/queued
     return workflows.find(w => w.status === 'failed')
       || workflows.find(w => w.status === 'running')
       || workflows.find(w => w.status === 'paused')
-      || workflows[0];
+      || null; // Don't fall back to workflows[0] if it's completed
   }, [workflows]);
 
   const loading = !isConnected && workflows.length === 0;
