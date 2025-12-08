@@ -1,30 +1,21 @@
-import { useEffect, useState } from 'react';
-import { type AdwWorkflowStatus, getAdwMonitor } from '../api/client';
+import { useMemo } from 'react';
+import type { AdwWorkflowStatus } from '../api/client';
 import { phaseSvgIconMap, workflowPhases } from '../config/workflows';
+import { useADWMonitorWebSocket } from '../hooks/useWebSocket';
 
 export function CurrentWorkflowCard() {
-  const [workflow, setWorkflow] = useState<AdwWorkflowStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Use WebSocket for real-time updates instead of polling
+  const { workflows, isConnected } = useADWMonitorWebSocket();
 
-  useEffect(() => {
-    const fetchWorkflow = async () => {
-      try {
-        const data = await getAdwMonitor();
-        const currentWorkflow = data.workflows.find(w => w.status === 'running')
-          || data.workflows.find(w => w.status === 'paused')
-          || data.workflows[0];
-        setWorkflow(currentWorkflow);
-        setLoading(false);
-      } catch (error) {
-        console.error('Failed to fetch workflow:', error);
-        setLoading(false);
-      }
-    };
+  // Select current workflow (prioritize running > paused > most recent)
+  const workflow = useMemo(() => {
+    if (!workflows.length) return null;
+    return workflows.find(w => w.status === 'running')
+      || workflows.find(w => w.status === 'paused')
+      || workflows[0];
+  }, [workflows]);
 
-    fetchWorkflow();
-    const interval = setInterval(fetchWorkflow, 3000);
-    return () => clearInterval(interval);
-  }, []);
+  const loading = !isConnected && workflows.length === 0;
 
   const renderIcon = (iconName: string, status: 'pending' | 'active' | 'completed' = 'pending') => {
     const iconClass = `w-6 h-6 transition-all duration-300 ${
@@ -156,11 +147,15 @@ export function CurrentWorkflowCard() {
           </div>
           <div className="flex items-center gap-2">
             <div className="relative w-2 h-2">
-              <div className="absolute w-2 h-2 bg-emerald-500 rounded-full"></div>
-              <div className="absolute w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>
+              <div className={`absolute w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'}`}></div>
+              {isConnected && <div className="absolute w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>}
             </div>
-            <span className="text-emerald-400 text-xs font-medium">Live</span>
-            <span className="text-slate-500 text-xs">Just now</span>
+            <span className={`text-xs font-medium ${isConnected ? 'text-emerald-400' : 'text-yellow-400'}`}>
+              {isConnected ? 'Live' : 'Reconnecting...'}
+            </span>
+            <span className="text-slate-500 text-xs">
+              {isConnected ? 'Real-time' : 'Waiting'}
+            </span>
           </div>
         </div>
 
