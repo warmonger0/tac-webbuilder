@@ -22,14 +22,30 @@ kill_port() {
     local port=$1
     local process_name=$2
 
-    # Find process using the port
-    local pid=$(lsof -ti:$port 2>/dev/null)
+    # Find ALL processes using the port (including parent/child processes)
+    local pids=$(lsof -ti:$port 2>/dev/null)
 
-    if [ ! -z "$pid" ]; then
-        echo -e "${YELLOW}Found $process_name running on port $port (PID: $pid). Killing it...${NC}"
-        kill -9 $pid 2>/dev/null
-        sleep 1
-        echo -e "${GREEN}$process_name on port $port has been terminated.${NC}"
+    if [ ! -z "$pids" ]; then
+        echo -e "${YELLOW}Found $process_name running on port $port (PIDs: $pids). Killing...${NC}"
+        # Kill all processes at once
+        echo "$pids" | xargs kill -9 2>/dev/null
+
+        # Wait up to 5 seconds for port to be freed
+        local attempts=0
+        while [ $attempts -lt 5 ]; do
+            if ! lsof -ti:$port >/dev/null 2>&1; then
+                echo -e "${GREEN}✅ Port $port is now free${NC}"
+                return 0
+            fi
+            sleep 1
+            attempts=$((attempts + 1))
+        done
+
+        # Check one more time
+        if lsof -ti:$port >/dev/null 2>&1; then
+            echo -e "${RED}⚠️  Warning: Port $port may still be in use${NC}"
+            return 1
+        fi
     fi
 }
 
