@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { intervals } from '../config/intervals';
 
+// Debug flag - only log in development mode
+const DEBUG_WS = import.meta.env.DEV;
+
 interface ReliableWebSocketOptions<T, M = any> {
   url: string;
   queryKey: string[];
@@ -139,14 +142,14 @@ export function useReliableWebSocket<T, M = any>({
       return;
     }
 
-    console.log(`[WS] Connecting to: ${url} (attempt ${reconnectAttemptsRef.current + 1})`);
+    if (DEBUG_WS) console.log(`[WS] Connecting to: ${url} (attempt ${reconnectAttemptsRef.current + 1})`);
 
     try {
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log(`[WS] Connected to ${url}`);
+        if (DEBUG_WS) console.log(`[WS] Connected to ${url}`);
         reconnectAttemptsRef.current = 0;
         lastMessageTimeRef.current = Date.now();
         messageCountRef.current = 0;
@@ -187,7 +190,7 @@ export function useReliableWebSocket<T, M = any>({
       };
 
       ws.onclose = () => {
-        console.log(`[WS] Disconnected from ${url}`);
+        if (DEBUG_WS) console.log(`[WS] Disconnected from ${url}`);
         setState((prev) => ({
           ...prev,
           isConnected: false,
@@ -197,7 +200,7 @@ export function useReliableWebSocket<T, M = any>({
         // Schedule reconnection with exponential backoff
         if (enabled && isPageVisibleRef.current && reconnectAttemptsRef.current < maxReconnectAttempts) {
           const delay = getReconnectDelay(reconnectAttemptsRef.current);
-          console.log(`[WS] Reconnecting to ${url} in ${Math.round(delay / 1000)}s...`);
+          if (DEBUG_WS) console.log(`[WS] Reconnecting to ${url} in ${Math.round(delay / 1000)}s...`);
 
           reconnectAttemptsRef.current++;
           setState((prev) => ({
@@ -228,11 +231,11 @@ export function useReliableWebSocket<T, M = any>({
       isPageVisibleRef.current = isVisible;
 
       if (isVisible && enabled) {
-        console.log(`[WS] Page visible, reconnecting to ${url}...`);
+        if (DEBUG_WS) console.log(`[WS] Page visible, reconnecting to ${url}...`);
         // Reset reconnect attempts on visibility change
         reconnectAttemptsRef.current = 0;
       } else if (!isVisible) {
-        console.log(`[WS] Page hidden, pausing connection to ${url}`);
+        if (DEBUG_WS) console.log(`[WS] Page hidden, pausing connection to ${url}`);
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
         }

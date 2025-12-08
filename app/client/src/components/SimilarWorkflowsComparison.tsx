@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { WorkflowHistoryItem } from '../types/api.types';
-import { thresholds } from '../config/thresholds';
+import { fetchWorkflowsBatch } from '../api/workflowClient';
 
 interface SimilarWorkflowsComparisonProps {
   currentWorkflowId: string;
@@ -22,29 +22,16 @@ export function SimilarWorkflowsComparison({
         setLoading(true);
         setError(null);
 
-        // Fetch current workflow
-        const currentResponse = await fetch(`/api/workflow-history?search=${currentWorkflowId}&limit=${thresholds.display.similarWorkflowsLimit}`);
-        if (!currentResponse.ok) {
-          throw new Error('Failed to fetch current workflow');
-        }
-        const currentData = await currentResponse.json();
-        if (currentData.workflows && currentData.workflows.length > 0) {
-          setCurrentWorkflow(currentData.workflows[0]);
-        }
+        // OPTIMIZED: Single batch request for all workflows (current + similar)
+        const allIds = [currentWorkflowId, ...similarWorkflowIds];
+        const allWorkflows = await fetchWorkflowsBatch(allIds);
 
-        // Fetch similar workflows
-        const workflows: WorkflowHistoryItem[] = [];
-        for (const id of similarWorkflowIds) {
-          const response = await fetch(`/api/workflow-history?search=${id}&limit=${thresholds.display.similarWorkflowsLimit}`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.workflows && data.workflows.length > 0) {
-              workflows.push(data.workflows[0]);
-            }
-          }
-        }
+        // Separate current workflow from similar workflows
+        const current = allWorkflows.find(w => w.adw_id === currentWorkflowId);
+        const similar = allWorkflows.filter(w => w.adw_id !== currentWorkflowId);
 
-        setSimilarWorkflows(workflows);
+        setCurrentWorkflow(current || null);
+        setSimilarWorkflows(similar);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch workflows');
       } finally {

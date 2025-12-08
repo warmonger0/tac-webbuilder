@@ -3,8 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { SimilarWorkflowsComparison } from '../SimilarWorkflowsComparison';
 import { WorkflowHistoryItem } from '../../types/api.types';
 
-// Mock fetch globally
-global.fetch = vi.fn();
+// Mock workflowClient module
+vi.mock('../../api/workflowClient', () => ({
+  fetchWorkflowsBatch: vi.fn(),
+}));
+
+import { fetchWorkflowsBatch } from '../../api/workflowClient';
 
 const mockCurrentWorkflow: WorkflowHistoryItem = {
   id: 1,
@@ -114,8 +118,8 @@ describe('SimilarWorkflowsComparison', () => {
   });
 
   it('renders loading state initially', () => {
-    (global.fetch as any).mockImplementation(() =>
-      new Promise(() => {}) // Never resolves to keep loading state
+    (fetchWorkflowsBatch as any).mockImplementation(
+      () => new Promise(() => {}) // Never resolves to keep loading state
     );
 
     render(
@@ -129,10 +133,7 @@ describe('SimilarWorkflowsComparison', () => {
   });
 
   it('renders "No similar workflows found" when similarWorkflowIds is empty array', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ workflows: [mockCurrentWorkflow] }),
-    });
+    (fetchWorkflowsBatch as any).mockResolvedValueOnce([mockCurrentWorkflow]);
 
     render(
       <SimilarWorkflowsComparison

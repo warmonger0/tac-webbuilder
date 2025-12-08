@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { intervals } from '../config/intervals';
 
+// Debug flag - only log in development mode
+const DEBUG_WS = import.meta.env.DEV;
+
 interface ReliablePollingOptions<T> {
   fetchFn: () => Promise<T>;
   onSuccess: (data: T) => void;
@@ -165,7 +168,7 @@ export function useReliablePolling<T>({
       isPageVisibleRef.current = isVisible;
 
       if (isVisible && enabled) {
-        console.log('[Polling] Page visible, resuming polling...');
+        if (DEBUG_WS) console.log('[Polling] Page visible, resuming polling...');
         // Reset error count on visibility change
         consecutiveErrorsRef.current = 0;
         setState((prev) => ({
@@ -175,7 +178,7 @@ export function useReliablePolling<T>({
         }));
         // Don't call startPolling here - let the main polling effect handle it
       } else if (!isVisible) {
-        console.log('[Polling] Page hidden, pausing polling');
+        if (DEBUG_WS) console.log('[Polling] Page hidden, pausing polling');
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
           intervalRef.current = undefined;
@@ -225,7 +228,7 @@ export function useReliablePolling<T>({
 
   // Manual retry function
   const retry = useCallback(() => {
-    console.log('[Polling] Manual retry triggered');
+    if (DEBUG_WS) console.log('[Polling] Manual retry triggered');
     consecutiveErrorsRef.current = 0;
     setState((prev) => ({
       ...prev,

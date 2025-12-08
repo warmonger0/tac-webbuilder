@@ -6,6 +6,9 @@ import { useReliableWebSocket } from './useReliableWebSocket';
 import { apiConfig } from '../config/api';
 import { intervals } from '../config/intervals';
 
+// Debug flag - only log in development mode
+const DEBUG_WS = import.meta.env.DEV;
+
 interface WorkflowsWebSocketMessage {
   type: 'workflows_update';
   data: WorkflowExecution[];
@@ -30,11 +33,11 @@ export function useWorkflowsWebSocket() {
       if ('type' in message && message.type === 'workflows_update') {
         // WebSocket message format
         setWorkflows(message.data);
-        console.log('[WS] Received workflow update:', message.data.length, 'workflows');
+        if (DEBUG_WS) console.log('[WS] Received workflow update:', message.data.length, 'workflows');
       } else if (Array.isArray(message)) {
         // HTTP polling response format (array of workflows)
         setWorkflows(message);
-        console.log('[HTTP] Received workflow update:', message.length, 'workflows');
+        if (DEBUG_WS) console.log('[HTTP] Received workflow update:', message.length, 'workflows');
       }
     },
   });
@@ -62,11 +65,11 @@ export function useRoutesWebSocket() {
       if (message.type === 'routes_update') {
         // WebSocket message format
         setRoutes(message.data);
-        console.log('[WS] Received routes update:', message.data.length, 'routes');
+        if (DEBUG_WS) console.log('[WS] Received routes update:', message.data.length, 'routes');
       } else if (message.routes) {
         // HTTP polling response format
         setRoutes(message.routes);
-        console.log('[HTTP] Received routes update:', message.routes.length, 'routes');
+        if (DEBUG_WS) console.log('[HTTP] Received routes update:', message.routes.length, 'routes');
       }
     },
   });
@@ -114,13 +117,13 @@ export function useWorkflowHistoryWebSocket() {
         setWorkflows(message.data.workflows);
         setTotalCount(message.data.total_count);
         setAnalytics(message.data.analytics);
-        console.log('[WS] Received workflow history update:', message.data.workflows.length, 'workflows');
+        if (DEBUG_WS) console.log('[WS] Received workflow history update:', message.data.workflows.length, 'workflows');
       } else if (message.workflows) {
         // HTTP polling response format
         setWorkflows(message.workflows);
         setTotalCount(message.total_count);
         setAnalytics(message.analytics);
-        console.log('[HTTP] Received workflow history update:', message.workflows.length, 'workflows');
+        if (DEBUG_WS) console.log('[HTTP] Received workflow history update:', message.workflows.length, 'workflows');
       }
     },
   });
@@ -178,7 +181,7 @@ export function useADWStateWebSocket(adwId: string | null) {
     onMessage: (message) => {
       if (message.type === 'adw_state_update') {
         setState(message.data);
-        console.log('[WS] Received ADW state update:', message.adw_id, message.data);
+        if (DEBUG_WS) console.log('[WS] Received ADW state update:', message.adw_id, message.data);
       }
     },
     enabled: !!adwId,
@@ -230,13 +233,13 @@ export function useADWMonitorWebSocket() {
         setWorkflows(message.data.workflows);
         setSummary(message.data.summary);
         setLastUpdated(message.data.last_updated);
-        console.log('[WS] Received ADW monitor update:', message.data.workflows.length, 'workflows');
+        if (DEBUG_WS) console.log('[WS] Received ADW monitor update:', message.data.workflows.length, 'workflows');
       } else if (message.workflows) {
         // HTTP polling response format
         setWorkflows(message.workflows);
         setSummary(message.summary);
         setLastUpdated(message.last_updated);
-        console.log('[HTTP] Received ADW monitor update:', message.workflows.length, 'workflows');
+        if (DEBUG_WS) console.log('[HTTP] Received ADW monitor update:', message.workflows.length, 'workflows');
       }
     },
   });
@@ -279,12 +282,12 @@ export function useQueueWebSocket() {
         // WebSocket message format
         setPhases(message.data.phases);
         setPaused(message.data.paused);
-        console.log('[WS] Received queue update:', message.data.phases.length, 'phases');
+        if (DEBUG_WS) console.log('[WS] Received queue update:', message.data.phases.length, 'phases');
       } else if (message.phases) {
         // HTTP polling response format
         setPhases(message.phases);
         setPaused(message.paused || false);
-        console.log('[HTTP] Received queue update:', message.phases.length, 'phases');
+        if (DEBUG_WS) console.log('[HTTP] Received queue update:', message.phases.length, 'phases');
       }
     },
   });

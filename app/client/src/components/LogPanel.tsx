@@ -147,7 +147,10 @@ export function LogPanel() {
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
             <button
-              onClick={() => setActiveTab('workLogs')}
+              onClick={() => {
+                setActiveTab('workLogs');
+                setOffset(0);
+              }}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'workLogs'
                   ? 'border-blue-500 text-blue-600'
@@ -157,7 +160,10 @@ export function LogPanel() {
               Work Logs
             </button>
             <button
-              onClick={() => setActiveTab('taskLogs')}
+              onClick={() => {
+                setActiveTab('taskLogs');
+                setOffset(0);
+              }}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'taskLogs'
                   ? 'border-blue-500 text-blue-600'
@@ -167,7 +173,10 @@ export function LogPanel() {
               Task Logs
             </button>
             <button
-              onClick={() => setActiveTab('userPrompts')}
+              onClick={() => {
+                setActiveTab('userPrompts');
+                setOffset(0);
+              }}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'userPrompts'
                   ? 'border-blue-500 text-blue-600'
