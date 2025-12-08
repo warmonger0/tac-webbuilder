@@ -1,9 +1,16 @@
 #!/bin/bash
 
+# Get the script's directory and project root
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( dirname "$SCRIPT_DIR" )"
+
+# Change to project root so .ports.env is always found
+cd "$PROJECT_ROOT"
+
 # SINGLE SOURCE OF TRUTH: .ports.env
 # All port configuration MUST be in .ports.env - no fallbacks allowed
 if [ ! -f ".ports.env" ]; then
-    echo "❌ ERROR: .ports.env not found!"
+    echo "❌ ERROR: .ports.env not found in $PROJECT_ROOT"
     echo "   Copy .ports.env.sample to .ports.env and configure your ports."
     exit 1
 fi
