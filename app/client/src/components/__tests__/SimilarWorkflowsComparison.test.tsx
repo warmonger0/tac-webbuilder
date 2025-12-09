@@ -497,4 +497,75 @@ describe('SimilarWorkflowsComparison', () => {
       expect(indicator?.textContent).toBe('↑');
     });
   });
+
+  it('cleans up fetch on unmount (no memory leak)', async () => {
+    // Mock fetchWorkflowsBatch to return a promise that resolves after a delay
+    let abortCalled = false;
+
+    // Override AbortController.abort to track if it was called
+    const originalAbort = AbortController.prototype.abort;
+    AbortController.prototype.abort = function() {
+      abortCalled = true;
+      originalAbort.call(this);
+    };
+
+    // Mock fetch to never resolve (simulates slow network)
+    (fetchWorkflowsBatch as any).mockImplementation(
+      () => new Promise(() => {}) // Never resolves
+    );
+
+    // Suppress console warnings for this test
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { unmount } = render(
+      <SimilarWorkflowsComparison
+        currentWorkflowId="current-123"
+        similarWorkflowIds={['similar-456']}
+      />
+    );
+
+    // Verify loading state appears
+    expect(screen.getByText('Loading similar workflows...')).toBeInTheDocument();
+
+    // Unmount the component before the promise resolves
+    unmount();
+
+    // Wait a bit to ensure any state updates would have been attempted
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Verify abort was called
+    expect(abortCalled).toBe(true);
+
+    // Verify no console errors occurred
+    expect(consoleError).not.toHaveBeenCalledWith(
+      expect.stringContaining('unmounted component')
+    );
+
+    // Restore original abort and console.error
+    AbortController.prototype.abort = originalAbort;
+    consoleError.mockRestore();
+  });
+
+  it('handles AbortError gracefully (no error UI shown)', async () => {
+    // Mock fetchWorkflowsBatch to throw AbortError
+    const abortError = new DOMException('The operation was aborted', 'AbortError');
+    (fetchWorkflowsBatch as any).mockRejectedValueOnce(abortError);
+
+    render(
+      <SimilarWorkflowsComparison
+        currentWorkflowId="current-123"
+        similarWorkflowIds={['similar-456']}
+      />
+    );
+
+    // Initially should show loading
+    expect(screen.getByText('Loading similar workflows...')).toBeInTheDocument();
+
+    // Wait a bit for the promise to reject and be handled
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // The key assertion: verify no error message is displayed after AbortError
+    expect(screen.queryByText(/Error:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/operation was aborted/i)).not.toBeInTheDocument();
+  });
 });

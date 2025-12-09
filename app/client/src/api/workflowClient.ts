@@ -72,11 +72,14 @@ export async function getWorkflowHistory(
  * Instead of making N separate requests, this batches them into one.
  *
  * @param workflowIds - Array of ADW IDs to fetch (max 20)
+ * @param signal - Optional AbortSignal for request cancellation
  * @returns Array of workflow history items
  * @throws Error if request fails or more than 20 IDs provided
+ * @throws DOMException with name 'AbortError' if request is aborted
  */
 export async function fetchWorkflowsBatch(
-  workflowIds: string[]
+  workflowIds: string[],
+  signal?: AbortSignal
 ): Promise<WorkflowHistoryItem[]> {
   const response = await fetch(`${API_BASE}/workflows/batch`, {
     method: 'POST',
@@ -84,6 +87,7 @@ export async function fetchWorkflowsBatch(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(workflowIds),
+    signal,
   });
 
   if (!response.ok) {
