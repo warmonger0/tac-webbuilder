@@ -225,7 +225,10 @@ def init_system_routes(health_service, service_controller, app_start_time):
         return service_controller.redeliver_github_webhook()
 
     @router.get("/preflight-checks")
-    async def run_preflight_health_checks(skip_tests: bool = Query(False)) -> dict:
+    async def run_preflight_health_checks(
+        skip_tests: bool = Query(False),
+        issue_number: int | None = Query(None, description="GitHub issue number to check for duplicate work")
+    ) -> dict:
         """
         Run pre-flight checks before launching ADW workflows.
 
@@ -235,17 +238,20 @@ def init_system_routes(health_service, service_controller, app_start_time):
         - Git repository state (uncommitted changes)
         - Disk space (minimum 1GB free)
         - Python environment (uv availability)
+        - Issue already resolved (if issue_number provided)
 
         Args:
             skip_tests: Skip the test suite check (for faster checks)
+            issue_number: GitHub issue number to validate for duplicate work
 
         Returns:
             Pre-flight check results with pass/fail status and detailed diagnostics
         """
         try:
-            result = run_preflight_checks(skip_tests=skip_tests)
+            result = run_preflight_checks(skip_tests=skip_tests, issue_number=issue_number)
             status = "✅ PASSED" if result["passed"] else "❌ FAILED"
-            logger.info(f"Pre-flight checks: {status} ({result['total_duration_ms']}ms)")
+            issue_info = f" (issue #{issue_number})" if issue_number else ""
+            logger.info(f"Pre-flight checks{issue_info}: {status} ({result['total_duration_ms']}ms)")
             return result
         except Exception as e:
             logger.error(f"Pre-flight check error: {str(e)}")

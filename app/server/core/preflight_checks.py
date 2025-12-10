@@ -27,12 +27,13 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def run_preflight_checks(skip_tests: bool = False) -> dict[str, Any]:
+def run_preflight_checks(skip_tests: bool = False, issue_number: int | None = None) -> dict[str, Any]:
     """
     Run all pre-flight checks before launching an ADW workflow.
 
     Args:
         skip_tests: If True, skip the test suite check (useful for testing)
+        issue_number: Optional GitHub issue number to validate for duplicate work
 
     Returns:
         {
@@ -205,19 +206,48 @@ def run_preflight_checks(skip_tests: bool = False) -> dict[str, Any]:
             "impact": pattern_result.get("impact", "Analytics and pattern discovery unavailable")
         })
 
+    # Check 10: Issue Already Resolved (if issue_number provided)
+    issue_validation = None
+    if issue_number:
+        check_start = time.time()
+        resolution_result = check_issue_already_resolved(issue_number)
+        checks_run.append({
+            "check": "issue_already_resolved",
+            "status": "warn" if resolution_result["is_resolved"] else "pass",
+            "duration_ms": int((time.time() - check_start) * 1000),
+            "details": resolution_result.get("summary")
+        })
+
+        if resolution_result["is_resolved"] and resolution_result["confidence"] >= 0.5:
+            warnings.append({
+                "check": "Issue Already Resolved",
+                "message": resolution_result["message"],
+                "impact": "Launching workflow may create duplicate work",
+                "evidence": resolution_result.get("evidence", []),
+                "recommendation": resolution_result.get("recommendation", "")
+            })
+
+        issue_validation = resolution_result
+
     total_duration = int((time.time() - start_time) * 1000)
 
     passed = len(blocking_failures) == 0
 
     logger.info(f"Pre-flight checks completed in {total_duration}ms: {'✅ PASSED' if passed else '❌ FAILED'}")
 
-    return {
+    result = {
         "passed": passed,
         "blocking_failures": blocking_failures,
         "warnings": warnings,
         "checks_run": checks_run,
         "total_duration_ms": total_duration
     }
+
+    # Add issue validation data if checked
+    if issue_validation:
+        result["issue_validation"] = issue_validation
+
+    return result
 
 
 def check_critical_tests() -> dict[str, Any]:
@@ -808,4 +838,178 @@ def check_pattern_analysis_system() -> dict[str, Any]:
             "error": f"Failed to check pattern analysis: {str(e)}",
             "impact": "Cannot verify pattern discovery system",
             "summary": "Check failed"
+        }
+
+
+def check_issue_already_resolved(issue_number: int) -> dict[str, Any]:
+    """
+    Check if a GitHub issue is already resolved to prevent duplicate work.
+
+    Uses multiple heuristics:
+    - GitHub issue state (closed, duplicate label)
+    - Git commit history (recent commits mentioning issue)
+    - Related closed issues
+
+    Args:
+        issue_number: GitHub issue number to check
+
+    Returns:
+        {
+            "is_resolved": bool,
+            "confidence": float (0.0-1.0),
+            "message": str,
+            "summary": str,
+            "evidence": [str],
+            "recommendation": str,
+            "closed_at": str | None,
+            "related_commits": [str],
+            "duplicate_of": [int]
+        }
+    """
+    try:
+        project_root = Path(__file__).parent.parent.parent
+
+        evidence = []
+        confidence = 0.0
+        closed_at = None
+        related_commits = []
+        duplicate_of = []
+
+        # Heuristic 1: Check GitHub issue state
+        try:
+            result = subprocess.run(
+                ["gh", "issue", "view", str(issue_number), "--json", "state,closedAt,labels,title"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if result.returncode == 0:
+                import json
+                issue_data = json.loads(result.stdout)
+
+                # Check if closed
+                if issue_data.get("state") == "CLOSED":
+                    closed_at = issue_data.get("closedAt")
+                    evidence.append(f"Issue #{issue_number} is closed")
+                    confidence += 0.4
+
+                    # Check for duplicate label
+                    labels = [label.get("name", "").lower() for label in issue_data.get("labels", [])]
+                    if "duplicate" in labels:
+                        evidence.append("Issue has 'duplicate' label")
+                        confidence += 0.3
+
+                    # Check how recently closed (< 24 hours = more likely related)
+                    if closed_at:
+                        from datetime import datetime, timedelta
+                        closed_time = datetime.fromisoformat(closed_at.replace("Z", "+00:00"))
+                        if datetime.now(closed_time.tzinfo) - closed_time < timedelta(hours=24):
+                            evidence.append("Issue closed within last 24 hours")
+                            confidence += 0.2
+
+        except Exception as e:
+            logger.warning(f"Failed to check GitHub issue state: {e}")
+
+        # Heuristic 2: Search git history for issue mentions
+        try:
+            # Search last 50 commits for issue number mentions
+            patterns = [
+                f"#{issue_number}",
+                f"Fix.*{issue_number}",
+                f"Fixes.*{issue_number}",
+                f"Close.*{issue_number}",
+                f"Closes.*{issue_number}"
+            ]
+
+            for pattern in patterns:
+                result = subprocess.run(
+                    ["git", "log", "-50", "--oneline", "--all", "--grep", pattern],
+                    cwd=project_root,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+
+                if result.returncode == 0 and result.stdout.strip():
+                    commits = result.stdout.strip().split('\n')
+                    for commit in commits[:3]:  # Limit to 3 most recent
+                        commit_hash = commit.split()[0]
+                        if commit_hash not in related_commits:
+                            related_commits.append(commit_hash)
+
+            if related_commits:
+                evidence.append(f"Found {len(related_commits)} commit(s) mentioning issue")
+                confidence += 0.25
+
+        except Exception as e:
+            logger.warning(f"Failed to search git history: {e}")
+
+        # Heuristic 3: Check for related closed issues (duplicates)
+        try:
+            # Search for closed issues with similar titles
+            result = subprocess.run(
+                ["gh", "issue", "list", "--state", "closed", "--limit", "20", "--json", "number,title,labels"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if result.returncode == 0:
+                import json
+                issues = json.loads(result.stdout)
+
+                # Look for issues with "duplicate" label that were closed recently
+                for issue in issues:
+                    if issue["number"] != issue_number:
+                        labels = [label.get("name", "").lower() for label in issue.get("labels", [])]
+                        if "duplicate" in labels:
+                            duplicate_of.append(issue["number"])
+
+                if duplicate_of:
+                    evidence.append(f"Found {len(duplicate_of)} other duplicate issue(s) recently closed")
+                    confidence += 0.15
+
+        except Exception as e:
+            logger.warning(f"Failed to check related issues: {e}")
+
+        # Build result
+        is_resolved = confidence >= 0.5
+        confidence = min(confidence, 1.0)  # Cap at 100%
+
+        if is_resolved:
+            message = f"Issue #{issue_number} may already be fixed (confidence: {int(confidence * 100)}%)"
+            summary = f"Resolved (confidence: {int(confidence * 100)}%)"
+            recommendation = f"Review commits {', '.join(related_commits[:3])} before launching workflow"
+        else:
+            message = f"Issue #{issue_number} does not appear to be resolved"
+            summary = "Not resolved"
+            recommendation = "Proceed with workflow"
+
+        return {
+            "is_resolved": is_resolved,
+            "confidence": confidence,
+            "message": message,
+            "summary": summary,
+            "evidence": evidence,
+            "recommendation": recommendation,
+            "closed_at": closed_at,
+            "related_commits": related_commits,
+            "duplicate_of": duplicate_of
+        }
+
+    except Exception as e:
+        logger.warning(f"Error checking issue resolution: {e}")
+        return {
+            "is_resolved": False,
+            "confidence": 0.0,
+            "message": f"Failed to check issue status: {str(e)}",
+            "summary": "Check failed",
+            "evidence": [],
+            "recommendation": "Proceed with caution",
+            "closed_at": None,
+            "related_commits": [],
+            "duplicate_of": []
         }
