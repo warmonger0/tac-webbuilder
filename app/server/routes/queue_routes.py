@@ -5,12 +5,16 @@ import hashlib
 import logging
 import os
 import subprocess
+import time
 
 from core.nl_processor import suggest_adw_workflow
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from repositories.webhook_event_repository import WebhookEventRepository
 from utils.webhook_security import validate_webhook_request
+from services.structured_logger import StructuredLogger
+from repositories.task_log_repository import TaskLogRepository
+from core.models.observability import TaskLogCreate
 
 logger = logging.getLogger(__name__)
 
@@ -623,6 +627,25 @@ def init_webhook_routes(phase_queue_service, github_poster):
         Returns:
             WorkflowCompleteResponse with success status and next phase info
         """
+        # Initialize observability services
+        structured_logger = StructuredLogger()
+        task_log_repo = TaskLogRepository()
+        start_time = time.time()
+
+        # Log webhook received
+        structured_logger.log_webhook_event(
+            adw_id=request.adw_id,
+            issue_number=request.parent_issue,
+            message=f"Workflow complete webhook received (status={request.status})",
+            webhook_type="workflow_complete",
+            event_data={
+                "status": request.status,
+                "queue_id": request.queue_id,
+                "phase_number": request.phase_number,
+                "trigger_next": request.trigger_next
+            }
+        )
+
         # VALIDATE SIGNATURE
         try:
             await validate_webhook_request(http_request, webhook_type="internal")
@@ -738,11 +761,56 @@ def init_webhook_routes(phase_queue_service, github_poster):
                 f"(adw_id: {adw_id})"
             )
 
+            # Log successful processing before returning
+            elapsed_time = time.time() - start_time
+
+            structured_logger.log_webhook_event(
+                adw_id=request.adw_id,
+                issue_number=request.parent_issue,
+                message=f"Workflow complete webhook processed successfully",
+                webhook_type="workflow_complete",
+                duration_seconds=elapsed_time,
+                event_data={
+                    "phase_updated": response.phase_updated,
+                    "next_phase_triggered": response.next_phase_triggered,
+                    "next_phase_number": response.next_phase_number
+                }
+            )
+
+            # Create TaskLog entry
+            try:
+                task_log_repo.create(TaskLogCreate(
+                    adw_id=request.adw_id,
+                    issue_number=request.parent_issue,
+                    workflow_template="workflow_complete",
+                    phase_name=f"phase_{request.phase_number}_complete",
+                    phase_status=request.status,
+                    log_message=f"Phase {request.phase_number} marked {request.status} via webhook",
+                    duration_seconds=elapsed_time
+                ))
+            except Exception as log_error:
+                logger.warning(f"Failed to create TaskLog entry: {log_error}")
+
             return response
 
         except HTTPException:
             raise
         except Exception as e:
+            # Log failure
+            elapsed_time = time.time() - start_time
+
+            structured_logger.log_webhook_event(
+                adw_id=request.adw_id,
+                issue_number=request.parent_issue,
+                message=f"Workflow complete webhook failed: {str(e)}",
+                webhook_type="workflow_complete",
+                duration_seconds=elapsed_time,
+                error_message=str(e),
+                event_data={
+                    "error_type": type(e).__name__
+                }
+            )
+
             logger.error(f"[WEBHOOK] Error processing workflow completion: {str(e)}")
             import traceback
             logger.error(f"Traceback:\n{traceback.format_exc()}")

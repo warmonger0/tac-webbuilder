@@ -460,6 +460,59 @@ class StructuredLogger:
         )
         return self._write_event(event)
 
+    def log_webhook_event(
+        self,
+        adw_id: str | None,
+        issue_number: int,
+        message: str,
+        webhook_type: str,
+        level: LogLevel = LogLevel.INFO,
+        event_data: dict | None = None,
+        duration_seconds: float | None = None,
+        error_message: str | None = None,
+        **context,
+    ) -> bool:
+        """
+        Log a webhook event.
+
+        Args:
+            adw_id: ADW workflow ID (may be None for initial webhook)
+            issue_number: GitHub issue number
+            message: Log message
+            webhook_type: Type of webhook ('github_issue', 'workflow_complete')
+            level: Log level (default: INFO)
+            event_data: Additional event metadata
+            duration_seconds: Processing time in seconds
+            error_message: Error message if failed
+            **context: Additional context
+
+        Returns:
+            True if successful, False otherwise
+        """
+        # Use SystemLogEvent for webhook events
+        event = SystemLogEvent(
+            event_id=f"evt_{uuid.uuid4().hex[:12]}",
+            timestamp=datetime.utcnow(),
+            level=level,
+            source=LogSource.SYSTEM,
+            message=message,
+            context={
+                "adw_id": adw_id,
+                "issue_number": issue_number,
+                "webhook_type": webhook_type,
+                "event_data": event_data or {},
+                "event_type": "webhook",
+                "duration_seconds": duration_seconds,
+                **context,
+            },
+            component="webhook",
+            operation=webhook_type,
+            status="success" if not error_message else "failed",
+            duration_ms=duration_seconds * 1000 if duration_seconds else None,
+            error_message=error_message,
+        )
+        return self._write_event(event)
+
 
 # Singleton instance
 _structured_logger: StructuredLogger | None = None
