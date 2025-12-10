@@ -101,3 +101,4 @@ Create-tac-webbuilder.md
 
 # Playwright config (generated)
 playwright-mcp-config.json.codebase_index.json
+app/client/coverage/.tmp/
