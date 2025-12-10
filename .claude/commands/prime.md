@@ -4,7 +4,7 @@
 **tac-webbuilder** - AI-powered GitHub automation platform with autonomous SDLC workflows
 
 ## Four Core Features
-1. **ADW Automation** - 9-phase SDLC workflows in isolated git worktrees (Claude Code CLI)
+1. **ADW Automation** - 10-phase SDLC workflows in isolated git worktrees (Claude Code CLI)
 2. **NL → GitHub Issues** - Natural language → Structured issues with auto-routing
 3. **Observability & Analytics** - Pattern analysis, cost attribution, error/latency tracking, ROI metrics
 4. **10-Panel Dashboard** - Real-time workflow monitoring, roadmap tracking, and control
@@ -12,10 +12,11 @@
 ## Quick Architecture
 - **Worktree isolation:** Up to 15 concurrent ADWs in `trees/{adw_id}/`
 - **Port allocation:** Backend 9100-9114, Frontend 9200-9214
-- **9-phase SDLC:** Plan → Validate → Build → Lint → Test → Review → Document → Ship → Cleanup
+- **10-phase SDLC:** Plan → Validate → Build → Lint → Test → Review → Document → Ship → Cleanup → Verify
 - **Cost optimization:** 60-80% savings via external test tools
 - **Database:** PostgreSQL only (production-grade, required for observability)
 - **Security:** Multi-layer SQL injection prevention
+- **Claude Code timeout:** 45-minute timeout for complex planning tasks (prevents premature termination)
 
 ## What Are You Working On?
 
@@ -39,7 +40,7 @@
 → Read `.claude/commands/quick_start/backend.md` [~300 tokens]
 
 ### ADW Workflows (adws/)
-**9-phase orchestration via isolated worktrees**
+**10-phase orchestration via isolated worktrees**
 **Key workflows:** adw_sdlc_complete_iso, adw_sdlc_complete_zte (zero-touch)
 
 → Read `.claude/commands/quick_start/adw.md` [~400 tokens]
@@ -85,7 +86,7 @@
 ./scripts/start_full.sh                # Backend + frontend
 
 # Backend
-cd app/server && uv run python server.py   # Port 8000
+cd app/server && uv run python server.py   # Port 8002
 
 # Frontend
 cd app/client && bun run dev           # Port 5173
@@ -108,7 +109,7 @@ cd app/client && bun test              # 149 tests
 ```bash
 # Multi-layer health check system
 ./scripts/health_check.sh              # Terminal: 7 sections including observability
-curl localhost:8000/api/v1/preflight-checks  # API: 9 checks before ADW launch
+curl localhost:8002/api/v1/preflight-checks  # API: 9 checks before ADW launch
 # Panel 1 UI: Automatic display of all preflight checks
 
 # 3 New Observability Checks:
