@@ -102,6 +102,7 @@ def main():
     logger.info("✅ Updated state to show full SDLC workflow active")
 
     # Post initial message
+    logger.info("Attempting to post initial GitHub comment...")
     try:
         make_issue_comment(
             issue_number,
@@ -123,7 +124,9 @@ def main():
             f"- Skip E2E: {'✅ Yes' if skip_e2e else '❌ No'}\n"
             f"- Auto-resolution: {'❌ Disabled' if skip_resolution else '✅ Enabled'}",
         )
+        logger.info("✅ Initial GitHub comment posted successfully")
     except Exception as e:
+        logger.error(f"Failed to post initial comment: {e}", exc_info=True)
         print(f"Warning: Failed to post initial comment: {e}")
 
     # Get the directory where this script is located
@@ -144,7 +147,24 @@ def main():
     print(f"PHASE 1/9: PLAN ({plan_script})")
     print(f"{'='*60}")
     print(f"Running: {' '.join(plan_cmd)}")
-    plan = subprocess.run(plan_cmd)
+    logger.info(f"Starting PHASE 1: PLAN with command: {' '.join(plan_cmd)}")
+
+    try:
+        plan = subprocess.run(plan_cmd, capture_output=False, text=True)
+        logger.info(f"Plan phase completed with exit code: {plan.returncode}")
+    except Exception as e:
+        logger.error(f"Plan phase crashed with exception: {e}", exc_info=True)
+        print(f"❌ Plan phase crashed: {e}")
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=None,
+            phase_name="Plan",
+            error_details=f"Plan phase crashed with exception: {str(e)}",
+            logger=logger
+        )
+        sys.exit(1)
+
     if plan.returncode != 0:
         print("❌ Plan phase failed")
         # Load state to get branch name
@@ -177,9 +197,18 @@ def main():
     print(f"PHASE 2/9: VALIDATE (Baseline Error Detection)")
     print(f"{'='*60}")
     print(f"Running: {' '.join(validate_cmd)}")
-    validate = subprocess.run(validate_cmd)
+    logger.info(f"Starting PHASE 2: VALIDATE with command: {' '.join(validate_cmd)}")
+
+    try:
+        validate = subprocess.run(validate_cmd, capture_output=False, text=True)
+        logger.info(f"Validate phase completed with exit code: {validate.returncode}")
+    except Exception as e:
+        logger.error(f"Validate phase crashed with exception: {e}", exc_info=True)
+        print(f"⚠️ Validate phase crashed: {e}, but continuing...")
+
     # Validation NEVER fails - always continue
     if validate.returncode != 0:
+        logger.warning("Validate phase encountered issues, but continuing...")
         print("⚠️ Validate phase encountered issues, but continuing...")
 
     # ========================================
@@ -199,7 +228,24 @@ def main():
     print(f"PHASE 3/9: BUILD")
     print(f"{'='*60}")
     print(f"Running: {' '.join(build_cmd)}")
-    build = subprocess.run(build_cmd)
+    logger.info(f"Starting PHASE 3: BUILD with command: {' '.join(build_cmd)}")
+
+    try:
+        build = subprocess.run(build_cmd, capture_output=False, text=True)
+        logger.info(f"Build phase completed with exit code: {build.returncode}")
+    except Exception as e:
+        logger.error(f"Build phase crashed with exception: {e}", exc_info=True)
+        print(f"❌ Build phase crashed: {e}")
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=state.get("branch_name") if state else None,
+            phase_name="Build",
+            error_details=f"Build phase crashed with exception: {str(e)}",
+            logger=logger
+        )
+        sys.exit(1)
+
     if build.returncode != 0:
         print("❌ Build phase failed")
         # Load state to get branch name
@@ -235,7 +281,24 @@ def main():
     print(f"PHASE 4/9: LINT")
     print(f"{'='*60}")
     print(f"Running: {' '.join(lint_cmd)}")
-    lint = subprocess.run(lint_cmd)
+    logger.info(f"Starting PHASE 4: LINT with command: {' '.join(lint_cmd)}")
+
+    try:
+        lint = subprocess.run(lint_cmd, capture_output=False, text=True)
+        logger.info(f"Lint phase completed with exit code: {lint.returncode}")
+    except Exception as e:
+        logger.error(f"Lint phase crashed with exception: {e}", exc_info=True)
+        print(f"❌ Lint phase crashed: {e}")
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=state.get("branch_name") if state else None,
+            phase_name="Lint",
+            error_details=f"Lint phase crashed with exception: {str(e)}",
+            logger=logger
+        )
+        sys.exit(1)
+
     if lint.returncode != 0:
         print("❌ Lint phase failed")
         # Load state to get branch name
@@ -272,7 +335,24 @@ def main():
     print(f"PHASE 5/9: TEST")
     print(f"{'='*60}")
     print(f"Running: {' '.join(test_cmd)}")
-    test = subprocess.run(test_cmd)
+    logger.info(f"Starting PHASE 5: TEST with command: {' '.join(test_cmd)}")
+
+    try:
+        test = subprocess.run(test_cmd, capture_output=False, text=True)
+        logger.info(f"Test phase completed with exit code: {test.returncode}")
+    except Exception as e:
+        logger.error(f"Test phase crashed with exception: {e}", exc_info=True)
+        print(f"❌ Test phase crashed: {e}")
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=state.get("branch_name") if state else None,
+            phase_name="Test",
+            error_details=f"Test phase crashed with exception: {str(e)}",
+            logger=logger
+        )
+        sys.exit(1)
+
     if test.returncode != 0:
         print("❌ Test phase failed")
         # Load state to get branch name
@@ -308,7 +388,24 @@ def main():
     print(f"PHASE 6/9: REVIEW")
     print(f"{'='*60}")
     print(f"Running: {' '.join(review_cmd)}")
-    review = subprocess.run(review_cmd)
+    logger.info(f"Starting PHASE 6: REVIEW with command: {' '.join(review_cmd)}")
+
+    try:
+        review = subprocess.run(review_cmd, capture_output=False, text=True)
+        logger.info(f"Review phase completed with exit code: {review.returncode}")
+    except Exception as e:
+        logger.error(f"Review phase crashed with exception: {e}", exc_info=True)
+        print(f"❌ Review phase crashed: {e}")
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=state.get("branch_name") if state else None,
+            phase_name="Review",
+            error_details=f"Review phase crashed with exception: {str(e)}",
+            logger=logger
+        )
+        sys.exit(1)
+
     if review.returncode != 0:
         print("❌ Review phase failed")
         # Load state to get branch name
@@ -341,7 +438,15 @@ def main():
     print(f"PHASE 7/9: DOCUMENT")
     print(f"{'='*60}")
     print(f"Running: {' '.join(document_cmd)}")
-    document = subprocess.run(document_cmd)
+    logger.info(f"Starting PHASE 7: DOCUMENT with command: {' '.join(document_cmd)}")
+
+    try:
+        document = subprocess.run(document_cmd, capture_output=False, text=True)
+        logger.info(f"Document phase completed with exit code: {document.returncode}")
+    except Exception as e:
+        logger.error(f"Document phase crashed with exception: {e}", exc_info=True)
+        print(f"⚠️ Document phase crashed: {e}, but continuing...")
+
     if document.returncode != 0:
         print("⚠️ Documentation phase failed but continuing...")
         # Documentation failure shouldn't block shipping
@@ -367,7 +472,24 @@ def main():
     print(f"PHASE 8/9: SHIP")
     print(f"{'='*60}")
     print(f"Running: {' '.join(ship_cmd)}")
-    ship = subprocess.run(ship_cmd)
+    logger.info(f"Starting PHASE 8: SHIP with command: {' '.join(ship_cmd)}")
+
+    try:
+        ship = subprocess.run(ship_cmd, capture_output=False, text=True)
+        logger.info(f"Ship phase completed with exit code: {ship.returncode}")
+    except Exception as e:
+        logger.error(f"Ship phase crashed with exception: {e}", exc_info=True)
+        print(f"❌ Ship phase crashed: {e}")
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=None,  # Don't close PR on ship failure
+            phase_name="Ship",
+            error_details=f"Ship phase crashed with exception: {str(e)}",
+            logger=logger
+        )
+        sys.exit(1)
+
     if ship.returncode != 0:
         print("❌ Ship phase failed")
         # Load state to get branch name
@@ -462,7 +584,15 @@ def main():
     print(f"PHASE 10/10: VERIFY (Post-Deployment Verification)")
     print(f"{'='*60}")
     print(f"Running: {' '.join(verify_cmd)}")
-    verify = subprocess.run(verify_cmd)
+    logger.info(f"Starting PHASE 10: VERIFY with command: {' '.join(verify_cmd)}")
+
+    try:
+        verify = subprocess.run(verify_cmd, capture_output=False, text=True)
+        logger.info(f"Verify phase completed with exit code: {verify.returncode}")
+    except Exception as e:
+        logger.error(f"Verify phase crashed with exception: {e}", exc_info=True)
+        print(f"⚠️ Verify phase crashed: {e}, but continuing...")
+
     if verify.returncode != 0:
         print("⚠️ Verify phase detected issues (follow-up issue created)")
         # Note: Don't fail workflow on verify failures
