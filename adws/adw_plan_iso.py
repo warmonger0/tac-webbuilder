@@ -389,21 +389,29 @@ def main():
     finalize_git_operations(state, logger, cwd=worktree_path)
 
     logger.info("Isolated planning phase completed successfully")
-    make_issue_comment(
-        issue_number, format_issue_message(adw_id, "ops", "✅ Isolated planning phase completed")
-    )
 
-    # OBSERVABILITY: Log phase completion
-    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
-    log_phase_completion(
-        adw_id=adw_id,
-        issue_number=int(issue_number),
-        phase_name="Plan",
-        phase_number=get_phase_number("Plan"),
-        success=True,
-        workflow_template="adw_plan_iso",
-        started_at=start_time,
-    )
+    # Post completion comment (non-critical, don't fail if this errors)
+    try:
+        make_issue_comment(
+            issue_number, format_issue_message(adw_id, "ops", "✅ Isolated planning phase completed")
+        )
+    except Exception as e:
+        logger.warning(f"Failed to post completion comment: {e}")
+
+    # OBSERVABILITY: Log phase completion (non-critical, don't fail if this errors)
+    try:
+        start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+        log_phase_completion(
+            adw_id=adw_id,
+            issue_number=int(issue_number),
+            phase_name="Plan",
+            phase_number=get_phase_number("Plan"),
+            success=True,
+            workflow_template="adw_plan_iso",
+            started_at=start_time,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to log phase completion: {e}")
 
     # Post final state summary to issue (non-critical, don't fail if this errors)
     try:
