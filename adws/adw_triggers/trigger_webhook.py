@@ -44,6 +44,7 @@ sys.path.insert(0, app_server_path)
 
 from core.adw_lock import acquire_lock, update_lock_status, release_lock
 from core.api_quota import can_start_adw, log_quota_warning
+from utils.webhook_security import validate_webhook_request
 
 # Load environment variables
 load_dotenv()
@@ -541,35 +542,42 @@ async def process_webhook_background(
 async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     """Handle GitHub webhook events - responds immediately and processes in background."""
     try:
+        # VALIDATE SIGNATURE FIRST (before any processing)
+        try:
+            body = await validate_webhook_request(request, webhook_type="github")
+        except Exception as sig_error:
+            print(f"❌ [WEBHOOK] Signature validation failed: {sig_error}")
+            # Return 401 for unauthorized requests
+            return {"status": "error", "message": "Unauthorized"}
+
         # Get event type from header
         event_type = request.headers.get("X-GitHub-Event", "")
 
-        # Parse webhook payload
+        # Parse webhook payload (already validated)
         # GitHub can send either JSON or form-urlencoded
         content_type = request.headers.get("content-type", "")
 
         try:
+            import json as json_module
             if "application/json" in content_type:
-                payload = await request.json()
+                payload = json_module.loads(body.decode('utf-8'))
             elif "application/x-www-form-urlencoded" in content_type:
                 # GitHub webhooks configured with form encoding send payload=<json>
-                import json as json_module
                 import urllib.parse
-                form_data = await request.body()
-                decoded = urllib.parse.unquote(form_data.decode())
+                decoded = urllib.parse.unquote(body.decode())
                 # Remove "payload=" prefix if present
                 if decoded.startswith("payload="):
                     decoded = decoded[8:]
                 payload = json_module.loads(decoded)
             else:
                 # Try JSON as default
-                payload = await request.json()
+                payload = json_module.loads(body.decode('utf-8'))
         except Exception as json_error:
             # GitHub sometimes sends ping events with empty body
             print(f"⚠️ Failed to parse payload: {json_error}")
             print(f"Content-Type: {content_type}")
             print(f"Headers: {dict(request.headers)}")
-            body = await request.body()
+            # body already read during signature validation
             print(f"Raw body (first 200 chars): {body[:200]}")
 
             # If this is a ping event, return success

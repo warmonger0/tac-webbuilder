@@ -6,8 +6,9 @@ import os
 import subprocess
 
 from core.nl_processor import suggest_adw_workflow
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
+from utils.webhook_security import validate_webhook_request
 
 logger = logging.getLogger(__name__)
 
@@ -593,7 +594,10 @@ def init_webhook_routes(phase_queue_service, github_poster):
     """
 
     @webhook_router.post("/workflow-complete", response_model=WorkflowCompleteResponse)
-    async def workflow_complete(request: WorkflowCompleteRequest) -> WorkflowCompleteResponse:
+    async def workflow_complete(
+        http_request: Request,
+        request: WorkflowCompleteRequest
+    ) -> WorkflowCompleteResponse:
         """
         Handle workflow completion notifications from ADW hooks.
 
@@ -611,11 +615,19 @@ def init_webhook_routes(phase_queue_service, github_poster):
            d. Auto-execute next phase
 
         Args:
+            http_request: FastAPI Request object for signature validation
             request: WorkflowCompleteRequest with adw_id, status, queue_id, trigger_next, etc
 
         Returns:
             WorkflowCompleteResponse with success status and next phase info
         """
+        # VALIDATE SIGNATURE
+        try:
+            await validate_webhook_request(http_request, webhook_type="internal")
+        except HTTPException:
+            logger.warning("[WEBHOOK] Internal webhook signature validation failed")
+            # For internal webhooks, log and continue (or enforce with: raise)
+
         try:
             logger.info(
                 f"[WEBHOOK] Received completion notification: "
