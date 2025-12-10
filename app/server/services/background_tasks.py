@@ -80,16 +80,19 @@ class BackgroundTaskManager:
         logger.info("[BACKGROUND_TASKS] Starting all background watchers...")
 
         # Create tasks
+        # NOTE: ADW monitor watcher REMOVED - now using event-driven HTTP POST updates
+        # Orchestrator broadcasts phase changes via /api/v1/adw-phase-update (0ms latency)
+        # Old polling approach had 500ms latency - event-driven is instant
         self._tasks = [
             asyncio.create_task(self.watch_workflows()),
             asyncio.create_task(self.watch_routes()),
             asyncio.create_task(self.watch_workflow_history()),
-            asyncio.create_task(self.watch_adw_monitor()),
+            # asyncio.create_task(self.watch_adw_monitor()),  # REMOVED - now event-driven
             asyncio.create_task(self.watch_queue()),
         ]
 
         logger.info(
-            f"[BACKGROUND_TASKS] Started {len(self._tasks)} background watchers"
+            f"[BACKGROUND_TASKS] Started {len(self._tasks)} background watchers (ADW monitor now event-driven)"
         )
         return self._tasks
 

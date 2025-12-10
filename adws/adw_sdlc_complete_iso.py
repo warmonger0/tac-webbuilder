@@ -39,7 +39,7 @@ import os
 
 # Add the parent directory to Python path to import modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from adw_modules.workflow_ops import ensure_adw_id, format_issue_message, trigger_cost_sync
+from adw_modules.workflow_ops import ensure_adw_id, format_issue_message, trigger_cost_sync, broadcast_phase_update
 from adw_modules.github import make_issue_comment, fetch_issue, get_repo_url, extract_repo_path
 from adw_modules.cleanup_operations import cleanup_shipped_issue
 from adw_modules.utils import setup_logger
@@ -240,7 +240,8 @@ def main():
     # ========================================
     # PHASE 1: PLAN
     # ========================================
-    # Update state with current phase for real-time WebSocket updates
+    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+    broadcast_phase_update(adw_id, "Plan", "running", logger=logger)
     state.update(current_phase="Plan")
     state.save("adw_sdlc_complete_iso")
     logger.info("✅ Updated state: current_phase=Plan")
@@ -310,7 +311,8 @@ def main():
     # ========================================
     # PHASE 2: VALIDATE (NEW)
     # ========================================
-    # Update state with current phase for real-time WebSocket updates
+    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+    broadcast_phase_update(adw_id, "Validate", "running", logger=logger)
     state.update(current_phase="Validate")
     state.save("adw_sdlc_complete_iso")
     logger.info("✅ Updated state: current_phase=Validate")
@@ -343,7 +345,8 @@ def main():
     # ========================================
     # PHASE 3: BUILD (formerly PHASE 2)
     # ========================================
-    # Update state with current phase for real-time WebSocket updates
+    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+    broadcast_phase_update(adw_id, "Build", "running", logger=logger)
     state.update(current_phase="Build")
     state.save("adw_sdlc_complete_iso")
     logger.info("✅ Updated state: current_phase=Build")
@@ -401,7 +404,8 @@ def main():
     # ========================================
     # PHASE 4: LINT
     # ========================================
-    # Update state with current phase for real-time WebSocket updates
+    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+    broadcast_phase_update(adw_id, "Lint", "running", logger=logger)
     state.update(current_phase="Lint")
     state.save("adw_sdlc_complete_iso")
     logger.info("✅ Updated state: current_phase=Lint")
@@ -459,7 +463,8 @@ def main():
     # ========================================
     # PHASE 5: TEST
     # ========================================
-    # Update state with current phase for real-time WebSocket updates
+    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+    broadcast_phase_update(adw_id, "Test", "running", logger=logger)
     state.update(current_phase="Test")
     state.save("adw_sdlc_complete_iso")
     logger.info("✅ Updated state: current_phase=Test")
@@ -518,7 +523,8 @@ def main():
     # ========================================
     # PHASE 6: REVIEW
     # ========================================
-    # Update state with current phase for real-time WebSocket updates
+    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+    broadcast_phase_update(adw_id, "Review", "running", logger=logger)
     state.update(current_phase="Review")
     state.save("adw_sdlc_complete_iso")
     logger.info("✅ Updated state: current_phase=Review")
@@ -576,7 +582,8 @@ def main():
     # ========================================
     # PHASE 7: DOCUMENT
     # ========================================
-    # Update state with current phase for real-time WebSocket updates
+    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+    broadcast_phase_update(adw_id, "Document", "running", logger=logger)
     state.update(current_phase="Document")
     state.save("adw_sdlc_complete_iso")
     logger.info("✅ Updated state: current_phase=Document")
@@ -615,7 +622,8 @@ def main():
     # ========================================
     # PHASE 8: SHIP
     # ========================================
-    # Update state with current phase for real-time WebSocket updates
+    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+    broadcast_phase_update(adw_id, "Ship", "running", logger=logger)
     state.update(current_phase="Ship")
     state.save("adw_sdlc_complete_iso")
     logger.info("✅ Updated state: current_phase=Ship")
@@ -670,7 +678,8 @@ def main():
     # ========================================
     # PHASE 9: CLEANUP
     # ========================================
-    # Update state with current phase for real-time WebSocket updates
+    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+    broadcast_phase_update(adw_id, "Cleanup", "running", logger=logger)
     state.update(current_phase="Cleanup")
     state.save("adw_sdlc_complete_iso")
     logger.info("✅ Updated state: current_phase=Cleanup")
@@ -737,7 +746,8 @@ def main():
     # ========================================
     # PHASE 10: VERIFY
     # ========================================
-    # Update state with current phase for real-time WebSocket updates
+    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+    broadcast_phase_update(adw_id, "Verify", "running", logger=logger)
     state.update(current_phase="Verify")
     state.save("adw_sdlc_complete_iso")
     logger.info("✅ Updated state: current_phase=Verify")

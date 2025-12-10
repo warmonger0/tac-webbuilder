@@ -28,8 +28,25 @@ from core.workflow_history import (
     resync_workflow_cost,
 )
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+# Request/Response models for phase updates
+class PhaseUpdateRequest(BaseModel):
+    """Request model for phase update events."""
+    adw_id: str
+    current_phase: str
+    status: str = "running"  # running, completed, failed
+    metadata: dict | None = None  # Optional metadata (cost, errors, etc.)
+
+
+class PhaseUpdateResponse(BaseModel):
+    """Response model for phase update events."""
+    success: bool
+    message: str
+    broadcasted: bool  # Whether WebSocket broadcast succeeded
 
 # Router will be created with dependencies injected from server.py
 router = APIRouter(prefix="", tags=["Workflows"])
@@ -191,6 +208,57 @@ async def _get_workflow_catalog_handler(workflow_service) -> WorkflowCatalogResp
     return catalog
 
 
+async def _update_phase_handler(request: PhaseUpdateRequest, websocket_manager) -> PhaseUpdateResponse:
+    """Handler for event-driven phase update notifications from orchestrator."""
+    logger.info(f"[PHASE_UPDATE] Received phase update: adw_id={request.adw_id}, phase={request.current_phase}, status={request.status}")
+
+    try:
+        # Update state file
+        from adw_modules.state import ADWState
+        from adw_modules.utils import setup_logger
+
+        state_logger = setup_logger(request.adw_id, "phase_update_api")
+        state = ADWState.load(request.adw_id, state_logger)
+
+        if state:
+            state.update(current_phase=request.current_phase, status=request.status)
+            if request.metadata:
+                state.update(**request.metadata)
+            state.save("phase_update_api")
+            logger.info(f"[PHASE_UPDATE] Updated state file for {request.adw_id}")
+        else:
+            logger.warning(f"[PHASE_UPDATE] State file not found for {request.adw_id}, skipping state update")
+
+        # Immediately broadcast via WebSocket
+        broadcasted = False
+        if websocket_manager and websocket_manager.active_connections:
+            try:
+                # Broadcast to ADW monitor listeners
+                from core.adw_monitor import aggregate_adw_monitor_data
+                monitor_data = aggregate_adw_monitor_data()
+
+                await websocket_manager.broadcast({
+                    "type": "adw_monitor_update",
+                    "data": monitor_data,
+                })
+                broadcasted = True
+                logger.info(f"[PHASE_UPDATE] Broadcasted update to {len(websocket_manager.active_connections)} WebSocket clients")
+            except Exception as e:
+                logger.error(f"[PHASE_UPDATE] WebSocket broadcast failed: {e}")
+        else:
+            logger.debug(f"[PHASE_UPDATE] No active WebSocket connections, skipping broadcast")
+
+        return PhaseUpdateResponse(
+            success=True,
+            message=f"Phase update processed for {request.adw_id}",
+            broadcasted=broadcasted
+        )
+
+    except Exception as e:
+        logger.error(f"[PHASE_UPDATE] Error processing phase update: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 async def _get_workflows_batch_handler(workflow_ids: list[str]) -> list[WorkflowHistoryItem]:
     """Handler for batch workflows fetch endpoint."""
     # Validate input
@@ -339,8 +407,27 @@ def _register_workflow_analytics_queries(router_obj, workflow_service):
             return WorkflowCatalogResponse(workflows=[], total=0)
 
 
-def _register_workflow_mutation_routes(router_obj):
+def _register_workflow_mutation_routes(router_obj, websocket_manager=None):
     """Register POST endpoints for workflow mutations."""
+
+    @router_obj.post("/api/v1/adw-phase-update", response_model=PhaseUpdateResponse)
+    async def update_adw_phase(request: PhaseUpdateRequest) -> PhaseUpdateResponse:
+        """
+        Event-driven phase update endpoint for ADW orchestrator.
+
+        This endpoint receives phase transition events from the orchestrator and:
+        1. Updates the state file immediately
+        2. Broadcasts via WebSocket to all connected clients
+        3. Provides instant frontend updates (0ms vs 500ms polling latency)
+        """
+        try:
+            return await _update_phase_handler(request, websocket_manager)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[PHASE_UPDATE] Error processing phase update: {str(e)}")
+            logger.error(f"[PHASE_UPDATE] Full traceback:\n{traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=f"Failed to process phase update: {str(e)}") from e
 
     @router_obj.post("/workflow-history/resync", response_model=ResyncResponse)
     async def resync_workflow_history(
@@ -372,8 +459,8 @@ def _register_workflow_mutation_routes(router_obj):
             raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_history_data_func):
+def init_workflow_routes(workflow_service, get_routes_data_func, get_workflow_history_data_func, websocket_manager=None):
     """Initialize workflow routes with service dependencies."""
     _register_workflow_basic_queries(router, workflow_service, get_routes_data_func, get_workflow_history_data_func)
     _register_workflow_analytics_queries(router, workflow_service)
-    _register_workflow_mutation_routes(router)
+    _register_workflow_mutation_routes(router, websocket_manager)

@@ -24,6 +24,78 @@ from adw_modules.state import ADWState
 from adw_modules.utils import parse_json
 
 
+def broadcast_phase_update(
+    adw_id: str,
+    current_phase: str,
+    status: str = "running",
+    metadata: Optional[Dict[str, Any]] = None,
+    logger: Optional[logging.Logger] = None
+) -> bool:
+    """
+    Broadcast phase update to backend API for immediate WebSocket notification.
+
+    This function makes an event-driven HTTP POST to the backend API, which:
+    1. Updates the state file
+    2. Immediately broadcasts via WebSocket to all connected clients
+    3. Provides instant frontend updates (0ms vs 500ms polling latency)
+
+    Args:
+        adw_id: ADW workflow identifier
+        current_phase: Phase name (Plan, Build, Test, etc.)
+        status: Phase status (running, completed, failed)
+        metadata: Optional metadata (cost, errors, etc.)
+        logger: Optional logger for debugging
+
+    Returns:
+        bool: True if broadcast succeeded, False otherwise
+
+    Example:
+        broadcast_phase_update("abc123", "Build", "running", logger=logger)
+    """
+    # Get backend port from environment
+    backend_port = os.environ.get("BACKEND_PORT", "8002")
+    url = f"http://localhost:{backend_port}/api/v1/adw-phase-update"
+
+    payload = {
+        "adw_id": adw_id,
+        "current_phase": current_phase,
+        "status": status,
+    }
+
+    if metadata:
+        payload["metadata"] = metadata
+
+    try:
+        # Make HTTP POST request with short timeout
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=2) as response:
+            if response.status == 200:
+                if logger:
+                    logger.debug(f"[BROADCAST] Phase update sent: {adw_id} → {current_phase} ({status})")
+                return True
+            else:
+                if logger:
+                    logger.warning(f"[BROADCAST] Unexpected status {response.status} from backend")
+                return False
+
+    except urllib.error.URLError as e:
+        # Backend not running or connection refused - this is acceptable
+        if logger:
+            logger.debug(f"[BROADCAST] Backend not available (this is OK): {e.reason}")
+        return False
+    except Exception as e:
+        # Log but don't fail - phase updates are best-effort
+        if logger:
+            logger.debug(f"[BROADCAST] Failed to broadcast phase update: {e}")
+        return False
+
+
 def extract_files_from_plan(plan_file: str, logger: Optional[logging.Logger] = None) -> List[str]:
     """Extract list of files to modify from a plan file.
 

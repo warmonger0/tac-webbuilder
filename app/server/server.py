@@ -293,7 +293,7 @@ def get_api_version():
 # All routes are versioned under /api/v1
 data_routes.router and app.include_router(data_routes.router, prefix="/api/v1")
 
-workflow_routes.init_workflow_routes(workflow_service, get_routes_data, get_workflow_history_data)
+workflow_routes.init_workflow_routes(workflow_service, get_routes_data, get_workflow_history_data, manager)
 app.include_router(workflow_routes.router, prefix="/api/v1")
 
 system_routes.init_system_routes(health_service, service_controller, app_start_time)
