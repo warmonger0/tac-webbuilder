@@ -153,8 +153,7 @@ def format_success_comment(branch_name: str) -> str:
 - Code is now in production
 
 **Issue Status:** Automatically closing as resolved.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)"""
+"""
 
 
 def post_success_summary(

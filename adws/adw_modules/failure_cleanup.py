@@ -164,8 +164,6 @@ This PR is being automatically closed because the workflow failed during the **{
 
 **Prevention:**
 Pre-flight checks have been enhanced to catch these issues earlier. If this was due to inherited errors from main, ensure main is clean before launching workflows.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 """
 
         result = subprocess.run(
@@ -222,6 +220,4 @@ def format_failure_summary(
 
 **To Retry:**
 Fix the errors above and launch a new workflow. Pre-flight checks will help catch issues early.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 """
