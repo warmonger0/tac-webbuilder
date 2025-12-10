@@ -266,6 +266,14 @@
 ### .claude/commands/classify_adw.md
 - Conditions: Adding or removing adws/adw_*.py workflow files
 
+### .claude/commands/updatedocs.md
+- Conditions:
+  - Completed work in current session that should be documented
+  - Created new features that need to be captured in project docs
+  - Changed panel status or added API endpoints
+  - Finished session and want to update `/prime` command
+  - Need to update quick start guides or reference documentation
+
 ---
 
 ## Loading Strategy Tips
