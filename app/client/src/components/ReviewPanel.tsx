@@ -75,6 +75,7 @@ export function ReviewPanel() {
     mutationFn: ({ patternId, request }: { patternId: string; request: CommentRequest }) =>
       patternReviewClient.addComment(patternId, request),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patterns'] });
       setShowCommentForm(false);
       setComment('');
       setMutationError(null);

@@ -17,6 +17,8 @@ export function SimilarWorkflowsComparison({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const abortController = new AbortController();
+
     const fetchSimilarWorkflows = async () => {
       try {
         setLoading(true);
@@ -24,7 +26,7 @@ export function SimilarWorkflowsComparison({
 
         // OPTIMIZED: Single batch request for all workflows (current + similar)
         const allIds = [currentWorkflowId, ...similarWorkflowIds];
-        const allWorkflows = await fetchWorkflowsBatch(allIds);
+        const allWorkflows = await fetchWorkflowsBatch(allIds, abortController.signal);
 
         // Separate current workflow from similar workflows
         const current = allWorkflows.find(w => w.adw_id === currentWorkflowId);
@@ -33,6 +35,10 @@ export function SimilarWorkflowsComparison({
         setCurrentWorkflow(current || null);
         setSimilarWorkflows(similar);
       } catch (err) {
+        // Ignore abort errors (component unmounted or deps changed)
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
         setError(err instanceof Error ? err.message : 'Failed to fetch workflows');
       } finally {
         setLoading(false);
@@ -40,6 +46,11 @@ export function SimilarWorkflowsComparison({
     };
 
     fetchSimilarWorkflows();
+
+    // Cleanup: cancel in-flight request if component unmounts or deps change
+    return () => {
+      abortController.abort();
+    };
   }, [currentWorkflowId, similarWorkflowIds]);
 
   if (loading) {
