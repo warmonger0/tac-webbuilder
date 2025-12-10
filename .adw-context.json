@@ -1,9 +1,182 @@
 {
-  "adw_id": "de7c977b",
-  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/de7c977b",
-  "created_at": "2025-11-28T11:39:58.987301",
+  "adw_id": "2ec83707",
+  "worktree_path": "/Users/Warmonger0/tac/tac-webbuilder/trees/2ec83707",
+  "created_at": "2025-12-10T00:31:40.351417",
+  "branch_name": "chore-issue-163-adw-2ec83707-verify-migration-010-postgresql",
   "changed_files": [
-    ".adw-context.json",
     ".mcp.json"
-  ]
+  ],
+  "commits": [
+    {
+      "sha": "761b8ac",
+      "message": "sdlc_planner: chore: update issue number: 161"
+    }
+  ],
+  "plan_file": "specs/issue-163-adw-2ec83707-sdlc_planner-issue-number-161-workflow-adw-sdlc-complete-iso-na.md",
+  "issue": {
+    "number": 163,
+    "title": "Issue Number: 161\n\n  Workflow: adw_sdlc_complete_iso\n\n  Natural Language Input (optional, already in",
+    "body": "## Description\nIssue Number: 161\n\n  Workflow: adw_sdlc_complete_iso\n\n  Natural Language Input (optional, already in issue):\n  Verify Migration 010 (Pattern Predictions) Applied to PostgreSQL\n\n## Classification\nExplicit workflow: `adw_sdlc_complete_iso` (user specified)\n\n## Workflow\nadw_sdlc_complete_iso with base model",
+    "state": "OPEN",
+    "author": {
+      "id": "MDQ6VXNlcjExNTk1NTE3",
+      "login": "warmonger0",
+      "name": "",
+      "is_bot": false
+    },
+    "assignees": [],
+    "labels": [
+      {
+        "id": "LA_kwDOQT8ln88AAAACQH6zig",
+        "name": "feature",
+        "color": "0e8a16",
+        "description": ""
+      },
+      {
+        "id": "LA_kwDOQT8ln88AAAACQH6zoQ",
+        "name": "explicit-workflow",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "milestone": null,
+    "comments": [
+      {
+        "id": "IC_kwDOQT8ln87YuAHy",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] \ud83e\udd16 ADW Webhook: Detected `adw_sdlc_complete_iso` workflow request\n\nStarting workflow with ID: `2ec83707`\nWorkflow: `adw_sdlc_complete_iso` \ud83c\udfd7\ufe0f\nModel Set: `base` \u2699\ufe0f\nReason: New issue with adw_sdlc_complete_iso workflow\n\nLogs will be available at: `agents/2ec83707/adw_sdlc_complete_iso/`",
+        "createdAt": "2025-12-10T08:29:06Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87YuAJB",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] 2ec83707_ops: \ud83c\udfaf **Starting Complete SDLC Workflow**\n\nThis workflow will execute ALL 10 phases:\n1. \u270d\ufe0f Plan the implementation\n2. \ud83d\udcca Validate baseline (detect inherited errors)\n3. \ud83d\udd28 Build the solution\n4. \ud83e\uddf9 Lint the code\n5. \ud83e\uddea Test the code\n6. \ud83d\udc40 Review the implementation\n7. \ud83d\udcda Generate documentation\n8. \ud83d\udea2 Ship to production\n9. \ud83d\uddc2\ufe0f Cleanup and organize\n10. \ud83d\udd0d Verify deployment (post-ship verification) \u2728\n\n**Configuration:**\n- External tools: \u2705 Enabled\n- Optimized planner: \u274c Disabled\n- Skip E2E: \u274c No\n- Auto-resolution: \u2705 Enabled",
+        "createdAt": "2025-12-10T08:29:07Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87YuALL",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] 2ec83707_ops: \u2705 Starting isolated planning phase",
+        "createdAt": "2025-12-10T08:29:10Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87YuAMK",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] 2ec83707_ops: \ud83d\udd0d Using state\n```json\n{\n  \"adw_id\": \"2ec83707\",\n  \"issue_number\": \"163\",\n  \"branch_name\": null,\n  \"plan_file\": null,\n  \"issue_class\": null,\n  \"worktree_path\": null,\n  \"backend_port\": 9107,\n  \"frontend_port\": 9207,\n  \"model_set\": \"base\",\n  \"all_adws\": [\n    \"adw_plan_iso\"\n  ],\n  \"estimated_cost_total\": null,\n  \"estimated_cost_breakdown\": null,\n  \"status\": \"running\",\n  \"workflow_template\": \"adw_sdlc_complete_iso\",\n  \"model_used\": \"sonnet\",\n  \"start_time\": \"2025-12-10T00:29:05.625118\",\n  \"nl_input\": \"##+Description\\nIssue+Number:+161\\n\\n++Workflow:+adw_sdlc_complete_iso\\n\\n++Natural+Language+Input+(optional,+already+in+issue):\\n++Verify+Migration+010+(Pattern+Predictions)+Applied+to+PostgreSQL\\n\\n##+Classification\\nExplicit+workflow:+`adw_sdlc_complete_iso`+(user+specified)\\n\\n##+Workflow\\nadw_sdlc_complete_iso+with+base+model\",\n  \"github_url\": \"https://github.com/warmonger0/tac-webbuilder/issues/163\"\n}\n```",
+        "createdAt": "2025-12-10T08:29:11Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87YuAT4",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] 2ec83707_ops: \u2705 Issue classified as: /chore",
+        "createdAt": "2025-12-10T08:29:19Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87YuAfJ",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] 2ec83707_ops: \u2705 Working in isolated worktree: /Users/Warmonger0/tac/tac-webbuilder/trees/2ec83707\n\ud83d\udd0c Ports - Backend: 9107, Frontend: 9207",
+        "createdAt": "2025-12-10T08:29:32Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87YuAgW",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] 2ec83707_sdlc_planner: \u2705 Building implementation plan in isolated environment",
+        "createdAt": "2025-12-10T08:29:33Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87YuCR_",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] 2ec83707_sdlc_planner: \u2705 Implementation plan created",
+        "createdAt": "2025-12-10T08:31:34Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87YuCS3",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] 2ec83707_ops: \u2705 Plan file validated in worktree: specs/issue-163-adw-2ec83707-sdlc_planner-issue-number-161-workflow-adw-sdlc-complete-iso-na.md",
+        "createdAt": "2025-12-10T08:31:35Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87YuCUE",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] 2ec83707_ops: \u2705 Integration checklist generated: 6 required items, 11 total items",
+        "createdAt": "2025-12-10T08:31:36Z",
+        "updatedAt": null
+      },
+      {
+        "id": "IC_kwDOQT8ln87YuCVW",
+        "author": {
+          "id": null,
+          "login": "warmonger0",
+          "name": null,
+          "is_bot": false
+        },
+        "body": "[ADW-AGENTS] 2ec83707_sdlc_planner: \u2705 Plan committed",
+        "createdAt": "2025-12-10T08:31:37Z",
+        "updatedAt": null
+      }
+    ],
+    "createdAt": "2025-12-10T08:29:00Z",
+    "updatedAt": "2025-12-10T08:31:37Z",
+    "closedAt": null,
+    "url": "https://github.com/warmonger0/tac-webbuilder/issues/163"
+  }
 }
