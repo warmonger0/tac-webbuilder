@@ -460,13 +460,11 @@ def _update_phase_status(
 
 def _find_next_phase(phase_queue_service, request: WorkflowCompleteRequest):
     """Find the next phase to execute."""
-    # Get all phases for this parent issue
-    phases = phase_queue_service.get_queue_by_parent(request.parent_issue)
-    next_phase = None
-    for phase in phases:
-        if phase.depends_on_phase == request.phase_number:
-            next_phase = phase
-            break
+    # Find next phase directly (optimized - no N+1 query)
+    next_phase = phase_queue_service.repository.find_by_depends_on_phase(
+        request.parent_issue,
+        request.phase_number
+    )
 
     # If no next phase in current parent, check hopper
     if not next_phase:
@@ -487,14 +485,17 @@ def _find_next_phase(phase_queue_service, request: WorkflowCompleteRequest):
         else:
             logger.info("[WEBHOOK] Hopper empty - no more Phase 1s to start")
 
-    return next_phase, phases
+    return next_phase
 
 
-def _create_phase_issue(github_poster, next_phase, phases) -> int:
+def _create_phase_issue(github_poster, next_phase, phase_queue_service) -> int:
     """Create GitHub issue for a phase."""
     logger.info(f"[WEBHOOK] Creating GitHub issue for phase {next_phase.phase_number}")
 
     phase_data = next_phase.phase_data
+
+    # Fetch all phases only when needed (for total_phases count)
+    phases = phase_queue_service.get_queue_by_parent(next_phase.parent_issue)
     total_phases = max(p.phase_number for p in phases)
 
     phase_title = f"Phase {next_phase.phase_number}: {phase_data.get('title', 'Untitled Phase')}"
@@ -650,7 +651,7 @@ def init_webhook_routes(phase_queue_service, github_poster):
                 return response
 
             # Find next phase
-            next_phase, phases = _find_next_phase(phase_queue_service, request)
+            next_phase = _find_next_phase(phase_queue_service, request)
 
             if not next_phase:
                 response.message += ". No more phases in queue"
@@ -663,7 +664,7 @@ def init_webhook_routes(phase_queue_service, github_poster):
 
             # Create GitHub issue if needed
             if not next_phase.issue_number:
-                issue_number = _create_phase_issue(github_poster, next_phase, phases)
+                issue_number = _create_phase_issue(github_poster, next_phase, phase_queue_service)
                 phase_queue_service.update_issue_number(next_phase.queue_id, issue_number)
                 next_phase.issue_number = issue_number
                 response.next_issue_created = issue_number

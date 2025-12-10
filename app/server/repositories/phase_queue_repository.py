@@ -137,6 +137,40 @@ class PhaseQueueRepository:
             logger.error(f"[ERROR] Failed to find phases by parent: {str(e)}")
             raise
 
+    def find_by_depends_on_phase(self, parent_issue: int, depends_on_phase: int) -> PhaseQueueItem | None:
+        """
+        Find a phase that depends on a specific phase number.
+
+        This is optimized for finding the next phase in a workflow sequence
+        instead of fetching all phases and looping (N+1 pattern).
+
+        Args:
+            parent_issue: Parent GitHub issue number
+            depends_on_phase: Phase number that the target phase depends on
+
+        Returns:
+            PhaseQueueItem if found, None otherwise
+        """
+        try:
+            with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    SELECT * FROM phase_queue
+                    WHERE parent_issue = {ph} AND depends_on_phase = {ph}
+                    LIMIT 1
+                    """,
+                    (parent_issue, depends_on_phase)
+                )
+                row = cursor.fetchone()
+
+            return PhaseQueueItem.from_db_row(row) if row else None
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to find phase by depends_on_phase: {str(e)}")
+            raise
+
     def find_ready_phases(self) -> list[PhaseQueueItem]:
         """
         Find all phases that are ready for execution.
