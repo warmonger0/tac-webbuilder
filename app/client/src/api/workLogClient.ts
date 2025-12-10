@@ -79,9 +79,13 @@ export async function createWorkLog(entry: WorkLogEntryCreate): Promise<WorkLogE
  * Delete a work log entry
  */
 export async function deleteWorkLog(entryId: number): Promise<void> {
-  await fetch(`${API_BASE}/work-log/${entryId}`, {
+  const response = await fetch(`${API_BASE}/work-log/${entryId}`, {
     method: 'DELETE',
   });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete work log: ${response.statusText}`);
+  }
 }
 
 // ============================================================================
