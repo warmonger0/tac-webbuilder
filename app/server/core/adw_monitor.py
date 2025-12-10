@@ -144,10 +144,16 @@ def is_process_running(adw_id: str) -> bool:
         )
 
         # Look for the adw_id in process list
-        # Common patterns: python aider.py, uv run, etc.
+        # Common patterns: adw_sdlc_complete_iso.py, adw_plan_iso.py, adw_build_iso.py, etc.
+        # Also check for legacy "aider" pattern for backward compatibility
         for line in result.stdout.splitlines():
-            if adw_id in line and "aider" in line.lower():
-                return True
+            if adw_id in line:
+                # Check for ADW workflow scripts (isolated workflows)
+                if any(pattern in line.lower() for pattern in ["adw_", "uv run"]):
+                    return True
+                # Check for legacy aider pattern
+                if "aider" in line.lower():
+                    return True
 
         return False
 
