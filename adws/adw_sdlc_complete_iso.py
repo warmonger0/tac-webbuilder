@@ -135,6 +135,11 @@ def main():
     # ========================================
     # PHASE 1: PLAN
     # ========================================
+    # Update state with current phase for real-time WebSocket updates
+    state.update(current_phase="Plan")
+    state.save("adw_sdlc_complete_iso")
+    logger.info("✅ Updated state: current_phase=Plan")
+
     plan_script = "adw_plan_iso_optimized.py" if use_optimized_plan else "adw_plan_iso.py"
     plan_cmd = [
         "uv",
@@ -144,7 +149,7 @@ def main():
         adw_id,
     ]
     print(f"\n{'='*60}")
-    print(f"PHASE 1/9: PLAN ({plan_script})")
+    print(f"PHASE 1/10: PLAN ({plan_script})")
     print(f"{'='*60}")
     print(f"Running: {' '.join(plan_cmd)}")
     logger.info(f"Starting PHASE 1: PLAN with command: {' '.join(plan_cmd)}")
@@ -200,6 +205,11 @@ def main():
     # ========================================
     # PHASE 2: VALIDATE (NEW)
     # ========================================
+    # Update state with current phase for real-time WebSocket updates
+    state.update(current_phase="Validate")
+    state.save("adw_sdlc_complete_iso")
+    logger.info("✅ Updated state: current_phase=Validate")
+
     validate_cmd = [
         "uv",
         "run",
@@ -208,7 +218,7 @@ def main():
         adw_id,
     ]
     print(f"\n{'='*60}")
-    print(f"PHASE 2/9: VALIDATE (Baseline Error Detection)")
+    print(f"PHASE 2/10: VALIDATE (Baseline Error Detection)")
     print(f"{'='*60}")
     print(f"Running: {' '.join(validate_cmd)}")
     logger.info(f"Starting PHASE 2: VALIDATE with command: {' '.join(validate_cmd)}")
@@ -228,6 +238,11 @@ def main():
     # ========================================
     # PHASE 3: BUILD (formerly PHASE 2)
     # ========================================
+    # Update state with current phase for real-time WebSocket updates
+    state.update(current_phase="Build")
+    state.save("adw_sdlc_complete_iso")
+    logger.info("✅ Updated state: current_phase=Build")
+
     build_cmd = [
         "uv",
         "run",
@@ -239,7 +254,7 @@ def main():
         build_cmd.append("--no-external")
 
     print(f"\n{'='*60}")
-    print(f"PHASE 3/9: BUILD")
+    print(f"PHASE 3/10: BUILD")
     print(f"{'='*60}")
     print(f"Running: {' '.join(build_cmd)}")
     logger.info(f"Starting PHASE 3: BUILD with command: {' '.join(build_cmd)}")
@@ -279,8 +294,13 @@ def main():
         sys.exit(1)
 
     # ========================================
-    # PHASE 3: LINT ✨ NEW
+    # PHASE 4: LINT
     # ========================================
+    # Update state with current phase for real-time WebSocket updates
+    state.update(current_phase="Lint")
+    state.save("adw_sdlc_complete_iso")
+    logger.info("✅ Updated state: current_phase=Lint")
+
     lint_cmd = [
         "uv",
         "run",
@@ -292,7 +312,7 @@ def main():
         lint_cmd.append("--no-external")
 
     print(f"\n{'='*60}")
-    print(f"PHASE 4/9: LINT")
+    print(f"PHASE 4/10: LINT")
     print(f"{'='*60}")
     print(f"Running: {' '.join(lint_cmd)}")
     logger.info(f"Starting PHASE 4: LINT with command: {' '.join(lint_cmd)}")
@@ -332,8 +352,13 @@ def main():
         sys.exit(1)
 
     # ========================================
-    # PHASE 4: TEST
+    # PHASE 5: TEST
     # ========================================
+    # Update state with current phase for real-time WebSocket updates
+    state.update(current_phase="Test")
+    state.save("adw_sdlc_complete_iso")
+    logger.info("✅ Updated state: current_phase=Test")
+
     test_cmd = [
         "uv",
         "run",
@@ -346,7 +371,7 @@ def main():
         test_cmd.append("--no-external")
 
     print(f"\n{'='*60}")
-    print(f"PHASE 5/9: TEST")
+    print(f"PHASE 5/10: TEST")
     print(f"{'='*60}")
     print(f"Running: {' '.join(test_cmd)}")
     logger.info(f"Starting PHASE 5: TEST with command: {' '.join(test_cmd)}")
@@ -386,8 +411,13 @@ def main():
         sys.exit(1)
 
     # ========================================
-    # PHASE 5: REVIEW
+    # PHASE 6: REVIEW
     # ========================================
+    # Update state with current phase for real-time WebSocket updates
+    state.update(current_phase="Review")
+    state.save("adw_sdlc_complete_iso")
+    logger.info("✅ Updated state: current_phase=Review")
+
     review_cmd = [
         "uv",
         "run",
@@ -399,7 +429,7 @@ def main():
         review_cmd.append("--skip-resolution")
 
     print(f"\n{'='*60}")
-    print(f"PHASE 6/9: REVIEW")
+    print(f"PHASE 6/10: REVIEW")
     print(f"{'='*60}")
     print(f"Running: {' '.join(review_cmd)}")
     logger.info(f"Starting PHASE 6: REVIEW with command: {' '.join(review_cmd)}")
@@ -439,8 +469,13 @@ def main():
         sys.exit(1)
 
     # ========================================
-    # PHASE 6: DOCUMENT
+    # PHASE 7: DOCUMENT
     # ========================================
+    # Update state with current phase for real-time WebSocket updates
+    state.update(current_phase="Document")
+    state.save("adw_sdlc_complete_iso")
+    logger.info("✅ Updated state: current_phase=Document")
+
     document_cmd = [
         "uv",
         "run",
@@ -449,7 +484,7 @@ def main():
         adw_id,
     ]
     print(f"\n{'='*60}")
-    print(f"PHASE 7/9: DOCUMENT")
+    print(f"PHASE 7/10: DOCUMENT")
     print(f"{'='*60}")
     print(f"Running: {' '.join(document_cmd)}")
     logger.info(f"Starting PHASE 7: DOCUMENT with command: {' '.join(document_cmd)}")
@@ -473,8 +508,13 @@ def main():
             pass
 
     # ========================================
-    # PHASE 7: SHIP ✨ NEW
+    # PHASE 8: SHIP
     # ========================================
+    # Update state with current phase for real-time WebSocket updates
+    state.update(current_phase="Ship")
+    state.save("adw_sdlc_complete_iso")
+    logger.info("✅ Updated state: current_phase=Ship")
+
     ship_cmd = [
         "uv",
         "run",
@@ -483,7 +523,7 @@ def main():
         adw_id,
     ]
     print(f"\n{'='*60}")
-    print(f"PHASE 8/9: SHIP")
+    print(f"PHASE 8/10: SHIP")
     print(f"{'='*60}")
     print(f"Running: {' '.join(ship_cmd)}")
     logger.info(f"Starting PHASE 8: SHIP with command: {' '.join(ship_cmd)}")
@@ -525,6 +565,11 @@ def main():
     # ========================================
     # PHASE 9: CLEANUP
     # ========================================
+    # Update state with current phase for real-time WebSocket updates
+    state.update(current_phase="Cleanup")
+    state.save("adw_sdlc_complete_iso")
+    logger.info("✅ Updated state: current_phase=Cleanup")
+
     print(f"\n{'='*60}")
     print(f"PHASE 9/10: CLEANUP")
     print(f"{'='*60}")
@@ -585,8 +630,13 @@ def main():
         print("WARNING: Cleanup failed but SDLC is still considered successful")
 
     # ========================================
-    # PHASE 10: VERIFY ✨ NEW
+    # PHASE 10: VERIFY
     # ========================================
+    # Update state with current phase for real-time WebSocket updates
+    state.update(current_phase="Verify")
+    state.save("adw_sdlc_complete_iso")
+    logger.info("✅ Updated state: current_phase=Verify")
+
     verify_cmd = [
         "uv",
         "run",

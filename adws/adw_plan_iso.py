@@ -289,7 +289,8 @@ def main():
     worktree_plan_path = os.path.join(worktree_path, expected_plan_file)
 
     if os.path.exists(worktree_plan_path):
-        plan_file_path = expected_plan_file
+        # Save ABSOLUTE path to state so downstream phases can find it
+        plan_file_path = worktree_plan_path
         logger.info(f"✅ Plan file created at expected path: {plan_file_path}")
     else:
         # Check if file was mistakenly created in parent repo
@@ -302,7 +303,8 @@ def main():
             os.makedirs(os.path.dirname(worktree_plan_path), exist_ok=True)
             # Move file to worktree
             shutil.move(parent_plan_path, worktree_plan_path)
-            plan_file_path = expected_plan_file
+            # Save ABSOLUTE path to state so downstream phases can find it
+            plan_file_path = worktree_plan_path
             make_issue_comment(
                 issue_number,
                 format_issue_message(adw_id, "ops", f"⚠️ Plan file was in parent repo, moved to worktree: {plan_file_path}"),
