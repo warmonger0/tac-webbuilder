@@ -66,6 +66,22 @@ from adw_modules.integration_checklist import (
 )
 
 
+def safe_comment(issue_number: str, message: str, logger: logging.Logger, critical: bool = False) -> None:
+    """Safely post GitHub comment with error handling.
+
+    Args:
+        issue_number: GitHub issue number
+        message: Comment message to post
+        logger: Logger instance
+        critical: If True, raise exceptions; if False, log warning and continue
+    """
+    try:
+        make_issue_comment(issue_number, message)
+    except Exception as e:
+        logger.warning(f"Failed to post GitHub comment: {e}")
+        if critical:
+            raise
+
 
 
 def main():
@@ -134,13 +150,14 @@ def main():
     issue: GitHubIssue = fetch_issue(issue_number, repo_path)
 
     logger.debug(f"Fetched issue: {issue.model_dump_json(indent=2, by_alias=True)}")
-    make_issue_comment(
-        issue_number, format_issue_message(adw_id, "ops", "✅ Starting isolated planning phase")
+    safe_comment(
+        issue_number, format_issue_message(adw_id, "ops", "✅ Starting isolated planning phase"), logger
     )
 
-    make_issue_comment(
+    safe_comment(
         issue_number,
         f"{adw_id}_ops: 🔍 Using state\n```json\n{json.dumps(state.data, indent=2)}\n```",
+        logger
     )
 
     # Classify the issue
@@ -157,9 +174,10 @@ def main():
     state.update(issue_class=issue_command)
     state.save("adw_plan_iso")
     logger.info(f"Issue classified as: {issue_command}")
-    make_issue_comment(
+    safe_comment(
         issue_number,
         format_issue_message(adw_id, "ops", f"✅ Issue classified as: {issue_command}"),
+        logger
     )
 
     # Generate branch name
@@ -211,10 +229,12 @@ def main():
 
         logger.info("✅ Worktree environment setup complete (deterministic Python)")
 
-    make_issue_comment(
+    # Post worktree info comment (non-critical)
+    safe_comment(
         issue_number,
         format_issue_message(adw_id, "ops", f"✅ Working in isolated worktree: {worktree_path}\n"
                            f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}"),
+        logger
     )
 
     # PRE-COMPUTE the plan file path deterministically
@@ -235,9 +255,10 @@ def main():
 
     # Build the implementation plan (now executing in worktree)
     logger.info("Building implementation plan in worktree")
-    make_issue_comment(
+    safe_comment(
         issue_number,
         format_issue_message(adw_id, AGENT_PLANNER, "✅ Building implementation plan in isolated environment"),
+        logger
     )
 
     # Pass the pre-computed plan file path to the agent
@@ -258,9 +279,10 @@ def main():
         sys.exit(1)
 
     logger.debug(f"Plan response: {plan_response.output}")
-    make_issue_comment(
+    safe_comment(
         issue_number,
         format_issue_message(adw_id, AGENT_PLANNER, "✅ Implementation plan created"),
+        logger
     )
 
     # Verify the deterministic plan file was created at the expected path
@@ -311,9 +333,10 @@ def main():
     state.update(plan_file=plan_file_path)
     state.save("adw_plan_iso")
     logger.info(f"Plan file validated: {plan_file_path}")
-    make_issue_comment(
+    safe_comment(
         issue_number,
         format_issue_message(adw_id, "ops", f"✅ Plan file validated in worktree: {plan_file_path}"),
+        logger
     )
 
     # Generate integration checklist
@@ -341,13 +364,14 @@ def main():
         f"{len(required_items)} required items, "
         f"{len(integration_checklist.get_all_items())} total items"
     )
-    make_issue_comment(
+    safe_comment(
         issue_number,
         format_issue_message(
             adw_id, "ops",
             f"✅ Integration checklist generated: {len(required_items)} required items, "
             f"{len(integration_checklist.get_all_items())} total items"
         ),
+        logger
     )
 
     # Create commit message
@@ -380,8 +404,8 @@ def main():
         sys.exit(1)
 
     logger.info(f"Committed plan: {commit_msg}")
-    make_issue_comment(
-        issue_number, format_issue_message(adw_id, AGENT_PLANNER, "✅ Plan committed")
+    safe_comment(
+        issue_number, format_issue_message(adw_id, AGENT_PLANNER, "✅ Plan committed"), logger
     )
 
     # Finalize git operations (push and PR)
