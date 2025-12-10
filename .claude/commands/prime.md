@@ -11,7 +11,8 @@
 
 ## Quick Architecture
 - **Worktree isolation:** Up to 15 concurrent ADWs in `trees/{adw_id}/`
-- **Port allocation:** Backend 9100-9114, Frontend 9200-9214
+- **Port allocation:** Backend 9100-9114, Frontend 9200-9214 (calculated from adw_id)
+- **Main ports:** Backend 8002, Frontend 5173 (from .ports.env)
 - **10-phase SDLC:** Plan → Validate → Build → Lint → Test → Review → Document → Ship → Cleanup → Verify
 - **Cost optimization:** 60-80% savings via external test tools
 - **Database:** PostgreSQL only (production-grade, required for observability)
@@ -86,10 +87,10 @@
 ./scripts/start_full.sh                # Backend + frontend
 
 # Backend
-cd app/server && uv run python server.py   # Port 8002
+cd app/server && uv run python server.py   # Port from .ports.env (BACKEND_PORT=8002)
 
 # Frontend
-cd app/client && bun run dev           # Port 5173
+cd app/client && bun run dev           # Port from .ports.env (FRONTEND_PORT=5173)
 
 # ADW
 cd adws/ && uv run adw_sdlc_complete_iso.py 123  # Full SDLC
@@ -109,7 +110,7 @@ cd app/client && bun test              # 149 tests
 ```bash
 # Multi-layer health check system
 ./scripts/health_check.sh              # Terminal: 7 sections including observability
-curl localhost:8002/api/v1/preflight-checks  # API: 9 checks before ADW launch
+curl localhost:8002/api/v1/preflight-checks  # API: 9 checks (port from .ports.env)
 # Panel 1 UI: Automatic display of all preflight checks
 
 # 3 New Observability Checks:
