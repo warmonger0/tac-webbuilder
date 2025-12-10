@@ -158,6 +158,8 @@ background_task_manager = BackgroundTaskManager(
     workflow_watch_interval=10.0,
     routes_watch_interval=10.0,
     history_watch_interval=10.0,
+    adw_monitor_watch_interval=0.5,  # 500ms for near-instant workflow updates in Panel 1
+    queue_watch_interval=2.0,  # Keep queue at 2s (less critical)
 )
 # Set app reference for routes introspection (done after app is created above)
 background_task_manager.set_app(app)
