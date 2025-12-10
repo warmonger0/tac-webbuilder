@@ -150,8 +150,22 @@ def main():
     logger.info(f"Starting PHASE 1: PLAN with command: {' '.join(plan_cmd)}")
 
     try:
-        plan = subprocess.run(plan_cmd, capture_output=False, text=True)
+        # Plan phase can take 5-15 minutes for complex issues - use generous timeout
+        # No timeout = wait indefinitely (let subprocess control its own timeout)
+        plan = subprocess.run(plan_cmd, capture_output=False, text=True, timeout=None)
         logger.info(f"Plan phase completed with exit code: {plan.returncode}")
+    except subprocess.TimeoutExpired as e:
+        logger.error(f"Plan phase timed out after {e.timeout} seconds", exc_info=True)
+        print(f"❌ Plan phase timed out")
+        cleanup_failed_workflow(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            branch_name=None,
+            phase_name="Plan",
+            error_details=f"Plan phase timed out after {e.timeout} seconds",
+            logger=logger
+        )
+        sys.exit(1)
     except Exception as e:
         logger.error(f"Plan phase crashed with exception: {e}", exc_info=True)
         print(f"❌ Plan phase crashed: {e}")
