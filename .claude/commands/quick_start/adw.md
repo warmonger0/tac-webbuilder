@@ -157,6 +157,51 @@ NEW: Plan → Validate → Build → Lint → Test → Review → Doc → Ship �
 
 **Best Practices**: See `docs/ADW_WORKFLOW_BEST_PRACTICES.md` for complete guide
 
+## Loop Prevention (Session 19 - Issue #168)
+
+**Problem Solved**: Test resolver agents claimed "✅ Resolved" but tests continued failing → infinite loops
+
+**Solution**: Dual-layer protection in test phase
+
+### Layer 1: Verification-Based Loop Control
+**Location**: `adws/adw_test_iso.py` lines 806-909 (unit tests), 1097-1200 (E2E tests)
+
+After each resolution attempt:
+1. Track failures BEFORE resolution: `previous_failed_count`
+2. Agent attempts fix: `resolve_failed_tests(...)`
+3. Re-run tests to verify: `verify_response = run_tests(...)`
+4. Compare results: `verify_failed >= previous_failed_count`
+5. Exit if no progress: `break` (prevents false success loops)
+6. Continue if progress made: failures decreased
+
+### Layer 2: Pattern-Based Circuit Breaker
+**Location**: `adws/adw_sdlc_complete_iso.py` lines 53-149
+
+Before starting workflow:
+- Checks last 15 comments on GitHub issue
+- Counts repetitions per agent (e.g., test_resolver)
+- Exits if same agent posts 8+ times in window
+- Exits if ADW posts 20+ times in window
+
+### Configuration
+```python
+# adws/adw_test_iso.py
+MAX_TEST_RETRY_ATTEMPTS = 3        # Unit test resolution attempts
+MAX_E2E_TEST_RETRY_ATTEMPTS = 3    # E2E test resolution attempts
+MAX_RECENT_COMMENTS_TO_CHECK = 15  # Comment window for pattern detection
+MAX_SAME_AGENT_REPEATS = 8         # Agent repetition threshold
+```
+
+### Exit Conditions
+Workflow exits when:
+- ✅ All tests pass (success)
+- ⚠️ No progress detected (same failure count after resolution)
+- ⚠️ Max attempts reached (3 retries)
+- ⚠️ Circuit breaker triggered (8+ agent repetitions)
+- ❌ High-level error (test execution failure)
+
+**Result**: Prevents infinite loops like Issue #168 (62 comments) - now exits after 2-3 iterations
+
 ## When to Load Full Docs
 - **Complete ADW guide:** `adws/README.md` (3,900 tokens)
 - **All workflows:** `.claude/commands/references/adw_workflows.md` (1,500 tokens)

@@ -15,6 +15,7 @@
 - **Main ports:** Backend 8002, Frontend 5173 (from .ports.env)
 - **10-phase SDLC:** Plan → Validate → Build → Lint → Test → Review → Document → Ship → Cleanup → Verify
 - **Cost optimization:** 60-80% savings via external test tools
+- **Loop prevention:** Verification-based loop control + pattern-based circuit breaker (Issue #168)
 - **Database:** PostgreSQL only (production-grade, required for observability)
 - **Security:** Multi-layer SQL injection prevention
 - **Claude Code timeout:** 20-minute timeout for planning tasks (prevents premature termination)
@@ -72,6 +73,16 @@
 - 🟢 SystemStatusPanel - Polling OK (status rarely changes)
 
 **Performance:** <2s latency (vs 3-10s polling), reduced network traffic, broadcast only on state change
+
+### ADW Loop Prevention (Session 19 - Issue #168)
+**Dual-layer protection against infinite retry loops**
+**Problem:** Test resolver agents claimed "✅ Resolved" but tests still failed → infinite loop (62 comments)
+**Solution:**
+- **Layer 1:** Verification-based loop control - Re-runs tests after each resolution to verify actual progress
+- **Layer 2:** Pattern-based circuit breaker - Detects same agent posting 8+ times in 15 comments
+- **Files:** `adws/adw_test_iso.py` (lines 806-909, 1097-1200), `adws/adw_sdlc_complete_iso.py` (lines 53-149)
+- **Retry limits:** Max 3 attempts (test and E2E)
+- **Exit conditions:** No progress detected OR max attempts OR circuit breaker triggered
 
 ### Documentation
 **Adding or updating docs**
