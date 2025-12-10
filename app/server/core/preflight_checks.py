@@ -489,49 +489,70 @@ def check_worktree_availability() -> dict[str, Any]:
             "passed": bool,
             "error": str,
             "fix": str,
-            "summary": str
+            "summary": str,
+            "active_count": int,
+            "max_worktrees": int,
+            "available": int
         }
     """
     try:
         project_root = Path(__file__).parent.parent.parent
 
-        # Check worktree directory
-        worktree_dir = project_root / "trees"
-        if not worktree_dir.exists():
-            # No worktrees yet - all slots available
+        # Use git worktree list for accurate counting (more reliable than directory inspection)
+        result = subprocess.run(
+            ["git", "worktree", "list"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode != 0:
             return {
-                "passed": True,
-                "summary": "0/15 worktrees active"
+                "passed": False,
+                "error": "Failed to list git worktrees",
+                "fix": "Check git repository health",
+                "summary": "git error",
+                "active_count": 0,
+                "max_worktrees": 15,
+                "available": 15
             }
 
-        # Count active worktrees (directories starting with 'adw-' or being git worktrees)
-        active_worktrees = []
-        for item in worktree_dir.iterdir():
-            if item.is_dir() and (item.name.startswith('adw-') or (item / '.git').exists()):
-                active_worktrees.append(item.name)
-
-        active_count = len(active_worktrees)
+        # Count worktrees (exclude main worktree)
+        worktree_lines = result.stdout.strip().split('\n')
+        # First line is always the main worktree, rest are ADW worktrees
+        active_count = len(worktree_lines) - 1 if len(worktree_lines) > 0 else 0
         max_worktrees = 15
+        available = max_worktrees - active_count
 
         if active_count >= max_worktrees:
             return {
                 "passed": False,
                 "error": f"All worktree slots occupied ({active_count}/{max_worktrees})",
-                "fix": "Wait for running workflows to complete or manually clean up old worktrees in trees/ directory",
-                "summary": f"{active_count}/{max_worktrees} active"
+                "fix": "Wait for running workflows to complete or manually clean up old worktrees: git worktree remove trees/<worktree-name>",
+                "summary": f"{active_count}/{max_worktrees} active, 0 available",
+                "active_count": active_count,
+                "max_worktrees": max_worktrees,
+                "available": 0
             }
 
         return {
             "passed": True,
-            "summary": f"{active_count}/{max_worktrees} active"
+            "summary": f"{active_count}/{max_worktrees} active, {available} available",
+            "active_count": active_count,
+            "max_worktrees": max_worktrees,
+            "available": available
         }
 
     except Exception as e:
         return {
             "passed": False,
             "error": f"Failed to check worktree availability: {str(e)}",
-            "fix": "Check trees/ directory permissions",
-            "summary": f"error: {str(e)}"
+            "fix": "Check git repository health and permissions",
+            "summary": f"error: {str(e)}",
+            "active_count": 0,
+            "max_worktrees": 15,
+            "available": 15
         }
 
 
