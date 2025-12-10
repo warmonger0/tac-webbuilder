@@ -25,16 +25,21 @@ Run comprehensive preflight checks for ADW workflow launch readiness.
 
 Call the preflight checks API endpoint and display results:
 
+**IMPORTANT:** The backend port is configured in `.ports.env` (default: BACKEND_PORT=8002)
+
 ```bash
-curl -s http://localhost:8000/api/v1/preflight-checks
+# Read backend port from .ports.env
+BACKEND_PORT=$(grep BACKEND_PORT .ports.env | cut -d '=' -f2)
+curl -s http://localhost:${BACKEND_PORT}/api/v1/preflight-checks
 ```
 
 ## Instructions
 
-1. First check if backend is running on port 8000
-2. Call the preflight checks endpoint
-3. Parse the JSON response
-4. Display results in a clear, formatted way:
+1. Read BACKEND_PORT from .ports.env file
+2. Check if backend is running on that port
+3. Call the preflight checks endpoint using the configured port
+4. Parse the JSON response
+5. Display results in a clear, formatted way:
    - Overall status (PASSED/FAILED)
    - List all blocking failures with fixes
    - List all warnings with impact
@@ -70,11 +75,15 @@ If backend is not running, inform the user and suggest:
 cd app/server && uv run python server.py
 ```
 
+The backend will use the port specified in `.ports.env` (BACKEND_PORT, default: 8002).
+
 ## Query Parameters
 
 - `skip_tests=true` - Skip test suite check for faster results (useful during development)
 
 Example with skip_tests:
 ```bash
-curl -s "http://localhost:8000/api/v1/preflight-checks?skip_tests=true"
+# Read backend port from .ports.env
+BACKEND_PORT=$(grep BACKEND_PORT .ports.env | cut -d '=' -f2)
+curl -s "http://localhost:${BACKEND_PORT}/api/v1/preflight-checks?skip_tests=true"
 ```
