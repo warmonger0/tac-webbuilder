@@ -405,23 +405,32 @@ def main():
         started_at=start_time,
     )
 
-    # Post final state summary to issue
-    make_issue_comment(
-        issue_number,
-        f"{adw_id}_ops: 📋 Final planning state:\n```json\n{json.dumps(state.data, indent=2)}\n```"
-    )
+    # Post final state summary to issue (non-critical, don't fail if this errors)
+    try:
+        make_issue_comment(
+            issue_number,
+            f"{adw_id}_ops: 📋 Final planning state:\n```json\n{json.dumps(state.data, indent=2)}\n```"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to post final state summary: {e}")
 
-    # Inform user about next steps
-    make_issue_comment(
-        issue_number,
-        f"{adw_id}_ops: ℹ️ **Planning workflow complete**\n\n"
-        "This workflow (`adw_plan_iso`) only creates an implementation plan and PR.\n\n"
-        "**To continue with full implementation:**\n"
-        f"```bash\n"
-        f"uv run adws/adw_sdlc_complete_iso.py {issue_number} {adw_id}\n"
-        f"```\n\n"
-        "This will execute all remaining phases: validate → build → lint → test → review → doc → ship → cleanup"
-    )
+    # Inform user about next steps (non-critical, don't fail if this errors)
+    try:
+        make_issue_comment(
+            issue_number,
+            f"{adw_id}_ops: ℹ️ **Planning workflow complete**\n\n"
+            "This workflow (`adw_plan_iso`) only creates an implementation plan and PR.\n\n"
+            "**To continue with full implementation:**\n"
+            f"```bash\n"
+            f"uv run adws/adw_sdlc_complete_iso.py {issue_number} {adw_id}\n"
+            f"```\n\n"
+            "This will execute all remaining phases: validate → build → lint → test → review → doc → ship → cleanup"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to post next steps comment: {e}")
+
+    # Explicit success exit - plan phase completed successfully
+    sys.exit(0)
 
 
 if __name__ == "__main__":

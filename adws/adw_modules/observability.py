@@ -21,8 +21,10 @@ from adw_modules.structured_logger import get_adw_logger
 
 logger = logging.getLogger(__name__)
 
-# Backend API base URL
-BACKEND_BASE_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
+# Backend API base URL - reads from BACKEND_URL or constructs from WEB_API_PORT/BACKEND_PORT
+# Default port is 8002 per app/server/.env configuration
+_backend_port = os.environ.get("WEB_API_PORT", os.environ.get("BACKEND_PORT", "8002"))
+BACKEND_BASE_URL = os.environ.get("BACKEND_URL", f"http://localhost:{_backend_port}")
 
 # Get structured logger instance
 structured_logger = get_adw_logger()
