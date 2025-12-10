@@ -1,6 +1,7 @@
 """
 Queue management endpoints for multi-phase workflow tracking.
 """
+import hashlib
 import logging
 import os
 import subprocess
@@ -8,6 +9,7 @@ import subprocess
 from core.nl_processor import suggest_adw_workflow
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
+from repositories.webhook_event_repository import WebhookEventRepository
 from utils.webhook_security import validate_webhook_request
 
 logger = logging.getLogger(__name__)
@@ -627,6 +629,34 @@ def init_webhook_routes(phase_queue_service, github_poster):
         except HTTPException:
             logger.warning("[WEBHOOK] Internal webhook signature validation failed")
             # For internal webhooks, log and continue (or enforce with: raise)
+
+        # CHECK FOR DUPLICATE (idempotency)
+        webhook_repo = WebhookEventRepository()
+
+        # Generate unique webhook ID from request data
+        webhook_id = hashlib.sha256(
+            f"{request.adw_id}:{request.status}:{request.queue_id}".encode()
+        ).hexdigest()[:16]
+
+        if webhook_repo.is_duplicate(webhook_id, window_seconds=30):
+            logger.warning(
+                f"[WEBHOOK] Duplicate webhook detected for adw_id={request.adw_id}, "
+                f"queue_id={request.queue_id}"
+            )
+            return WorkflowCompleteResponse(
+                success=True,
+                message="Duplicate webhook - already processed",
+                phase_updated=False,
+                next_phase_triggered=False
+            )
+
+        # Record webhook event
+        webhook_repo.record_webhook(
+            webhook_id=webhook_id,
+            webhook_type="workflow_complete",
+            adw_id=request.adw_id,
+            issue_number=request.parent_issue
+        )
 
         try:
             logger.info(
