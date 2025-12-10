@@ -35,6 +35,10 @@ Coverage Enforcement:
 Resolution Loop (Issue #74, #168):
 - Infrastructure failures: Retries with fallback to inline mode (max 3 attempts)
 - Test failures: Attempts resolution via inline mode with test fixing (max 3 attempts)
+- **Verification-based loop control**: After each resolution attempt, re-runs tests to verify actual progress
+  - Compares failures before vs after resolution
+  - Exits immediately if no progress detected (prevents false success loops)
+  - Only continues if failures actually decreased
 - Never continues to review phase with failing tests
 - Blocks progression until tests pass or max retries exhausted
 - Circuit breaker: Detects loops by checking for repetitive agent patterns (not total comment count)
@@ -803,6 +807,9 @@ def run_tests_with_resolution(
             ),
         )
 
+        # Track failures before resolution to verify progress
+        previous_failed_count = failed_count
+
         # Get list of failed tests
         failed_tests = [test for test in results if not test.passed]
 
@@ -811,28 +818,98 @@ def run_tests_with_resolution(
             failed_tests, adw_id, issue_number, logger, worktree_path, iteration=attempt
         )
 
-        # Report resolution results
+        # CRITICAL: Verify resolution actually worked by re-running tests
+        # Don't trust agent's "resolved" claim - check actual test results
         if resolved > 0:
+            logger.info(f"Agent claimed to resolve {resolved} tests, verifying...")
             make_issue_comment(
                 issue_number,
                 format_issue_message(
-                    adw_id, "ops", f"✅ Resolved {resolved}/{failed_count} failed tests"
+                    adw_id, "ops", f"🔍 Agent claimed {resolved}/{failed_count} tests resolved, verifying..."
                 ),
             )
 
-            # Continue to next attempt if we resolved something
-            logger.info(f"\n=== Re-running tests after resolving {resolved} tests ===")
+            # Re-run tests to verify fixes actually work
+            verify_response = run_tests(adw_id, logger, worktree_path)
+
+            if not verify_response.success:
+                logger.error("Verification test run failed")
+                break
+
+            # Parse verification results
+            verify_results, verify_passed, verify_failed = parse_test_results(
+                verify_response.output, logger
+            )
+
+            # Check for ACTUAL progress (not just agent claims)
+            if verify_failed >= previous_failed_count:
+                # No progress or regression - agent lied about fixing tests
+                logger.warning(
+                    f"No actual progress: {verify_failed} failures remain "
+                    f"(was {previous_failed_count}). Agent claimed success but tests still fail."
+                )
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id, "ops",
+                        f"⚠️ **No Progress Detected**\n\n"
+                        f"Agent claimed to fix {resolved} tests, but verification shows:\n"
+                        f"- Before: {previous_failed_count} failures\n"
+                        f"- After: {verify_failed} failures\n\n"
+                        f"**No improvement.** Stopping retry loop to prevent infinite attempts."
+                    ),
+                )
+                # Update our state with verified results for final return
+                results = verify_results
+                passed_count = verify_passed
+                failed_count = verify_failed
+                break  # EXIT - no point continuing if no progress
+
+            # Real progress made - update state and continue
+            logger.info(
+                f"✅ Verified progress: {previous_failed_count} → {verify_failed} failures "
+                f"({previous_failed_count - verify_failed} tests actually fixed)"
+            )
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id, "ops",
+                    f"✅ **Progress Verified**\n"
+                    f"- Before: {previous_failed_count} failures\n"
+                    f"- After: {verify_failed} failures\n"
+                    f"- Improvement: {previous_failed_count - verify_failed} tests fixed"
+                ),
+            )
+
+            # Update our state with verified results
+            results = verify_results
+            passed_count = verify_passed
+            failed_count = verify_failed
+
+            # Check if all tests now pass
+            if verify_failed == 0:
+                logger.info("All tests now pass after verification!")
+                break  # EXIT - success!
+
+            # Still have failures but made progress - continue to next iteration
+            logger.info(f"\n=== Re-running resolution for remaining {verify_failed} failures ===")
             make_issue_comment(
                 issue_number,
                 format_issue_message(
                     adw_id,
                     AGENT_TESTER,
-                    f"🔄 Re-running tests (attempt {attempt + 1}/{max_attempts})...",
+                    f"🔄 Continuing resolution for {verify_failed} remaining failures (attempt {attempt + 1}/{max_attempts})...",
                 ),
             )
         else:
-            # No tests were resolved, no point in retrying
-            logger.info("No tests were resolved, stopping retry attempts")
+            # No tests were resolved by agent, no point in retrying
+            logger.info("Agent didn't resolve any tests, stopping retry attempts")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id, "ops", f"⚠️ Agent couldn't resolve any tests. Stopping attempts."
+                ),
+            )
             break
 
     # Log final attempt status
@@ -1021,6 +1098,9 @@ def run_e2e_tests_with_resolution(
             ),
         )
 
+        # Track failures before resolution to verify progress
+        previous_failed_count = failed_count
+
         # Get list of failed tests
         failed_tests = [test for test in results if not test.passed]
 
@@ -1029,32 +1109,98 @@ def run_e2e_tests_with_resolution(
             failed_tests, adw_id, issue_number, logger, worktree_path, iteration=attempt
         )
 
-        # Report resolution results
+        # CRITICAL: Verify resolution actually worked by re-running E2E tests
+        # Don't trust agent's "resolved" claim - check actual test results
         if resolved > 0:
+            logger.info(f"Agent claimed to resolve {resolved} E2E tests, verifying...")
             make_issue_comment(
                 issue_number,
                 format_issue_message(
-                    adw_id,
-                    "ops",
-                    f"✅ Resolved {resolved}/{failed_count} failed E2E tests",
+                    adw_id, "ops", f"🔍 Agent claimed {resolved}/{failed_count} E2E tests resolved, verifying..."
                 ),
             )
 
-            # Continue to next attempt if we resolved something
-            logger.info(
-                f"\n=== Re-running E2E tests after resolving {resolved} tests ==="
+            # Re-run E2E tests to verify fixes actually work
+            verify_response = run_e2e_tests(adw_id, logger, worktree_path)
+
+            if not verify_response.success:
+                logger.error("Verification E2E test run failed")
+                break
+
+            # Parse verification results
+            verify_results, verify_passed, verify_failed = parse_e2e_test_results(
+                verify_response.output, logger
             )
+
+            # Check for ACTUAL progress (not just agent claims)
+            if verify_failed >= previous_failed_count:
+                # No progress or regression - agent lied about fixing tests
+                logger.warning(
+                    f"No actual progress: {verify_failed} E2E failures remain "
+                    f"(was {previous_failed_count}). Agent claimed success but tests still fail."
+                )
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id, "ops",
+                        f"⚠️ **No Progress Detected**\n\n"
+                        f"Agent claimed to fix {resolved} E2E tests, but verification shows:\n"
+                        f"- Before: {previous_failed_count} failures\n"
+                        f"- After: {verify_failed} failures\n\n"
+                        f"**No improvement.** Stopping retry loop to prevent infinite attempts."
+                    ),
+                )
+                # Update our state with verified results for final return
+                results = verify_results
+                passed_count = verify_passed
+                failed_count = verify_failed
+                break  # EXIT - no point continuing if no progress
+
+            # Real progress made - update state and continue
+            logger.info(
+                f"✅ Verified progress: {previous_failed_count} → {verify_failed} E2E failures "
+                f"({previous_failed_count - verify_failed} tests actually fixed)"
+            )
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id, "ops",
+                    f"✅ **Progress Verified**\n"
+                    f"- Before: {previous_failed_count} E2E failures\n"
+                    f"- After: {verify_failed} E2E failures\n"
+                    f"- Improvement: {previous_failed_count - verify_failed} tests fixed"
+                ),
+            )
+
+            # Update our state with verified results
+            results = verify_results
+            passed_count = verify_passed
+            failed_count = verify_failed
+
+            # Check if all E2E tests now pass
+            if verify_failed == 0:
+                logger.info("All E2E tests now pass after verification!")
+                break  # EXIT - success!
+
+            # Still have failures but made progress - continue to next iteration
+            logger.info(f"\n=== Re-running E2E resolution for remaining {verify_failed} failures ===")
             make_issue_comment(
                 issue_number,
                 format_issue_message(
                     adw_id,
                     AGENT_E2E_TESTER,
-                    f"🔄 Re-running E2E tests (attempt {attempt + 1}/{max_attempts})...",
+                    f"🔄 Continuing E2E resolution for {verify_failed} remaining failures (attempt {attempt + 1}/{max_attempts})...",
                 ),
             )
         else:
-            # No tests were resolved, no point in retrying
-            logger.info("No E2E tests were resolved, stopping retry attempts")
+            # No tests were resolved by agent, no point in retrying
+            logger.info("Agent didn't resolve any E2E tests, stopping retry attempts")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id, "ops", f"⚠️ Agent couldn't resolve any E2E tests. Stopping attempts."
+                ),
+            )
             break
 
     # Log final attempt status
