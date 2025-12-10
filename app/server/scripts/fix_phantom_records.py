@@ -17,7 +17,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.workflow_history_utils.database import DB_PATH, init_db
+from core.workflow_history_utils.database import DB_PATH
 from core.workflow_history_utils.database.schema import _get_adapter
 
 logging.basicConfig(

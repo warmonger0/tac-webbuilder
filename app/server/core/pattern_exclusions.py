@@ -8,14 +8,12 @@ This module defines exclusion rules so the pattern detection system only flags
 truly anomalous patterns worth investigating for automation.
 """
 
-from typing import List, Tuple
-
 
 # ============================================================================
 # NORMAL ORCHESTRATION PATTERNS (DO NOT FLAG AS AUTOMATION OPPORTUNITIES)
 # ============================================================================
 
-def is_normal_orchestration_pattern(tool_sequence: List[str]) -> Tuple[bool, str]:
+def is_normal_orchestration_pattern(tool_sequence: list[str]) -> tuple[bool, str]:
     """
     Check if a tool sequence is normal workflow orchestration.
 
@@ -72,7 +70,7 @@ def is_normal_orchestration_pattern(tool_sequence: List[str]) -> Tuple[bool, str
     return False, ""
 
 
-def should_flag_for_automation(tool_sequence: List[str], occurrence_count: int) -> Tuple[bool, str]:
+def should_flag_for_automation(tool_sequence: list[str], occurrence_count: int) -> tuple[bool, str]:
     """
     Determine if a pattern should be flagged as automation opportunity.
 
@@ -168,7 +166,7 @@ def get_exclusion_stats() -> dict:
 # PATTERN CLASSIFICATION
 # ============================================================================
 
-def classify_pattern_type(tool_sequence: List[str]) -> str:
+def classify_pattern_type(tool_sequence: list[str]) -> str:
     """
     Classify a pattern by its likely purpose.
 

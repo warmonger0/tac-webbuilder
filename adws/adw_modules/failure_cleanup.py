@@ -62,9 +62,9 @@ def cleanup_failed_workflow(
     """Clean up resources after workflow failure.
 
     This function:
-    1. Finds and closes associated PR with failure comment
-    2. Posts failure summary to issue
-    3. Marks workflow as failed
+    1. Updates workflow status to "failed"
+    2. Finds and closes associated PR with failure comment
+    3. Posts failure summary to issue
 
     Args:
         adw_id: ADW workflow ID
@@ -75,6 +75,26 @@ def cleanup_failed_workflow(
         logger: Logger instance
     """
     logger.info(f"Starting failure cleanup for {adw_id} (phase: {phase_name})")
+
+    # Step 0: Mark workflow as failed in state
+    try:
+        from .state import ADWState
+        from datetime import datetime
+
+        state = ADWState.load(adw_id, logger)
+        if state:
+            end_time = datetime.now()
+            state.update(
+                status="failed",
+                end_time=end_time.isoformat()
+            )
+            state.save("cleanup_failed_workflow")
+            logger.info("✅ Workflow status updated to 'failed'")
+        else:
+            logger.warning("Could not load state to mark as failed")
+    except Exception as e:
+        logger.warning(f"Failed to update workflow status: {e}")
+        # Don't let state update failure block the rest of cleanup
 
     # Step 1: Close PR if it exists
     if branch_name:

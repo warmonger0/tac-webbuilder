@@ -12,12 +12,9 @@ Responsibilities:
 - Track failure trends over time
 """
 
-import json
 import logging
-import re
-from typing import Dict, List, Optional, Tuple
+from collections import defaultdict
 from datetime import datetime, timedelta
-from collections import defaultdict, Counter
 
 from database import get_database_adapter
 
@@ -96,7 +93,7 @@ class ErrorAnalyticsService:
         """Initialize the error analytics service."""
         self.db = get_database_adapter()
 
-    def get_error_summary(self, days: int = 30) -> Dict:
+    def get_error_summary(self, days: int = 30) -> dict:
         """
         Get summary statistics for workflow errors.
 
@@ -171,7 +168,7 @@ class ErrorAnalyticsService:
             'error_categories': dict(error_categories)
         }
 
-    def analyze_by_phase(self, days: int = 30) -> Dict:
+    def analyze_by_phase(self, days: int = 30) -> dict:
         """
         Analyze error rates by workflow phase.
 
@@ -226,7 +223,7 @@ class ErrorAnalyticsService:
             'most_error_prone_phase': most_error_prone
         }
 
-    def find_error_patterns(self, days: int = 30) -> List[Dict]:
+    def find_error_patterns(self, days: int = 30) -> list[dict]:
         """
         Detect recurring error patterns.
 
@@ -290,7 +287,7 @@ class ErrorAnalyticsService:
 
         return patterns
 
-    def get_failure_trends(self, days: int = 30) -> Dict:
+    def get_failure_trends(self, days: int = 30) -> dict:
         """
         Analyze error trends over time.
 
@@ -370,7 +367,7 @@ class ErrorAnalyticsService:
             'average_daily_failures': round(avg_daily, 2)
         }
 
-    def get_debugging_recommendations(self, days: int = 30) -> List[Dict]:
+    def get_debugging_recommendations(self, days: int = 30) -> list[dict]:
         """
         Generate debugging recommendations based on error analysis.
 

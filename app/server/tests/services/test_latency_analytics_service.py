@@ -10,7 +10,6 @@ Run with:
 """
 
 import json
-from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest

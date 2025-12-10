@@ -14,8 +14,6 @@ Responsibilities:
 import json
 import logging
 from dataclasses import asdict, dataclass
-from datetime import datetime
-from typing import Dict, List, Optional
 
 from database import get_database_adapter
 
@@ -32,14 +30,14 @@ class PatternReviewItem:
     confidence_score: float
     occurrence_count: int
     estimated_savings_usd: float
-    pattern_context: Optional[str] = None
-    example_sessions: Optional[List[str]] = None  # Parsed from JSON
-    reviewed_by: Optional[str] = None
-    reviewed_at: Optional[str] = None
-    approval_notes: Optional[str] = None
-    id: Optional[int] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    pattern_context: str | None = None
+    example_sessions: list[str] | None = None  # Parsed from JSON
+    reviewed_by: str | None = None
+    reviewed_at: str | None = None
+    approval_notes: str | None = None
+    id: int | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
     def to_dict(self):
         """Convert to dictionary."""
@@ -59,7 +57,7 @@ class PatternReviewService:
         self.adapter = get_database_adapter()
         logger.info("[INIT] PatternReviewService initialized")
 
-    def get_pending_patterns(self, limit: int = 20) -> List[PatternReviewItem]:
+    def get_pending_patterns(self, limit: int = 20) -> list[PatternReviewItem]:
         """
         Get patterns pending review, ordered by impact score.
 
@@ -92,7 +90,7 @@ class PatternReviewService:
             )
             return patterns
 
-    def get_pattern_details(self, pattern_id: str) -> Optional[PatternReviewItem]:
+    def get_pattern_details(self, pattern_id: str) -> PatternReviewItem | None:
         """
         Get single pattern by pattern_id.
 
@@ -120,8 +118,8 @@ class PatternReviewService:
             return self._row_to_model(row)
 
     def approve_pattern(
-        self, pattern_id: str, reviewer: str, notes: Optional[str] = None
-    ) -> Optional[PatternReviewItem]:
+        self, pattern_id: str, reviewer: str, notes: str | None = None
+    ) -> PatternReviewItem | None:
         """
         Approve a pattern.
 
@@ -174,7 +172,7 @@ class PatternReviewService:
 
     def reject_pattern(
         self, pattern_id: str, reviewer: str, reason: str
-    ) -> Optional[PatternReviewItem]:
+    ) -> PatternReviewItem | None:
         """
         Reject a pattern.
 
@@ -225,7 +223,7 @@ class PatternReviewService:
             )
             return self.get_pattern_details(pattern_id)
 
-    def get_review_statistics(self) -> Dict[str, int]:
+    def get_review_statistics(self) -> dict[str, int]:
         """
         Get review statistics by status.
 
@@ -251,7 +249,7 @@ class PatternReviewService:
             logger.info(f"[{self.__class__.__name__}] Review statistics: {stats}")
             return stats
 
-    def create_pattern(self, pattern_data: Dict[str, any]) -> str:
+    def create_pattern(self, pattern_data: dict[str, any]) -> str:
         """
         Insert new pattern into pattern_approvals.
 
@@ -343,7 +341,7 @@ class PatternReviewService:
         pattern_id: str,
         new_confidence: float,
         reason: str,
-        roi_data: Optional[Dict] = None
+        roi_data: dict | None = None
     ) -> bool:
         """
         Update pattern confidence score and log to history (Session 13).

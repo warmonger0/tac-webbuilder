@@ -16,7 +16,7 @@ import json
 import logging
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.models import PlannedFeature, PlannedFeatureCreate, PlannedFeatureUpdate
 from database import get_database_adapter
@@ -34,11 +34,11 @@ class PlannedFeaturesService:
 
     def get_all(
         self,
-        status: Optional[str] = None,
-        item_type: Optional[str] = None,
-        priority: Optional[str] = None,
+        status: str | None = None,
+        item_type: str | None = None,
+        priority: str | None = None,
         limit: int = 100,
-    ) -> List[PlannedFeature]:
+    ) -> list[PlannedFeature]:
         """
         Get all planned features with optional filtering.
 
@@ -96,7 +96,7 @@ class PlannedFeaturesService:
             )
             return features
 
-    def get_by_id(self, feature_id: int) -> Optional[PlannedFeature]:
+    def get_by_id(self, feature_id: int) -> PlannedFeature | None:
         """
         Get single planned feature by ID.
 
@@ -125,7 +125,7 @@ class PlannedFeaturesService:
                 )
                 return None
 
-    def get_by_session(self, session_number: int) -> Optional[PlannedFeature]:
+    def get_by_session(self, session_number: int) -> PlannedFeature | None:
         """
         Get planned feature by session number.
 
@@ -318,7 +318,7 @@ class PlannedFeaturesService:
         logger.info(f"[{self.__class__.__name__}] Soft deleted feature {feature_id}")
         return True
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         Get statistics about planned features.
 
@@ -402,7 +402,7 @@ class PlannedFeaturesService:
             )
             return stats
 
-    def get_recent_completions(self, days: int = 30) -> List[PlannedFeature]:
+    def get_recent_completions(self, days: int = 30) -> list[PlannedFeature]:
         """
         Get recently completed features.
 

@@ -14,11 +14,9 @@ Endpoints:
 """
 
 import logging
-from typing import List, Optional
-
-from fastapi import APIRouter, HTTPException, Query
 
 from core.models import PlannedFeature, PlannedFeatureCreate, PlannedFeatureUpdate
+from fastapi import APIRouter, HTTPException, Query
 from services.planned_features_service import PlannedFeaturesService
 
 logger = logging.getLogger(__name__)
@@ -26,15 +24,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/planned-features", tags=["planned-features"])
 
 
-@router.get("/", response_model=List[PlannedFeature])
+@router.get("/", response_model=list[PlannedFeature])
 async def get_planned_features(
-    status: Optional[str] = Query(
+    status: str | None = Query(
         None, description="Filter by status: planned, in_progress, completed, cancelled"
     ),
-    item_type: Optional[str] = Query(
+    item_type: str | None = Query(
         None, description="Filter by type: session, feature, bug, enhancement"
     ),
-    priority: Optional[str] = Query(
+    priority: str | None = Query(
         None, description="Filter by priority: high, medium, low"
     ),
     limit: int = Query(100, description="Maximum number of results", ge=1, le=1000),

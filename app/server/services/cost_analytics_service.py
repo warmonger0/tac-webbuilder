@@ -14,11 +14,9 @@ Responsibilities:
 
 import json
 import logging
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, asdict
-from datetime import datetime, timedelta
 from collections import defaultdict
-import statistics
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
 
 from database import get_database_adapter
 
@@ -28,9 +26,9 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PhaseBreakdown:
     """Cost breakdown by workflow phase."""
-    phase_costs: Dict[str, float]  # {phase: total_cost}
-    phase_percentages: Dict[str, float]  # {phase: percentage}
-    phase_counts: Dict[str, int]  # {phase: occurrence_count}
+    phase_costs: dict[str, float]  # {phase: total_cost}
+    phase_percentages: dict[str, float]  # {phase: percentage}
+    phase_counts: dict[str, int]  # {phase: occurrence_count}
     total: float
     average_per_workflow: float
     workflow_count: int
@@ -42,9 +40,9 @@ class PhaseBreakdown:
 @dataclass
 class WorkflowBreakdown:
     """Cost breakdown by workflow type."""
-    by_type: Dict[str, float]  # {workflow_type: total_cost}
-    count_by_type: Dict[str, int]  # {workflow_type: count}
-    average_by_type: Dict[str, float]  # {workflow_type: avg_cost}
+    by_type: dict[str, float]  # {workflow_type: total_cost}
+    count_by_type: dict[str, int]  # {workflow_type: count}
+    average_by_type: dict[str, float]  # {workflow_type: avg_cost}
 
     def to_dict(self):
         return asdict(self)
@@ -61,8 +59,8 @@ class TimeSeriesDataPoint:
 @dataclass
 class TrendAnalysis:
     """Cost trend analysis over time."""
-    daily_costs: List[TimeSeriesDataPoint]  # [(date, cost, count)]
-    moving_average: List[float]  # 7-day moving average
+    daily_costs: list[TimeSeriesDataPoint]  # [(date, cost, count)]
+    moving_average: list[float]  # 7-day moving average
     trend_direction: str  # 'increasing', 'decreasing', 'stable'
     percentage_change: float  # Overall percentage change
     total_cost: float
@@ -95,8 +93,8 @@ class CostAnalyticsService:
 
     def analyze_by_phase(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         days: int = 30
     ) -> PhaseBreakdown:
         """
@@ -154,7 +152,7 @@ class CostAnalyticsService:
                     try:
                         cost_breakdown = json.loads(cost_breakdown)
                     except json.JSONDecodeError:
-                        logger.warning(f"[CostAnalyticsService] Failed to parse cost_breakdown")
+                        logger.warning("[CostAnalyticsService] Failed to parse cost_breakdown")
                         continue
 
                 # Extract by_phase costs
@@ -194,8 +192,8 @@ class CostAnalyticsService:
 
     def analyze_by_workflow_type(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         days: int = 30
     ) -> WorkflowBreakdown:
         """
@@ -324,7 +322,7 @@ class CostAnalyticsService:
     def get_optimization_opportunities(
         self,
         days: int = 30
-    ) -> List[OptimizationOpportunity]:
+    ) -> list[OptimizationOpportunity]:
         """
         Identify cost optimization opportunities.
 
@@ -359,7 +357,7 @@ class CostAnalyticsService:
 
         return opportunities
 
-    def _detect_phase_anomalies(self, phase_breakdown: PhaseBreakdown) -> List[OptimizationOpportunity]:
+    def _detect_phase_anomalies(self, phase_breakdown: PhaseBreakdown) -> list[OptimizationOpportunity]:
         """Detect phases with abnormally high costs."""
         opportunities = []
 
@@ -404,7 +402,7 @@ class CostAnalyticsService:
     def _detect_workflow_inefficiencies(
         self,
         workflow_breakdown: WorkflowBreakdown
-    ) -> List[OptimizationOpportunity]:
+    ) -> list[OptimizationOpportunity]:
         """Detect workflow types with high average costs."""
         opportunities = []
 
@@ -434,7 +432,7 @@ class CostAnalyticsService:
 
         return opportunities
 
-    def _detect_outliers(self, days: int = 30) -> List[OptimizationOpportunity]:
+    def _detect_outliers(self, days: int = 30) -> list[OptimizationOpportunity]:
         """Detect individual workflows with abnormally high costs."""
         opportunities = []
 
@@ -510,7 +508,7 @@ class CostAnalyticsService:
         }
         return recommendations.get(phase, "Review phase configuration for optimization opportunities")
 
-    def _calculate_moving_average(self, values: List[float], window: int = 7) -> List[float]:
+    def _calculate_moving_average(self, values: list[float], window: int = 7) -> list[float]:
         """Calculate moving average for a list of values."""
         if len(values) < window:
             return values.copy()
@@ -529,8 +527,8 @@ class CostAnalyticsService:
 
     def _calculate_trend(
         self,
-        daily_costs: List[TimeSeriesDataPoint]
-    ) -> Tuple[str, float]:
+        daily_costs: list[TimeSeriesDataPoint]
+    ) -> tuple[str, float]:
         """Calculate overall trend direction and percentage change."""
         if len(daily_costs) < 2:
             return 'stable', 0.0
@@ -559,10 +557,10 @@ class CostAnalyticsService:
 
     def _resolve_date_range(
         self,
-        start_date: Optional[str],
-        end_date: Optional[str],
+        start_date: str | None,
+        end_date: str | None,
         days: int
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Resolve start and end dates from inputs."""
         if end_date is None:
             end_date = datetime.now().isoformat()

@@ -650,7 +650,7 @@ def check_observability_database() -> dict[str, Any]:
             "passed": False,
             "error": f"Database connection failed: {str(e)}",
             "fix": "Check PostgreSQL is running and credentials in .env are correct",
-            "summary": f"Connection error"
+            "summary": "Connection error"
         }
 
 
@@ -667,8 +667,9 @@ def check_hook_events_recording() -> dict[str, Any]:
         }
     """
     try:
-        from database import get_database_adapter
         from datetime import datetime, timedelta
+
+        from database import get_database_adapter
 
         adapter = get_database_adapter()
 
@@ -769,7 +770,7 @@ def check_pattern_analysis_system() -> dict[str, Any]:
 
             return {
                 "passed": True,
-                "summary": f"Pattern system OK"
+                "summary": "Pattern system OK"
             }
 
         except Exception as e:

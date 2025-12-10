@@ -12,17 +12,15 @@ Endpoints:
 """
 
 import logging
-from typing import Optional, List
-
-from fastapi import APIRouter, Query, HTTPException
 
 from core.models.workflow import (
-    LatencySummaryResponse,
-    PhaseLatencyBreakdownResponse,
     BottleneckResponse,
-    TrendDataResponse,
+    LatencySummaryResponse,
     OptimizationRecommendationResponse,
+    PhaseLatencyBreakdownResponse,
+    TrendDataResponse,
 )
+from fastapi import APIRouter, HTTPException, Query
 from services.latency_analytics_service import LatencyAnalyticsService
 
 logger = logging.getLogger(__name__)
@@ -35,8 +33,8 @@ latency_analytics_service = LatencyAnalyticsService()
 
 @router.get("/api/latency-analytics/summary", response_model=LatencySummaryResponse)
 async def get_latency_summary(
-    start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    start_date: str | None = Query(None, description="Start date (ISO format)"),
+    end_date: str | None = Query(None, description="End date (ISO format)"),
     days: int = Query(30, description="Number of days to analyze (default: 30)")
 ):
     """
@@ -74,8 +72,8 @@ async def get_latency_summary(
 
 @router.get("/api/latency-analytics/by-phase", response_model=PhaseLatencyBreakdownResponse)
 async def get_phase_latencies(
-    start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    start_date: str | None = Query(None, description="Start date (ISO format)"),
+    end_date: str | None = Query(None, description="End date (ISO format)"),
     days: int = Query(30, description="Number of days to analyze (default: 30)")
 ):
     """
@@ -111,7 +109,7 @@ async def get_phase_latencies(
         raise HTTPException(status_code=500, detail=f"Failed to analyze phase latencies: {str(e)}")
 
 
-@router.get("/api/latency-analytics/bottlenecks", response_model=List[BottleneckResponse])
+@router.get("/api/latency-analytics/bottlenecks", response_model=list[BottleneckResponse])
 async def get_bottlenecks(
     threshold: int = Query(300, description="Bottleneck threshold in seconds (default: 300)"),
     days: int = Query(30, description="Number of days to analyze (default: 30)")
@@ -183,7 +181,7 @@ async def get_latency_trends(
         raise HTTPException(status_code=500, detail=f"Failed to analyze latency trends: {str(e)}")
 
 
-@router.get("/api/latency-analytics/recommendations", response_model=List[OptimizationRecommendationResponse])
+@router.get("/api/latency-analytics/recommendations", response_model=list[OptimizationRecommendationResponse])
 async def get_optimization_recommendations(
     days: int = Query(30, description="Number of days to analyze (default: 30)")
 ):

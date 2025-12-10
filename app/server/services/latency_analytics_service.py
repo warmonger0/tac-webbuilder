@@ -14,11 +14,10 @@ Responsibilities:
 
 import json
 import logging
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, asdict
-from datetime import datetime, timedelta
-from collections import defaultdict
 import statistics
+from collections import defaultdict
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
 
 from database import get_database_adapter
 
@@ -44,7 +43,7 @@ class PhaseStats:
 @dataclass
 class PhaseLatencyBreakdown:
     """Latency breakdown by workflow phase."""
-    phase_latencies: Dict[str, PhaseStats]  # {phase: stats}
+    phase_latencies: dict[str, PhaseStats]  # {phase: stats}
     total_duration_avg: float
 
     def to_dict(self):
@@ -99,8 +98,8 @@ class TimeSeriesDataPoint:
 @dataclass
 class TrendData:
     """Latency trend analysis over time."""
-    daily_latencies: List[TimeSeriesDataPoint]
-    moving_average: List[float]  # 7-day moving average
+    daily_latencies: list[TimeSeriesDataPoint]
+    moving_average: list[float]  # 7-day moving average
     trend_direction: str  # 'increasing', 'decreasing', 'stable'
     percentage_change: float  # Overall percentage change
     average_daily_duration: float
@@ -119,7 +118,7 @@ class OptimizationRecommendation:
     current_latency: float
     target_latency: float
     improvement_percentage: float
-    actions: List[str]
+    actions: list[str]
 
     def to_dict(self):
         return asdict(self)
@@ -130,8 +129,8 @@ class LatencyAnalyticsService:
 
     def get_latency_summary(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         days: int = 30
     ) -> LatencySummary:
         """
@@ -229,8 +228,8 @@ class LatencyAnalyticsService:
 
     def analyze_by_phase(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         days: int = 30
     ) -> PhaseLatencyBreakdown:
         """
@@ -326,7 +325,7 @@ class LatencyAnalyticsService:
         self,
         threshold_seconds: int = 300,
         days: int = 30
-    ) -> List[Bottleneck]:
+    ) -> list[Bottleneck]:
         """
         Identify performance bottlenecks (phases consistently exceeding threshold).
 
@@ -465,7 +464,7 @@ class LatencyAnalyticsService:
     def get_optimization_recommendations(
         self,
         days: int = 30
-    ) -> List[OptimizationRecommendation]:
+    ) -> list[OptimizationRecommendation]:
         """
         Generate optimization recommendations based on latency analysis.
 
@@ -521,7 +520,7 @@ class LatencyAnalyticsService:
 
         return recommendations
 
-    def calculate_percentiles(self, durations: List[float]) -> Dict[str, float]:
+    def calculate_percentiles(self, durations: list[float]) -> dict[str, float]:
         """
         Calculate latency percentiles.
 
@@ -567,9 +566,9 @@ class LatencyAnalyticsService:
 
     def detect_outliers(
         self,
-        durations: List[float],
+        durations: list[float],
         threshold_std: float = 2.0
-    ) -> List[int]:
+    ) -> list[int]:
         """
         Detect outlier workflows (>N standard deviations from mean).
 
@@ -614,7 +613,7 @@ class LatencyAnalyticsService:
             f"Review {phase} phase for parallelization opportunities and caching"
         )
 
-    def _get_optimization_actions(self, phase: str, latency: float) -> List[str]:
+    def _get_optimization_actions(self, phase: str, latency: float) -> list[str]:
         """Get specific optimization actions for a phase."""
         phase_lower = phase.lower()
 
@@ -655,7 +654,7 @@ class LatencyAnalyticsService:
 
         return actions_map.get(phase_lower, default_actions)
 
-    def _calculate_moving_average(self, values: List[float], window: int = 7) -> List[float]:
+    def _calculate_moving_average(self, values: list[float], window: int = 7) -> list[float]:
         """Calculate moving average for a list of values."""
         if len(values) < window:
             return values.copy()
@@ -674,8 +673,8 @@ class LatencyAnalyticsService:
 
     def _calculate_trend(
         self,
-        daily_latencies: List[TimeSeriesDataPoint]
-    ) -> Tuple[str, float]:
+        daily_latencies: list[TimeSeriesDataPoint]
+    ) -> tuple[str, float]:
         """Calculate overall trend direction and percentage change."""
         if len(daily_latencies) < 2:
             return 'stable', 0.0
@@ -704,10 +703,10 @@ class LatencyAnalyticsService:
 
     def _resolve_date_range(
         self,
-        start_date: Optional[str],
-        end_date: Optional[str],
+        start_date: str | None,
+        end_date: str | None,
         days: int
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Resolve start and end dates from inputs."""
         if end_date is None:
             end_date = datetime.now().isoformat()

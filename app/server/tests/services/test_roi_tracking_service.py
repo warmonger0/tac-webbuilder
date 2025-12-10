@@ -10,11 +10,11 @@ Run with:
 """
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
+from core.models.workflow import PatternExecution
 from services.roi_tracking_service import ROITrackingService
-from core.models.workflow import PatternExecution, PatternROISummary, ROIReport
 
 
 @pytest.fixture

@@ -11,16 +11,14 @@ Endpoints:
 """
 
 import logging
-from typing import Optional
-
-from fastapi import APIRouter, Query, HTTPException
 
 from core.models.workflow import (
-    PhaseBreakdownResponse,
-    WorkflowBreakdownResponse,
-    TrendAnalysisResponse,
     OptimizationOpportunityResponse,
+    PhaseBreakdownResponse,
+    TrendAnalysisResponse,
+    WorkflowBreakdownResponse,
 )
+from fastapi import APIRouter, HTTPException, Query
 from services.cost_analytics_service import CostAnalyticsService
 
 logger = logging.getLogger(__name__)
@@ -33,8 +31,8 @@ cost_analytics_service = CostAnalyticsService()
 
 @router.get("/api/cost-analytics/by-phase", response_model=PhaseBreakdownResponse)
 async def get_phase_breakdown(
-    start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    start_date: str | None = Query(None, description="Start date (ISO format)"),
+    end_date: str | None = Query(None, description="End date (ISO format)"),
     days: int = Query(30, description="Number of days to analyze (default: 30)")
 ):
     """
@@ -72,8 +70,8 @@ async def get_phase_breakdown(
 
 @router.get("/api/cost-analytics/by-workflow-type", response_model=WorkflowBreakdownResponse)
 async def get_workflow_breakdown(
-    start_date: Optional[str] = Query(None, description="Start date (ISO format)"),
-    end_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    start_date: str | None = Query(None, description="Start date (ISO format)"),
+    end_date: str | None = Query(None, description="End date (ISO format)"),
     days: int = Query(30, description="Number of days to analyze (default: 30)")
 ):
     """

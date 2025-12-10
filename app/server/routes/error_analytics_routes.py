@@ -12,17 +12,15 @@ Endpoints:
 """
 
 import logging
-from typing import List
-
-from fastapi import APIRouter, Query, HTTPException
 
 from core.models.workflow import (
-    ErrorSummary,
-    PhaseErrorBreakdown,
-    ErrorPattern,
-    ErrorTrends,
     DebugRecommendation,
+    ErrorPattern,
+    ErrorSummary,
+    ErrorTrends,
+    PhaseErrorBreakdown,
 )
+from fastapi import APIRouter, HTTPException, Query
 from services.error_analytics_service import ErrorAnalyticsService
 
 logger = logging.getLogger(__name__)
@@ -89,7 +87,7 @@ async def get_phase_errors(
         raise HTTPException(status_code=500, detail=f"Failed to analyze phase errors: {str(e)}")
 
 
-@router.get("/api/error-analytics/patterns", response_model=List[ErrorPattern])
+@router.get("/api/error-analytics/patterns", response_model=list[ErrorPattern])
 async def get_error_patterns(
     days: int = Query(30, description="Number of days to analyze (default: 30)")
 ):
@@ -145,7 +143,7 @@ async def get_failure_trends(
         raise HTTPException(status_code=500, detail=f"Failed to analyze error trends: {str(e)}")
 
 
-@router.get("/api/error-analytics/recommendations", response_model=List[DebugRecommendation])
+@router.get("/api/error-analytics/recommendations", response_model=list[DebugRecommendation])
 async def get_debugging_recommendations(
     days: int = Query(30, description="Number of days to analyze (default: 30)")
 ):

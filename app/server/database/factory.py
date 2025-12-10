@@ -4,7 +4,6 @@ Database Adapter Factory
 Provides PostgreSQL database adapter (SQLite support has been removed).
 """
 
-import os
 from typing import TYPE_CHECKING, Union
 
 from .connection import DatabaseAdapter

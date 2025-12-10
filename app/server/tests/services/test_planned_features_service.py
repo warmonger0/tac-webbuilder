@@ -4,7 +4,6 @@ Unit tests for PlannedFeaturesService.
 Tests CRUD operations, filtering, statistics, and timestamp management for planned features.
 """
 
-import json
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 

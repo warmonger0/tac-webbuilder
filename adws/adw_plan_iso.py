@@ -393,16 +393,6 @@ def main():
         issue_number, format_issue_message(adw_id, "ops", "✅ Isolated planning phase completed")
     )
 
-    # Mark workflow as completed with end time
-    from datetime import datetime
-    end_time = datetime.now()
-    state.update(
-        status="completed",
-        end_time=end_time.isoformat()
-    )
-    state.save("adw_plan_iso")
-    logger.info("✅ Planning workflow marked as completed in state")
-
     # OBSERVABILITY: Log phase completion
     start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
     log_phase_completion(

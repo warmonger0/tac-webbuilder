@@ -12,14 +12,8 @@ Endpoints:
 """
 
 import logging
-from typing import List
 
 from fastapi import APIRouter, HTTPException, Query
-
-from core.models.workflow import (
-    ConfidenceUpdate,
-    StatusChangeRecommendation,
-)
 from services.confidence_update_service import ConfidenceUpdateService
 
 logger = logging.getLogger(__name__)
@@ -131,7 +125,7 @@ async def update_all_patterns(
 async def get_confidence_history(
     pattern_id: str,
     limit: int = Query(50, ge=1, le=500, description="Maximum number of records to return")
-) -> List[dict]:
+) -> list[dict]:
     """
     Get confidence change history for a pattern.
 

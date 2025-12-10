@@ -2,7 +2,6 @@
 Pattern Review API endpoints for reviewing and approving automation patterns.
 """
 import logging
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -26,17 +25,17 @@ class PatternReviewResponse(BaseModel):
     occurrence_count: int
     estimated_savings_usd: float
     impact_score: float
-    pattern_context: Optional[str] = None
-    example_sessions: Optional[List[str]] = None
-    reviewed_by: Optional[str] = None
-    reviewed_at: Optional[str] = None
-    approval_notes: Optional[str] = None
-    created_at: Optional[str] = None
+    pattern_context: str | None = None
+    example_sessions: list[str] | None = None
+    reviewed_by: str | None = None
+    reviewed_at: str | None = None
+    approval_notes: str | None = None
+    created_at: str | None = None
 
 
 class ApproveRequest(BaseModel):
     """Request to approve a pattern."""
-    notes: Optional[str] = Field(None, description="Optional approval notes")
+    notes: str | None = Field(None, description="Optional approval notes")
 
 
 class RejectRequest(BaseModel):
@@ -85,7 +84,7 @@ async def get_review_statistics():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/pending", response_model=List[PatternReviewResponse])
+@router.get("/pending", response_model=list[PatternReviewResponse])
 async def get_pending_patterns(limit: int = 20):
     """
     Get pending patterns for review, ordered by impact score.

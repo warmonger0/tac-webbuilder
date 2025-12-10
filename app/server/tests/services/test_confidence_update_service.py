@@ -9,13 +9,13 @@ Run with:
     pytest tests/services/test_confidence_update_service.py -v -k "test_calculate_confidence"
 """
 
-from datetime import datetime
-from unittest.mock import MagicMock, patch, call
 import json
+from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
+from core.models.workflow import ConfidenceUpdate, PatternROISummary
 from services.confidence_update_service import ConfidenceUpdateService
-from core.models.workflow import PatternROISummary, ConfidenceUpdate, StatusChangeRecommendation
 
 
 @pytest.fixture

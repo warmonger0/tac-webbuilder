@@ -262,8 +262,8 @@ def get_webhook_status_data() -> dict:
     Returns:
         dict: Webhook service status from external webhook service
     """
-    import urllib.request
     import json
+    import urllib.request
     webhook_port = os.environ.get("WEBHOOK_PORT", "8001")
 
     try:

@@ -14,15 +14,13 @@ Endpoints:
 """
 
 import logging
-from typing import List, Optional
-
-from fastapi import APIRouter, HTTPException, Query
 
 from core.models.workflow import (
     PatternExecution,
     PatternROISummary,
     ROIReport,
 )
+from fastapi import APIRouter, HTTPException, Query
 from services.roi_tracking_service import ROITrackingService
 
 logger = logging.getLogger(__name__)
@@ -91,7 +89,7 @@ async def get_pattern_roi(pattern_id: str) -> PatternROISummary:
 
 
 @router.get("/api/roi-tracking/summary")
-async def get_all_roi_summaries() -> List[PatternROISummary]:
+async def get_all_roi_summaries() -> list[PatternROISummary]:
     """
     Get ROI summaries for all patterns.
 
@@ -145,7 +143,7 @@ async def get_roi_report(pattern_id: str) -> ROIReport:
 
 
 @router.get("/api/roi-tracking/top-performers")
-async def get_top_performers(limit: int = Query(10, ge=1, le=50)) -> List[PatternROISummary]:
+async def get_top_performers(limit: int = Query(10, ge=1, le=50)) -> list[PatternROISummary]:
     """
     Get top performing patterns by ROI.
 
@@ -168,7 +166,7 @@ async def get_top_performers(limit: int = Query(10, ge=1, le=50)) -> List[Patter
 
 
 @router.get("/api/roi-tracking/underperformers")
-async def get_underperformers(limit: int = Query(10, ge=1, le=50)) -> List[PatternROISummary]:
+async def get_underperformers(limit: int = Query(10, ge=1, le=50)) -> list[PatternROISummary]:
     """
     Get underperforming patterns by success rate and ROI.
 

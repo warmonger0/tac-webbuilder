@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { plannedFeaturesClient, PlannedFeature } from '../api/plannedFeaturesClient';
+import { PlannedFeature, plannedFeaturesClient } from '../api/plannedFeaturesClient';
 import { apiConfig } from '../config/api';
 
 export function PlansPanel() {

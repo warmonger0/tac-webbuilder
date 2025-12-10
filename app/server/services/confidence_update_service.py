@@ -14,15 +14,14 @@ Responsibilities:
 
 import json
 import logging
-from typing import Dict, List, Optional
 from datetime import datetime
 
-from database import get_database_adapter
 from core.models.workflow import (
-    PatternROISummary,
     ConfidenceUpdate,
+    PatternROISummary,
     StatusChangeRecommendation,
 )
+from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +84,7 @@ class ConfidenceUpdateService:
         self,
         pattern_id: str,
         dry_run: bool = False
-    ) -> Optional[ConfidenceUpdate]:
+    ) -> ConfidenceUpdate | None:
         """
         Update confidence score for a single pattern based on ROI data.
 
@@ -218,7 +217,7 @@ class ConfidenceUpdateService:
                 updated_at=datetime.utcnow().isoformat() if not dry_run else None
             )
 
-    def update_all_patterns(self, dry_run: bool = False) -> Dict[str, float]:
+    def update_all_patterns(self, dry_run: bool = False) -> dict[str, float]:
         """
         Update confidence scores for all patterns with ROI data.
 
@@ -265,7 +264,7 @@ class ConfidenceUpdateService:
         self,
         pattern_id: str,
         limit: int = 50
-    ) -> List[ConfidenceUpdate]:
+    ) -> list[ConfidenceUpdate]:
         """
         Get confidence change history for a pattern.
 
@@ -314,7 +313,7 @@ class ConfidenceUpdateService:
 
             return history
 
-    def recommend_status_changes(self) -> List[StatusChangeRecommendation]:
+    def recommend_status_changes(self) -> list[StatusChangeRecommendation]:
         """
         Recommend status changes based on performance data.
 

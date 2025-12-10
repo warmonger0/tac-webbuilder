@@ -105,7 +105,7 @@ class WorkflowService:
             # Database connection errors are expected in Uvicorn reloader process
             error_msg = str(e)
             if "connection" in error_msg.lower() or "password" in error_msg.lower():
-                logger.debug(f"[WORKFLOW_SERVICE] Initial sync skipped (connection unavailable)")
+                logger.debug("[WORKFLOW_SERVICE] Initial sync skipped (connection unavailable)")
             else:
                 logger.error(f"[WORKFLOW_SERVICE] Initial sync failed: {e}")
 

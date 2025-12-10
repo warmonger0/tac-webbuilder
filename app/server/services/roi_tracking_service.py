@@ -12,17 +12,15 @@ Responsibilities:
 - Generate ROI reports for confidence updates
 """
 
-import json
 import logging
-from typing import List, Optional
 from datetime import datetime
 
-from database import get_database_adapter
 from core.models.workflow import (
     PatternExecution,
     PatternROISummary,
     ROIReport,
 )
+from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +169,7 @@ class ROITrackingService:
                 f"${total_cost_saved:.2f} saved, {roi_percentage:.1f}% ROI"
             )
 
-    def get_pattern_roi(self, pattern_id: str) -> Optional[PatternROISummary]:
+    def get_pattern_roi(self, pattern_id: str) -> PatternROISummary | None:
         """
         Get ROI summary for a specific pattern.
 
@@ -199,7 +197,7 @@ class ROITrackingService:
 
             return self._row_to_summary(row)
 
-    def get_all_roi_summaries(self) -> List[PatternROISummary]:
+    def get_all_roi_summaries(self) -> list[PatternROISummary]:
         """
         Get ROI summaries for all patterns.
 
@@ -248,7 +246,7 @@ class ROITrackingService:
         else:
             return "failed"
 
-    def get_roi_report(self, pattern_id: str) -> Optional[ROIReport]:
+    def get_roi_report(self, pattern_id: str) -> ROIReport | None:
         """
         Generate comprehensive ROI report for a pattern.
 
@@ -317,7 +315,7 @@ class ROITrackingService:
 
             return report
 
-    def get_top_performers(self, limit: int = 10) -> List[PatternROISummary]:
+    def get_top_performers(self, limit: int = 10) -> list[PatternROISummary]:
         """
         Get top performing patterns by ROI.
 
@@ -331,7 +329,7 @@ class ROITrackingService:
             cursor = conn.cursor()
 
             cursor.execute(
-                f"""
+                """
                 SELECT * FROM pattern_roi_summary
                 WHERE total_executions >= 5
                 ORDER BY roi_percentage DESC, success_rate DESC
@@ -346,7 +344,7 @@ class ROITrackingService:
             logger.info(f"[ROITrackingService] Retrieved {len(performers)} top performers")
             return performers
 
-    def get_underperformers(self, limit: int = 10) -> List[PatternROISummary]:
+    def get_underperformers(self, limit: int = 10) -> list[PatternROISummary]:
         """
         Get underperforming patterns by success rate and ROI.
 
@@ -360,7 +358,7 @@ class ROITrackingService:
             cursor = conn.cursor()
 
             cursor.execute(
-                f"""
+                """
                 SELECT * FROM pattern_roi_summary
                 WHERE total_executions >= 3
                 ORDER BY success_rate ASC, roi_percentage ASC
