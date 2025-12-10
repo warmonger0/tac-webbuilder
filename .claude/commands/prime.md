@@ -16,7 +16,7 @@
 - **Cost optimization:** 60-80% savings via external test tools
 - **Database:** PostgreSQL only (production-grade, required for observability)
 - **Security:** Multi-layer SQL injection prevention
-- **Claude Code timeout:** 45-minute timeout for complex planning tasks (prevents premature termination)
+- **Claude Code timeout:** 20-minute timeout for planning tasks (prevents premature termination)
 
 ## What Are You Working On?
 
