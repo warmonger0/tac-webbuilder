@@ -351,6 +351,8 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
         # Open output file for streaming
         with open(request.output_file, "w") as output_f:
             # Execute Claude Code and stream output to file
+            # Set generous timeout - planning can take 10-30 minutes for complex issues
+            # Use 45 minutes (2700 seconds) to allow Claude Code enough time
             result = subprocess.run(
                 cmd,
                 stdout=output_f,  # Stream directly to file
@@ -358,6 +360,7 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
                 text=True,
                 env=env,
                 cwd=request.working_dir,  # Use working_dir if provided
+                timeout=2700,  # 45 minutes timeout
             )
 
         if result.returncode == 0:
@@ -496,8 +499,9 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
                 retry_code=RetryCode.CLAUDE_CODE_ERROR,
             )
 
-    except subprocess.TimeoutExpired:
-        error_msg = "Error: Claude Code command timed out after 5 minutes"
+    except subprocess.TimeoutExpired as e:
+        timeout_mins = e.timeout / 60 if e.timeout else "unknown"
+        error_msg = f"Error: Claude Code command timed out after {timeout_mins:.0f} minutes. The planning task may be too complex or Claude Code encountered an issue."
         return AgentPromptResponse(
             output=error_msg,
             success=False,
