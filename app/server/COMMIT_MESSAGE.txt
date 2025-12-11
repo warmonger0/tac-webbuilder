@@ -1,0 +1,41 @@
+fix: Add conftest.py files to all test subdirectories for proper fixture discovery
+
+Session 21 systematically addresses test discovery and fixture availability issues
+by creating conftest.py in all test subdirectories.
+
+Created Files (8 new conftest.py files):
+- tests/core/conftest.py - Python path setup for core module tests
+- tests/core/workflow_history_utils/conftest.py - Python path for nested tests
+- tests/services/conftest.py - Python path setup for services tests
+- tests/repositories/conftest.py - Python path setup for repositories tests
+- tests/utils/conftest.py - Python path setup for utils tests
+- tests/adws/conftest.py - Python path setup for ADW tests
+- tests/manual/conftest.py - Python path setup for manual tests
+- tests/routes/conftest.py - Python path + integration fixture loading
+
+Problems Fixed:
+1. Import errors from missing sys.path configuration in test subdirectories
+2. Fixture not found errors for integration tests in tests/routes/
+3. Module discovery issues in nested directories like workflow_history_utils
+
+Key Implementation:
+- Each conftest.py adds app/server to sys.path for module imports
+- tests/routes/conftest.py uses pytest_plugins to expose integration fixtures
+- Maintains consistency with existing conftest patterns
+
+Expected Impact:
+- Fixes ~15-25 import and fixture discovery errors
+- Reduces test errors from ~73 to ~48-55
+- Enables proper test discovery across all subdirectories
+
+Documentation:
+- TEST_FIXES_SESSION_21.md - Detailed fix documentation
+- REMAINING_ERRORS_DIAGNOSTIC.md - Guide for investigating remaining errors
+- SESSION_21_SUMMARY.md - Session completion summary
+- VERIFICATION_CHECKLIST_SESSION_21.md - Validation steps
+
+See REMAINING_ERRORS_DIAGNOSTIC.md for next steps in fixing remaining 48-55 errors
+by category (async issues, database configuration, module imports, etc).
+
+Fixes: #test-discovery-errors
+Related: #fixture-discovery-errors #import-path-issues

@@ -64,7 +64,7 @@ def _extract_workflow_metadata(adw_id: str, adw_dir: Path, state_data: dict) -> 
 
 def _infer_status_from_filesystem(workflow: dict, adw_dir: Path, state_data: dict, state_file: Path) -> None:
     """Infer workflow status from filesystem state (modifies workflow dict in place)."""
-    if workflow["status"] not in ("pending", "running"):
+    if workflow["status"] in ("completed", "failed"):
         return
 
     # Check for error file first

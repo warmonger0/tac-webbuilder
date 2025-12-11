@@ -15,6 +15,7 @@ from core.github_poster import GitHubPoster
 from core.workflow_history import (
     init_db as init_workflow_history_db,
 )
+from services.phase_queue_schema import init_phase_queue_db
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,6 +74,10 @@ async def lifespan(app: FastAPI):
     # Initialize context review database
     init_context_review_db()
     logger.info("[STARTUP] Context review database initialized")
+
+    # Initialize phase queue database
+    init_phase_queue_db()
+    logger.info("[STARTUP] Phase queue database initialized")
 
     # Start background watchers using BackgroundTaskManager
     await background_task_manager.start_all()

@@ -105,8 +105,11 @@ def temp_workflow_db():
 def phase_queue_service(temp_phase_db):
     """Create PhaseQueueService with temporary database adapter"""
     # temp_phase_db is now a SQLiteAdapter instance
-    repository = PhaseQueueRepository()
-    repository.adapter = temp_phase_db  # Inject the test adapter
+    # Create repository with patched get_database_adapter to return our test adapter
+    with patch('repositories.phase_queue_repository.get_database_adapter', return_value=temp_phase_db):
+        repository = PhaseQueueRepository()
+    # Ensure adapter is set (patch should have worked, but override just in case)
+    repository.adapter = temp_phase_db
     return PhaseQueueService(repository=repository)
 
 
@@ -119,16 +122,20 @@ def mock_websocket_manager():
 
 
 @pytest.fixture
-def phase_coordinator(phase_queue_service, temp_workflow_db, mock_websocket_manager):
+def phase_coordinator(phase_queue_service, temp_phase_db, temp_workflow_db, mock_websocket_manager):
     """Create PhaseCoordinator with test dependencies and patched adapters"""
-    coordinator = PhaseCoordinator(
-        phase_queue_service=phase_queue_service,
-        poll_interval=0.1,  # Fast polling for tests
-        websocket_manager=mock_websocket_manager
-    )
+    # Patch get_database_adapter to return our test workflow adapter for WorkflowCompletionDetector
+    with patch('services.phase_coordination.workflow_completion_detector.get_database_adapter', return_value=temp_workflow_db):
+        coordinator = PhaseCoordinator(
+            phase_queue_service=phase_queue_service,
+            poll_interval=0.1,  # Fast polling for tests
+            websocket_manager=mock_websocket_manager
+        )
 
-    # Inject the test workflow database adapter into the detector
-    # temp_workflow_db is now a SQLiteAdapter instance
+    # Ensure adapters are set correctly (patching should have worked, but override just in case)
+    if hasattr(phase_queue_service, 'repository'):
+        phase_queue_service.repository.adapter = temp_phase_db
+
     coordinator.detector.adapter = temp_workflow_db
 
     return coordinator
@@ -160,13 +167,15 @@ def create_workflow_entry(
     """
     with workflow_adapter.get_connection() as conn:
         cursor = conn.cursor()
+        # Set end_time only for completed/failed status (for phantom detection)
+        end_time = datetime.now().isoformat() if status in ('completed', 'failed') else None
         cursor.execute(
             """
             INSERT INTO workflow_history (
                 workflow_id, issue_number, status, error_message,
-                phase_number, is_multi_phase, created_at, updated_at
+                phase_number, is_multi_phase, created_at, updated_at, end_time
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 f"wf-{issue_number}",
@@ -177,6 +186,7 @@ def create_workflow_entry(
                 1 if is_multi_phase else 0,
                 datetime.now().isoformat(),
                 datetime.now().isoformat(),
+                end_time,
             ),
         )
 

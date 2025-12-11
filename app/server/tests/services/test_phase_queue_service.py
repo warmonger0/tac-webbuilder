@@ -6,14 +6,53 @@ Tests phase queue management, dependency tracking, and sequential execution coor
 
 import pytest
 from services.phase_queue_service import PhaseQueueService
+from database import get_database_adapter
 
 
 @pytest.fixture
-def service():
+def clean_queue():
+    """
+    Clean the phase_queue table before and after test.
+
+    Ensures complete test isolation by clearing all data.
+    Also initializes the schema if needed.
+    """
+    # Initialize schema before test
+    try:
+        from services.phase_queue_schema import init_phase_queue_db
+        init_phase_queue_db()
+    except Exception as e:
+        pass  # Schema might already exist
+
+    # Clean before test
+    try:
+        adapter = get_database_adapter()
+        with adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM phase_queue")
+            conn.commit()
+    except Exception:
+        pass  # Table might not exist
+
+    yield  # Test runs
+
+    # Clean after test
+    try:
+        adapter = get_database_adapter()
+        with adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM phase_queue")
+            conn.commit()
+    except Exception:
+        pass  # Ignore cleanup errors
+
+
+@pytest.fixture
+def service(clean_queue):
     """
     Create PhaseQueueService instance.
 
-    Uses PostgreSQL database with cleanup_phase_queue_data autouse fixture
+    Uses PostgreSQL database with clean_queue fixture
     for automatic test isolation.
     """
     return PhaseQueueService()

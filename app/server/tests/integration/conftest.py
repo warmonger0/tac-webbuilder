@@ -99,7 +99,7 @@ def integration_test_db(monkeypatch) -> Generator[Path, None, None]:
     monkeypatch.setenv("POSTGRES_PASSWORD", "changeme")
     monkeypatch.setenv("DB_TYPE", "postgresql")
 
-    # Initialize database schema (with error handling)
+    # Initialize database schemas (with error handling)
     try:
         from core.workflow_history_utils.database import init_db
         init_db()
@@ -107,6 +107,15 @@ def integration_test_db(monkeypatch) -> Generator[Path, None, None]:
         # Log but don't fail fixture - some tests may not use workflow_history DB
         import traceback
         print(f"\nWarning: workflow_history database initialization: {e}")
+        traceback.print_exc()
+
+    try:
+        from services.phase_queue_schema import init_phase_queue_db
+        init_phase_queue_db()
+    except Exception as e:
+        # Log but don't fail fixture - some tests may not use phase_queue DB
+        import traceback
+        print(f"\nWarning: phase_queue database initialization: {e}")
         traceback.print_exc()
 
     yield temp_db_path
