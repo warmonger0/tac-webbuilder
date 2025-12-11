@@ -44,10 +44,9 @@ sys.path.insert(0, app_server_path)
 
 from core.adw_lock import acquire_lock, update_lock_status, release_lock
 from core.api_quota import can_start_adw, log_quota_warning
-from utils.webhook_security import validate_webhook_request
-from services.structured_logger import StructuredLogger
-from repositories.task_log_repository import TaskLogRepository
-from core.models.observability import TaskLogCreate
+
+# Lightweight webhook validation (no heavy dependencies)
+from webhook_validator import validate_webhook, WebhookValidationError
 
 # Load environment variables
 load_dotenv()
@@ -74,9 +73,8 @@ app = FastAPI(
 # Thread pool for background classification with timeout
 executor = ThreadPoolExecutor(max_workers=4)
 
-# Initialize observability services
-structured_logger = StructuredLogger()
-task_log_repo = TaskLogRepository()
+# Note: Observability logging moved to backend (app/server/routes/queue_routes.py)
+# to avoid heavy dependencies in lightweight webhook server
 
 # Global stats tracking
 webhook_stats = {
@@ -224,19 +222,8 @@ async def process_webhook_background(
         print(f"🔄 Background processing: {trigger_source} for issue #{issue_number}")
         error_logger.info(f"Processing {trigger_source} for issue #{issue_number}")
 
-        # Log webhook received
-        structured_logger.log_webhook_event(
-            adw_id=None,  # Don't have it yet
-            issue_number=issue_number,
-            message=f"Webhook received from {trigger_source}",
-            webhook_type="github_issue",
-            event_data={
-                "event_type": event_type,
-                "action": action,
-                "trigger_source": trigger_source,
-                "content_length": len(content_to_check)
-            }
-        )
+        # Note: Observability logging happens in backend (queue_routes.py)
+        # Webhook server kept lightweight - no database dependencies
 
         # Use temporary ID for classification
         temp_id = make_adw_id()
@@ -510,36 +497,8 @@ async def process_webhook_background(
         print(f"Logs will be written to: agents/{adw_id}/{workflow}/execution.log")
         error_logger.info(f"Successfully launched {workflow} for issue #{issue_number} with ADW ID {adw_id}")
 
-        # Log successful processing
+        # Note: Observability logging happens in backend (queue_routes.py)
         elapsed_time = time.time() - start_time
-
-        structured_logger.log_webhook_event(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            message=f"Webhook processed successfully - workflow launched",
-            webhook_type="github_issue",
-            duration_seconds=elapsed_time,
-            event_data={
-                "workflow": workflow,
-                "model_set": model_set,
-                "trigger_source": trigger_source
-            }
-        )
-
-        # Create TaskLog entry for successful webhook processing
-        try:
-            task_log_repo.create(TaskLogCreate(
-                adw_id=adw_id,
-                issue_number=issue_number,
-                workflow_template=workflow,
-                phase_name="webhook_received",
-                phase_status="completed",
-                log_message=f"Webhook received and processed from {trigger_source} (workflow={workflow}, model_set={model_set})",
-                duration_seconds=elapsed_time
-            ))
-        except Exception as log_error:
-            # Don't fail the workflow if logging fails
-            error_logger.warning(f"Failed to create TaskLog entry: {log_error}")
 
         # Track success
         webhook_stats["successful"] += 1
@@ -562,39 +521,8 @@ async def process_webhook_background(
         error_logger.error(f"Error: {e}")
         error_logger.error(f"Traceback:\n{tb}")
 
-        # Log failure to observability system
+        # Note: Observability logging happens in backend (queue_routes.py)
         elapsed_time = time.time() - start_time
-
-        structured_logger.log_webhook_event(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            message=f"Webhook processing failed: {str(e)}",
-            webhook_type="github_issue",
-            duration_seconds=elapsed_time,
-            error_message=str(e),
-            event_data={
-                "workflow": workflow,
-                "trigger_source": trigger_source,
-                "error_type": type(e).__name__
-            }
-        )
-
-        # Create TaskLog for failure (if we have adw_id)
-        if adw_id and workflow:
-            try:
-                task_log_repo.create(TaskLogCreate(
-                    adw_id=adw_id,
-                    issue_number=issue_number,
-                    workflow_template=workflow,
-                    phase_name="webhook_received",
-                    phase_status="failed",
-                    log_message=f"Webhook processing failed: {str(e)[:200]}",
-                    error_message=str(e)[:500],
-                    duration_seconds=elapsed_time
-                ))
-            except Exception as log_error:
-                # Don't fail the workflow if logging fails
-                error_logger.warning(f"Failed to create TaskLog entry for failure: {log_error}")
 
         # Track failure
         webhook_stats["failed"] += 1
@@ -635,8 +563,8 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
         # VALIDATE SIGNATURE FIRST (before any processing)
         try:
-            body = await validate_webhook_request(request, webhook_type="github")
-        except Exception as sig_error:
+            body = await validate_webhook(request)
+        except WebhookValidationError as sig_error:
             print(f"❌ [WEBHOOK] Signature validation failed: {sig_error}")
             # Return 401 for unauthorized requests
             return {"status": "error", "message": "Unauthorized"}
