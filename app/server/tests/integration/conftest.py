@@ -136,6 +136,24 @@ def integration_test_db(monkeypatch) -> Generator[Path, None, None]:
         print(f"\nWarning: context_review database initialization failed: {e}")
         traceback.print_exc()
 
+    try:
+        from core.workflow_history_utils.database import init_db
+        init_db()
+    except Exception as e:
+        # Log but don't fail fixture - some tests may not use workflow_history DB
+        import traceback
+        print(f"\nWarning: workflow_history database initialization failed: {e}")
+        traceback.print_exc()
+
+    try:
+        from core.adw_lock import init_adw_locks_table
+        init_adw_locks_table()
+    except Exception as e:
+        # Log but don't fail fixture - some tests may not use adw_locks table
+        import traceback
+        print(f"\nWarning: adw_locks table initialization failed: {e}")
+        traceback.print_exc()
+
     # Initialize PostgreSQL tables for integration tests
     try:
         from database import get_database_adapter
@@ -274,15 +292,18 @@ def integration_client(integration_app) -> Generator[TestClient, None, None]:
             adapter = get_database_adapter()
             with adapter.get_connection() as conn:
                 cursor = conn.cursor()
-                # Clean up all test tables
-                tables_to_clean = ['work_log', 'phase_queue', 'webhook_events', 'task_log']
+                # Clean up all test tables including adw_locks and workflow_history
+                tables_to_clean = ['work_log', 'phase_queue', 'webhook_events', 'task_log', 'adw_locks', 'workflow_history']
                 for table in tables_to_clean:
                     try:
-                        cursor.execute(f"DELETE FROM {table}")
+                        # Use TRUNCATE for PostgreSQL if available (faster and resets sequences)
+                        if adapter.get_db_type() == "postgresql":
+                            cursor.execute(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE")
+                        else:
+                            cursor.execute(f"DELETE FROM {table}")
                     except Exception as table_error:
                         # Table might not exist yet, that's ok
                         print(f"Note: Could not clean {table}: {table_error}")
-                conn.commit()
         except Exception as e:
             # Database might not be ready yet, that's ok
             print(f"Warning: Could not clean tables before test: {e}")
@@ -296,15 +317,18 @@ def integration_client(integration_app) -> Generator[TestClient, None, None]:
             adapter = get_database_adapter()
             with adapter.get_connection() as conn:
                 cursor = conn.cursor()
-                # Clean up all test tables
-                tables_to_clean = ['work_log', 'phase_queue', 'webhook_events', 'task_log']
+                # Clean up all test tables including adw_locks and workflow_history
+                tables_to_clean = ['work_log', 'phase_queue', 'webhook_events', 'task_log', 'adw_locks', 'workflow_history']
                 for table in tables_to_clean:
                     try:
-                        cursor.execute(f"DELETE FROM {table}")
+                        # Use TRUNCATE for PostgreSQL if available (faster and resets sequences)
+                        if adapter.get_db_type() == "postgresql":
+                            cursor.execute(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE")
+                        else:
+                            cursor.execute(f"DELETE FROM {table}")
                     except Exception as table_error:
                         # Table might not exist, that's ok
                         pass
-                conn.commit()
         except Exception as e:
             # Cleanup failure shouldn't break tests
             print(f"Warning: Could not clean tables after test: {e}")
@@ -314,6 +338,53 @@ def integration_client(integration_app) -> Generator[TestClient, None, None]:
 # ============================================================================
 # Database Integration Fixtures
 # ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def cleanup_integration_test_data(request):
+    """
+    Automatically clean integration test data before and after each test.
+
+    This ensures test isolation for integration tests using PostgreSQL.
+    """
+    # Skip cleanup for tests that use integration_client (it has its own cleanup)
+    if 'integration_client' in request.fixturenames:
+        yield
+        return
+
+    # Clean before test
+    try:
+        from database import get_database_adapter
+        adapter = get_database_adapter()
+        if adapter.get_db_type() == "postgresql":
+            with adapter.get_connection() as conn:
+                cursor = conn.cursor()
+                tables_to_clean = ['work_log', 'phase_queue', 'webhook_events', 'task_log', 'adw_locks', 'workflow_history']
+                for table in tables_to_clean:
+                    try:
+                        cursor.execute(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE")
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+    yield
+
+    # Clean after test
+    try:
+        from database import get_database_adapter
+        adapter = get_database_adapter()
+        if adapter.get_db_type() == "postgresql":
+            with adapter.get_connection() as conn:
+                cursor = conn.cursor()
+                tables_to_clean = ['work_log', 'phase_queue', 'webhook_events', 'task_log', 'adw_locks', 'workflow_history']
+                for table in tables_to_clean:
+                    try:
+                        cursor.execute(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE")
+                    except Exception:
+                        pass
+    except Exception:
+        pass
 
 
 @pytest.fixture
