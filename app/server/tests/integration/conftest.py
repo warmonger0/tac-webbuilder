@@ -118,6 +118,24 @@ def integration_test_db(monkeypatch) -> Generator[Path, None, None]:
         print(f"\nWarning: phase_queue database initialization: {e}")
         traceback.print_exc()
 
+    try:
+        from services.work_log_schema import init_work_log_db
+        init_work_log_db()
+    except Exception as e:
+        # Log but don't fail fixture - some tests may not use work_log DB
+        import traceback
+        print(f"\nWarning: work_log database initialization: {e}")
+        traceback.print_exc()
+
+    try:
+        from core.context_review.database.schema import init_context_review_db
+        init_context_review_db()
+    except Exception as e:
+        # Log but don't fail fixture - some tests may not use context_review DB
+        import traceback
+        print(f"\nWarning: context_review database initialization: {e}")
+        traceback.print_exc()
+
     yield temp_db_path
 
     # Cleanup
@@ -196,26 +214,25 @@ def integration_app(integration_test_db: Path, monkeypatch):
     except Exception:
         pass
 
-    # Patch database path for workflow_history database
-    with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
-        try:
-            # Reload database module to pick up the patched DB_PATH
-            import importlib
-            import core.workflow_history_utils.database as db_module
-            importlib.reload(db_module)
-        except Exception as e:
-            # Log but continue - some tests may not use this module
-            print(f"Warning: Failed to reload workflow_history database module: {e}")
+    # Patch database path at module level before importing server
+    import core.workflow_history_utils.database.schema as schema_module
+    original_db_path = getattr(schema_module, 'DB_PATH', None)
+    monkeypatch.setattr(schema_module, 'DB_PATH', integration_test_db)
 
-        try:
-            from server import app
-            yield app
-        except Exception as e:
-            # If app import fails, provide detailed error
-            import traceback
-            print(f"\nError importing server app: {e}")
-            traceback.print_exc()
-            raise
+    try:
+        # Import server app (DB_PATH is now patched at module level)
+        from server import app
+        yield app
+    except Exception as e:
+        # If app import fails, provide detailed error
+        import traceback
+        print(f"\nError importing server app: {e}")
+        traceback.print_exc()
+        raise
+    finally:
+        # Restore original DB_PATH
+        if original_db_path is not None:
+            monkeypatch.setattr(schema_module, 'DB_PATH', original_db_path)
 
 
 @pytest.fixture

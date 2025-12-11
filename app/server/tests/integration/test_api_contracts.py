@@ -81,7 +81,7 @@ class TestDatabaseEndpoints:
 
         if response.status_code == 200:
             data = response.json()
-            assert isinstance(data, dict | list)
+            assert isinstance(data, (dict, list))
 
     @pytest.mark.parametrize("invalid_query", [
         "DROP TABLE users",

@@ -75,7 +75,7 @@ class TestWorkflowHistoryDatabase:
             integration_test_db.unlink()
 
         # Act: Initialize database
-        with patch.object(Path, 'parent', integration_test_db.parent), patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
+        with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
             init_db()
 
         # Assert: Database file was created

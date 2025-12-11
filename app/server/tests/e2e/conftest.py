@@ -670,13 +670,9 @@ def full_stack_context(e2e_test_client, websocket_manager, e2e_database):
             ws_manager = full_stack_context["websocket"]
             # Test realtime updates during workflow execution
     """
-    from services.websocket_manager import ConnectionManager
-
-    ws_manager = ConnectionManager()
-
     return {
         "client": e2e_test_client,
-        "websocket": ws_manager,
+        "websocket": websocket_manager,
         "database": e2e_database,
     }
 

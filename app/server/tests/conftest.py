@@ -374,20 +374,51 @@ def cleanup_workflow_history_data():
     This fixture runs automatically for every test to ensure test isolation
     and prevent UNIQUE constraint violations on adw_id.
 
-    Cleans both the main database and workflow_history database to handle
-    tests that use either database.
+    Supports both SQLite (local files) and PostgreSQL (via adapter).
     """
     def cleanup_test_records():
-        """Helper to clean ALL test records from both databases"""
+        """Helper to clean ALL test records from SQLite and PostgreSQL databases"""
+        # First, try cleaning via database adapter (works for both SQLite and PostgreSQL)
         try:
-            # Clean main database.db - Delete ALL workflow_history for tests
-            # This is safe because tests should be isolated anyway
+            from database import get_database_adapter
+
+            # Try cleaning workflow_history from the configured database
+            try:
+                adapter = get_database_adapter()
+                db_type = adapter.get_db_type()
+
+                with adapter.get_connection() as conn:
+                    cursor = conn.cursor()
+                    # Use TRUNCATE for PostgreSQL (faster), DELETE for SQLite
+                    if db_type == "postgresql":
+                        try:
+                            cursor.execute("TRUNCATE TABLE workflow_history RESTART IDENTITY CASCADE")
+                        except Exception:
+                            # TRUNCATE might fail if table doesn't exist, try DELETE
+                            cursor.execute("DELETE FROM workflow_history")
+                    else:
+                        cursor.execute("DELETE FROM workflow_history")
+                    conn.commit()
+            except Exception as e:
+                # Table might not exist yet for some tests, that's OK
+                # But log in verbose mode for debugging
+                import sys
+                if "--verbose" in sys.argv or "-v" in sys.argv:
+                    print(f"\nWarning: workflow_history cleanup via adapter failed: {e}")
+                pass
+        except ImportError:
+            # Database module not available during test collection
+            pass
+
+        # Also clean SQLite files directly (for tests that use direct SQLite access)
+        # This handles legacy code and tests that don't use the adapter pattern
+        try:
+            # Clean main database.db
             main_db = Path(__file__).parent.parent / "db" / "database.db"
             if main_db.exists():
                 conn = sqlite3.connect(main_db)
                 try:
                     cursor = conn.cursor()
-                    # Delete ALL workflow_history records to ensure test isolation
                     cursor.execute("DELETE FROM workflow_history")
                     conn.commit()
                 except Exception:
@@ -401,7 +432,6 @@ def cleanup_workflow_history_data():
                 conn = sqlite3.connect(wf_db)
                 try:
                     cursor = conn.cursor()
-                    # Delete ALL workflow_history records to ensure test isolation
                     cursor.execute("DELETE FROM workflow_history")
                     conn.commit()
                 except Exception:
@@ -409,7 +439,7 @@ def cleanup_workflow_history_data():
                 finally:
                     conn.close()
         except Exception:
-            # Ignore all cleanup errors
+            # Ignore all cleanup errors for SQLite files
             pass
 
     # Clean before test
@@ -439,10 +469,19 @@ def cleanup_phase_queue_data():
             adapter = get_database_adapter()
             with adapter.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM phase_queue")
+                # Use TRUNCATE for PostgreSQL (faster), DELETE for SQLite
+                db_type = adapter.get_db_type()
+                if db_type == "postgresql":
+                    cursor.execute("TRUNCATE TABLE phase_queue RESTART IDENTITY CASCADE")
+                else:
+                    cursor.execute("DELETE FROM phase_queue")
                 conn.commit()
-        except Exception:
+        except Exception as e:
             # Table might not exist yet for some tests, that's OK
+            # But log the error for debugging
+            import sys
+            if "--verbose" in sys.argv or "-v" in sys.argv:
+                print(f"\nWarning: phase_queue cleanup before test failed: {e}")
             pass
 
         yield  # Test runs here
@@ -452,10 +491,18 @@ def cleanup_phase_queue_data():
             adapter = get_database_adapter()
             with adapter.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM phase_queue")
+                # Use TRUNCATE for PostgreSQL (faster), DELETE for SQLite
+                db_type = adapter.get_db_type()
+                if db_type == "postgresql":
+                    cursor.execute("TRUNCATE TABLE phase_queue RESTART IDENTITY CASCADE")
+                else:
+                    cursor.execute("DELETE FROM phase_queue")
                 conn.commit()
-        except Exception:
+        except Exception as e:
             # Ignore cleanup errors (database might be closed)
+            import sys
+            if "--verbose" in sys.argv or "-v" in sys.argv:
+                print(f"\nWarning: phase_queue cleanup after test failed: {e}")
             pass
 
     except ImportError:

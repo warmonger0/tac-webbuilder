@@ -16,6 +16,7 @@ from core.workflow_history import (
     init_db as init_workflow_history_db,
 )
 from services.phase_queue_schema import init_phase_queue_db
+from services.work_log_schema import init_work_log_db
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -78,6 +79,10 @@ async def lifespan(app: FastAPI):
     # Initialize phase queue database
     init_phase_queue_db()
     logger.info("[STARTUP] Phase queue database initialized")
+
+    # Initialize work log database
+    init_work_log_db()
+    logger.info("[STARTUP] Work log database initialized")
 
     # Start background watchers using BackgroundTaskManager
     await background_task_manager.start_all()

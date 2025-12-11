@@ -191,7 +191,7 @@ Build feature X
 
     def test_ensure_database_state_updates_when_incorrect(self, mock_logger):
         """Test that ensure_database_state updates database when state is incorrect."""
-        with patch('app.server.repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
+        with patch('repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
             # Mock workflow with incorrect state
             mock_workflow = Mock()
             mock_workflow.status = "pending"
@@ -211,7 +211,7 @@ Build feature X
 
     def test_ensure_database_state_skips_update_when_correct(self, mock_logger):
         """Test that ensure_database_state skips update when state is already correct."""
-        with patch('app.server.repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
+        with patch('repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
             # Mock workflow with correct state
             mock_workflow = Mock()
             mock_workflow.status = "planned"
@@ -248,7 +248,7 @@ class TestStateValidator:
 
         mock_workflow.adw_id = "test-adw-123"
 
-        with patch('app.server.repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
+        with patch('repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
             with patch.object(StateValidator, '_get_worktree_path', return_value=str(worktree)):
                 mock_repo = Mock()
                 mock_repo.find_by_issue_number.return_value = mock_workflow
@@ -274,7 +274,7 @@ class TestStateValidator:
 
         mock_workflow.adw_id = "test-adw-123"
 
-        with patch('app.server.repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
+        with patch('repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
             with patch.object(StateValidator, '_get_worktree_path', return_value=str(worktree)):
                 mock_repo = Mock()
                 mock_repo.find_by_issue_number.return_value = mock_workflow

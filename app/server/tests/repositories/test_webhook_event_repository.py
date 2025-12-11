@@ -9,8 +9,12 @@ def cleanup_test_webhooks():
     """Clean up test webhook events after each test."""
     yield
     # Cleanup after test - remove all test webhooks
-    repo = WebhookEventRepository()
-    repo.cleanup_old_events(days=0)
+    try:
+        repo = WebhookEventRepository()
+        repo.cleanup_old_events(days=0)
+    except Exception:
+        # Cleanup may fail if database isn't available, but don't fail the test
+        pass
 
 
 def test_is_duplicate_returns_false_for_new_webhook():

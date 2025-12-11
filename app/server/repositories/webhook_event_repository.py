@@ -1,6 +1,6 @@
 """Repository for webhook event deduplication."""
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from database import get_database_adapter
@@ -28,7 +28,7 @@ class WebhookEventRepository:
         Returns:
             True if duplicate (already processed), False otherwise
         """
-        cutoff_time = datetime.now() - timedelta(seconds=window_seconds)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(seconds=window_seconds)
 
         with self.adapter.get_connection() as conn:
             cursor = conn.cursor()
@@ -99,7 +99,7 @@ class WebhookEventRepository:
         Returns:
             Number of events deleted
         """
-        cutoff_time = datetime.now() - timedelta(days=days)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(days=days)
 
         with self.adapter.get_connection() as conn:
             cursor = conn.cursor()

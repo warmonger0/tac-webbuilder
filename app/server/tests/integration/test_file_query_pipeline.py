@@ -73,38 +73,49 @@ Eve,32,Boston"""
     @pytest.fixture
     def shared_test_db(self, integration_test_db):
         """Provide a shared test database for all file operations and queries."""
-        # Patch all database paths to use the test database
-        # Patch where functions are used (in server module), not where they're defined
-        with patch('server.convert_csv_to_sqlite') as mock_csv, \
-             patch('server.convert_json_to_sqlite') as mock_json, \
-             patch('server.convert_jsonl_to_sqlite') as mock_jsonl, \
-             patch('utils.db_connection.get_connection') as mock_conn:
+        # Import the real functions before patching
+        from core.file_processor import (
+            convert_csv_to_sqlite as real_csv,
+            convert_json_to_sqlite as real_json,
+            convert_jsonl_to_sqlite as real_jsonl,
+        )
+        from utils.db_connection import get_connection as real_conn
+        from database.sqlite_adapter import SQLiteAdapter
 
-            # Import the real functions
-            from core.file_processor import (
-                convert_csv_to_sqlite as real_csv,
-            )
-            from core.file_processor import (
-                convert_json_to_sqlite as real_json,
-            )
-            from core.file_processor import (
-                convert_jsonl_to_sqlite as real_jsonl,
-            )
-            from utils.db_connection import get_connection as real_conn
+        # Create wrapper functions that use the test database
+        def csv_with_test_db(content, table):
+            return real_csv(content, table, str(integration_test_db))
 
-            # Wrap functions to use test database
-            mock_csv.side_effect = lambda content, table: real_csv(content, table, str(integration_test_db))
-            mock_json.side_effect = lambda content, table: real_json(content, table, str(integration_test_db))
-            mock_jsonl.side_effect = lambda content, table: real_jsonl(content, table, str(integration_test_db))
-            mock_conn.side_effect = lambda **kwargs: real_conn(db_path=str(integration_test_db))
+        def json_with_test_db(content, table):
+            return real_json(content, table, str(integration_test_db))
 
+        def jsonl_with_test_db(content, table):
+            return real_jsonl(content, table, str(integration_test_db))
+
+        def conn_with_test_db(**kwargs):
+            return real_conn(db_path=str(integration_test_db))
+
+        def get_test_adapter():
+            """Return SQLite adapter pointing to test database for file pipeline tests"""
+            return SQLiteAdapter(str(integration_test_db))
+
+        # Patch at import locations using patch context managers
+        # Also patch get_database_adapter to use SQLite for consistent database access
+        with patch('routes.data_routes.convert_csv_to_sqlite', side_effect=csv_with_test_db), \
+             patch('routes.data_routes.convert_json_to_sqlite', side_effect=json_with_test_db), \
+             patch('routes.data_routes.convert_jsonl_to_sqlite', side_effect=jsonl_with_test_db), \
+             patch('utils.db_connection.get_connection', side_effect=conn_with_test_db), \
+             patch('database.get_database_adapter', side_effect=get_test_adapter), \
+             patch('core.sql_processor.get_database_adapter', side_effect=get_test_adapter), \
+             patch('core.insights.get_database_adapter', side_effect=get_test_adapter), \
+             patch('routes.data_routes.get_database_adapter', side_effect=get_test_adapter):
             yield integration_test_db
 
     @pytest.fixture
     def mock_sql_generation(self):
         """Mock SQL generation to avoid LLM API calls."""
-        # Patch where the function is used (in server module), not where it's defined
-        with patch('server.generate_sql') as mock_gen:
+        # Patch where the function is used (in data_routes module), not where it's defined
+        with patch('routes.data_routes.generate_sql', autospec=False) as mock_gen:
             # Return different SQL based on the query
             def generate_sql_mock(request, schema_info=None):
                 # Handle both request objects and direct query strings
@@ -538,7 +549,7 @@ Eve,32,Boston"""
 
         # Test 2: Query non-existent table
         # We need to mock SQL generation to reference a non-existent table
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "SELECT * FROM nonexistent_table"
 
             nonexistent_response = integration_client.post(
@@ -596,7 +607,7 @@ Eve,32,Boston"""
         assert upload_response.status_code == 200
 
         # Test 1: DROP TABLE injection attempt
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "DROP TABLE people; --"
 
             drop_response = integration_client.post(
@@ -615,7 +626,7 @@ Eve,32,Boston"""
             assert "security error" in error.lower() or "dangerous" in error.lower()
 
         # Test 2: DELETE injection attempt
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "DELETE FROM people WHERE 1=1"
 
             delete_response = integration_client.post(
@@ -634,7 +645,7 @@ Eve,32,Boston"""
             assert "security error" in error.lower() or "dangerous" in error.lower()
 
         # Test 3: UPDATE injection attempt
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "UPDATE people SET age = 99 WHERE name = 'Alice'"
 
             update_response = integration_client.post(
@@ -653,7 +664,7 @@ Eve,32,Boston"""
             assert "security error" in error.lower() or "dangerous" in error.lower()
 
         # Test 4: SQL comment injection attempt
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "SELECT * FROM people -- WHERE age > 30"
 
             comment_response = integration_client.post(
@@ -672,7 +683,7 @@ Eve,32,Boston"""
             assert "security error" in error.lower() or "comment" in error.lower()
 
         # Test 5: Multiple statement injection
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "SELECT * FROM people; DROP TABLE people;"
 
             multi_response = integration_client.post(
@@ -691,7 +702,7 @@ Eve,32,Boston"""
             assert "security error" in error.lower() or "dangerous" in error.lower()
 
         # Test 6: Verify data still exists after all injection attempts
-        with patch('server.generate_sql') as mock_gen:
+        with patch('routes.data_routes.generate_sql') as mock_gen:
             mock_gen.return_value = "SELECT COUNT(*) as count FROM people"
 
             verify_response = integration_client.post(
@@ -906,31 +917,42 @@ Eve,32,Boston"""
     @pytest.fixture
     def shared_test_db(self, integration_test_db):
         """Provide a shared test database for all file operations and queries."""
-        # Patch all database paths to use the test database
-        # Patch where functions are used (in server module), not where they're defined
-        with patch('server.convert_csv_to_sqlite') as mock_csv, \
-             patch('server.convert_json_to_sqlite') as mock_json, \
-             patch('server.convert_jsonl_to_sqlite') as mock_jsonl, \
-             patch('utils.db_connection.get_connection') as mock_conn:
+        # Import the real functions before patching
+        from core.file_processor import (
+            convert_csv_to_sqlite as real_csv,
+            convert_json_to_sqlite as real_json,
+            convert_jsonl_to_sqlite as real_jsonl,
+        )
+        from utils.db_connection import get_connection as real_conn
+        from database.sqlite_adapter import SQLiteAdapter
 
-            # Import the real functions
-            from core.file_processor import (
-                convert_csv_to_sqlite as real_csv,
-            )
-            from core.file_processor import (
-                convert_json_to_sqlite as real_json,
-            )
-            from core.file_processor import (
-                convert_jsonl_to_sqlite as real_jsonl,
-            )
-            from utils.db_connection import get_connection as real_conn
+        # Create wrapper functions that use the test database
+        def csv_with_test_db(content, table):
+            return real_csv(content, table, str(integration_test_db))
 
-            # Wrap functions to use test database
-            mock_csv.side_effect = lambda content, table: real_csv(content, table, str(integration_test_db))
-            mock_json.side_effect = lambda content, table: real_json(content, table, str(integration_test_db))
-            mock_jsonl.side_effect = lambda content, table: real_jsonl(content, table, str(integration_test_db))
-            mock_conn.side_effect = lambda **kwargs: real_conn(db_path=str(integration_test_db))
+        def json_with_test_db(content, table):
+            return real_json(content, table, str(integration_test_db))
 
+        def jsonl_with_test_db(content, table):
+            return real_jsonl(content, table, str(integration_test_db))
+
+        def conn_with_test_db(**kwargs):
+            return real_conn(db_path=str(integration_test_db))
+
+        def get_test_adapter():
+            """Return SQLite adapter pointing to test database for file pipeline tests"""
+            return SQLiteAdapter(str(integration_test_db))
+
+        # Patch at import locations using patch context managers
+        # Also patch get_database_adapter to use SQLite for consistent database access
+        with patch('routes.data_routes.convert_csv_to_sqlite', side_effect=csv_with_test_db), \
+             patch('routes.data_routes.convert_json_to_sqlite', side_effect=json_with_test_db), \
+             patch('routes.data_routes.convert_jsonl_to_sqlite', side_effect=jsonl_with_test_db), \
+             patch('utils.db_connection.get_connection', side_effect=conn_with_test_db), \
+             patch('database.get_database_adapter', side_effect=get_test_adapter), \
+             patch('core.sql_processor.get_database_adapter', side_effect=get_test_adapter), \
+             patch('core.insights.get_database_adapter', side_effect=get_test_adapter), \
+             patch('routes.data_routes.get_database_adapter', side_effect=get_test_adapter):
             yield integration_test_db
 
     def test_concurrent_uploads(self, integration_client: TestClient, shared_test_db):

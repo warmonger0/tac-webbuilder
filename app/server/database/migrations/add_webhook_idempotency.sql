@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     webhook_type VARCHAR(50) NOT NULL,
     adw_id VARCHAR(100),
     issue_number INTEGER,
-    received_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    received_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     processed BOOLEAN DEFAULT FALSE,
     UNIQUE(webhook_id)
 );

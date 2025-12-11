@@ -32,61 +32,60 @@ class TestCompleteGitHubIssueFlow:
     @pytest.fixture
     def mock_nl_processor(self):
         """Mock the NL processor to return predictable issue data."""
-        with patch('services.github_issue_service.process_request') as mock_process:
-            async def mock_process_request(nl_input, project_context):
-                """Return a mock GitHub issue based on input."""
-                from core.data_models import GitHubIssue
+        from core.data_models import GitHubIssue
 
-                # Simulate NL processing with predictable output
-                return GitHubIssue(
-                    title=f"Implement: {nl_input[:50]}",
-                    body=f"## Description\n\n{nl_input}\n\n## Acceptance Criteria\n\n- [ ] Complete implementation",
-                    labels=["feature", "enhancement"],
-                    classification="feature",
-                    workflow="adw_sdlc_iso",
-                    model_set="base"
-                )
+        async def mock_process_request(nl_input, project_context):
+            """Return a mock GitHub issue based on input."""
+            # Simulate NL processing with predictable output
+            return GitHubIssue(
+                title=f"Implement: {nl_input[:50]}",
+                body=f"## Description\n\n{nl_input}\n\n## Acceptance Criteria\n\n- [ ] Complete implementation",
+                labels=["feature", "enhancement"],
+                classification="feature",
+                workflow="adw_sdlc_iso",
+                model_set="base"
+            )
 
-            mock_process.side_effect = mock_process_request
+        with patch('services.github_issue_service.process_request', side_effect=mock_process_request) as mock_process:
             yield mock_process
 
     @pytest.fixture
     def mock_complexity_analyzer(self):
         """Mock the complexity analyzer to return predictable cost estimates."""
+        def create_mock_cost_analysis(complexity_level="standard"):
+            """Create a mock cost analysis object."""
+            mock_result = Mock()
+            mock_result.level = complexity_level
+
+            if complexity_level == "lightweight":
+                mock_result.estimated_cost_range = (0.10, 0.25)
+                mock_result.estimated_cost_total = 0.18
+                mock_result.confidence = 0.85
+                mock_result.reasoning = "Simple feature with minimal complexity"
+            elif complexity_level == "standard":
+                mock_result.estimated_cost_range = (0.30, 0.70)
+                mock_result.estimated_cost_total = 0.50
+                mock_result.confidence = 0.80
+                mock_result.reasoning = "Standard feature with moderate complexity"
+            else:  # complex
+                mock_result.estimated_cost_range = (0.80, 2.00)
+                mock_result.estimated_cost_total = 1.40
+                mock_result.confidence = 0.70
+                mock_result.reasoning = "Complex feature requiring significant work"
+
+            mock_result.cost_breakdown_estimate = {
+                "plan": mock_result.estimated_cost_total * 0.2,
+                "build": mock_result.estimated_cost_total * 0.4,
+                "test": mock_result.estimated_cost_total * 0.2,
+                "review": mock_result.estimated_cost_total * 0.1,
+                "document": mock_result.estimated_cost_total * 0.05,
+                "ship": mock_result.estimated_cost_total * 0.05
+            }
+            mock_result.recommended_workflow = "adw_sdlc_iso"
+
+            return mock_result
+
         with patch('services.github_issue_service.analyze_issue_complexity') as mock_analyze:
-            def create_mock_cost_analysis(complexity_level="standard"):
-                """Create a mock cost analysis object."""
-                mock_result = Mock()
-                mock_result.level = complexity_level
-
-                if complexity_level == "lightweight":
-                    mock_result.estimated_cost_range = (0.10, 0.25)
-                    mock_result.estimated_cost_total = 0.18
-                    mock_result.confidence = 0.85
-                    mock_result.reasoning = "Simple feature with minimal complexity"
-                elif complexity_level == "standard":
-                    mock_result.estimated_cost_range = (0.30, 0.70)
-                    mock_result.estimated_cost_total = 0.50
-                    mock_result.confidence = 0.80
-                    mock_result.reasoning = "Standard feature with moderate complexity"
-                else:  # complex
-                    mock_result.estimated_cost_range = (0.80, 2.00)
-                    mock_result.estimated_cost_total = 1.40
-                    mock_result.confidence = 0.70
-                    mock_result.reasoning = "Complex feature requiring significant work"
-
-                mock_result.cost_breakdown_estimate = {
-                    "plan": mock_result.estimated_cost_total * 0.2,
-                    "build": mock_result.estimated_cost_total * 0.4,
-                    "test": mock_result.estimated_cost_total * 0.2,
-                    "review": mock_result.estimated_cost_total * 0.1,
-                    "document": mock_result.estimated_cost_total * 0.05,
-                    "ship": mock_result.estimated_cost_total * 0.05
-                }
-                mock_result.recommended_workflow = "adw_sdlc_iso"
-
-                return mock_result
-
             # Default to standard complexity
             mock_analyze.return_value = create_mock_cost_analysis("standard")
             mock_analyze.create_mock = create_mock_cost_analysis
@@ -95,37 +94,37 @@ class TestCompleteGitHubIssueFlow:
     @pytest.fixture
     def mock_github_poster(self):
         """Mock the GitHub poster to simulate posting issues."""
-        with patch('services.github_issue_service.GitHubPoster') as mock_poster_class:
-            poster_instance = Mock()
-            poster_instance.post_issue.return_value = 42  # Return issue number
-            mock_poster_class.return_value = poster_instance
+        poster_instance = Mock()
+        poster_instance.post_issue.return_value = 42  # Return issue number
+
+        with patch('services.github_issue_service.GitHubPoster', return_value=poster_instance) as mock_poster_class:
             yield poster_instance
 
     @pytest.fixture
     def mock_cost_storage(self):
         """Mock the cost estimate storage."""
-        with patch('services.github_issue_service.save_cost_estimate') as mock_save:
+        mock_save = Mock()
+        with patch('services.github_issue_service.save_cost_estimate', mock_save) as mock_patched:
             yield mock_save
 
     @pytest.fixture
     def mock_webhook_health(self):
         """Mock the webhook trigger health check."""
-        with patch('services.github_issue_service.httpx.AsyncClient') as mock_client_class:
-            mock_client = AsyncMock()
-            mock_response = AsyncMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
-                "status": "healthy",
-                "service": "ADW Webhook Trigger"
-            }
-            mock_response.raise_for_status = Mock()
-            mock_client.get.return_value = mock_response
+        mock_client = AsyncMock()
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "healthy",
+            "service": "ADW Webhook Trigger"
+        }
+        mock_response.raise_for_status = Mock()
+        mock_client.get.return_value = mock_response
 
-            # Setup context manager
-            mock_client.__aenter__.return_value = mock_client
-            mock_client.__aexit__.return_value = AsyncMock()
-            mock_client_class.return_value = mock_client
+        # Setup context manager
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = AsyncMock()
 
+        with patch('services.github_issue_service.httpx.AsyncClient', return_value=mock_client) as mock_client_class:
             yield mock_client
 
     @pytest.fixture(autouse=True)
@@ -175,8 +174,7 @@ class TestCompleteGitHubIssueFlow:
         mock_complexity_analyzer,
         mock_github_poster,
         mock_cost_storage,
-        mock_webhook_health,
-        sample_github_issue
+        mock_webhook_health
     ):
         """
         TC-001: Happy path - Test complete flow from NL request to GitHub issue creation.
@@ -581,39 +579,37 @@ class TestGitHubIssueFlowEdgeCases:
     @pytest.fixture
     def mock_failing_webhook(self):
         """Mock webhook that fails health check."""
-        with patch('services.github_issue_service.httpx.AsyncClient') as mock_client_class:
-            mock_client = AsyncMock()
+        mock_client = AsyncMock()
 
-            # Simulate connection error
-            from httpx import ConnectError
-            mock_client.get.side_effect = ConnectError("Connection refused")
+        # Simulate connection error
+        from httpx import ConnectError
+        mock_client.get.side_effect = ConnectError("Connection refused")
 
-            mock_client.__aenter__.return_value = mock_client
-            mock_client.__aexit__.return_value = AsyncMock()
-            mock_client_class.return_value = mock_client
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = AsyncMock()
 
+        with patch('services.github_issue_service.httpx.AsyncClient', return_value=mock_client) as mock_client_class:
             yield mock_client
 
     @pytest.fixture
     def mock_unhealthy_webhook(self):
         """Mock webhook that returns unhealthy status."""
-        with patch('services.github_issue_service.httpx.AsyncClient') as mock_client_class:
-            mock_client = AsyncMock()
-            mock_response = AsyncMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
-                "status": "unhealthy",
-                "health_check": {
-                    "errors": ["Database connection failed"]
-                }
+        mock_client = AsyncMock()
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "unhealthy",
+            "health_check": {
+                "errors": ["Database connection failed"]
             }
-            mock_response.raise_for_status = Mock()
-            mock_client.get.return_value = mock_response
+        }
+        mock_response.raise_for_status = Mock()
+        mock_client.get.return_value = mock_response
 
-            mock_client.__aenter__.return_value = mock_client
-            mock_client.__aexit__.return_value = AsyncMock()
-            mock_client_class.return_value = mock_client
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = AsyncMock()
 
+        with patch('services.github_issue_service.httpx.AsyncClient', return_value=mock_client) as mock_client_class:
             yield mock_client
 
     def test_webhook_offline_during_confirmation(
@@ -859,8 +855,7 @@ class TestGitHubIssueFlowDataPersistence:
     def test_cost_estimate_saved_correctly(
         self,
         e2e_test_client,
-        e2e_test_db_cleanup,
-        mock_external_services_e2e
+        e2e_test_db_cleanup
     ):
         """
         Test that cost estimates are saved correctly for workflow tracking.
