@@ -32,19 +32,35 @@ class ADWState:
         self.logger = logging.getLogger(__name__)
 
     def update(self, **kwargs):
-        """Update state with new key-value pairs."""
-        # Filter to only our core fields + workflow history sync fields
+        """Update state with new key-value pairs.
+
+        IMPORTANT: Does NOT accept 'status' or 'current_phase' - these are coordination
+        state fields that belong in the database. Use PhaseQueueRepository for those.
+        See docs/adw/state-management-ssot.md for complete SSoT rules.
+        """
+        # Core execution metadata fields (NOT coordination state)
         core_fields = {
             "adw_id", "issue_number", "branch_name", "plan_file", "issue_class",
             "worktree_path", "backend_port", "frontend_port", "model_set", "all_adws",
             "estimated_cost_total", "estimated_cost_breakdown",
-            # Workflow history sync fields
-            "status", "workflow_template", "model_used", "start_time", "nl_input", "github_url",
-            # Validate phase fields
-            "baseline_errors",
-            # Real-time phase tracking
-            "current_phase"
+            # Workflow context metadata
+            "workflow_template", "model_used", "start_time", "nl_input", "github_url",
+            # Phase output metadata
+            "baseline_errors", "external_build_results", "external_lint_results",
+            "external_test_results", "review_results", "integration_checklist",
+            "integration_checklist_markdown"
         }
+
+        # Validate no forbidden fields (SSoT enforcement)
+        forbidden_fields = {"status", "current_phase"}
+        for key in kwargs:
+            if key in forbidden_fields:
+                raise ValueError(
+                    f"Cannot update '{key}' in state file. Database is SSoT for coordination state. "
+                    f"Use PhaseQueueRepository.update_status() instead. "
+                    f"See docs/adw/state-management-ssot.md"
+                )
+
         for key, value in kwargs.items():
             if key in core_fields:
                 self.data[key] = value
@@ -83,11 +99,26 @@ class ADWState:
         return os.path.join(project_root, "agents", self.adw_id, self.STATE_FILENAME)
 
     def save(self, workflow_step: Optional[str] = None) -> None:
-        """Save state to file in agents/{adw_id}/adw_state.json."""
+        """Save state to file in agents/{adw_id}/adw_state.json.
+
+        IMPORTANT: Does NOT save 'status' or 'current_phase' - these belong in database.
+        See docs/adw/state-management-ssot.md for complete SSoT rules.
+        """
         state_path = self.get_state_path()
         os.makedirs(os.path.dirname(state_path), exist_ok=True)
 
-        # Create ADWStateData for validation of core fields + sync fields
+        # Validate no forbidden fields before saving (SSoT enforcement)
+        forbidden_fields = {"status", "current_phase"}
+        found_forbidden = [f for f in forbidden_fields if f in self.data]
+        if found_forbidden:
+            raise ValueError(
+                f"Cannot save state with forbidden fields: {found_forbidden}. "
+                f"These are coordination state fields that belong in database. "
+                f"Use PhaseQueueRepository for status/current_phase. "
+                f"See docs/adw/state-management-ssot.md"
+            )
+
+        # Create ADWStateData for validation of core execution metadata fields
         state_data = ADWStateData(
             adw_id=self.data.get("adw_id"),
             issue_number=self.data.get("issue_number"),
@@ -101,8 +132,7 @@ class ADWState:
             all_adws=self.data.get("all_adws", []),
             estimated_cost_total=self.data.get("estimated_cost_total"),
             estimated_cost_breakdown=self.data.get("estimated_cost_breakdown"),
-            # Workflow history sync fields
-            status=self.data.get("status"),
+            # Workflow context metadata (NOT coordination state)
             workflow_template=self.data.get("workflow_template"),
             model_used=self.data.get("model_used"),
             start_time=self.data.get("start_time"),
@@ -117,6 +147,9 @@ class ADWState:
         core_field_names = set(state_data.model_fields.keys())
         for key, value in self.data.items():
             if key not in core_field_names:
+                # Double-check no forbidden fields slip through
+                if key in forbidden_fields:
+                    continue  # Skip forbidden fields silently
                 save_data[key] = value
 
         # Save as JSON

@@ -220,7 +220,11 @@ class ADWStateData(BaseModel):
     """Minimal persistent state for ADW workflow.
 
     Stored in agents/{adw_id}/adw_state.json
-    Contains only essential identifiers to connect workflow steps.
+    Contains ONLY execution metadata (paths, ports, outputs).
+
+    IMPORTANT: Coordination state (status, current_phase) is stored in the database
+    (phase_queue table). This file is NOT the source of truth for workflow status.
+    See docs/adw/state-management-ssot.md for complete SSoT rules.
     """
 
     adw_id: str
@@ -238,13 +242,15 @@ class ADWStateData(BaseModel):
     estimated_cost_total: Optional[float] = None
     estimated_cost_breakdown: Optional[dict] = None  # Per-phase estimates
 
-    # Workflow history sync fields (required for database sync)
-    status: Optional[str] = "running"  # pending, running, completed, failed
+    # Workflow context metadata (NOT coordination state)
     workflow_template: Optional[str] = None  # e.g., "adw_sdlc_complete_zte_iso"
     model_used: Optional[str] = None  # e.g., "sonnet", "haiku", "opus"
     start_time: Optional[str] = None  # ISO format timestamp
     nl_input: Optional[str] = None  # Natural language input from user
     github_url: Optional[str] = None  # GitHub issue URL
+
+    # NOTE: 'status' and 'current_phase' removed - Database is SSoT for coordination
+    # Use PhaseQueueRepository to read/write workflow status and current phase
 
 
 class ReviewIssue(BaseModel):

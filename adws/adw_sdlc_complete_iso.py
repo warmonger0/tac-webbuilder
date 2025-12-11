@@ -242,9 +242,6 @@ def main():
     # ========================================
     # Event-driven broadcast - immediate WebSocket notification (0ms latency)
     broadcast_phase_update(adw_id, "Plan", "running", logger=logger)
-    state.update(current_phase="Plan")
-    state.save("adw_sdlc_complete_iso")
-    logger.info("✅ Updated state: current_phase=Plan")
 
     plan_script = "adw_plan_iso_optimized.py" if use_optimized_plan else "adw_plan_iso.py"
     plan_cmd = [
@@ -313,9 +310,6 @@ def main():
     # ========================================
     # Event-driven broadcast - immediate WebSocket notification (0ms latency)
     broadcast_phase_update(adw_id, "Validate", "running", logger=logger)
-    state.update(current_phase="Validate")
-    state.save("adw_sdlc_complete_iso")
-    logger.info("✅ Updated state: current_phase=Validate")
 
     validate_cmd = [
         "uv",
@@ -347,9 +341,6 @@ def main():
     # ========================================
     # Event-driven broadcast - immediate WebSocket notification (0ms latency)
     broadcast_phase_update(adw_id, "Build", "running", logger=logger)
-    state.update(current_phase="Build")
-    state.save("adw_sdlc_complete_iso")
-    logger.info("✅ Updated state: current_phase=Build")
 
     build_cmd = [
         "uv",
@@ -406,9 +397,6 @@ def main():
     # ========================================
     # Event-driven broadcast - immediate WebSocket notification (0ms latency)
     broadcast_phase_update(adw_id, "Lint", "running", logger=logger)
-    state.update(current_phase="Lint")
-    state.save("adw_sdlc_complete_iso")
-    logger.info("✅ Updated state: current_phase=Lint")
 
     lint_cmd = [
         "uv",
@@ -465,9 +453,6 @@ def main():
     # ========================================
     # Event-driven broadcast - immediate WebSocket notification (0ms latency)
     broadcast_phase_update(adw_id, "Test", "running", logger=logger)
-    state.update(current_phase="Test")
-    state.save("adw_sdlc_complete_iso")
-    logger.info("✅ Updated state: current_phase=Test")
 
     test_cmd = [
         "uv",
@@ -525,9 +510,6 @@ def main():
     # ========================================
     # Event-driven broadcast - immediate WebSocket notification (0ms latency)
     broadcast_phase_update(adw_id, "Review", "running", logger=logger)
-    state.update(current_phase="Review")
-    state.save("adw_sdlc_complete_iso")
-    logger.info("✅ Updated state: current_phase=Review")
 
     review_cmd = [
         "uv",
@@ -584,9 +566,6 @@ def main():
     # ========================================
     # Event-driven broadcast - immediate WebSocket notification (0ms latency)
     broadcast_phase_update(adw_id, "Document", "running", logger=logger)
-    state.update(current_phase="Document")
-    state.save("adw_sdlc_complete_iso")
-    logger.info("✅ Updated state: current_phase=Document")
 
     document_cmd = [
         "uv",
@@ -624,9 +603,6 @@ def main():
     # ========================================
     # Event-driven broadcast - immediate WebSocket notification (0ms latency)
     broadcast_phase_update(adw_id, "Ship", "running", logger=logger)
-    state.update(current_phase="Ship")
-    state.save("adw_sdlc_complete_iso")
-    logger.info("✅ Updated state: current_phase=Ship")
 
     ship_cmd = [
         "uv",
@@ -680,9 +656,6 @@ def main():
     # ========================================
     # Event-driven broadcast - immediate WebSocket notification (0ms latency)
     broadcast_phase_update(adw_id, "Cleanup", "running", logger=logger)
-    state.update(current_phase="Cleanup")
-    state.save("adw_sdlc_complete_iso")
-    logger.info("✅ Updated state: current_phase=Cleanup")
 
     print(f"\n{'='*60}")
     print(f"PHASE 9/10: CLEANUP")
@@ -748,9 +721,6 @@ def main():
     # ========================================
     # Event-driven broadcast - immediate WebSocket notification (0ms latency)
     broadcast_phase_update(adw_id, "Verify", "running", logger=logger)
-    state.update(current_phase="Verify")
-    state.save("adw_sdlc_complete_iso")
-    logger.info("✅ Updated state: current_phase=Verify")
 
     verify_cmd = [
         "uv",

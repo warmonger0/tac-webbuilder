@@ -1,0 +1,249 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tac-webbuilder.com/schemas/adw_state.json",
+  "title": "ADW State File Schema",
+  "description": "Execution metadata for ADW workflows. This file stores ONLY execution metadata (paths, ports, outputs). Coordination state (status, current_phase) is stored in the database (phase_queue table). See docs/adw/state-management-ssot.md for complete SSoT rules.",
+  "type": "object",
+  "required": ["adw_id"],
+  "properties": {
+    "adw_id": {
+      "type": "string",
+      "description": "Unique ADW identifier (8-char hex)",
+      "pattern": "^[a-f0-9]{8}$"
+    },
+    "issue_number": {
+      "type": ["string", "null"],
+      "description": "GitHub issue number as string"
+    },
+    "worktree_path": {
+      "type": ["string", "null"],
+      "description": "Absolute path to isolated git worktree directory (SSoT for file location)"
+    },
+    "branch_name": {
+      "type": ["string", "null"],
+      "description": "Feature branch name (SSoT for execution context)"
+    },
+    "plan_file": {
+      "type": ["string", "null"],
+      "description": "Absolute or relative path to SDLC plan file (SSoT for file location)"
+    },
+    "issue_class": {
+      "type": ["string", "null"],
+      "description": "Issue classification: /feature, /bug, /chore, or /patch",
+      "enum": ["/feature", "/bug", "/chore", "/patch", null]
+    },
+    "backend_port": {
+      "type": ["integer", "null"],
+      "description": "Allocated backend port (9100-9114) (SSoT for execution environment)",
+      "minimum": 9100,
+      "maximum": 9114
+    },
+    "frontend_port": {
+      "type": ["integer", "null"],
+      "description": "Allocated frontend port (9200-9214) (SSoT for execution environment)",
+      "minimum": 9200,
+      "maximum": 9214
+    },
+    "model_set": {
+      "type": "string",
+      "description": "AI model tier: base (Sonnet), heavy (Opus), or lightweight (Haiku)",
+      "enum": ["base", "heavy", "lightweight"],
+      "default": "base"
+    },
+    "all_adws": {
+      "type": "array",
+      "description": "List of all ADW scripts executed in this workflow",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "estimated_cost_total": {
+      "type": ["number", "null"],
+      "description": "Total estimated cost in USD",
+      "minimum": 0
+    },
+    "estimated_cost_breakdown": {
+      "type": ["object", "null"],
+      "description": "Per-phase cost estimates",
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "workflow_template": {
+      "type": ["string", "null"],
+      "description": "Workflow template name (e.g., adw_sdlc_complete_iso)"
+    },
+    "model_used": {
+      "type": ["string", "null"],
+      "description": "Specific model used (sonnet, opus, haiku)"
+    },
+    "start_time": {
+      "type": ["string", "null"],
+      "description": "ISO 8601 timestamp when workflow started",
+      "format": "date-time"
+    },
+    "nl_input": {
+      "type": ["string", "null"],
+      "description": "Natural language input from user"
+    },
+    "github_url": {
+      "type": ["string", "null"],
+      "description": "GitHub issue URL",
+      "format": "uri"
+    },
+    "baseline_errors": {
+      "type": ["object", "null"],
+      "description": "Baseline error state from Validate phase (SSoT for phase output)",
+      "properties": {
+        "frontend": {
+          "type": "object",
+          "properties": {
+            "type_errors": {"type": "integer", "minimum": 0},
+            "build_errors": {"type": "integer", "minimum": 0},
+            "warnings": {"type": "integer", "minimum": 0},
+            "error_details": {"type": "array"}
+          }
+        },
+        "backend": {
+          "type": "object",
+          "properties": {
+            "type_errors": {"type": "integer", "minimum": 0},
+            "lint_errors": {"type": "integer", "minimum": 0}
+          }
+        },
+        "validation_timestamp": {"type": "string", "format": "date-time"},
+        "worktree_base_commit": {"type": "string"},
+        "duration_seconds": {"type": "number", "minimum": 0}
+      }
+    },
+    "external_build_results": {
+      "type": ["object", "null"],
+      "description": "Build phase output metadata (SSoT for phase output)",
+      "properties": {
+        "success": {"type": "boolean"},
+        "summary": {
+          "type": "object",
+          "properties": {
+            "total_errors": {"type": "integer", "minimum": 0},
+            "type_errors": {"type": "integer", "minimum": 0},
+            "build_errors": {"type": "integer", "minimum": 0}
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file": {"type": "string"},
+              "line": {"type": "integer"},
+              "column": {"type": "integer"},
+              "message": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "external_lint_results": {
+      "type": ["object", "null"],
+      "description": "Lint phase output metadata (SSoT for phase output)",
+      "properties": {
+        "success": {"type": "boolean"},
+        "summary": {
+          "type": "object",
+          "properties": {
+            "total_errors": {"type": "integer", "minimum": 0},
+            "style_errors": {"type": "integer", "minimum": 0},
+            "quality_errors": {"type": "integer", "minimum": 0},
+            "fixable_count": {"type": "integer", "minimum": 0}
+          }
+        },
+        "errors": {"type": "array"}
+      }
+    },
+    "external_test_results": {
+      "type": ["object", "null"],
+      "description": "Test phase output metadata (SSoT for phase output)",
+      "properties": {
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "coverage": {"type": "number", "minimum": 0, "maximum": 100},
+        "details": {"type": "array"}
+      }
+    },
+    "integration_checklist": {
+      "type": ["object", "null"],
+      "description": "Integration validation checklist from Plan phase"
+    },
+    "integration_checklist_markdown": {
+      "type": ["string", "null"],
+      "description": "Formatted markdown version of integration checklist"
+    },
+    "review_results": {
+      "type": ["object", "null"],
+      "description": "Review phase output metadata (SSoT for phase output)",
+      "properties": {
+        "summary": {"type": "string"},
+        "blockers": {"type": "integer", "minimum": 0},
+        "tech_debt": {"type": "integer", "minimum": 0},
+        "screenshots": {"type": "array"},
+        "screenshot_urls": {"type": "array"}
+      }
+    }
+  },
+  "additionalProperties": true,
+  "not": {
+    "anyOf": [
+      {
+        "required": ["status"],
+        "description": "FORBIDDEN: 'status' must NOT be in state file. Database (phase_queue.status) is SSoT for workflow status. See docs/adw/state-management-ssot.md"
+      },
+      {
+        "required": ["current_phase"],
+        "description": "FORBIDDEN: 'current_phase' must NOT be in state file. Database (phase_queue.current_phase) is SSoT for current phase. See docs/adw/state-management-ssot.md"
+      }
+    ]
+  },
+  "examples": [
+    {
+      "adw_id": "77c90e61",
+      "issue_number": "170",
+      "worktree_path": "/Users/user/tac/tac-webbuilder/trees/77c90e61",
+      "branch_name": "feature/add-user-auth",
+      "plan_file": "trees/77c90e61/specs/issue-170-adw-77c90e61-sdlc_planner-user-auth.md",
+      "issue_class": "/feature",
+      "backend_port": 9107,
+      "frontend_port": 9207,
+      "model_set": "base",
+      "all_adws": ["adw_plan_iso", "adw_build_iso"],
+      "estimated_cost_total": 0.45,
+      "estimated_cost_breakdown": {
+        "plan": 0.15,
+        "build": 0.20,
+        "test": 0.10
+      },
+      "workflow_template": "adw_sdlc_complete_iso",
+      "model_used": "sonnet",
+      "start_time": "2025-12-10T10:33:03.064774",
+      "nl_input": "Add user authentication with JWT tokens",
+      "github_url": "https://github.com/user/repo/issues/170",
+      "baseline_errors": {
+        "frontend": {
+          "type_errors": 0,
+          "build_errors": 0,
+          "warnings": 2
+        }
+      },
+      "external_build_results": {
+        "success": true,
+        "summary": {
+          "total_errors": 0,
+          "type_errors": 0,
+          "build_errors": 0
+        },
+        "errors": []
+      }
+    }
+  ]
+}
