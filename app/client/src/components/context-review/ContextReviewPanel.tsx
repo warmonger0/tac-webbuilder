@@ -5,7 +5,8 @@
  * additional files and context to improve workflow accuracy.
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, CheckCircle2, FileCode, Loader2, Sparkles } from 'lucide-react';
 
 export interface ContextSuggestion {
@@ -35,50 +36,71 @@ interface ContextReviewPanelProps {
   onClose: () => void;
 }
 
+/**
+ * Fetch context analysis by review ID.
+ *
+ * @param reviewId - Review ID to fetch
+ * @returns Promise resolving to ContextAnalysisResult
+ */
+const fetchContextAnalysis = async (reviewId: number): Promise<ContextAnalysisResult> => {
+  const response = await fetch(`/api/v1/context-review/${reviewId}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch analysis: ${response.statusText}`);
+  }
+
+  return response.json();
+};
+
+/**
+ * Fetch context suggestions by review ID.
+ *
+ * @param reviewId - Review ID to fetch suggestions for
+ * @returns Promise resolving to array of ContextSuggestion
+ */
+const fetchContextSuggestions = async (reviewId: number): Promise<ContextSuggestion[]> => {
+  const response = await fetch(`/api/v1/context-review/${reviewId}/suggestions`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch suggestions: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.suggestions || [];
+};
+
 export function ContextReviewPanel({ reviewId, onClose }: ContextReviewPanelProps) {
-  const [analysis, setAnalysis] = useState<ContextAnalysisResult | null>(null);
-  const [suggestions, setSuggestions] = useState<ContextSuggestion[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Fetch analysis with conditional polling
+  const {
+    data: analysis,
+    isLoading: isLoadingAnalysis,
+    error: analysisError,
+  } = useQuery({
+    queryKey: ['context-review', reviewId],
+    queryFn: () => fetchContextAnalysis(reviewId!),
+    // Conditional refetch: Poll every 3s while analyzing, stop when complete
+    refetchInterval: (data) => {
+      return data?.status === 'analyzing' ? 3000 : false;
+    },
+    // Only run query if reviewId exists
+    enabled: !!reviewId,
+    // Keep data fresh
+    staleTime: 0,
+  });
 
-  useEffect(() => {
-    if (!reviewId) return;
+  // Fetch suggestions separately
+  const {
+    data: suggestions = [],
+    isLoading: isLoadingSuggestions,
+  } = useQuery({
+    queryKey: ['context-review-suggestions', reviewId],
+    queryFn: () => fetchContextSuggestions(reviewId!),
+    enabled: !!reviewId,
+    staleTime: 0,
+  });
 
-    const fetchAnalysis = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        // Fetch review result
-        const reviewResponse = await fetch(`/api/v1/context-review/${reviewId}`);
-        if (!reviewResponse.ok) throw new Error('Failed to fetch analysis');
-        const reviewData = await reviewResponse.json();
-        setAnalysis(reviewData);
-
-        // Fetch suggestions
-        const suggestionsResponse = await fetch(`/api/v1/context-review/${reviewId}/suggestions`);
-        if (!suggestionsResponse.ok) throw new Error('Failed to fetch suggestions');
-        const suggestionsData = await suggestionsResponse.json();
-        setSuggestions(suggestionsData.suggestions || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAnalysis();
-
-    // Poll while analyzing
-    let pollInterval: NodeJS.Timeout | null = null;
-    if (analysis?.status === 'analyzing') {
-      pollInterval = setInterval(fetchAnalysis, 3000);
-    }
-
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-    };
-  }, [reviewId, analysis?.status]);
+  const isLoading = isLoadingAnalysis || isLoadingSuggestions;
+  const error = analysisError;
 
   if (!reviewId) return null;
 
@@ -115,7 +137,9 @@ export function ContextReviewPanel({ reviewId, onClose }: ContextReviewPanelProp
           <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-red-300 font-medium">Analysis Failed</p>
-            <p className="text-red-400 text-sm mt-1">{error}</p>
+            <p className="text-red-400 text-sm mt-1">
+              {error instanceof Error ? error.message : 'Unknown error'}
+            </p>
           </div>
         </div>
       )}

@@ -1,7 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { getHistory } from '../api/client';
+import { useWorkflowHistoryWebSocket } from '../hooks/useWebSocket';
 import { StatusBadge } from './StatusBadge';
-import { intervals } from '../config/intervals';
 
 function formatDate(timestamp: string): string {
   const date = new Date(timestamp);
@@ -10,27 +8,16 @@ function formatDate(timestamp: string): string {
 
 export function HistoryView() {
   const {
-    data: history,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ['history'],
-    queryFn: () => getHistory(intervals.components.workflowHistory.defaultLimit),
-    refetchInterval: 30000, // Auto-refresh every 30 seconds to show new workflows
-  });
+    workflows: history,
+    isConnected,
+    connectionQuality,
+    lastUpdated,
+  } = useWorkflowHistoryWebSocket();
 
-  if (isLoading) {
+  if (!isConnected) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="text-gray-600">Loading history...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
-        Error loading history: {error instanceof Error ? error.message : 'Unknown error'}
+        <div className="text-gray-600">Connecting to real-time updates...</div>
       </div>
     );
   }
@@ -48,9 +35,16 @@ export function HistoryView() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">
-        Request History
-      </h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">
+          Request History
+        </h2>
+        {isConnected && (
+          <div className="text-xs text-gray-500">
+            Live updates • {connectionQuality} • Last update: {new Date(lastUpdated).toLocaleTimeString()}
+          </div>
+        )}
+      </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
