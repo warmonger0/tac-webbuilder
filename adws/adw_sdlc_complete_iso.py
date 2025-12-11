@@ -148,6 +148,115 @@ def check_for_loop(issue_number: str, logger, adw_id: str = None) -> None:
         logger.warning(f"Circuit breaker check failed (continuing anyway): {e}")
 
 
+def run_phase_with_retry(
+    cmd: list,
+    phase_name: str,
+    issue_number: str,
+    adw_id: str,
+    logger,
+    max_retries: int = 2,
+    critical: bool = True
+) -> int:
+    """
+    Run a phase with automatic retry on crash (leveraging idempotency).
+
+    Args:
+        cmd: Command to execute
+        phase_name: Name of phase for logging
+        issue_number: GitHub issue number
+        adw_id: ADW identifier
+        logger: Logger instance
+        max_retries: Maximum number of retry attempts (default: 2)
+        critical: If True, fail the workflow on error; if False, log warning and continue
+
+    Returns:
+        Exit code of the phase (0 = success)
+    """
+    logger.info(f"Running {phase_name} phase with up to {max_retries} retries")
+
+    for attempt in range(max_retries + 1):  # +1 to include initial attempt
+        try:
+            logger.info(f"{'='*60}")
+            if attempt == 0:
+                logger.info(f"Starting {phase_name.upper()} phase (initial attempt)")
+            else:
+                logger.info(f"Retrying {phase_name.upper()} phase (attempt {attempt + 1}/{max_retries + 1})")
+                # Post retry notification to GitHub
+                try:
+                    make_issue_comment(
+                        issue_number,
+                        format_issue_message(
+                            adw_id,
+                            "ops",
+                            f"🔄 Retrying {phase_name} phase (attempt {attempt + 1}/{max_retries + 1}) - "
+                            f"leveraging idempotency for safe retry"
+                        )
+                    )
+                except:
+                    pass
+
+            logger.info(f"Running: {' '.join(cmd)}")
+            logger.info(f"{'='*60}")
+
+            result = subprocess.run(cmd, capture_output=False, text=True)
+            exit_code = result.returncode
+
+            logger.info(f"{phase_name} phase completed with exit code: {exit_code}")
+
+            if exit_code == 0:
+                logger.info(f"✓ {phase_name} phase succeeded")
+                return 0
+            else:
+                logger.warning(f"✗ {phase_name} phase failed with exit code: {exit_code}")
+
+                if attempt < max_retries:
+                    logger.info(f"Will retry {phase_name} phase (idempotent)")
+                else:
+                    logger.error(f"{phase_name} phase failed after {max_retries + 1} attempts")
+
+        except Exception as e:
+            logger.error(f"{phase_name} phase crashed with exception: {e}", exc_info=True)
+
+            if attempt < max_retries:
+                logger.info(f"Will retry {phase_name} phase after crash (idempotent)")
+            else:
+                logger.error(f"{phase_name} phase crashed after {max_retries + 1} attempts")
+
+                if critical:
+                    # For critical phases, fail the workflow
+                    cleanup_failed_workflow(
+                        issue_number=issue_number,
+                        adw_id=adw_id,
+                        phase=phase_name.lower(),
+                        reason=f"Phase crashed after {max_retries + 1} attempts: {str(e)}",
+                        logger=logger
+                    )
+                    print(f"❌ {phase_name} phase crashed: {e}")
+                    sys.exit(1)
+                else:
+                    # For non-critical phases, log warning and continue
+                    logger.warning(f"⚠️ {phase_name} phase crashed but marked as non-critical, continuing...")
+                    print(f"⚠️ {phase_name} phase crashed: {e}, but continuing...")
+                    return exit_code
+
+    # If we get here, all retries failed
+    if critical:
+        logger.error(f"{phase_name} phase failed after all retries")
+        cleanup_failed_workflow(
+            issue_number=issue_number,
+            adw_id=adw_id,
+            phase=phase_name.lower(),
+            reason=f"Phase failed after {max_retries + 1} attempts",
+            logger=logger
+        )
+        print(f"❌ {phase_name} phase failed after all retries")
+        sys.exit(1)
+    else:
+        logger.warning(f"⚠️ {phase_name} phase failed but marked as non-critical, continuing...")
+        print(f"⚠️ {phase_name} phase failed but continuing...")
+        return 1
+
+
 def main():
     """Main entry point."""
     # Check for flags
@@ -254,56 +363,17 @@ def main():
     print(f"\n{'='*60}")
     print(f"PHASE 1/10: PLAN ({plan_script})")
     print(f"{'='*60}")
-    print(f"Running: {' '.join(plan_cmd)}")
     logger.info(f"Starting PHASE 1: PLAN with command: {' '.join(plan_cmd)}")
 
-    try:
-        # Plan phase can take 5-15 minutes for complex issues - use generous timeout
-        # No timeout = wait indefinitely (let subprocess control its own timeout)
-        plan = subprocess.run(plan_cmd, capture_output=False, text=True, timeout=None)
-        logger.info(f"Plan phase completed with exit code: {plan.returncode}")
-    except subprocess.TimeoutExpired as e:
-        logger.error(f"Plan phase timed out after {e.timeout} seconds", exc_info=True)
-        print(f"❌ Plan phase timed out")
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=None,
-            phase_name="Plan",
-            error_details=f"Plan phase timed out after {e.timeout} seconds",
-            logger=logger
-        )
-        sys.exit(1)
-    except Exception as e:
-        logger.error(f"Plan phase crashed with exception: {e}", exc_info=True)
-        print(f"❌ Plan phase crashed: {e}")
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=None,
-            phase_name="Plan",
-            error_details=f"Plan phase crashed with exception: {str(e)}",
-            logger=logger
-        )
-        sys.exit(1)
-
-    if plan.returncode != 0:
-        print("❌ Plan phase failed")
-        # Load state to get branch name
-        logger = setup_logger(adw_id, "sdlc_cleanup")
-        state = ADWState.load(adw_id, logger)
-        branch_name = state.get("branch_name") if state else None
-
-        # Clean up failed workflow
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=branch_name,
-            phase_name="Plan",
-            error_details="Plan phase failed. Check planning logs for errors.",
-            logger=logger
-        )
-        sys.exit(1)
+    exit_code = run_phase_with_retry(
+        cmd=plan_cmd,
+        phase_name="Plan",
+        issue_number=issue_number,
+        adw_id=adw_id,
+        logger=logger,
+        max_retries=2,  # Allow 2 retries (3 total attempts)
+        critical=True   # Fail workflow if all retries fail
+    )
 
     # ========================================
     # PHASE 2: VALIDATE (NEW)
@@ -321,20 +391,17 @@ def main():
     print(f"\n{'='*60}")
     print(f"PHASE 2/10: VALIDATE (Baseline Error Detection)")
     print(f"{'='*60}")
-    print(f"Running: {' '.join(validate_cmd)}")
     logger.info(f"Starting PHASE 2: VALIDATE with command: {' '.join(validate_cmd)}")
 
-    try:
-        validate = subprocess.run(validate_cmd, capture_output=False, text=True)
-        logger.info(f"Validate phase completed with exit code: {validate.returncode}")
-    except Exception as e:
-        logger.error(f"Validate phase crashed with exception: {e}", exc_info=True)
-        print(f"⚠️ Validate phase crashed: {e}, but continuing...")
-
-    # Validation NEVER fails - always continue
-    if validate.returncode != 0:
-        logger.warning("Validate phase encountered issues, but continuing...")
-        print("⚠️ Validate phase encountered issues, but continuing...")
+    exit_code = run_phase_with_retry(
+        cmd=validate_cmd,
+        phase_name="Validate",
+        issue_number=issue_number,
+        adw_id=adw_id,
+        logger=logger,
+        max_retries=1,  # Allow 1 retry (2 total attempts)
+        critical=False  # Non-critical: can continue if fails
+    )
 
     # ========================================
     # PHASE 3: BUILD (formerly PHASE 2)
@@ -355,42 +422,17 @@ def main():
     print(f"\n{'='*60}")
     print(f"PHASE 3/10: BUILD")
     print(f"{'='*60}")
-    print(f"Running: {' '.join(build_cmd)}")
     logger.info(f"Starting PHASE 3: BUILD with command: {' '.join(build_cmd)}")
 
-    try:
-        build = subprocess.run(build_cmd, capture_output=False, text=True)
-        logger.info(f"Build phase completed with exit code: {build.returncode}")
-    except Exception as e:
-        logger.error(f"Build phase crashed with exception: {e}", exc_info=True)
-        print(f"❌ Build phase crashed: {e}")
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=state.get("branch_name") if state else None,
-            phase_name="Build",
-            error_details=f"Build phase crashed with exception: {str(e)}",
-            logger=logger
-        )
-        sys.exit(1)
-
-    if build.returncode != 0:
-        print("❌ Build phase failed")
-        # Load state to get branch name
-        logger = setup_logger(adw_id, "sdlc_cleanup")
-        state = ADWState.load(adw_id, logger)
-        branch_name = state.get("branch_name") if state else None
-
-        # Clean up failed workflow
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=branch_name,
-            phase_name="Build",
-            error_details="Build phase failed. Check build logs for TypeScript/compilation errors.",
-            logger=logger
-        )
-        sys.exit(1)
+    exit_code = run_phase_with_retry(
+        cmd=build_cmd,
+        phase_name="Build",
+        issue_number=issue_number,
+        adw_id=adw_id,
+        logger=logger,
+        max_retries=2,  # Allow 2 retries (3 total attempts)
+        critical=True   # Fail workflow if all retries fail
+    )
 
     # ========================================
     # PHASE 4: LINT
@@ -411,42 +453,17 @@ def main():
     print(f"\n{'='*60}")
     print(f"PHASE 4/10: LINT")
     print(f"{'='*60}")
-    print(f"Running: {' '.join(lint_cmd)}")
     logger.info(f"Starting PHASE 4: LINT with command: {' '.join(lint_cmd)}")
 
-    try:
-        lint = subprocess.run(lint_cmd, capture_output=False, text=True)
-        logger.info(f"Lint phase completed with exit code: {lint.returncode}")
-    except Exception as e:
-        logger.error(f"Lint phase crashed with exception: {e}", exc_info=True)
-        print(f"❌ Lint phase crashed: {e}")
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=state.get("branch_name") if state else None,
-            phase_name="Lint",
-            error_details=f"Lint phase crashed with exception: {str(e)}",
-            logger=logger
-        )
-        sys.exit(1)
-
-    if lint.returncode != 0:
-        print("❌ Lint phase failed")
-        # Load state to get branch name
-        logger = setup_logger(adw_id, "sdlc_cleanup")
-        state = ADWState.load(adw_id, logger)
-        branch_name = state.get("branch_name") if state else None
-
-        # Clean up failed workflow
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=branch_name,
-            phase_name="Lint",
-            error_details="Lint phase failed. Fix linting errors before proceeding.",
-            logger=logger
-        )
-        sys.exit(1)
+    exit_code = run_phase_with_retry(
+        cmd=lint_cmd,
+        phase_name="Lint",
+        issue_number=issue_number,
+        adw_id=adw_id,
+        logger=logger,
+        max_retries=2,  # Allow 2 retries (3 total attempts)
+        critical=True   # Fail workflow if all retries fail
+    )
 
     # ========================================
     # PHASE 5: TEST
@@ -468,42 +485,17 @@ def main():
     print(f"\n{'='*60}")
     print(f"PHASE 5/10: TEST")
     print(f"{'='*60}")
-    print(f"Running: {' '.join(test_cmd)}")
     logger.info(f"Starting PHASE 5: TEST with command: {' '.join(test_cmd)}")
 
-    try:
-        test = subprocess.run(test_cmd, capture_output=False, text=True)
-        logger.info(f"Test phase completed with exit code: {test.returncode}")
-    except Exception as e:
-        logger.error(f"Test phase crashed with exception: {e}", exc_info=True)
-        print(f"❌ Test phase crashed: {e}")
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=state.get("branch_name") if state else None,
-            phase_name="Test",
-            error_details=f"Test phase crashed with exception: {str(e)}",
-            logger=logger
-        )
-        sys.exit(1)
-
-    if test.returncode != 0:
-        print("❌ Test phase failed")
-        # Load state to get branch name
-        logger = setup_logger(adw_id, "sdlc_cleanup")
-        state = ADWState.load(adw_id, logger)
-        branch_name = state.get("branch_name") if state else None
-
-        # Clean up failed workflow
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=branch_name,
-            phase_name="Test",
-            error_details="Test phase failed. Review test output and fix failing tests before proceeding.",
-            logger=logger
-        )
-        sys.exit(1)
+    exit_code = run_phase_with_retry(
+        cmd=test_cmd,
+        phase_name="Test",
+        issue_number=issue_number,
+        adw_id=adw_id,
+        logger=logger,
+        max_retries=2,  # Allow 2 retries (3 total attempts)
+        critical=True   # Fail workflow if all retries fail
+    )
 
     # ========================================
     # PHASE 6: REVIEW
@@ -524,42 +516,17 @@ def main():
     print(f"\n{'='*60}")
     print(f"PHASE 6/10: REVIEW")
     print(f"{'='*60}")
-    print(f"Running: {' '.join(review_cmd)}")
     logger.info(f"Starting PHASE 6: REVIEW with command: {' '.join(review_cmd)}")
 
-    try:
-        review = subprocess.run(review_cmd, capture_output=False, text=True)
-        logger.info(f"Review phase completed with exit code: {review.returncode}")
-    except Exception as e:
-        logger.error(f"Review phase crashed with exception: {e}", exc_info=True)
-        print(f"❌ Review phase crashed: {e}")
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=state.get("branch_name") if state else None,
-            phase_name="Review",
-            error_details=f"Review phase crashed with exception: {str(e)}",
-            logger=logger
-        )
-        sys.exit(1)
-
-    if review.returncode != 0:
-        print("❌ Review phase failed")
-        # Load state to get branch name
-        logger = setup_logger(adw_id, "sdlc_cleanup")
-        state = ADWState.load(adw_id, logger)
-        branch_name = state.get("branch_name") if state else None
-
-        # Clean up failed workflow
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=branch_name,
-            phase_name="Review",
-            error_details="Review phase failed. Address review issues before proceeding.",
-            logger=logger
-        )
-        sys.exit(1)
+    exit_code = run_phase_with_retry(
+        cmd=review_cmd,
+        phase_name="Review",
+        issue_number=issue_number,
+        adw_id=adw_id,
+        logger=logger,
+        max_retries=2,  # Allow 2 retries (3 total attempts)
+        critical=True   # Fail workflow if all retries fail
+    )
 
     # ========================================
     # PHASE 7: DOCUMENT
@@ -577,26 +544,17 @@ def main():
     print(f"\n{'='*60}")
     print(f"PHASE 7/10: DOCUMENT")
     print(f"{'='*60}")
-    print(f"Running: {' '.join(document_cmd)}")
     logger.info(f"Starting PHASE 7: DOCUMENT with command: {' '.join(document_cmd)}")
 
-    try:
-        document = subprocess.run(document_cmd, capture_output=False, text=True)
-        logger.info(f"Document phase completed with exit code: {document.returncode}")
-    except Exception as e:
-        logger.error(f"Document phase crashed with exception: {e}", exc_info=True)
-        print(f"⚠️ Document phase crashed: {e}, but continuing...")
-
-    if document.returncode != 0:
-        print("⚠️ Documentation phase failed but continuing...")
-        # Documentation failure shouldn't block shipping
-        try:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", "⚠️ Documentation phase failed but continuing to ship")
-            )
-        except:
-            pass
+    exit_code = run_phase_with_retry(
+        cmd=document_cmd,
+        phase_name="Document",
+        issue_number=issue_number,
+        adw_id=adw_id,
+        logger=logger,
+        max_retries=1,  # Allow 1 retry (2 total attempts)
+        critical=False  # Non-critical: can continue if fails
+    )
 
     # ========================================
     # PHASE 8: SHIP
@@ -614,42 +572,17 @@ def main():
     print(f"\n{'='*60}")
     print(f"PHASE 8/10: SHIP")
     print(f"{'='*60}")
-    print(f"Running: {' '.join(ship_cmd)}")
     logger.info(f"Starting PHASE 8: SHIP with command: {' '.join(ship_cmd)}")
 
-    try:
-        ship = subprocess.run(ship_cmd, capture_output=False, text=True)
-        logger.info(f"Ship phase completed with exit code: {ship.returncode}")
-    except Exception as e:
-        logger.error(f"Ship phase crashed with exception: {e}", exc_info=True)
-        print(f"❌ Ship phase crashed: {e}")
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=None,  # Don't close PR on ship failure
-            phase_name="Ship",
-            error_details=f"Ship phase crashed with exception: {str(e)}",
-            logger=logger
-        )
-        sys.exit(1)
-
-    if ship.returncode != 0:
-        print("❌ Ship phase failed")
-        # Load state to get branch name
-        logger = setup_logger(adw_id, "sdlc_cleanup")
-        state = ADWState.load(adw_id, logger)
-        branch_name = state.get("branch_name") if state else None
-
-        # Clean up failed workflow (but keep PR open - manual review may help)
-        cleanup_failed_workflow(
-            adw_id=adw_id,
-            issue_number=issue_number,
-            branch_name=None,  # Don't close PR on ship failure - manual review may be needed
-            phase_name="Ship",
-            error_details="Ship phase failed. Manual review and merge may be required. PR remains open for manual handling.",
-            logger=logger
-        )
-        sys.exit(1)
+    exit_code = run_phase_with_retry(
+        cmd=ship_cmd,
+        phase_name="Ship",
+        issue_number=issue_number,
+        adw_id=adw_id,
+        logger=logger,
+        max_retries=2,  # Allow 2 retries (3 total attempts)
+        critical=True   # Fail workflow if all retries fail
+    )
 
     # ========================================
     # PHASE 9: CLEANUP
@@ -732,42 +665,17 @@ def main():
     print(f"\n{'='*60}")
     print(f"PHASE 10/10: VERIFY (Post-Deployment Verification)")
     print(f"{'='*60}")
-    print(f"Running: {' '.join(verify_cmd)}")
     logger.info(f"Starting PHASE 10: VERIFY with command: {' '.join(verify_cmd)}")
 
-    try:
-        verify = subprocess.run(verify_cmd, capture_output=False, text=True)
-        logger.info(f"Verify phase completed with exit code: {verify.returncode}")
-    except Exception as e:
-        logger.error(f"Verify phase crashed with exception: {e}", exc_info=True)
-        print(f"⚠️ Verify phase crashed: {e}, but continuing...")
-
-    if verify.returncode != 0:
-        print("⚠️ Verify phase detected issues (follow-up issue created)")
-        # Note: Don't fail workflow on verify failures
-        # Issues are tracked via GitHub, code is already shipped
-        try:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops",
-                    "⚠️ Verify phase detected post-deployment issues. "
-                    "A follow-up issue has been created for tracking. "
-                    "The shipped code has NOT been reverted."
-                )
-            )
-        except:
-            pass
-    else:
-        print("✅ Verify phase passed!")
-        try:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops",
-                    "✅ Verify phase passed! All post-deployment checks successful."
-                )
-            )
-        except:
-            pass
+    exit_code = run_phase_with_retry(
+        cmd=verify_cmd,
+        phase_name="Verify",
+        issue_number=issue_number,
+        adw_id=adw_id,
+        logger=logger,
+        max_retries=1,  # Allow 1 retry (2 total attempts)
+        critical=False  # Non-critical: can continue if fails
+    )
 
     # ========================================
     # COMPLETION

@@ -27,6 +27,11 @@ from typing import Dict, Any
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from adw_modules.state import ADWState
+from utils.idempotency import (
+    check_and_skip_if_complete,
+    validate_phase_completion,
+    ensure_database_state,
+)
 from adw_modules.github import make_issue_comment
 from adw_modules.workflow_ops import format_issue_message
 from adw_modules.utils import setup_logger
@@ -167,6 +172,15 @@ def main():
     logger = setup_logger(adw_id, "adw_validate_iso")
     logger.info(f"Starting validation phase - Issue: {issue_number}, ADW: {adw_id}")
 
+    # IDEMPOTENCY CHECK: Skip if validate phase already complete
+    if check_and_skip_if_complete('validate', int(issue_number), logger):
+        logger.info(f"{'='*60}")
+        logger.info(f"Validate phase already complete for issue {issue_number}")
+        state = ADWState.load(adw_id)
+        logger.info(f"Baseline errors recorded: {state.get('baseline_errors', {})}")
+        logger.info(f"{'='*60}")
+        sys.exit(0)
+
     # Post starting comment
     make_issue_comment(
         issue_number,
@@ -207,6 +221,18 @@ def main():
     )
 
     logger.info("Validation phase completed successfully")
+
+    # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
+    try:
+        validate_phase_completion('validate', int(issue_number), logger)
+        ensure_database_state(int(issue_number), 'validated', 'validate', logger)
+    except Exception as e:
+        logger.error(f"Phase validation failed: {e}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "validator", f"❌ Validate phase validation failed: {e}")
+        )
+        sys.exit(1)
 
     # OBSERVABILITY: Log phase completion
     from datetime import datetime

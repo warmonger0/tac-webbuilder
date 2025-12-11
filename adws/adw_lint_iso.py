@@ -35,6 +35,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from adw_modules.state import ADWState
+from utils.idempotency import (
+    check_and_skip_if_complete,
+    validate_phase_completion,
+    ensure_database_state,
+)
 from adw_modules.git_ops import commit_changes
 from adw_modules.github import make_issue_comment
 from adw_modules.workflow_ops import format_issue_message
@@ -140,6 +145,15 @@ def main():
 
     # Validate environment
     check_env_vars(logger)
+
+    # IDEMPOTENCY CHECK: Skip if lint phase already complete
+    if check_and_skip_if_complete('lint', int(issue_number), logger):
+        logger.info(f"{'='*60}")
+        logger.info(f"Lint phase already complete for issue {issue_number}")
+        state = ADWState.load(adw_id, logger)
+        logger.info(f"Lint results: {state.get('external_lint_results', {})}")
+        logger.info(f"{'='*60}")
+        sys.exit(0)
 
     # Load state
     state = ADWState.load(adw_id, logger)
@@ -320,6 +334,18 @@ def main():
     make_issue_comment(
         issue_number, format_issue_message(adw_id, "ops", "✅ Lint phase completed")
     )
+
+    # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
+    try:
+        validate_phase_completion('lint', int(issue_number), logger)
+        ensure_database_state(int(issue_number), 'linted', 'lint', logger)
+    except Exception as e:
+        logger.error(f"Phase validation failed: {e}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "linter", f"❌ Lint phase validation failed: {e}")
+        )
+        sys.exit(1)
 
     # OBSERVABILITY: Log phase completion
     from datetime import datetime

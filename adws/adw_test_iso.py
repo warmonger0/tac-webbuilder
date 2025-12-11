@@ -72,6 +72,11 @@ from adw_modules.github import (
 )
 from adw_modules.utils import make_adw_id, setup_logger, parse_json, check_env_vars
 from adw_modules.state import ADWState
+from utils.idempotency import (
+    check_and_skip_if_complete,
+    validate_phase_completion,
+    ensure_database_state,
+)
 from adw_modules.git_ops import commit_changes, finalize_git_operations
 from adw_modules.workflow_ops import (
     format_issue_message,
@@ -1306,6 +1311,15 @@ def main():
     # Validate environment
     check_env_vars(logger)
 
+    # IDEMPOTENCY CHECK: Skip if test phase already complete
+    if check_and_skip_if_complete('test', int(issue_number), logger):
+        logger.info(f"{'='*60}")
+        logger.info(f"Test phase already complete for issue {issue_number}")
+        state = ADWState.load(adw_id, temp_logger)
+        logger.info(f"Test results: {state.get('external_test_results', {})}")
+        logger.info(f"{'='*60}")
+        sys.exit(0)
+
     # Validate worktree exists
     valid, error = validate_worktree(adw_id, state)
     if not valid:
@@ -1703,6 +1717,18 @@ def main():
 
     # Save final state
     state.save("adw_test_iso")
+
+    # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
+    try:
+        validate_phase_completion('test', int(issue_number), logger)
+        ensure_database_state(int(issue_number), 'tested', 'test', logger)
+    except Exception as e:
+        logger.error(f"Phase validation failed: {e}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "tester", f"❌ Test phase validation failed: {e}")
+        )
+        sys.exit(1)
 
     # OBSERVABILITY: Log phase completion
     from datetime import datetime

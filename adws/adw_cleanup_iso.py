@@ -36,6 +36,11 @@ from typing import Optional
 from dotenv import load_dotenv
 
 from adw_modules.state import ADWState
+from utils.idempotency import (
+    check_and_skip_if_complete,
+    validate_phase_completion,
+    ensure_database_state,
+)
 from adw_modules.github import make_issue_comment
 from adw_modules.workflow_ops import format_issue_message
 from adw_modules.utils import setup_logger, check_env_vars
@@ -86,6 +91,15 @@ def main():
 
     # Validate environment
     check_env_vars(logger)
+
+    # IDEMPOTENCY CHECK: Skip if cleanup phase already complete
+    if check_and_skip_if_complete('cleanup', int(issue_number), logger):
+        logger.info(f"{'='*60}")
+        logger.info(f"Cleanup phase already complete for issue {issue_number}")
+        state = ADWState.load(adw_id, temp_logger)
+        logger.info(f"Cleanup complete: {state.get('cleanup_complete', {})}")
+        logger.info(f"{'='*60}")
+        sys.exit(0)
 
     # Post initial status
     make_issue_comment(
@@ -234,6 +248,18 @@ def main():
                 f"Manual cleanup: `./scripts/purge_tree.sh {adw_id}`"
             )
         )
+
+    # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
+    try:
+        validate_phase_completion('cleanup', int(issue_number), logger)
+        ensure_database_state(int(issue_number), 'cleaned_up', 'cleanup', logger)
+    except Exception as e:
+        logger.error(f"Phase validation failed: {e}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"❌ Cleanup phase validation failed: {e}")
+        )
+        sys.exit(1)
 
     # OBSERVABILITY: Log phase completion
     from datetime import datetime

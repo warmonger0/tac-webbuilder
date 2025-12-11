@@ -31,6 +31,11 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from adw_modules.state import ADWState
+from utils.idempotency import (
+    check_and_skip_if_complete,
+    validate_phase_completion,
+    ensure_database_state,
+)
 from adw_modules.git_ops import commit_changes, finalize_git_operations
 from adw_modules.github import (
     fetch_issue,
@@ -391,6 +396,15 @@ def main():
     # Validate environment
     check_env_vars(logger)
 
+    # IDEMPOTENCY CHECK: Skip if document phase already complete
+    if check_and_skip_if_complete('document', int(issue_number), logger):
+        logger.info(f"{'='*60}")
+        logger.info(f"Document phase already complete for issue {issue_number}")
+        state = ADWState.load(adw_id, temp_logger)
+        logger.info(f"Documentation changes: {state.get('documentation_changes', {})}")
+        logger.info(f"{'='*60}")
+        sys.exit(0)
+
     # Validate worktree exists
     valid, error = validate_worktree(adw_id, state)
     if not valid:
@@ -561,6 +575,18 @@ def main():
             adw_id, "ops", "✅ Isolated documentation phase completed"
         ),
     )
+
+    # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
+    try:
+        validate_phase_completion('document', int(issue_number), logger)
+        ensure_database_state(int(issue_number), 'documented', 'document', logger)
+    except Exception as e:
+        logger.error(f"Phase validation failed: {e}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "documenter", f"❌ Document phase validation failed: {e}")
+        )
+        sys.exit(1)
 
     # OBSERVABILITY: Log phase completion
     start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None

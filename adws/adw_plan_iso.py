@@ -30,8 +30,14 @@ import logging
 import json
 from typing import Optional
 from dotenv import load_dotenv
+from datetime import datetime
 
 from adw_modules.state import ADWState
+from utils.idempotency import (
+    check_and_skip_if_complete,
+    validate_phase_completion,
+    ensure_database_state,
+)
 from adw_modules.git_ops import commit_changes, finalize_git_operations
 from adw_modules.github import (
     fetch_issue,
@@ -117,6 +123,16 @@ def main():
 
     # Validate environment
     check_env_vars(logger)
+
+    # IDEMPOTENCY CHECK: Skip if plan phase already complete
+    if check_and_skip_if_complete('plan', int(issue_number), logger):
+        logger.info(f"{'='*60}")
+        logger.info(f"Plan phase already complete for issue {issue_number}")
+        logger.info(f"Worktree: {state.get('worktree_path')}")
+        logger.info(f"Plan file: {state.get('plan_file')}")
+        logger.info(f"Branch: {state.get('branch_name')}")
+        logger.info(f"{'='*60}")
+        sys.exit(0)
 
     # Get repo information
     try:
@@ -415,6 +431,18 @@ def main():
     finalize_git_operations(state, logger, cwd=worktree_path)
 
     logger.info("Isolated planning phase completed successfully")
+
+    # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
+    try:
+        validate_phase_completion('plan', int(issue_number), logger)
+        ensure_database_state(int(issue_number), 'planned', 'plan', logger)
+    except Exception as e:
+        logger.error(f"Phase validation failed: {e}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"❌ Plan phase validation failed: {e}")
+        )
+        sys.exit(1)
 
     # Post completion comment (non-critical, don't fail if this errors)
     try:

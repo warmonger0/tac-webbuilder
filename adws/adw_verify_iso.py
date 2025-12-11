@@ -43,6 +43,11 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from adw_modules.state import ADWState
+from utils.idempotency import (
+    check_and_skip_if_complete,
+    validate_phase_completion,
+    ensure_database_state,
+)
 from adw_modules.github import make_issue_comment, get_repo_url, extract_repo_path
 from adw_modules.workflow_ops import format_issue_message
 from adw_modules.utils import setup_logger
@@ -485,6 +490,15 @@ def run_verify_phase(
     """
     logger.info(f"[Verify] Starting verification for issue #{issue_number}")
 
+    # IDEMPOTENCY CHECK: Skip if verify phase already complete
+    if check_and_skip_if_complete('verify', int(issue_number), logger):
+        logger.info(f"{'='*60}")
+        logger.info(f"Verify phase already complete for issue {issue_number}")
+        state = ADWState.load(adw_id, logger)
+        logger.info(f"Verification results: {state.get('verification_results', {})}")
+        logger.info(f"{'='*60}")
+        return 0
+
     # Post initial status
     make_issue_comment(
         issue_number,
@@ -628,6 +642,18 @@ def run_verify_phase(
             "Feature is working correctly in production."
         )
     )
+
+    # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
+    try:
+        validate_phase_completion('verify', int(issue_number), logger)
+        ensure_database_state(int(issue_number), 'verified', 'verify', logger)
+    except Exception as e:
+        logger.error(f"Phase validation failed: {e}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "verifier", f"❌ Verify phase validation failed: {e}")
+        )
+        return 1
 
     # OBSERVABILITY: Log phase completion
     start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
