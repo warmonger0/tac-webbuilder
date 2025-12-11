@@ -27,39 +27,6 @@ from services.phase_queue_service import PhaseQueueService
 
 
 @pytest.fixture
-def temp_phase_db():
-    """Create temporary database for phase queue"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = os.path.join(tmpdir, "test_phase_queue.db")
-
-        conn = sqlite3.connect(db_path)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS phase_queue (
-                queue_id TEXT PRIMARY KEY,
-                parent_issue INTEGER NOT NULL,
-                phase_number INTEGER NOT NULL,
-                issue_number INTEGER,
-                status TEXT CHECK(status IN ('queued', 'ready', 'running', 'completed', 'blocked', 'failed')) DEFAULT 'queued',
-                depends_on_phase INTEGER,
-                phase_data TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                error_message TEXT,
-                adw_id TEXT,
-                pr_number INTEGER,
-                priority INTEGER DEFAULT 50,
-                queue_position INTEGER,
-                ready_timestamp TEXT,
-                started_timestamp TEXT
-            )
-        """)
-        conn.commit()
-        conn.close()
-
-        yield db_path
-
-
-@pytest.fixture
 def temp_workflow_db():
     """Create temporary database for workflow history"""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -87,9 +54,14 @@ def temp_workflow_db():
 
 
 @pytest.fixture
-def phase_queue_service(temp_phase_db):
-    """Create PhaseQueueService with temporary database"""
-    return PhaseQueueService(db_path=temp_phase_db)
+def phase_queue_service():
+    """
+    Create PhaseQueueService.
+
+    Uses PostgreSQL database with cleanup_phase_queue_data autouse fixture
+    for automatic test isolation.
+    """
+    return PhaseQueueService()
 
 
 @pytest.fixture

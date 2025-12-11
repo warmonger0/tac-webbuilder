@@ -364,11 +364,11 @@ def cleanup_phase_queue_data():
     """
     # Import here to avoid circular dependencies during test collection
     try:
-        from database import get_db_adapter
+        from database import get_database_adapter
 
         # Clean before test
         try:
-            adapter = get_db_adapter()
+            adapter = get_database_adapter()
             with adapter.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM phase_queue")
@@ -381,7 +381,7 @@ def cleanup_phase_queue_data():
 
         # Clean after test
         try:
-            adapter = get_db_adapter()
+            adapter = get_database_adapter()
             with adapter.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM phase_queue")

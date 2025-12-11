@@ -4,52 +4,19 @@ Tests for PhaseQueueService
 Tests phase queue management, dependency tracking, and sequential execution coordination.
 """
 
-import os
-import tempfile
-
 import pytest
 from services.phase_queue_service import PhaseQueueService
 
 
 @pytest.fixture
-def temp_db():
-    """Create a temporary database for testing"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = os.path.join(tmpdir, "test_phase_queue.db")
+def service():
+    """
+    Create PhaseQueueService instance.
 
-        # Initialize database with schema
-        import sqlite3
-        conn = sqlite3.connect(db_path)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS phase_queue (
-              queue_id TEXT PRIMARY KEY,
-              parent_issue INTEGER NOT NULL,
-              phase_number INTEGER NOT NULL,
-              issue_number INTEGER,
-              status TEXT CHECK(status IN ('queued', 'ready', 'running', 'completed', 'blocked', 'failed')) DEFAULT 'queued',
-              depends_on_phase INTEGER,
-              phase_data TEXT,
-              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-              error_message TEXT,
-              adw_id TEXT,
-              pr_number INTEGER,
-              priority INTEGER DEFAULT 50,
-              queue_position INTEGER,
-              ready_timestamp TEXT,
-              started_timestamp TEXT
-            )
-        """)
-        conn.commit()
-        conn.close()
-
-        yield db_path
-
-
-@pytest.fixture
-def service(temp_db):
-    """Create PhaseQueueService instance with temporary database"""
-    return PhaseQueueService(db_path=temp_db)
+    Uses PostgreSQL database with cleanup_phase_queue_data autouse fixture
+    for automatic test isolation.
+    """
+    return PhaseQueueService()
 
 
 def test_enqueue_single_phase(service):

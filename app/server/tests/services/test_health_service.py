@@ -45,13 +45,19 @@ class TestHealthServiceInstantiation:
 
     def test_instantiate_with_defaults(self):
         """Verify HealthService can be instantiated with default parameters."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         assert health_service is not None
         assert isinstance(health_service, HealthService)
 
     def test_default_parameters(self):
         """Verify default parameter values are set correctly."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         assert health_service.db_path == "db/database.db"
         assert health_service.webhook_url == "http://localhost:8001/webhook-status"
         assert health_service.cloudflare_tunnel_name is None
@@ -82,7 +88,11 @@ class TestHealthServiceInstantiation:
 
     def test_instantiate_with_none_tunnel_name(self):
         """Verify HealthService handles None for optional cloudflare_tunnel_name."""
-        health_service = HealthService(cloudflare_tunnel_name=None)
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000",
+            cloudflare_tunnel_name=None
+        )
         assert health_service.cloudflare_tunnel_name is None
 
 
@@ -91,13 +101,19 @@ class TestHealthServiceCheckAll:
 
     def test_check_all_returns_dict(self):
         """Verify check_all() returns a dictionary."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = asyncio.run(health_service.check_all())
         assert isinstance(result, dict)
 
     def test_check_all_has_all_service_keys(self):
         """Verify check_all() returns all expected service keys."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = asyncio.run(health_service.check_all())
 
         expected_keys = [
@@ -116,7 +132,10 @@ class TestHealthServiceCheckAll:
 
     def test_check_all_values_are_service_health(self):
         """Verify check_all() returns ServiceHealth objects for all services."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = asyncio.run(health_service.check_all())
 
         for service_name, health in result.items():
@@ -134,26 +153,38 @@ class TestHealthServiceStubMethods:
 
     def test_check_backend_returns_service_health(self):
         """Verify check_backend() returns ServiceHealth instance."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = health_service.check_backend()
         assert isinstance(result, ServiceHealth)
 
     def test_check_backend_returns_healthy_status(self):
         """Verify check_backend() returns healthy status when backend is running."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = health_service.check_backend()
         assert result.status == ServiceStatus.HEALTHY.value
         assert result.name == "Backend API"
 
     def test_check_database_returns_service_health(self):
         """Verify check_database() returns ServiceHealth instance."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = health_service.check_database()
         assert isinstance(result, ServiceHealth)
 
     def test_check_database_returns_healthy_status(self):
         """Verify check_database() returns healthy status when database is accessible."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = health_service.check_database()
         # Database should be healthy or error (depending on if db exists)
         assert result.status in [ServiceStatus.HEALTHY.value, "error"]
@@ -161,13 +192,19 @@ class TestHealthServiceStubMethods:
 
     def test_check_webhook_returns_service_health(self):
         """Verify check_webhook() returns ServiceHealth instance."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = asyncio.run(health_service.check_webhook())
         assert isinstance(result, ServiceHealth)
 
     def test_check_webhook_returns_status(self):
         """Verify check_webhook() returns appropriate status."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = asyncio.run(health_service.check_webhook())
         # Webhook service may be running or not - both are valid
         assert result.status in [ServiceStatus.HEALTHY.value, "error", ServiceStatus.UNKNOWN.value]
@@ -180,13 +217,19 @@ class TestHealthServiceStubMethods:
 
     def test_check_cloudflare_tunnel_returns_service_health(self):
         """Verify check_cloudflare_tunnel() returns ServiceHealth instance."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = health_service.check_cloudflare_tunnel()
         assert isinstance(result, ServiceHealth)
 
     def test_check_cloudflare_tunnel_returns_status(self):
         """Verify check_cloudflare_tunnel() returns appropriate status."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = health_service.check_cloudflare_tunnel()
         # Cloudflare tunnel may or may not be running
         assert result.status in [ServiceStatus.HEALTHY.value, "error", ServiceStatus.UNKNOWN.value]
@@ -194,13 +237,19 @@ class TestHealthServiceStubMethods:
 
     def test_check_github_webhook_returns_service_health(self):
         """Verify check_github_webhook() returns ServiceHealth instance."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = asyncio.run(health_service.check_github_webhook())
         assert isinstance(result, ServiceHealth)
 
     def test_check_github_webhook_returns_status(self):
         """Verify check_github_webhook() returns appropriate status."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = asyncio.run(health_service.check_github_webhook())
         # GitHub webhook check may succeed or fail
         assert result.status in [ServiceStatus.HEALTHY.value, "error", ServiceStatus.UNKNOWN.value, ServiceStatus.DEGRADED.value]
@@ -213,13 +262,19 @@ class TestHealthServiceStubMethods:
 
     def test_check_frontend_returns_service_health(self):
         """Verify check_frontend() returns ServiceHealth instance."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = asyncio.run(health_service.check_frontend())
         assert isinstance(result, ServiceHealth)
 
     def test_check_frontend_returns_status(self):
         """Verify check_frontend() returns appropriate status."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = asyncio.run(health_service.check_frontend())
         # Frontend may or may not be running
         assert result.status in [ServiceStatus.HEALTHY.value, "error", ServiceStatus.UNKNOWN.value, ServiceStatus.DEGRADED.value]
@@ -236,7 +291,10 @@ class TestHealthServiceIntegration:
 
     def test_all_methods_called_by_check_all(self):
         """Verify check_all() calls all health check methods and returns their results."""
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = asyncio.run(health_service.check_all())
 
         # Verify all services return valid status values
@@ -250,7 +308,10 @@ class TestHealthServiceIntegration:
     def test_concurrent_check_all_calls(self):
         """Verify multiple concurrent check_all() calls work correctly."""
         async def run_concurrent():
-            health_service = HealthService()
+            health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
 
             # Run multiple check_all() calls concurrently
             results = await asyncio.gather(
@@ -299,7 +360,10 @@ class TestModuleImports:
         from core.data_models import ServiceHealth as DataModelsServiceHealth
         from services.health_service import HealthService
 
-        health_service = HealthService()
+        health_service = HealthService(
+            frontend_url="http://localhost:5173",
+            backend_port="8000"
+        )
         result = health_service.check_backend()
 
         # Result should be an instance of the ServiceHealth from data_models
