@@ -38,6 +38,72 @@ FastAPI + Python 3.10+ + PostgreSQL + OpenAI/Anthropic APIs + Pydantic
 Module: `core/sql_security.py`
 Tests: `tests/test_sql_injection.py` (30+ tests)
 
+## Session 19: Repository Standards (NEW)
+
+### Standard CRUD Naming
+**All repositories follow consistent naming:**
+```python
+from typing import Optional, List
+from pydantic import BaseModel
+
+class MyRepository:
+    # Create
+    def create(self, item: ModelCreate) -> Model:
+        """Create new record, return full object"""
+
+    # Read
+    def get_by_id(self, id: int) -> Optional[Model]:
+        """Get single record by primary key"""
+
+    def get_by_<field>(self, value: Any) -> Optional[Model]:
+        """Get by unique field (e.g., get_by_email)"""
+
+    def get_all(self, limit: int = 100, offset: int = 0) -> List[Model]:
+        """Get all with pagination"""
+
+    def get_all_by_<field>(self, value: Any, limit: int = 100) -> List[Model]:
+        """Get all matching field value"""
+
+    # Update
+    def update(self, id: int, data: ModelUpdate) -> Optional[Model]:
+        """Update existing record"""
+
+    # Delete
+    def delete(self, id: int) -> bool:
+        """Delete by ID"""
+
+    # Custom
+    def find_<custom_criteria>(...) -> List[Model]:
+        """Complex queries with descriptive name"""
+```
+
+**Benefits:**
+- Predictable method names across all repositories
+- Easy IDE autocomplete
+- Consistent pagination support
+- create() returns full object (not just ID)
+
+### WebSocket Broadcasting
+**Broadcast state changes to connected clients:**
+```python
+from app.server.routes.websocket_routes import manager
+
+async def update_workflow(workflow_id: int, status: str):
+    # Update database
+    workflow = repository.update_status(workflow_id, status)
+
+    # Broadcast to all clients
+    await manager.broadcast({
+        "type": "workflows_update",
+        "data": [workflow.model_dump()]
+    })
+```
+
+**Documentation:**
+- Repository Standards: `docs/backend/repository-standards.md`
+- Backend Patterns: `docs/patterns/backend-patterns.md`
+- Migration Guide: `docs/guides/migration-guide-session-19.md`
+
 ## Common Tasks
 
 ### API Endpoints

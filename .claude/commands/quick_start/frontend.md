@@ -43,6 +43,83 @@ React 18.3 + Vite + TypeScript + Tailwind CSS + TanStack Query
 
 **Performance:** <2s latency vs 3-10s polling, reduced network traffic
 
+## Session 19: Standard Patterns (NEW)
+
+### Data Fetching Patterns
+**Use useQuery for one-time fetches:**
+```typescript
+import { useQuery } from '@tanstack/react-query';
+import { LoadingState } from './common/LoadingState';
+import { ErrorBanner } from './common/ErrorBanner';
+
+const { data, isLoading, error } = useQuery({
+  queryKey: ['resource', id],
+  queryFn: () => fetchResource(id),
+});
+
+if (isLoading) return <LoadingState message="Loading..." />;
+if (error) return <ErrorBanner error={error} />;
+```
+
+**Use WebSocket for real-time data:**
+```typescript
+import { useWorkflowHistoryWebSocket } from '../hooks/useWebSocket';
+
+const { workflowHistory, isConnected } = useWorkflowHistoryWebSocket();
+
+if (!isConnected) return <LoadingState message="Connecting..." />;
+```
+
+**NO POLLING:** Never use `refetchInterval` except conditional (self-terminating)
+
+### Reusable UI Components
+**Location:** `app/client/src/components/common/`
+
+```typescript
+import { LoadingState } from './common/LoadingState';
+import { ErrorBanner } from './common/ErrorBanner';
+import { ConfirmationDialog } from './common/ConfirmationDialog';
+
+// Loading indicator
+<LoadingState message="Loading data..." />
+
+// Error display
+<ErrorBanner error={error} onDismiss={() => setError(null)} />
+
+// Confirmation dialog
+<ConfirmationDialog
+  isOpen={showConfirm}
+  onClose={() => setShowConfirm(false)}
+  onConfirm={handleDelete}
+  title="Delete Entry?"
+  message="This action cannot be undone."
+  confirmVariant="danger"
+/>
+```
+
+### Error Handling Pattern
+```typescript
+import { formatErrorMessage, logError } from '../utils/errorHandler';
+
+const mutation = useMutation({
+  mutationFn: apiCall,
+
+  onError: (err: unknown) => {
+    logError('[ComponentName]', 'Operation', err);
+    setError(formatErrorMessage(err));
+  },
+
+  onSuccess: () => setError(null),
+});
+```
+
+**Documentation:**
+- Migration Guide: `docs/guides/migration-guide-session-19.md`
+- Frontend Patterns: `docs/patterns/frontend-patterns.md`
+- WebSocket API: `docs/api/websocket-api.md`
+- Error Handler: `docs/api/error-handler.md`
+- Components API: `docs/api/reusable-components.md`
+
 ## Common Tasks
 
 ### Styling Changes
