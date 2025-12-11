@@ -1,9 +1,19 @@
 """Pytest configuration for regression tests."""
 
 import sqlite3
+import sys
 from pathlib import Path
 
 import pytest
+
+# ============================================================================
+# Python Path Setup for Regression Tests
+# ============================================================================
+
+# Ensure app/server directory is in Python path
+server_root = Path(__file__).parent.parent.parent
+if str(server_root) not in sys.path:
+    sys.path.insert(0, str(server_root))
 
 
 @pytest.fixture

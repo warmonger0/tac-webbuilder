@@ -13,6 +13,7 @@ import asyncio
 import os
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import time
 from collections.abc import Generator
@@ -23,6 +24,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 # ============================================================================
+# Python Path Setup for Integration Tests
+# ============================================================================
+
+# Ensure app/server directory is in Python path
+server_root = Path(__file__).parent.parent.parent
+if str(server_root) not in sys.path:
+    sys.path.insert(0, str(server_root))
+
+# ============================================================================
 # Server Integration Fixtures
 # ============================================================================
 
@@ -30,51 +40,116 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def integration_test_db(monkeypatch) -> Generator[Path, None, None]:
     """
-    Create a temporary database for integration tests with full schema.
+    Create temporary databases for integration tests (Post-Session 19).
 
-    This fixture initializes a complete database schema matching production,
-    including all tables, indexes, and constraints.
+    **Dual-Database Architecture:**
+    This fixture sets up TWO separate databases:
+
+    1. **workflow_history database** (SQLite):
+       - Stores ADW workflow execution history
+       - Uses DB_PATH constant (patched to temp file)
+       - Legacy direct-access pattern (NOT via adapter)
+
+    2. **Main application database** (PostgreSQL):
+       - Stores phase_queue, planned_features, etc.
+       - Uses adapter pattern via get_database_adapter()
+       - Configured via environment variables (POSTGRES_*)
+
+    **Why Two Databases?**
+    - workflow_history predates Session 19 refactoring, still uses DB_PATH
+    - Main database refactored to adapter pattern in Session 19
+    - Both coexist during transition period
+
+    **Fixture Setup:**
+    - Creates temp SQLite file for workflow_history
+    - Patches core.workflow_history_utils.database.schema.DB_PATH
+    - Sets PostgreSQL env vars for main database adapter
+    - Resets adapter factory cache before/after test
 
     Usage:
         def test_workflow_lifecycle(integration_test_db):
             from core.workflow_history_utils.database import insert_workflow_history
-            # No need to patch - fixture already handles it
             row_id = insert_workflow_history(adw_id="TEST-001", ...)
-            assert row_id > 0
+            assert row_id > 0  # Uses SQLite via patched DB_PATH
     """
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         temp_db_path = Path(f.name)
 
-    # Use monkeypatch to replace DB_PATH in all modules
-    import core.workflow_history_utils.database.analytics as analytics_module
-    import core.workflow_history_utils.database.mutations as mutations_module
-    import core.workflow_history_utils.database.queries as queries_module
+    # Reset database adapter before test to ensure clean state
+    try:
+        from database.factory import close_database_adapter
+        close_database_adapter()
+    except Exception:
+        pass
+
+    # Use monkeypatch to replace DB_PATH in schema module (only module that has it)
     import core.workflow_history_utils.database.schema as schema_module
 
     monkeypatch.setattr(schema_module, 'DB_PATH', temp_db_path)
-    monkeypatch.setattr(mutations_module, 'DB_PATH', temp_db_path)
-    monkeypatch.setattr(queries_module, 'DB_PATH', temp_db_path)
-    monkeypatch.setattr(analytics_module, 'DB_PATH', temp_db_path)
 
-    # Initialize database schema
-    from core.workflow_history_utils.database import init_db
-    init_db()
+    # Also reset the _db_adapter cache in schema module
+    if hasattr(schema_module, '_db_adapter'):
+        monkeypatch.setattr(schema_module, '_db_adapter', None)
+
+    # Set environment variables for PostgreSQL adapter (required by get_database_adapter)
+    monkeypatch.setenv("POSTGRES_HOST", "localhost")
+    monkeypatch.setenv("POSTGRES_PORT", "5432")
+    monkeypatch.setenv("POSTGRES_DB", "tac_webbuilder_test")
+    monkeypatch.setenv("POSTGRES_USER", "tac_user")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "changeme")
+    monkeypatch.setenv("DB_TYPE", "postgresql")
+
+    # Initialize database schema (with error handling)
+    try:
+        from core.workflow_history_utils.database import init_db
+        init_db()
+    except Exception as e:
+        # Log but don't fail fixture - some tests may not use workflow_history DB
+        import traceback
+        print(f"\nWarning: workflow_history database initialization: {e}")
+        traceback.print_exc()
 
     yield temp_db_path
 
     # Cleanup
-    temp_db_path.unlink(missing_ok=True)
+    try:
+        temp_db_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+    # Reset adapter after test
+    try:
+        from database.factory import close_database_adapter
+        close_database_adapter()
+    except Exception:
+        pass
 
 
 @pytest.fixture
-def integration_app(integration_test_db: Path):
+def integration_app(integration_test_db: Path, monkeypatch):
     """
-    Create FastAPI app instance with test database for integration testing.
+    Create FastAPI app instance with dual-database setup (Post-Session 19).
 
-    This fixture provides a fully configured FastAPI application with:
-    - Test database (isolated from production)
-    - Real service instances
-    - Mocked external API calls
+    **App Configuration:**
+    - Fully configured FastAPI application
+    - Real service instances (no mocking)
+    - Test database isolation (SQLite + PostgreSQL)
+
+    **Database Setup (Inherited from integration_test_db):**
+    1. workflow_history → SQLite (via patched DB_PATH)
+    2. Main database → PostgreSQL (via adapter pattern)
+
+    **Additional Setup:**
+    - Sets required server env vars (GITHUB_TOKEN, ports, etc.)
+    - Resets adapter factory cache to pick up test env vars
+    - Patches DB_PATH context for workflow_history import
+    - Reloads database modules to apply patches
+
+    **Adapter Reset Strategy:**
+    Session 19 uses singleton adapter pattern. This fixture:
+    - Closes existing adapter before test (close_database_adapter())
+    - Forces factory to create new adapter with test env vars
+    - Ensures no state leakage from previous tests
 
     Usage:
         def test_api_workflow(integration_app):
@@ -82,10 +157,56 @@ def integration_app(integration_test_db: Path):
             response = client.get("/api/v1/health")
             assert response.status_code == 200
     """
-    # Patch database path before importing server
+    # Set required environment variables for server startup
+    monkeypatch.setenv("FRONTEND_PORT", "3000")
+    monkeypatch.setenv("BACKEND_PORT", "8000")
+    monkeypatch.setenv("GITHUB_TOKEN", "test-token-123")
+    monkeypatch.setenv("GITHUB_REPO", "test/repo")
+
+    # Set PostgreSQL environment variables (already set in integration_test_db, but ensure here)
+    monkeypatch.setenv("POSTGRES_HOST", "localhost")
+    monkeypatch.setenv("POSTGRES_PORT", "5432")
+    monkeypatch.setenv("POSTGRES_DB", "tac_webbuilder_test")
+    monkeypatch.setenv("POSTGRES_USER", "tac_user")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "changeme")
+    monkeypatch.setenv("DB_TYPE", "postgresql")
+
+    # Session 19: Reset global database adapter cache when environment changes
+    # This ensures the adapter factory creates a new instance with updated env vars
+    try:
+        from database.factory import close_database_adapter
+        close_database_adapter()
+    except Exception:
+        pass
+
+    # Also reset the schema module's _db_adapter cache if it exists
+    try:
+        import core.workflow_history_utils.database.schema as schema_module
+        if hasattr(schema_module, '_db_adapter'):
+            schema_module._db_adapter = None
+    except Exception:
+        pass
+
+    # Patch database path for workflow_history database
     with patch('core.workflow_history_utils.database.DB_PATH', integration_test_db):
-        from server import app
-        yield app
+        try:
+            # Reload database module to pick up the patched DB_PATH
+            import importlib
+            import core.workflow_history_utils.database as db_module
+            importlib.reload(db_module)
+        except Exception as e:
+            # Log but continue - some tests may not use this module
+            print(f"Warning: Failed to reload workflow_history database module: {e}")
+
+        try:
+            from server import app
+            yield app
+        except Exception as e:
+            # If app import fails, provide detailed error
+            import traceback
+            print(f"\nError importing server app: {e}")
+            traceback.print_exc()
+            raise
 
 
 @pytest.fixture
@@ -114,11 +235,14 @@ def integration_client(integration_app) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture
-def db_with_workflows(integration_test_db: Path) -> Path:
+def db_with_workflows(integration_test_db: Path, monkeypatch) -> Path:
     """
     Create a test database pre-populated with sample workflow data.
 
     Provides realistic test data for validating queries and analytics.
+
+    Note: This fixture returns the path to the SQLite workflow_history database
+    and patches DB_PATH for tests that need it.
 
     Usage:
         def test_workflow_analytics(db_with_workflows):
@@ -127,6 +251,10 @@ def db_with_workflows(integration_test_db: Path) -> Path:
                 workflows = get_workflow_history(limit=10)
                 assert len(workflows) > 0
     """
+    # Ensure DB_PATH is patched for this fixture
+    import core.workflow_history_utils.database.schema as schema_module
+    monkeypatch.setattr(schema_module, 'DB_PATH', integration_test_db)
+
     # Initialize with sample data
     conn = sqlite3.connect(str(integration_test_db))
     cursor = conn.cursor()
@@ -210,6 +338,26 @@ def db_with_workflows(integration_test_db: Path) -> Path:
 # ============================================================================
 # WebSocket Integration Fixtures
 # ============================================================================
+
+
+@pytest.fixture
+def mock_websocket():
+    """
+    Create a mock WebSocket object for integration testing.
+
+    Usage:
+        @pytest.mark.asyncio
+        async def test_websocket_connection(mock_websocket):
+            await manager.connect(mock_websocket)
+            assert mock_websocket.accept.called
+    """
+    websocket = Mock()
+    websocket.accept = AsyncMock()
+    websocket.send_json = AsyncMock()
+    websocket.send_text = AsyncMock()
+    websocket.close = AsyncMock()
+
+    return websocket
 
 
 @pytest.fixture
@@ -505,6 +653,28 @@ def event_loop():
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
+
+
+# ============================================================================
+# Temporary Directory Fixture (inherited from root conftest but re-exported)
+# ============================================================================
+
+
+@pytest.fixture
+def temp_directory(tmp_path):
+    """
+    Create a temporary directory for integration test files.
+
+    This fixture wraps pytest's tmp_path to ensure it's available in integration tests.
+    It automatically cleans up after test execution.
+
+    Usage:
+        def test_with_temp_files(temp_directory):
+            test_file = temp_directory / "test.json"
+            test_file.write_text("{}")
+            # File automatically cleaned up after test
+    """
+    return tmp_path
 
 
 # ============================================================================

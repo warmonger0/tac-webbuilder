@@ -14,19 +14,34 @@ from pathlib import Path
 import json
 import sys
 import os
+import importlib.util
 
-# Add adws directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../..', 'adws'))
-
-from utils.idempotency import (
-    is_phase_complete,
-    check_and_skip_if_complete,
-    validate_phase_completion,
-    check_plan_file_valid,
-    check_pr_exists,
-    ensure_database_state,
+# Load ADW utils modules directly to avoid conflicts with app.server.utils
+adws_base = Path(__file__).parent.parent.parent.parent.parent / "adws"
+idempotency_spec = importlib.util.spec_from_file_location(
+    "adws_idempotency",
+    adws_base / "utils" / "idempotency.py"
 )
-from utils.state_validator import StateValidator, ValidationResult
+idempotency_module = importlib.util.module_from_spec(idempotency_spec)
+idempotency_spec.loader.exec_module(idempotency_module)
+
+state_validator_spec = importlib.util.spec_from_file_location(
+    "adws_state_validator",
+    adws_base / "utils" / "state_validator.py"
+)
+state_validator_module = importlib.util.module_from_spec(state_validator_spec)
+state_validator_spec.loader.exec_module(state_validator_module)
+
+# Import from the loaded modules
+is_phase_complete = idempotency_module.is_phase_complete
+check_and_skip_if_complete = idempotency_module.check_and_skip_if_complete
+validate_phase_completion = idempotency_module.validate_phase_completion
+check_plan_file_valid = idempotency_module.check_plan_file_valid
+check_pr_exists = idempotency_module.check_pr_exists
+ensure_database_state = idempotency_module.ensure_database_state
+
+StateValidator = state_validator_module.StateValidator
+ValidationResult = state_validator_module.ValidationResult
 
 
 @pytest.fixture
@@ -76,11 +91,10 @@ class TestIdempotencyHelpers:
 
     def test_is_phase_complete_returns_false_for_incomplete_phase(self, mock_logger):
         """Test that is_phase_complete returns False for incomplete phase."""
-        with patch('utils.idempotency.StateValidator') as mock_validator:
-            # Mock validator to return invalid result
-            mock_result = ValidationResult(is_valid=False, errors=["Plan file missing"], warnings=[])
-            mock_validator.return_value.validate_outputs.return_value = mock_result
-
+        # Patch StateValidator in idempotency_module where it's actually used
+        with patch.dict(idempotency_module.__dict__, {'StateValidator': Mock(return_value=Mock(
+            validate_outputs=Mock(return_value=ValidationResult(is_valid=False, errors=["Plan file missing"], warnings=[]))
+        ))}):
             result = is_phase_complete('plan', 123, mock_logger)
 
             assert result is False
@@ -88,11 +102,10 @@ class TestIdempotencyHelpers:
 
     def test_is_phase_complete_returns_true_for_complete_phase(self, mock_logger):
         """Test that is_phase_complete returns True for complete phase."""
-        with patch('utils.idempotency.StateValidator') as mock_validator:
-            # Mock validator to return valid result
-            mock_result = ValidationResult(is_valid=True, errors=[], warnings=[])
-            mock_validator.return_value.validate_outputs.return_value = mock_result
-
+        # Patch StateValidator in idempotency_module where it's actually used
+        with patch.dict(idempotency_module.__dict__, {'StateValidator': Mock(return_value=Mock(
+            validate_outputs=Mock(return_value=ValidationResult(is_valid=True, errors=[], warnings=[]))
+        ))}):
             result = is_phase_complete('plan', 123, mock_logger)
 
             assert result is True
@@ -100,7 +113,7 @@ class TestIdempotencyHelpers:
 
     def test_check_and_skip_if_complete_returns_true_when_complete(self, mock_logger):
         """Test that check_and_skip_if_complete returns True when phase is complete."""
-        with patch('utils.idempotency.is_phase_complete', return_value=True):
+        with patch.object(idempotency_module, 'is_phase_complete', return_value=True):
             result = check_and_skip_if_complete('plan', 123, mock_logger)
 
             assert result is True
@@ -108,7 +121,7 @@ class TestIdempotencyHelpers:
 
     def test_check_and_skip_if_complete_returns_false_when_incomplete(self, mock_logger):
         """Test that check_and_skip_if_complete returns False when phase is incomplete."""
-        with patch('utils.idempotency.is_phase_complete', return_value=False):
+        with patch.object(idempotency_module, 'is_phase_complete', return_value=False):
             result = check_and_skip_if_complete('plan', 123, mock_logger)
 
             assert result is False
@@ -116,13 +129,13 @@ class TestIdempotencyHelpers:
 
     def test_validate_phase_completion_raises_on_incomplete(self, mock_logger):
         """Test that validate_phase_completion raises ValueError on incomplete phase."""
-        with patch('utils.idempotency.is_phase_complete', return_value=False):
+        with patch.object(idempotency_module, 'is_phase_complete', return_value=False):
             with pytest.raises(ValueError, match="Plan phase incomplete after execution"):
                 validate_phase_completion('plan', 123, mock_logger)
 
     def test_validate_phase_completion_succeeds_on_complete(self, mock_logger):
         """Test that validate_phase_completion succeeds on complete phase."""
-        with patch('utils.idempotency.is_phase_complete', return_value=True):
+        with patch.object(idempotency_module, 'is_phase_complete', return_value=True):
             # Should not raise
             validate_phase_completion('plan', 123, mock_logger)
             mock_logger.info.assert_called_with("✓ Plan phase validated as complete")
@@ -178,7 +191,7 @@ Build feature X
 
     def test_ensure_database_state_updates_when_incorrect(self, mock_logger):
         """Test that ensure_database_state updates database when state is incorrect."""
-        with patch('utils.idempotency.PhaseQueueRepository') as mock_repo_class:
+        with patch('app.server.repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
             # Mock workflow with incorrect state
             mock_workflow = Mock()
             mock_workflow.status = "pending"
@@ -198,7 +211,7 @@ Build feature X
 
     def test_ensure_database_state_skips_update_when_correct(self, mock_logger):
         """Test that ensure_database_state skips update when state is already correct."""
-        with patch('utils.idempotency.PhaseQueueRepository') as mock_repo_class:
+        with patch('app.server.repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
             # Mock workflow with correct state
             mock_workflow = Mock()
             mock_workflow.status = "planned"
@@ -235,8 +248,8 @@ class TestStateValidator:
 
         mock_workflow.adw_id = "test-adw-123"
 
-        with patch('utils.state_validator.PhaseQueueRepository') as mock_repo_class:
-            with patch('utils.state_validator.StateValidator._get_worktree_path', return_value=str(worktree)):
+        with patch('app.server.repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
+            with patch.object(StateValidator, '_get_worktree_path', return_value=str(worktree)):
                 mock_repo = Mock()
                 mock_repo.find_by_issue_number.return_value = mock_workflow
                 mock_repo_class.return_value = mock_repo
@@ -261,8 +274,8 @@ class TestStateValidator:
 
         mock_workflow.adw_id = "test-adw-123"
 
-        with patch('utils.state_validator.PhaseQueueRepository') as mock_repo_class:
-            with patch('utils.state_validator.StateValidator._get_worktree_path', return_value=str(worktree)):
+        with patch('app.server.repositories.phase_queue_repository.PhaseQueueRepository') as mock_repo_class:
+            with patch.object(StateValidator, '_get_worktree_path', return_value=str(worktree)):
                 mock_repo = Mock()
                 mock_repo.find_by_issue_number.return_value = mock_workflow
                 mock_repo_class.return_value = mock_repo

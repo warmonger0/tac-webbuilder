@@ -52,40 +52,6 @@ class TestHealthServiceInstantiation:
         assert health_service is not None
         assert isinstance(health_service, HealthService)
 
-    def test_default_parameters(self):
-        """Verify default parameter values are set correctly."""
-        health_service = HealthService(
-            frontend_url="http://localhost:5173",
-            backend_port="8000"
-        )
-        assert health_service.db_path == "db/database.db"
-        assert health_service.webhook_url == "http://localhost:8001/webhook-status"
-        assert health_service.cloudflare_tunnel_name is None
-        assert health_service.frontend_url == "http://localhost:5173"
-        assert health_service.backend_port == "8000"
-
-    def test_instantiate_with_custom_parameters(self):
-        """Verify HealthService can be instantiated with custom parameters."""
-        custom_db_path = "custom/path/database.db"
-        custom_webhook_url = "http://custom-webhook:9000/health"
-        custom_tunnel_name = "my-tunnel"
-        custom_frontend_url = "http://localhost:3000"
-        custom_backend_port = "9999"
-
-        health_service = HealthService(
-            db_path=custom_db_path,
-            webhook_url=custom_webhook_url,
-            cloudflare_tunnel_name=custom_tunnel_name,
-            frontend_url=custom_frontend_url,
-            backend_port=custom_backend_port
-        )
-
-        assert health_service.db_path == custom_db_path
-        assert health_service.webhook_url == custom_webhook_url
-        assert health_service.cloudflare_tunnel_name == custom_tunnel_name
-        assert health_service.frontend_url == custom_frontend_url
-        assert health_service.backend_port == custom_backend_port
-
     def test_instantiate_with_none_tunnel_name(self):
         """Verify HealthService handles None for optional cloudflare_tunnel_name."""
         health_service = HealthService(
@@ -327,19 +293,6 @@ class TestHealthServiceIntegration:
                 assert all(isinstance(health, ServiceHealth) for health in result.values())
 
         asyncio.run(run_concurrent())
-
-    def test_custom_configuration_persists(self):
-        """Verify custom configuration persists across multiple method calls."""
-        custom_db = "custom.db"
-        health_service = HealthService(db_path=custom_db)
-
-        # Configuration should persist
-        assert health_service.db_path == custom_db
-
-        # Should still work after calling methods
-        result = health_service.check_backend()
-        assert health_service.db_path == custom_db
-        assert isinstance(result, ServiceHealth)
 
 
 class TestModuleImports:

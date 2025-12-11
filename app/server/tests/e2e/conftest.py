@@ -11,6 +11,7 @@ services, databases, and workflow orchestration where possible.
 import asyncio
 import contextlib
 import json
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -19,8 +20,31 @@ from unittest.mock import Mock, patch
 import pytest
 
 # ============================================================================
+# Python Path Setup for E2E Tests
+# ============================================================================
+
+# Ensure app/server directory is in Python path
+server_root = Path(__file__).parent.parent.parent
+if str(server_root) not in sys.path:
+    sys.path.insert(0, str(server_root))
+
+# ============================================================================
 # E2E Test Environment Setup
 # ============================================================================
+
+
+@pytest.fixture(scope="session")
+def monkeypatch_session():
+    """
+    Session-scoped monkeypatch fixture for E2E testing.
+
+    Allows patching at session scope, which is needed for database setup.
+    This is a workaround since pytest's built-in monkeypatch is function-scoped.
+    """
+    from _pytest.monkeypatch import MonkeyPatch
+    m = MonkeyPatch()
+    yield m
+    m.undo()
 
 
 @pytest.fixture(scope="session")
@@ -71,7 +95,7 @@ def e2e_test_environment():
 
 
 @pytest.fixture(scope="session")
-def e2e_database(e2e_test_environment):
+def e2e_database(e2e_test_environment, monkeypatch_session):
     """
     Create a fully initialized database for E2E testing.
 
@@ -79,97 +103,118 @@ def e2e_database(e2e_test_environment):
 
     Session-scoped to prevent UNIQUE constraint violations from re-inserting seed data.
 
+    Note: Post-Session 19, this uses the database adapter pattern.
+    We patch DB_PATH and set environment variables for the database adapter.
+
     Usage:
         def test_workflow_query_journey(e2e_database):
             # Database is ready with schema and seed data
-            from core.workflow_history import get_workflow_history
+            from core.workflow_history_utils.database import get_workflow_history
             workflows = get_workflow_history(limit=10)
             assert len(workflows) > 0
     """
     db_path = Path(e2e_test_environment["config"]["DB_PATH"])
 
+    # Set environment variables for database adapter (required by Session 19 database adapter pattern)
+    monkeypatch_session.setenv("POSTGRES_HOST", "localhost")
+    monkeypatch_session.setenv("POSTGRES_PORT", "5432")
+    monkeypatch_session.setenv("POSTGRES_DB", "tac_webbuilder_test")
+    monkeypatch_session.setenv("POSTGRES_USER", "tac_user")
+    monkeypatch_session.setenv("POSTGRES_PASSWORD", "changeme")
+    monkeypatch_session.setenv("DB_TYPE", "postgresql")
+
+    # Patch DB_PATH in schema module before initializing database
+    import core.workflow_history_utils.database.schema as schema_module
+    monkeypatch_session.setattr(schema_module, 'DB_PATH', db_path)
+
     # Initialize database with full schema
-    from core.workflow_history import init_db
+    from core.workflow_history_utils.database import init_db
 
-    with patch('core.workflow_history_utils.database.DB_PATH', db_path):
-        init_db()
+    init_db()
 
-        # Add seed data for realistic testing
-        import sqlite3
-        conn = sqlite3.connect(str(db_path))
-        cursor = conn.cursor()
+    # Add seed data for realistic testing
+    import sqlite3
+    conn = sqlite3.connect(str(db_path))
+    cursor = conn.cursor()
 
-        seed_workflows = [
-            {
-                "adw_id": "E2E-001",
-                "issue_number": 1,
-                "nl_input": "Create user authentication system",
-                "github_url": "https://github.com/test/repo/issues/1",
-                "workflow_template": "adw_sdlc_iso",
-                "model_used": "claude-sonnet-4-5",
-                "status": "completed",
-                "duration_seconds": 1200,
-                "input_tokens": 10000,
-                "output_tokens": 5000,
-                "total_tokens": 15000,
-                "actual_cost_total": 0.75,
-            },
-            {
-                "adw_id": "E2E-002",
-                "issue_number": 2,
-                "nl_input": "Add password reset functionality",
-                "github_url": "https://github.com/test/repo/issues/2",
-                "workflow_template": "adw_sdlc_iso",
-                "model_used": "claude-sonnet-4-5",
-                "status": "completed",
-                "duration_seconds": 800,
-                "input_tokens": 6000,
-                "output_tokens": 3000,
-                "total_tokens": 9000,
-                "actual_cost_total": 0.45,
-            },
-            {
-                "adw_id": "E2E-003",
-                "issue_number": 3,
-                "nl_input": "Implement email verification",
-                "github_url": "https://github.com/test/repo/issues/3",
-                "workflow_template": "adw_sdlc_iso",
-                "model_used": "claude-sonnet-4-5",
-                "status": "running",
-                "duration_seconds": 300,
-                "input_tokens": 3000,
-                "output_tokens": 1500,
-                "total_tokens": 4500,
-                "actual_cost_total": 0.22,
-            },
-        ]
+    seed_workflows = [
+        {
+            "adw_id": "E2E-001",
+            "issue_number": 1,
+            "nl_input": "Create user authentication system",
+            "github_url": "https://github.com/test/repo/issues/1",
+            "workflow_template": "adw_sdlc_iso",
+            "model_used": "claude-sonnet-4-5",
+            "status": "completed",
+            "duration_seconds": 1200,
+            "input_tokens": 10000,
+            "output_tokens": 5000,
+            "total_tokens": 15000,
+            "actual_cost_total": 0.75,
+        },
+        {
+            "adw_id": "E2E-002",
+            "issue_number": 2,
+            "nl_input": "Add password reset functionality",
+            "github_url": "https://github.com/test/repo/issues/2",
+            "workflow_template": "adw_sdlc_iso",
+            "model_used": "claude-sonnet-4-5",
+            "status": "completed",
+            "duration_seconds": 800,
+            "input_tokens": 6000,
+            "output_tokens": 3000,
+            "total_tokens": 9000,
+            "actual_cost_total": 0.45,
+        },
+        {
+            "adw_id": "E2E-003",
+            "issue_number": 3,
+            "nl_input": "Implement email verification",
+            "github_url": "https://github.com/test/repo/issues/3",
+            "workflow_template": "adw_sdlc_iso",
+            "model_used": "claude-sonnet-4-5",
+            "status": "running",
+            "duration_seconds": 300,
+            "input_tokens": 3000,
+            "output_tokens": 1500,
+            "total_tokens": 4500,
+            "actual_cost_total": 0.22,
+        },
+    ]
 
-        for workflow in seed_workflows:
-            cursor.execute("""
-                INSERT INTO workflow_history (
-                    adw_id, issue_number, nl_input, github_url, workflow_template,
-                    model_used, status, duration_seconds, input_tokens, output_tokens,
-                    total_tokens, actual_cost_total
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                workflow["adw_id"],
-                workflow["issue_number"],
-                workflow["nl_input"],
-                workflow["github_url"],
-                workflow["workflow_template"],
-                workflow["model_used"],
-                workflow["status"],
-                workflow["duration_seconds"],
-                workflow["input_tokens"],
-                workflow["output_tokens"],
-                workflow["total_tokens"],
-                workflow["actual_cost_total"],
-            ))
+    for workflow in seed_workflows:
+        cursor.execute("""
+            INSERT INTO workflow_history (
+                adw_id, issue_number, nl_input, github_url, workflow_template,
+                model_used, status, duration_seconds, input_tokens, output_tokens,
+                total_tokens, actual_cost_total
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            workflow["adw_id"],
+            workflow["issue_number"],
+            workflow["nl_input"],
+            workflow["github_url"],
+            workflow["workflow_template"],
+            workflow["model_used"],
+            workflow["status"],
+            workflow["duration_seconds"],
+            workflow["input_tokens"],
+            workflow["output_tokens"],
+            workflow["total_tokens"],
+            workflow["actual_cost_total"],
+        ))
 
-        conn.commit()
-        conn.close()
+    conn.commit()
+    conn.close()
 
-    return db_path
+    yield db_path
+
+    # Cleanup: Reset database adapter cache (important for session-scoped fixture)
+    try:
+        from database.factory import close_database_adapter
+        close_database_adapter()
+    except Exception:
+        pass
 
 
 # ============================================================================
@@ -439,15 +484,17 @@ def e2e_test_db_cleanup(e2e_database):
 
 
 @pytest.fixture
-def e2e_test_client(e2e_database, mock_external_services_e2e, e2e_test_db_cleanup):
+def e2e_test_client(e2e_database, mock_external_services_e2e, e2e_test_db_cleanup, monkeypatch):
     """
     Create a fully configured test client for E2E testing.
 
     This client has:
-    - Real database with seed data
+    - Real database with seed data (using Session 19 database adapter pattern)
     - Mocked external APIs
     - Full service stack
     - Automatic cleanup between tests
+
+    Note: Post-Session 19, uses database adapter pattern with environment variables.
 
     Usage:
         def test_complete_api_flow(e2e_test_client):
@@ -458,11 +505,29 @@ def e2e_test_client(e2e_database, mock_external_services_e2e, e2e_test_db_cleanu
     """
     from fastapi.testclient import TestClient
 
-    with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
-        from server import app
+    # Set environment variables for database adapter
+    monkeypatch.setenv("POSTGRES_HOST", "localhost")
+    monkeypatch.setenv("POSTGRES_PORT", "5432")
+    monkeypatch.setenv("POSTGRES_DB", "tac_webbuilder_test")
+    monkeypatch.setenv("POSTGRES_USER", "tac_user")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "changeme")
+    monkeypatch.setenv("DB_TYPE", "postgresql")
 
-        with TestClient(app) as client:
-            yield client
+    # Patch DB_PATH in schema module
+    import core.workflow_history_utils.database.schema as schema_module
+    monkeypatch.setattr(schema_module, 'DB_PATH', e2e_database)
+
+    # Set required environment variables for server startup
+    monkeypatch.setenv("FRONTEND_PORT", "3000")
+    monkeypatch.setenv("BACKEND_PORT", "8000")
+    monkeypatch.setenv("GITHUB_TOKEN", "test-token-123")
+    monkeypatch.setenv("GITHUB_REPO", "test/repo")
+
+    # Import app and create client
+    from server import app
+
+    with TestClient(app) as client:
+        yield client
 
 
 # ============================================================================
@@ -555,7 +620,7 @@ def workflow_execution_harness(e2e_database, adw_test_workspace):
 
         def execute_workflow(self, workflow_data):
             """Execute a workflow and track results."""
-            from core.workflow_history import insert_workflow_history
+            from core.workflow_history_utils.database import insert_workflow_history
 
             with patch('core.workflow_history_utils.database.DB_PATH', self.database):
                 # Insert workflow

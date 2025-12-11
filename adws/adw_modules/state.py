@@ -9,7 +9,7 @@ import os
 import sys
 import logging
 from typing import Dict, Any, Optional
-from adw_modules.data_types import ADWStateData
+from adws.adw_modules.data_types import ADWStateData
 
 
 class ADWState:

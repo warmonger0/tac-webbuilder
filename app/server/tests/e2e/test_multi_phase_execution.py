@@ -12,11 +12,22 @@ Tests the complete flow of multi-phase workflow execution including:
 import asyncio
 import os
 import sqlite3
+import sys
 import tempfile
+import traceback
 from datetime import datetime
-from unittest.mock import AsyncMock
+from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
+
+# Ensure app/server directory is in Python path
+server_root = Path(__file__).parent.parent.parent
+if str(server_root) not in sys.path:
+    sys.path.insert(0, str(server_root))
+
+from database.sqlite_adapter import SQLiteAdapter
+from repositories.phase_queue_repository import PhaseQueueRepository
 from services.phase_coordinator import PhaseCoordinator
 from services.phase_queue_service import PhaseQueueService
 
@@ -27,7 +38,7 @@ from services.phase_queue_service import PhaseQueueService
 
 @pytest.fixture
 def temp_phase_db():
-    """Create temporary database for phase queue"""
+    """Create temporary database for phase queue with adapter instance"""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_phase_queue.db")
 
@@ -56,12 +67,13 @@ def temp_phase_db():
         conn.commit()
         conn.close()
 
-        yield db_path
+        # Create and return SQLiteAdapter instance with this database path
+        yield SQLiteAdapter(db_path=db_path)
 
 
 @pytest.fixture
 def temp_workflow_db():
-    """Create temporary database for workflow history"""
+    """Create temporary database for workflow history with adapter instance"""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_workflow_history.db")
 
@@ -76,6 +88,7 @@ def temp_workflow_db():
                 error_message TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                end_time TEXT,
                 phase_number INTEGER,
                 parent_workflow_id TEXT,
                 is_multi_phase INTEGER DEFAULT 0
@@ -84,13 +97,17 @@ def temp_workflow_db():
         conn.commit()
         conn.close()
 
-        yield db_path
+        # Create and return SQLiteAdapter instance with this database path
+        yield SQLiteAdapter(db_path=db_path)
 
 
 @pytest.fixture
 def phase_queue_service(temp_phase_db):
-    """Create PhaseQueueService with temporary database"""
-    return PhaseQueueService(db_path=temp_phase_db)
+    """Create PhaseQueueService with temporary database adapter"""
+    # temp_phase_db is now a SQLiteAdapter instance
+    repository = PhaseQueueRepository()
+    repository.adapter = temp_phase_db  # Inject the test adapter
+    return PhaseQueueService(repository=repository)
 
 
 @pytest.fixture
@@ -103,13 +120,17 @@ def mock_websocket_manager():
 
 @pytest.fixture
 def phase_coordinator(phase_queue_service, temp_workflow_db, mock_websocket_manager):
-    """Create PhaseCoordinator with test dependencies"""
+    """Create PhaseCoordinator with test dependencies and patched adapters"""
     coordinator = PhaseCoordinator(
         phase_queue_service=phase_queue_service,
-        workflow_db_path=temp_workflow_db,
         poll_interval=0.1,  # Fast polling for tests
         websocket_manager=mock_websocket_manager
     )
+
+    # Inject the test workflow database adapter into the detector
+    # temp_workflow_db is now a SQLiteAdapter instance
+    coordinator.detector.adapter = temp_workflow_db
+
     return coordinator
 
 
@@ -119,7 +140,7 @@ def phase_coordinator(phase_queue_service, temp_workflow_db, mock_websocket_mana
 
 
 def create_workflow_entry(
-    workflow_db_path: str,
+    workflow_adapter: SQLiteAdapter,
     issue_number: int,
     status: str = "running",
     error_message: str | None = None,
@@ -130,39 +151,38 @@ def create_workflow_entry(
     Helper to create workflow_history entry.
 
     Args:
-        workflow_db_path: Path to workflow database
+        workflow_adapter: SQLiteAdapter instance for workflow database
         issue_number: GitHub issue number
         status: Workflow status (pending, running, completed, failed)
         error_message: Error message for failed workflows
         phase_number: Phase number (for multi-phase workflows)
         is_multi_phase: Whether this is a multi-phase workflow
     """
-    conn = sqlite3.connect(workflow_db_path)
-    conn.execute(
-        """
-        INSERT INTO workflow_history (
-            workflow_id, issue_number, status, error_message,
-            phase_number, is_multi_phase, created_at, updated_at
+    with workflow_adapter.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO workflow_history (
+                workflow_id, issue_number, status, error_message,
+                phase_number, is_multi_phase, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                f"wf-{issue_number}",
+                issue_number,
+                status,
+                error_message,
+                phase_number,
+                1 if is_multi_phase else 0,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+            ),
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            f"wf-{issue_number}",
-            issue_number,
-            status,
-            error_message,
-            phase_number,
-            1 if is_multi_phase else 0,
-            datetime.now().isoformat(),
-            datetime.now().isoformat(),
-        ),
-    )
-    conn.commit()
-    conn.close()
 
 
 def update_workflow_status(
-    workflow_db_path: str,
+    workflow_adapter: SQLiteAdapter,
     issue_number: int,
     status: str,
     error_message: str | None = None
@@ -171,22 +191,22 @@ def update_workflow_status(
     Helper to update workflow status.
 
     Args:
-        workflow_db_path: Path to workflow database
+        workflow_adapter: SQLiteAdapter instance for workflow database
         issue_number: GitHub issue number
         status: New status
         error_message: Error message (for failed status)
     """
-    conn = sqlite3.connect(workflow_db_path)
-    conn.execute(
-        """
-        UPDATE workflow_history
-        SET status = ?, error_message = ?, updated_at = ?
-        WHERE issue_number = ?
-        """,
-        (status, error_message, datetime.now().isoformat(), issue_number),
-    )
-    conn.commit()
-    conn.close()
+    with workflow_adapter.get_connection() as conn:
+        cursor = conn.cursor()
+        end_time = datetime.now().isoformat() if status in ('completed', 'failed') else None
+        cursor.execute(
+            """
+            UPDATE workflow_history
+            SET status = ?, error_message = ?, updated_at = ?, end_time = ?
+            WHERE issue_number = ?
+            """,
+            (status, error_message, datetime.now().isoformat(), end_time, issue_number),
+        )
 
 
 def get_phase_status(phase_queue_service: PhaseQueueService, queue_id: str) -> str:
@@ -570,13 +590,15 @@ class TestMultiPhaseExecution:
         """
         Test that errors in polling loop are caught and logged without crashing.
         """
-        # Create coordinator with invalid workflow DB path to trigger errors
+        # Create coordinator to test error handling
         bad_coordinator = PhaseCoordinator(
             phase_queue_service=phase_queue_service,
-            workflow_db_path="/nonexistent/path/to/db.db",
             poll_interval=0.1,
             websocket_manager=mock_websocket_manager
         )
+
+        # Inject test workflow database adapter
+        bad_coordinator.detector.adapter = temp_workflow_db
 
         await bad_coordinator.start()
 

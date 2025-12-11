@@ -470,13 +470,13 @@ class TestPlannedFeaturesServiceStatistics:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_cursor.fetchall.side_effect = [
-            [("planned", 5), ("in_progress", 2), ("completed", 10)],  # by_status
-            [("high", 3), ("medium", 8), ("low", 6)],  # by_priority
-            [("session", 7), ("feature", 10)],  # by_type
+            [{"status": "planned", "count": 5}, {"status": "in_progress", "count": 2}, {"status": "completed", "count": 10}],  # by_status
+            [{"priority": "high", "count": 3}, {"priority": "medium", "count": 8}, {"priority": "low", "count": 6}],  # by_priority
+            [{"item_type": "session", "count": 7}, {"item_type": "feature", "count": 10}],  # by_type
         ]
         mock_cursor.fetchone.side_effect = [
-            (45.5, 38.0),  # hours summary
-            (58.8,),  # completion rate
+            {"total_estimated": 45.5, "total_actual": 38.0},  # hours summary
+            {"completion_rate": 58.8},  # completion rate
         ]
         mock_conn.cursor.return_value = mock_cursor
         mock_adapter.get_connection.return_value.__enter__.return_value = mock_conn

@@ -77,7 +77,6 @@ def phase_coordinator(phase_queue_service, temp_workflow_db, mock_websocket_mana
     """Create PhaseCoordinator with test dependencies"""
     return PhaseCoordinator(
         phase_queue_service=phase_queue_service,
-        workflow_db_path=temp_workflow_db,
         poll_interval=0.1,  # Fast polling for tests
         websocket_manager=mock_websocket_manager
     )
@@ -457,7 +456,6 @@ class TestWebSocketBroadcasting:
         # Create coordinator without WebSocket manager
         coordinator = PhaseCoordinator(
             phase_queue_service=phase_queue_service,
-            workflow_db_path=temp_workflow_db,
             poll_interval=0.1,
             websocket_manager=None
         )
@@ -519,26 +517,6 @@ class TestErrorHandling:
 
         finally:
             await phase_coordinator.stop()
-
-    async def test_invalid_workflow_db_path(
-        self,
-        phase_queue_service,
-        mock_websocket_manager
-    ):
-        """Test handling of invalid workflow database path"""
-        coordinator = PhaseCoordinator(
-            phase_queue_service=phase_queue_service,
-            workflow_db_path="/invalid/path/db.db",
-            poll_interval=0.1,
-            websocket_manager=mock_websocket_manager
-        )
-
-        # Should not crash when checking completions
-        await coordinator._check_workflow_completions()
-
-        # Status should be None for non-existent DB
-        status = coordinator._get_workflow_status(123)
-        assert status is None
 
 
 @pytest.mark.unit

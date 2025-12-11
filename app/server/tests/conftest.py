@@ -15,6 +15,7 @@ Fixtures provided:
 
 import os
 import sqlite3
+import sys
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
@@ -22,6 +23,29 @@ from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
+
+# ============================================================================
+# Python Path Setup for Test Imports
+# ============================================================================
+
+# Ensure app/server directory is in Python path so tests can import:
+# - from services.x import X
+# - from core.x import X
+# - from utils.x import X
+# - from repositories.x import X
+# - from database import X
+server_root = Path(__file__).parent.parent
+if str(server_root) not in sys.path:
+    sys.path.insert(0, str(server_root))
+
+# ============================================================================
+# Test Environment Configuration
+# ============================================================================
+
+# Set default test environment variables for SQLite database
+# Tests use SQLite by default for speed and isolation
+if "DB_TYPE" not in os.environ:
+    os.environ["DB_TYPE"] = "sqlite"
 
 # ============================================================================
 # Pytest Configuration
@@ -48,6 +72,46 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "requires_github: marks tests requiring GitHub integration"
     )
+
+
+@pytest.fixture(autouse=True)
+def reset_database_adapter():
+    """
+    Reset the database adapter singleton before each test.
+
+    This ensures each test gets a fresh adapter instance, preventing
+    state leakage between tests. This is necessary because the adapter
+    is a global singleton that maintains connection pools.
+    """
+    # Reset before test
+    try:
+        from database import factory
+        # Close any existing adapter
+        if factory._adapter is not None:
+            try:
+                factory._adapter.close()
+            except Exception:
+                pass  # Ignore close errors
+        factory._adapter = None
+    except ImportError:
+        # Database module not yet available during test collection
+        pass
+
+    yield  # Test runs here
+
+    # Reset after test
+    try:
+        from database import factory
+        # Close the adapter used by the test
+        if factory._adapter is not None:
+            try:
+                factory._adapter.close()
+            except Exception:
+                pass  # Ignore close errors
+        factory._adapter = None
+    except ImportError:
+        # Database module not yet available during test collection
+        pass
 
 
 # ============================================================================
@@ -168,31 +232,35 @@ def test_client() -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture
-def test_client_with_db(temp_test_db: str) -> Generator[TestClient, None, None]:
+def test_client_with_db(monkeypatch, temp_test_db: str) -> Generator[TestClient, None, None]:
     """
     Create a TestClient with a temporary test database.
 
-    This fixture patches the database path to use a temporary database,
-    ensuring tests don't modify the production database.
+    Post-Session 19: Uses database adapter pattern. Sets environment variables
+    to configure SQLite adapter with temporary database path, then resets
+    the adapter factory to pick up the new configuration.
 
     Usage:
         def test_database_endpoint(test_client_with_db):
             response = test_client_with_db.post("/api/v1/workflow/create", json={...})
             assert response.status_code == 200
     """
+    # Set environment to use SQLite with temp database
+    monkeypatch.setenv("DB_TYPE", "sqlite")
+    monkeypatch.setenv("DATABASE_PATH", temp_test_db)
+
+    # Reset adapter factory to pick up new environment configuration
+    from database.factory import close_database_adapter
+    close_database_adapter()
+
+    # Now import app (will use configured adapter)
     from server import app
 
-    # Patch database paths to use temp database
-    with patch('utils.db_connection.get_connection') as mock_get_conn:
-        # Configure mock to use temp database
-        def get_temp_connection(*args, **kwargs):
-            from utils.db_connection import get_connection
-            return get_connection(db_path=temp_test_db)
+    with TestClient(app) as client:
+        yield client
 
-        mock_get_conn.side_effect = get_temp_connection
-
-        with TestClient(app) as client:
-            yield client
+    # Cleanup: Reset adapter after test
+    close_database_adapter()
 
 
 # ============================================================================

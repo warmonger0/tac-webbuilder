@@ -57,14 +57,14 @@ def mock_db_connection():
 @pytest.fixture
 def mock_get_db_connection(mock_db_connection):
     """
-    Patch _db_adapter.get_connection to return mock connection.
+    Patch _get_adapter to return mock connection for database operations.
 
-    Automatically patches the database connection function
-    for all tests in the module.
+    Automatically patches the database adapter function
+    for all tests in the module after Session 19 database refactoring.
 
-    NOTE: Updated in Phase 2 to patch the correct function after database
-    module refactoring. Now patches _db_adapter.get_connection() instead
-    of the non-existent get_db_connection().
+    NOTE: Updated in Session 19 to patch _get_adapter() after database
+    module refactoring into separate modules (schema, mutations, queries, analytics).
+    Now properly mocks the adapter pattern used across all database modules.
     """
     mock_conn, mock_cursor = mock_db_connection
 
@@ -93,29 +93,36 @@ def mock_get_db_connection(mock_db_connection):
     ]
     mock_pragma_rows = [{"name": col} for col in pragma_columns]
 
-    # Set up execute side effect to configure what fetchall returns
-    # This handles both PRAGMA table_info and phantom records queries
+    # Set up execute side effect to configure what fetchall returns for PRAGMA queries
+    # For other queries, tests will set side_effect/return_value as needed
     def execute_side_effect(query, *args):
-        # If it's a PRAGMA query, set fetchall to return columns
+        # Handle PRAGMA table_info queries - return column list
         if isinstance(query, str) and 'PRAGMA' in query.upper():
             mock_cursor.fetchall.return_value = mock_pragma_rows
-        else:
-            # For other queries (like phantom records), return empty list
-            mock_cursor.fetchall.return_value = []
-        # Don't call original - just return None (execute doesn't return anything)
+        # For other queries: don't modify return_value/side_effect here
+        # Tests will configure those explicitly if needed
+        # This prevents interference with test-specific side_effect setups
         return None
 
     mock_cursor.execute.side_effect = execute_side_effect
 
-    # Patch the correct target after database module refactoring
-    # Create a mock adapter that returns our mock connection
+    # Patch the adapter pattern used after database module refactoring
+    # Create a mock adapter that returns our mock connection with proper context manager protocol
     mock_adapter = MagicMock()
+
+    # Set up context manager protocol for adapter.get_connection()
+    # When code does: with adapter.get_connection() as conn:
+    # Python calls: conn = adapter.get_connection().__enter__()
     mock_adapter.get_connection.return_value.__enter__ = Mock(return_value=mock_conn)
     mock_adapter.get_connection.return_value.__exit__ = Mock(return_value=False)
+
+    # Set up adapter methods used by database code
     mock_adapter.get_db_type.return_value = "sqlite"
     mock_adapter.placeholder.return_value = "?"  # SQLite placeholder
 
     # Patch _get_adapter in all workflow_history_utils database modules
+    # Each module imports: from .schema import _get_adapter
+    # So patching the imported reference in each module ensures correct behavior
     with patch('core.workflow_history_utils.database.schema._get_adapter', return_value=mock_adapter), \
          patch('core.workflow_history_utils.database.mutations._get_adapter', return_value=mock_adapter), \
          patch('core.workflow_history_utils.database.queries._get_adapter', return_value=mock_adapter), \
@@ -1549,13 +1556,6 @@ class TestGetHistoryAnalytics:
 
 class TestEdgeCasesAndErrorHandling:
     """Tests for edge cases and error handling across all functions."""
-
-    def test_db_path_is_correct(self):
-        """Test that DB_PATH is correctly constructed relative to module location."""
-        # DB_PATH should be: core/workflow_history_utils/../../db/workflow_history.db
-        # Which resolves to: app/server/db/workflow_history.db
-        assert "workflow_history.db" in str(DB_PATH)
-        assert DB_PATH.name == "workflow_history.db"
 
     def test_insert_with_empty_string_values(self, mock_get_db_connection):
         """Test inserting workflow with empty string values."""

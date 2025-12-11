@@ -7,6 +7,7 @@ Separates database access from business logic (Repository Pattern).
 
 import json
 import logging
+import traceback
 from datetime import datetime
 
 from database import get_database_adapter
