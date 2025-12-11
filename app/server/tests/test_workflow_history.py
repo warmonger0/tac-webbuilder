@@ -37,22 +37,42 @@ from core.workflow_history_utils.filesystem import scan_agents_directory
 
 @pytest.fixture
 def temp_db(monkeypatch):
-    """Create a temporary database for testing"""
+    """
+    Create a temporary database for testing.
+
+    Uses database adapter pattern (Session 19) instead of monkeypatching DB_PATH.
+    Works with both SQLite (test) and PostgreSQL (production).
+    """
     # Use a temporary file for testing
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         temp_db_path = Path(f.name)
 
-    # Use monkeypatch to replace DB_PATH in all modules that import it
-    # This works better than patch() because it happens before module-level code runs
-    import core.workflow_history_utils.database.analytics as analytics_module
+    # Patch the database adapter to use temporary SQLite database for tests
+    # This works with the Session 19 database adapter pattern
+    from database.sqlite_adapter import SQLiteAdapter
+
+    class TestSQLiteAdapter(SQLiteAdapter):
+        """Test adapter that uses temporary database"""
+        def __init__(self):
+            # Call parent __init__ with temp database path
+            super().__init__(db_path=str(temp_db_path))
+
+    test_adapter = TestSQLiteAdapter()
+
+    # Patch _get_adapter in all workflow_history_utils modules
+    import core.workflow_history_utils.database.schema as schema_module
     import core.workflow_history_utils.database.mutations as mutations_module
     import core.workflow_history_utils.database.queries as queries_module
-    import core.workflow_history_utils.database.schema as schema_module
+    import core.workflow_history_utils.database.analytics as analytics_module
+    import core.workflow_history_utils.sync_manager as sync_manager_module
 
-    monkeypatch.setattr(schema_module, 'DB_PATH', temp_db_path)
-    monkeypatch.setattr(mutations_module, 'DB_PATH', temp_db_path)
-    monkeypatch.setattr(queries_module, 'DB_PATH', temp_db_path)
-    monkeypatch.setattr(analytics_module, 'DB_PATH', temp_db_path)
+    monkeypatch.setattr(schema_module, '_get_adapter', lambda: test_adapter)
+    monkeypatch.setattr(mutations_module, '_get_adapter', lambda: test_adapter)
+    monkeypatch.setattr(queries_module, '_get_adapter', lambda: test_adapter)
+    monkeypatch.setattr(analytics_module, '_get_adapter', lambda: test_adapter)
+
+    # Also patch _db_adapter in sync_manager (it imports this module-level variable)
+    monkeypatch.setattr(sync_manager_module, '_db_adapter', test_adapter)
 
     try:
         # Initialize the database
@@ -799,118 +819,115 @@ def test_resync_workflow_cost_no_cost_file(temp_db):
 
 def test_resync_all_completed_workflows(temp_db):
     """Test bulk resync of all completed workflows"""
-    with patch('core.workflow_history_utils.sync_manager.DB_PATH', Path(temp_db)):
-        # Insert multiple workflows
-        insert_workflow_history(adw_id="bulk-1", status="completed", actual_cost_total=0.0)
-        insert_workflow_history(adw_id="bulk-2", status="completed", actual_cost_total=0.0)
-        insert_workflow_history(adw_id="bulk-3", status="running", actual_cost_total=0.0)  # Should be skipped
-        insert_workflow_history(adw_id="bulk-4", status="failed", actual_cost_total=0.0)
+    # Insert multiple workflows
+    insert_workflow_history(adw_id="bulk-1", status="completed", actual_cost_total=0.0)
+    insert_workflow_history(adw_id="bulk-2", status="completed", actual_cost_total=0.0)
+    insert_workflow_history(adw_id="bulk-3", status="running", actual_cost_total=0.0)  # Should be skipped
+    insert_workflow_history(adw_id="bulk-4", status="failed", actual_cost_total=0.0)
 
-        # Mock cost data
-        from core.data_models import CostData, PhaseCost, TokenBreakdown
-        def mock_read_cost_history(adw_id):
-            return CostData(
-                adw_id=adw_id,
-                phases=[
-                    PhaseCost(
-                        phase="test",
-                        cost=0.25,
-                        tokens=TokenBreakdown(input_tokens=5000, cache_creation_tokens=1000, cache_read_tokens=2000, output_tokens=500)
-                    )
-                ],
-                total_cost=0.25,
-                cache_efficiency_percent=20.0,
-                cache_savings_amount=0.05,
-                total_tokens=8500
-            )
+    # Mock cost data
+    from core.data_models import CostData, PhaseCost, TokenBreakdown
+    def mock_read_cost_history(adw_id):
+        return CostData(
+            adw_id=adw_id,
+            phases=[
+                PhaseCost(
+                    phase="test",
+                    cost=0.25,
+                    tokens=TokenBreakdown(input_tokens=5000, cache_creation_tokens=1000, cache_read_tokens=2000, output_tokens=500)
+                )
+            ],
+            total_cost=0.25,
+            cache_efficiency_percent=20.0,
+            cache_savings_amount=0.05,
+            total_tokens=8500
+        )
 
-        # Patch read_cost_history in enrichment module where it's actually called
-        with patch('core.workflow_history_utils.enrichment.read_cost_history', side_effect=mock_read_cost_history):
-            resynced_count, workflows, errors = resync_all_completed_workflows(force=False)
+    # Patch read_cost_history in enrichment module where it's actually called
+    with patch('core.workflow_history_utils.enrichment.read_cost_history', side_effect=mock_read_cost_history):
+        resynced_count, workflows, errors = resync_all_completed_workflows(force=False)
 
-        # Should resync 3 workflows (2 completed + 1 failed)
-        assert resynced_count == 3
-        assert len(workflows) == 3
-        assert len(errors) == 0
+    # Should resync 3 workflows (2 completed + 1 failed)
+    assert resynced_count == 3
+    assert len(workflows) == 3
+    assert len(errors) == 0
 
-        # Verify running workflow was not resynced
-        running_workflow = get_workflow_by_adw_id("bulk-3")
-        assert running_workflow["actual_cost_total"] == 0.0
+    # Verify running workflow was not resynced
+    running_workflow = get_workflow_by_adw_id("bulk-3")
+    assert running_workflow["actual_cost_total"] == 0.0
 
 
 def test_resync_all_completed_workflows_force(temp_db):
     """Test force resync clears and recalculates all workflows"""
-    with patch('core.workflow_history_utils.sync_manager.DB_PATH', Path(temp_db)):
-        # Insert workflows with existing costs
-        insert_workflow_history(adw_id="force-1", status="completed", actual_cost_total=1.0)
-        insert_workflow_history(adw_id="force-2", status="completed", actual_cost_total=2.0)
+    # Insert workflows with existing costs
+    insert_workflow_history(adw_id="force-1", status="completed", actual_cost_total=1.0)
+    insert_workflow_history(adw_id="force-2", status="completed", actual_cost_total=2.0)
 
-        # Mock cost data
-        from core.data_models import CostData, PhaseCost, TokenBreakdown
-        def mock_read_cost_history(adw_id):
+    # Mock cost data
+    from core.data_models import CostData, PhaseCost, TokenBreakdown
+    def mock_read_cost_history(adw_id):
+        return CostData(
+            adw_id=adw_id,
+            phases=[
+                PhaseCost(
+                    phase="test",
+                    cost=0.30,
+                    tokens=TokenBreakdown(input_tokens=6000, cache_creation_tokens=1200, cache_read_tokens=2400, output_tokens=600)
+                )
+            ],
+            total_cost=0.30,
+            cache_efficiency_percent=22.0,
+            cache_savings_amount=0.06,
+            total_tokens=10200
+        )
+
+    # Patch read_cost_history in enrichment module where it's actually called
+    with patch('core.workflow_history_utils.enrichment.read_cost_history', side_effect=mock_read_cost_history):
+        resynced_count, workflows, errors = resync_all_completed_workflows(force=True)
+
+    assert resynced_count == 2
+    assert len(errors) == 0
+
+    # Verify costs were updated
+    workflow1 = get_workflow_by_adw_id("force-1")
+    assert workflow1["actual_cost_total"] == 0.30
+
+
+def test_resync_all_completed_workflows_error_handling(temp_db):
+    """Test partial success with errors"""
+    # Insert workflows
+    insert_workflow_history(adw_id="error-1", status="completed")
+    insert_workflow_history(adw_id="error-2", status="completed")
+
+    # Mock cost data - one succeeds, one fails
+    from core.data_models import CostData, PhaseCost, TokenBreakdown
+    def mock_read_cost_history(adw_id):
+        if adw_id == "error-1":
             return CostData(
                 adw_id=adw_id,
                 phases=[
                     PhaseCost(
                         phase="test",
-                        cost=0.30,
-                        tokens=TokenBreakdown(input_tokens=6000, cache_creation_tokens=1200, cache_read_tokens=2400, output_tokens=600)
+                        cost=0.40,
+                        tokens=TokenBreakdown(input_tokens=7000, cache_creation_tokens=1400, cache_read_tokens=2800, output_tokens=700)
                     )
                 ],
-                total_cost=0.30,
-                cache_efficiency_percent=22.0,
-                cache_savings_amount=0.06,
-                total_tokens=10200
+                total_cost=0.40,
+                cache_efficiency_percent=24.0,
+                cache_savings_amount=0.07,
+                total_tokens=11900
             )
+        else:
+            raise FileNotFoundError("Cost file not found")
 
-        # Patch read_cost_history in enrichment module where it's actually called
-        with patch('core.workflow_history_utils.enrichment.read_cost_history', side_effect=mock_read_cost_history):
-            resynced_count, workflows, errors = resync_all_completed_workflows(force=True)
+    # Patch read_cost_history in enrichment module where it's actually called
+    with patch('core.workflow_history_utils.enrichment.read_cost_history', side_effect=mock_read_cost_history):
+        resynced_count, workflows, errors = resync_all_completed_workflows(force=False)
 
-        assert resynced_count == 2
-        assert len(errors) == 0
-
-        # Verify costs were updated
-        workflow1 = get_workflow_by_adw_id("force-1")
-        assert workflow1["actual_cost_total"] == 0.30
-
-
-def test_resync_all_completed_workflows_error_handling(temp_db):
-    """Test partial success with errors"""
-    with patch('core.workflow_history_utils.sync_manager.DB_PATH', Path(temp_db)):
-        # Insert workflows
-        insert_workflow_history(adw_id="error-1", status="completed")
-        insert_workflow_history(adw_id="error-2", status="completed")
-
-        # Mock cost data - one succeeds, one fails
-        from core.data_models import CostData, PhaseCost, TokenBreakdown
-        def mock_read_cost_history(adw_id):
-            if adw_id == "error-1":
-                return CostData(
-                    adw_id=adw_id,
-                    phases=[
-                        PhaseCost(
-                            phase="test",
-                            cost=0.40,
-                            tokens=TokenBreakdown(input_tokens=7000, cache_creation_tokens=1400, cache_read_tokens=2800, output_tokens=700)
-                        )
-                    ],
-                    total_cost=0.40,
-                    cache_efficiency_percent=24.0,
-                    cache_savings_amount=0.07,
-                    total_tokens=11900
-                )
-            else:
-                raise FileNotFoundError("Cost file not found")
-
-        # Patch read_cost_history in enrichment module where it's actually called
-        with patch('core.workflow_history_utils.enrichment.read_cost_history', side_effect=mock_read_cost_history):
-            resynced_count, workflows, errors = resync_all_completed_workflows(force=False)
-
-        assert resynced_count == 1
-        assert len(workflows) == 1  # Only successful workflow in the list
-        assert len(errors) == 1  # One error
-        assert "error-2" in errors[0]
+    assert resynced_count == 1
+    assert len(workflows) == 1  # Only successful workflow in the list
+    assert len(errors) == 1  # One error
+    assert "error-2" in errors[0]
 
 
 # ============================================================================
