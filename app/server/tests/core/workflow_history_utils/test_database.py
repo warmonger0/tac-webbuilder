@@ -108,9 +108,19 @@ def mock_get_db_connection(mock_db_connection):
     mock_cursor.execute.side_effect = execute_side_effect
 
     # Patch the correct target after database module refactoring
-    with patch('core.workflow_history_utils.database.schema._db_adapter.get_connection') as mock_get_conn:
-        mock_get_conn.return_value = mock_conn
-        yield mock_get_conn, mock_conn, mock_cursor
+    # Create a mock adapter that returns our mock connection
+    mock_adapter = MagicMock()
+    mock_adapter.get_connection.return_value.__enter__ = Mock(return_value=mock_conn)
+    mock_adapter.get_connection.return_value.__exit__ = Mock(return_value=False)
+    mock_adapter.get_db_type.return_value = "sqlite"
+    mock_adapter.placeholder.return_value = "?"  # SQLite placeholder
+
+    # Patch _get_adapter in all workflow_history_utils database modules
+    with patch('core.workflow_history_utils.database.schema._get_adapter', return_value=mock_adapter), \
+         patch('core.workflow_history_utils.database.mutations._get_adapter', return_value=mock_adapter), \
+         patch('core.workflow_history_utils.database.queries._get_adapter', return_value=mock_adapter), \
+         patch('core.workflow_history_utils.database.analytics._get_adapter', return_value=mock_adapter):
+        yield mock_adapter, mock_conn, mock_cursor
 
 
 # ============================================================================
