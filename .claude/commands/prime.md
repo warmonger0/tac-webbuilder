@@ -20,6 +20,14 @@
 - **Security:** Multi-layer SQL injection prevention
 - **Claude Code timeout:** 20-minute timeout for planning tasks (prevents premature termination)
 
+## Code Standards - Git Commits
+**CRITICAL:** Never include in commit messages:
+- ❌ "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+- ❌ "Co-Authored-By: Claude <noreply@anthropic.com>"
+- ❌ Any AI generation references
+
+Commits should be professional and focused on technical changes only.
+
 ## What Are You Working On?
 
 ### Frontend (app/client/)

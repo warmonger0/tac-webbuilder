@@ -1,4 +1,17 @@
-- i need prompts like this one:
+## Commit Message Rules
+
+**CRITICAL:** Never include the following in commit messages:
+- ❌ "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+- ❌ "Co-Authored-By: Claude <noreply@anthropic.com>"
+- ❌ Any reference to AI generation, Claude Code, or co-authorship
+
+Commit messages should be professional and focused on the technical changes only.
+
+---
+
+## Prompt Format
+
+I need prompts like this one:
 # Task: Fix N+1 Query Patterns in Queue Routes
 
   ## Context
