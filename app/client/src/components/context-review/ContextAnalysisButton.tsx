@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
+import { ErrorBanner } from '../common/ErrorBanner';
 
 interface ContextAnalysisButtonProps {
   changeDescription: string;
@@ -80,12 +81,7 @@ export function ContextAnalysisButton({
         )}
       </button>
 
-      {error && (
-        <p className="text-red-400 text-sm flex items-center gap-1">
-          <span>⚠</span>
-          {error}
-        </p>
-      )}
+      <ErrorBanner error={error} title="Analysis Error" />
 
       <p className="text-slate-400 text-xs">
         AI will suggest additional files and context to improve accuracy

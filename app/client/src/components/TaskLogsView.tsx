@@ -7,6 +7,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { observabilityClient, TaskLog } from '../api/observabilityClient';
+import { LoadingState } from './common/LoadingState';
+import { ErrorBanner } from './common/ErrorBanner';
 
 interface TaskLogsViewProps {
   filterIssueNumber?: number;
@@ -55,18 +57,8 @@ export function TaskLogsView({ filterIssueNumber }: TaskLogsViewProps) {
   return (
     <div>
       {/* Loading/Error States */}
-      {isLoading && (
-        <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">Loading task logs...</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          Error loading task logs: {(error as Error).message}
-        </div>
-      )}
+      {isLoading && <LoadingState message="Loading task logs..." />}
+      <ErrorBanner error={error ? `Error loading task logs: ${(error as Error).message}` : null} />
 
       {/* Task Logs Table */}
       {data && displayedLogs && displayedLogs.length > 0 && (

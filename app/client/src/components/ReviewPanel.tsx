@@ -14,6 +14,9 @@ import {
   patternReviewClient,
   RejectRequest,
 } from '../api/patternReviewClient';
+import { LoadingState } from './common/LoadingState';
+import { ErrorBanner } from './common/ErrorBanner';
+import { ConfirmationDialog } from './common/ConfirmationDialog';
 
 export function ReviewPanel() {
   const queryClient = useQueryClient();
@@ -23,6 +26,8 @@ export function ReviewPanel() {
   const [comment, setComment] = useState('');
   const [showCommentForm, setShowCommentForm] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [confirmApprove, setConfirmApprove] = useState(false);
+  const [confirmReject, setConfirmReject] = useState(false);
 
   // Fetch pending patterns
   const { data: patterns, isLoading, error } = useQuery({
@@ -88,31 +93,15 @@ export function ReviewPanel() {
 
   const handleApprove = () => {
     if (!selectedPattern) return;
-    toast((t) => (
-      <div>
-        <p className="mb-3">Approve pattern "{selectedPattern.pattern_id}"?</p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              approveMutation.mutate({
-                patternId: selectedPattern.pattern_id,
-                request: { notes },
-              });
-              toast.dismiss(t.id);
-            }}
-            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-          >
-            Approve
-          </button>
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    ), { duration: Infinity, icon: '✅' });
+    setConfirmApprove(true);
+  };
+
+  const confirmApprovePattern = () => {
+    if (!selectedPattern) return;
+    approveMutation.mutate({
+      patternId: selectedPattern.pattern_id,
+      request: { notes },
+    });
   };
 
   const handleReject = () => {
@@ -121,31 +110,15 @@ export function ReviewPanel() {
       toast.error('Reason is required for rejection');
       return;
     }
-    toast((t) => (
-      <div>
-        <p className="mb-3">Reject pattern "{selectedPattern.pattern_id}"?</p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              rejectMutation.mutate({
-                patternId: selectedPattern.pattern_id,
-                request: { reason },
-              });
-              toast.dismiss(t.id);
-            }}
-            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-          >
-            Reject
-          </button>
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    ), { duration: Infinity, icon: '❌' });
+    setConfirmReject(true);
+  };
+
+  const confirmRejectPattern = () => {
+    if (!selectedPattern) return;
+    rejectMutation.mutate({
+      patternId: selectedPattern.pattern_id,
+      request: { reason },
+    });
   };
 
   const handleAddComment = () => {
@@ -161,23 +134,7 @@ export function ReviewPanel() {
       <h2 className="text-2xl font-bold text-gray-900 mb-4">Pattern Review</h2>
 
       {/* Error Banner */}
-      {mutationError && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <svg className="w-5 h-5 text-red-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-            </svg>
-            <p className="text-sm text-red-700 flex-1">{mutationError}</p>
-            <button
-              onClick={() => setMutationError(null)}
-              className="ml-2 text-red-400 hover:text-red-600 font-bold text-lg leading-none"
-              aria-label="Dismiss error"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
+      <ErrorBanner error={mutationError} onDismiss={() => setMutationError(null)} className="mb-4" />
 
       {/* Statistics Summary */}
       {stats && (
@@ -205,8 +162,8 @@ export function ReviewPanel() {
         </div>
       )}
 
-      {isLoading && <div className="text-gray-600">Loading patterns...</div>}
-      {error && <div className="text-red-600">Error loading patterns: {String(error)}</div>}
+      {isLoading && <LoadingState message="Loading patterns..." />}
+      <ErrorBanner error={error ? `Error loading patterns: ${String(error)}` : null} />
 
       <div className="grid grid-cols-2 gap-6">
         {/* Pattern List */}
@@ -426,6 +383,27 @@ export function ReviewPanel() {
           )}
         </div>
       </div>
+
+      {/* Confirmation Dialogs */}
+      <ConfirmationDialog
+        isOpen={confirmApprove}
+        onClose={() => setConfirmApprove(false)}
+        onConfirm={confirmApprovePattern}
+        title="Approve Pattern?"
+        message={selectedPattern ? `Approve pattern "${selectedPattern.pattern_id}"?` : ''}
+        confirmText="Approve"
+        confirmVariant="primary"
+      />
+
+      <ConfirmationDialog
+        isOpen={confirmReject}
+        onClose={() => setConfirmReject(false)}
+        onConfirm={confirmRejectPattern}
+        title="Reject Pattern?"
+        message={selectedPattern ? `Reject pattern "${selectedPattern.pattern_id}"?` : ''}
+        confirmText="Reject"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

@@ -7,6 +7,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { observabilityClient, UserPrompt } from '../api/observabilityClient';
+import { LoadingState } from './common/LoadingState';
+import { ErrorBanner } from './common/ErrorBanner';
 
 interface UserPromptsViewProps {
   filterIssueNumber?: number;
@@ -73,18 +75,9 @@ export function UserPromptsView({ filterIssueNumber }: UserPromptsViewProps) {
   return (
     <div>
       {/* Loading/Error States */}
-      {isLoading && (
-        <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">Loading user prompts...</p>
-        </div>
-      )}
+      {isLoading && <LoadingState message="Loading user prompts..." />}
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          Error loading user prompts: {(error as Error).message}
-        </div>
-      )}
+      <ErrorBanner error={error ? `Error loading user prompts: ${(error as Error).message}` : null} />
 
       {/* User Prompts List */}
       {data && displayedPrompts && displayedPrompts.length > 0 && (

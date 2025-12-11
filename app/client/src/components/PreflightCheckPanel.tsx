@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { LoadingState } from './common/LoadingState';
+import { ErrorBanner } from './common/ErrorBanner';
 
 interface PreflightCheck {
   check: string;
@@ -91,19 +93,13 @@ export function PreflightCheckPanel() {
       </div>
 
       {/* Loading State */}
-      {isLoading && (
-        <div className="text-center py-8 text-gray-600">
-          <div className="animate-pulse">Running pre-flight checks...</div>
-        </div>
-      )}
+      {isLoading && <LoadingState message="Running pre-flight checks..." />}
 
       {/* Error State */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800 font-medium">Error running pre-flight checks</p>
-          <p className="text-red-600 text-sm mt-1">{(error as Error).message}</p>
-        </div>
-      )}
+      <ErrorBanner
+        error={error ? `Error running pre-flight checks: ${(error as Error).message}` : null}
+        title="Pre-flight Check Failed"
+      />
 
       {/* Results */}
       {data && !isLoading && (

@@ -3,6 +3,8 @@ import { setQueuePaused } from "../api/client";
 import { PhaseQueueList } from "./PhaseQueueCard";
 import { QueuePauseToggle } from "./QueuePauseToggle";
 import { useQueueWebSocket } from "../hooks/useWebSocket";
+import { LoadingState } from "./common/LoadingState";
+import { ErrorBanner } from "./common/ErrorBanner";
 
 type TabType = "in-progress" | "completed";
 
@@ -109,26 +111,11 @@ export function ZteHopperQueueCard() {
 
       {/* Tab Content */}
       <div className="flex-1 overflow-hidden flex flex-col">
-        {error && (
-          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4 mb-4">
-            <p className="text-red-200 text-sm">⚠️ {error}</p>
-          </div>
-        )}
+        <ErrorBanner error={error} />
 
         {loading ? (
-          <div className="flex items-center justify-center flex-1">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full animate-ping opacity-75"></div>
-                <div className="relative bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full w-16 h-16 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-white animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                </div>
-              </div>
-              <p className="text-slate-300">Loading queue...</p>
-            </div>
+          <div className="flex-1 flex items-center justify-center">
+            <LoadingState message="Loading queue..." />
           </div>
         ) : (
           <>

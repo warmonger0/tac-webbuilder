@@ -16,6 +16,9 @@ import {
 } from '../api/workLogClient';
 import { TaskLogsView } from './TaskLogsView';
 import { UserPromptsView } from './UserPromptsView';
+import { LoadingState } from './common/LoadingState';
+import { ErrorBanner } from './common/ErrorBanner';
+import { ConfirmationDialog } from './common/ConfirmationDialog';
 
 type TabType = 'workLogs' | 'taskLogs' | 'userPrompts';
 
@@ -24,6 +27,7 @@ export function LogPanel() {
   const [activeTab, setActiveTab] = useState<TabType>('workLogs');
   const [filterIssueNumber, setFilterIssueNumber] = useState<string>('');
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   // Work Logs state
   const [limit] = useState(50);
@@ -155,23 +159,7 @@ export function LogPanel() {
       </div>
 
       {/* Error Banner */}
-      {mutationError && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <svg className="w-5 h-5 text-red-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-            </svg>
-            <p className="text-sm text-red-700 flex-1">{mutationError}</p>
-            <button
-              onClick={() => setMutationError(null)}
-              className="ml-2 text-red-400 hover:text-red-600 font-bold text-lg leading-none"
-              aria-label="Dismiss error"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
+      <ErrorBanner error={mutationError} onDismiss={() => setMutationError(null)} className="mb-4" />
 
       {/* Tabs */}
       <div className="mb-6">
@@ -420,18 +408,8 @@ export function LogPanel() {
             </div>
 
             {/* Loading/Error States */}
-            {isLoading && (
-              <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p className="mt-2 text-gray-600">Loading work logs...</p>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-                Error loading work logs: {error.message}
-              </div>
-            )}
+            {isLoading && <LoadingState message="Loading work logs..." />}
+            <ErrorBanner error={error ? `Error loading work logs: ${error.message}` : null} />
 
             {/* Work Log Entries */}
             {data && data.entries.length > 0 && (
@@ -454,30 +432,7 @@ export function LogPanel() {
                         <p className="text-gray-900 mb-2">{entry.summary}</p>
                       </div>
                       <button
-                        onClick={() => {
-                          toast((t) => (
-                            <div>
-                              <p className="mb-3">Delete this entry?</p>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => {
-                                    deleteMutation.mutate(entry.id);
-                                    toast.dismiss(t.id);
-                                  }}
-                                  className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                                >
-                                  Delete
-                                </button>
-                                <button
-                                  onClick={() => toast.dismiss(t.id)}
-                                  className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ), { duration: Infinity, icon: '🗑️' });
-                        }}
+                        onClick={() => setDeleteConfirm(entry.id)}
                         className="text-red-600 hover:text-red-800 text-sm ml-2"
                       >
                         Delete
@@ -581,6 +536,21 @@ export function LogPanel() {
           <UserPromptsView filterIssueNumber={parseIssueNumber()} />
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={deleteConfirm !== null}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => {
+          if (deleteConfirm !== null) {
+            deleteMutation.mutate(deleteConfirm);
+          }
+        }}
+        title="Delete Entry?"
+        message="This action cannot be undone. Are you sure you want to delete this work log entry?"
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 import { PreflightCheckPanel } from './PreflightCheckPanel';
 import { intervals } from '../config/intervals';
 import { serviceDisplayOrder } from '../config/services';
+import { ErrorBanner } from './common/ErrorBanner';
 
 export function SystemStatusPanel() {
   const [status, setStatus] = useState<SystemStatusResponse | null>(null);
@@ -270,11 +271,7 @@ export function SystemStatusPanel() {
           </div>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded text-red-200 text-sm">
-            {error}
-          </div>
-        )}
+        <ErrorBanner error={error} />
 
         {actionMessage && (
           <div className={`mb-4 p-3 rounded text-sm border ${

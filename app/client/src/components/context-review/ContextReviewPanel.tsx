@@ -8,6 +8,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, CheckCircle2, FileCode, Loader2, Sparkles } from 'lucide-react';
+import { LoadingState } from '../common/LoadingState';
+import { ErrorBanner } from '../common/ErrorBanner';
 
 export interface ContextSuggestion {
   id: number;
@@ -125,24 +127,14 @@ export function ContextReviewPanel({ reviewId, onClose }: ContextReviewPanelProp
 
       {/* Loading State */}
       {isLoading && !analysis && (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
-          <span className="ml-2 text-slate-300">Analyzing codebase context...</span>
-        </div>
+        <LoadingState message="Analyzing codebase context..." />
       )}
 
       {/* Error State */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-red-300 font-medium">Analysis Failed</p>
-            <p className="text-red-400 text-sm mt-1">
-              {error instanceof Error ? error.message : 'Unknown error'}
-            </p>
-          </div>
-        </div>
-      )}
+      <ErrorBanner
+        error={error ? (error instanceof Error ? error.message : 'Unknown error') : null}
+        title="Analysis Failed"
+      />
 
       {/* Analysis Results */}
       {analysis && analysis.status === 'complete' && analysis.result && (

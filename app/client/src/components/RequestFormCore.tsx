@@ -8,6 +8,7 @@ import { CurrentWorkflowCard } from './CurrentWorkflowCard';
 import { FileUploadSection } from './request-form/FileUploadSection';
 import { ContextAnalysisButton } from './context-review/ContextAnalysisButton';
 import { ContextReviewPanel } from './context-review/ContextReviewPanel';
+import { ErrorBanner } from './common/ErrorBanner';
 
 export function RequestFormCore() {
   const [contextReviewId, setContextReviewId] = useState<number | null>(null);
@@ -163,11 +164,7 @@ export function RequestFormCore() {
               </div>
             )}
 
-            {error && (
-              <div className="p-4 bg-red-900/20 border border-red-500/50 rounded-lg text-red-200">
-                {error}
-              </div>
-            )}
+            <ErrorBanner error={error} title="Request Error" />
 
             {successMessage && (
               <div className="p-4 bg-emerald-900/20 border border-emerald-500/50 rounded-lg text-emerald-200">

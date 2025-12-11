@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useWebhookStatusWebSocket } from '../hooks/useWebSocket';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 import { thresholds } from '../config/thresholds';
+import { ErrorBanner } from './common/ErrorBanner';
 
 interface WebhookStatus {
   status: 'healthy' | 'degraded' | 'error' | 'unknown';
@@ -111,11 +112,7 @@ export function WebhookStatusPanel() {
           </div>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
-            {error}
-          </div>
-        )}
+        <ErrorBanner error={error} />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Main Status Indicator */}
