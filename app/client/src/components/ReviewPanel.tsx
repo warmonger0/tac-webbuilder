@@ -17,6 +17,7 @@ import {
 import { LoadingState } from './common/LoadingState';
 import { ErrorBanner } from './common/ErrorBanner';
 import { ConfirmationDialog } from './common/ConfirmationDialog';
+import { formatErrorMessage, logError } from '../utils/errorHandler';
 
 export function ReviewPanel() {
   const queryClient = useQueryClient();
@@ -25,12 +26,12 @@ export function ReviewPanel() {
   const [reason, setReason] = useState('');
   const [comment, setComment] = useState('');
   const [showCommentForm, setShowCommentForm] = useState(false);
-  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<Error | string | null>(null);
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmReject, setConfirmReject] = useState(false);
 
   // Fetch pending patterns
-  const { data: patterns, isLoading, error } = useQuery({
+  const { data: patterns, isLoading, error: queryError } = useQuery({
     queryKey: ['patterns', 'pending'],
     queryFn: () => patternReviewClient.getPendingPatterns(20),
     refetchInterval: 30000, // Refetch every 30 seconds
@@ -53,9 +54,9 @@ export function ReviewPanel() {
       setNotes('');
       setMutationError(null);
     },
-    onError: (error: Error) => {
-      console.error('[ReviewPanel] Approve mutation failed:', error);
-      setMutationError(`Failed to approve pattern: ${error.message}`);
+    onError: (err: unknown) => {
+      logError('[ReviewPanel]', 'Approve pattern', err);
+      setMutationError(formatErrorMessage(err));
     },
   });
 
@@ -69,9 +70,9 @@ export function ReviewPanel() {
       setReason('');
       setMutationError(null);
     },
-    onError: (error: Error) => {
-      console.error('[ReviewPanel] Reject mutation failed:', error);
-      setMutationError(`Failed to reject pattern: ${error.message}`);
+    onError: (err: unknown) => {
+      logError('[ReviewPanel]', 'Reject pattern', err);
+      setMutationError(formatErrorMessage(err));
     },
   });
 
@@ -85,9 +86,9 @@ export function ReviewPanel() {
       setComment('');
       setMutationError(null);
     },
-    onError: (error: Error) => {
-      console.error('[ReviewPanel] Comment mutation failed:', error);
-      setMutationError(`Failed to add comment: ${error.message}`);
+    onError: (err: unknown) => {
+      logError('[ReviewPanel]', 'Add comment', err);
+      setMutationError(formatErrorMessage(err));
     },
   });
 
@@ -163,7 +164,7 @@ export function ReviewPanel() {
       )}
 
       {isLoading && <LoadingState message="Loading patterns..." />}
-      <ErrorBanner error={error ? `Error loading patterns: ${String(error)}` : null} />
+      <ErrorBanner error={queryError ? `Error loading patterns: ${String(queryError)}` : null} />
 
       <div className="grid grid-cols-2 gap-6">
         {/* Pattern List */}

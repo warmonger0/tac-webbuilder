@@ -19,6 +19,7 @@ import { UserPromptsView } from './UserPromptsView';
 import { LoadingState } from './common/LoadingState';
 import { ErrorBanner } from './common/ErrorBanner';
 import { ConfirmationDialog } from './common/ConfirmationDialog';
+import { formatErrorMessage, logError } from '../utils/errorHandler';
 
 type TabType = 'workLogs' | 'taskLogs' | 'userPrompts';
 
@@ -26,7 +27,7 @@ export function LogPanel() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('workLogs');
   const [filterIssueNumber, setFilterIssueNumber] = useState<string>('');
-  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<Error | string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   // Work Logs state
@@ -45,7 +46,7 @@ export function LogPanel() {
   const [tagInput, setTagInput] = useState('');
 
   // Fetch work logs (only for Work Logs tab)
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error: queryError } = useQuery({
     queryKey: ['work-logs', limit, offset, filterSession],
     queryFn: () =>
       filterSession
@@ -68,9 +69,9 @@ export function LogPanel() {
       resetForm();
       setMutationError(null);
     },
-    onError: (error: Error) => {
-      console.error('[LogPanel] Create mutation failed:', error);
-      setMutationError(`Failed to create work log: ${error.message}`);
+    onError: (err: unknown) => {
+      logError('[LogPanel]', 'Create work log', err);
+      setMutationError(formatErrorMessage(err));
     },
   });
 
@@ -81,9 +82,9 @@ export function LogPanel() {
       queryClient.invalidateQueries({ queryKey: ['work-logs'] });
       setMutationError(null);
     },
-    onError: (error: Error) => {
-      console.error('[LogPanel] Delete mutation failed:', error);
-      setMutationError(`Failed to delete work log: ${error.message}`);
+    onError: (err: unknown) => {
+      logError('[LogPanel]', 'Delete work log', err);
+      setMutationError(formatErrorMessage(err));
     },
   });
 
@@ -409,7 +410,7 @@ export function LogPanel() {
 
             {/* Loading/Error States */}
             {isLoading && <LoadingState message="Loading work logs..." />}
-            <ErrorBanner error={error ? `Error loading work logs: ${error.message}` : null} />
+            <ErrorBanner error={queryError ? `Error loading work logs: ${String(queryError)}` : null} />
 
             {/* Work Log Entries */}
             {data && data.entries.length > 0 && (
