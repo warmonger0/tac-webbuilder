@@ -11,7 +11,6 @@ Tests the complete flow of multi-phase workflow execution including:
 
 import asyncio
 import os
-import sqlite3
 import sys
 import tempfile
 import traceback
@@ -42,33 +41,19 @@ def temp_phase_db():
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_phase_queue.db")
 
-        # Initialize phase_queue table
-        conn = sqlite3.connect(db_path)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS phase_queue (
-                queue_id TEXT PRIMARY KEY,
-                parent_issue INTEGER NOT NULL,
-                phase_number INTEGER NOT NULL,
-                issue_number INTEGER,
-                status TEXT CHECK(status IN ('queued', 'ready', 'running', 'completed', 'blocked', 'failed')) DEFAULT 'queued',
-                depends_on_phase INTEGER,
-                phase_data TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                error_message TEXT,
-                adw_id TEXT,
-                pr_number INTEGER,
-                priority INTEGER DEFAULT 50,
-                queue_position INTEGER,
-                ready_timestamp TEXT,
-                started_timestamp TEXT
-            )
-        """)
-        conn.commit()
-        conn.close()
+        # Initialize phase_queue table using the standard schema
+        adapter = SQLiteAdapter(db_path=db_path)
 
-        # Create and return SQLiteAdapter instance with this database path
-        yield SQLiteAdapter(db_path=db_path)
+        # Use the schema initialization module to ensure schema consistency
+        from services.phase_queue_schema import init_phase_queue_db
+
+        # Temporarily patch get_database_adapter to return our test adapter
+        # Must patch where it's imported, not where it's defined
+        with patch('services.phase_queue_schema.get_database_adapter', return_value=adapter):
+            init_phase_queue_db()
+
+        # Return SQLiteAdapter instance with this database path
+        yield adapter
 
 
 @pytest.fixture
@@ -77,28 +62,30 @@ def temp_workflow_db():
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_workflow_history.db")
 
-        # Initialize workflow_history table with required fields
-        conn = sqlite3.connect(db_path)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS workflow_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                workflow_id TEXT UNIQUE NOT NULL,
-                issue_number INTEGER,
-                status TEXT CHECK(status IN ('pending', 'running', 'completed', 'failed')) DEFAULT 'pending',
-                error_message TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                end_time TEXT,
-                phase_number INTEGER,
-                parent_workflow_id TEXT,
-                is_multi_phase INTEGER DEFAULT 0
-            )
-        """)
-        conn.commit()
-        conn.close()
+        # Initialize workflow_history table using the standard schema
+        adapter = SQLiteAdapter(db_path=db_path)
 
-        # Create and return SQLiteAdapter instance with this database path
-        yield SQLiteAdapter(db_path=db_path)
+        # Use the standard workflow_history schema initialization
+        import core.workflow_history_utils.database.schema as schema_module
+
+        # Temporarily patch DB_PATH to use our test database
+        original_db_path = schema_module.DB_PATH
+        schema_module.DB_PATH = Path(db_path)
+
+        # Patch the schema module's adapter cache to use our test adapter
+        original_adapter = schema_module._db_adapter
+        schema_module._db_adapter = adapter
+
+        try:
+            from core.workflow_history_utils.database import init_db
+            init_db()
+        finally:
+            # Restore original values
+            schema_module.DB_PATH = original_db_path
+            schema_module._db_adapter = original_adapter
+
+        # Return SQLiteAdapter instance with this database path
+        yield adapter
 
 
 @pytest.fixture
@@ -108,9 +95,18 @@ def phase_queue_service(temp_phase_db):
     # Create repository with patched get_database_adapter to return our test adapter
     with patch('repositories.phase_queue_repository.get_database_adapter', return_value=temp_phase_db):
         repository = PhaseQueueRepository()
-    # Ensure adapter is set (patch should have worked, but override just in case)
+
+    # Ensure adapter is set (override after initialization)
     repository.adapter = temp_phase_db
-    return PhaseQueueService(repository=repository)
+
+    # Create service with repository
+    service = PhaseQueueService(repository=repository)
+
+    # Ensure dependency tracker also uses correct adapter
+    if hasattr(service.dependency_tracker, 'repository'):
+        service.dependency_tracker.repository.adapter = temp_phase_db
+
+    return service
 
 
 @pytest.fixture
@@ -124,20 +120,19 @@ def mock_websocket_manager():
 @pytest.fixture
 def phase_coordinator(phase_queue_service, temp_phase_db, temp_workflow_db, mock_websocket_manager):
     """Create PhaseCoordinator with test dependencies and patched adapters"""
-    # Patch get_database_adapter to return our test workflow adapter for WorkflowCompletionDetector
-    with patch('services.phase_coordination.workflow_completion_detector.get_database_adapter', return_value=temp_workflow_db):
-        coordinator = PhaseCoordinator(
-            phase_queue_service=phase_queue_service,
-            poll_interval=0.1,  # Fast polling for tests
-            websocket_manager=mock_websocket_manager
-        )
+    # Create coordinator - will use get_database_adapter initially
+    coordinator = PhaseCoordinator(
+        phase_queue_service=phase_queue_service,
+        poll_interval=0.1,  # Fast polling for tests
+        websocket_manager=mock_websocket_manager
+    )
 
-    # Ensure adapters are set correctly
+    # Ensure adapters are set correctly after initialization
     # temp_phase_db and temp_workflow_db are already SQLiteAdapter instances
     if hasattr(phase_queue_service, 'repository'):
         phase_queue_service.repository.adapter = temp_phase_db
 
-    # Manually inject the workflow adapter into the detector
+    # Manually inject the workflow adapter into the detector (CRITICAL for E2E tests)
     coordinator.detector.adapter = temp_workflow_db
 
     return coordinator
@@ -174,18 +169,16 @@ def create_workflow_entry(
         cursor.execute(
             """
             INSERT INTO workflow_history (
-                workflow_id, issue_number, status, error_message,
-                phase_number, is_multi_phase, created_at, updated_at, end_time
+                adw_id, issue_number, status, error_message,
+                created_at, updated_at, end_time
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 f"wf-{issue_number}",
                 issue_number,
                 status,
                 error_message,
-                phase_number,
-                1 if is_multi_phase else 0,
                 datetime.now().isoformat(),
                 datetime.now().isoformat(),
                 end_time,
@@ -596,6 +589,7 @@ class TestMultiPhaseExecution:
     async def test_error_in_polling_loop_does_not_crash(
         self,
         phase_queue_service,
+        temp_phase_db,
         temp_workflow_db,
         mock_websocket_manager
     ):
@@ -609,7 +603,9 @@ class TestMultiPhaseExecution:
             websocket_manager=mock_websocket_manager
         )
 
-        # Inject test workflow database adapter
+        # Inject test database adapters (same as phase_coordinator fixture)
+        if hasattr(phase_queue_service, 'repository'):
+            phase_queue_service.repository.adapter = temp_phase_db
         bad_coordinator.detector.adapter = temp_workflow_db
 
         await bad_coordinator.start()

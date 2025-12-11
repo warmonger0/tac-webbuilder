@@ -51,11 +51,15 @@ class TestWorkLogRepositoryCreate:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_cursor.lastrowid = 1
+        # Mock row with both integer and column name access
         mock_cursor.fetchone.return_value = MagicMock(
             __getitem__=lambda self, key: {
                 0: 1,
                 1: datetime(2025, 12, 2, 10, 30),
-                2: datetime(2025, 12, 2, 10, 30)
+                2: datetime(2025, 12, 2, 10, 30),
+                'id': 1,
+                'timestamp': datetime(2025, 12, 2, 10, 30),
+                'created_at': datetime(2025, 12, 2, 10, 30)
             }[key]
         )
         mock_conn.cursor.return_value = mock_cursor
@@ -99,11 +103,15 @@ class TestWorkLogRepositoryCreate:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_cursor.lastrowid = 1
+        # Mock row with both integer and column name access
         mock_cursor.fetchone.return_value = MagicMock(
             __getitem__=lambda self, key: {
                 0: 1,
                 1: datetime.now(),
-                2: datetime.now()
+                2: datetime.now(),
+                'id': 1,
+                'timestamp': datetime.now(),
+                'created_at': datetime.now()
             }[key]
         )
         mock_conn.cursor.return_value = mock_cursor
@@ -119,7 +127,7 @@ class TestWorkLogRepositoryRetrieval:
 
     def test_get_all_with_pagination(self, repository, mock_adapter):
         """Test retrieving work logs with pagination."""
-        # Setup
+        # Setup - Mock row with both integer and column name access
         mock_row = MagicMock()
         mock_row.__getitem__ = lambda self, key: {
             0: 1,
@@ -130,7 +138,16 @@ class TestWorkLogRepositoryRetrieval:
             5: 42,
             6: "adw-123",
             7: json.dumps(["test"]),
-            8: datetime(2025, 12, 2, 10, 30)
+            8: datetime(2025, 12, 2, 10, 30),
+            'id': 1,
+            'timestamp': datetime(2025, 12, 2, 10, 30),
+            'session_id': "session-123",
+            'summary': "Test summary",
+            'chat_file_link': None,
+            'issue_number': 42,
+            'workflow_id': "adw-123",
+            'tags': json.dumps(["test"]),
+            'created_at': datetime(2025, 12, 2, 10, 30)
         }[key]
 
         mock_conn = MagicMock()

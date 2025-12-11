@@ -76,4 +76,20 @@ def init_phase_queue_db():
             CREATE INDEX IF NOT EXISTS idx_phase_queue_adw_id ON phase_queue(adw_id)
         """)
 
+        # Create queue_config table for global queue settings
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS queue_config (
+                config_key TEXT PRIMARY KEY,
+                config_value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT {timestamp_default}
+            )
+        """)
+
+        # Initialize with queue not paused by default
+        cursor.execute("""
+            INSERT INTO queue_config (config_key, config_value)
+            VALUES ('queue_paused', 'false')
+            ON CONFLICT (config_key) DO NOTHING
+        """)
+
         logger.info(f"[DB] Phase queue database initialized (type: {db_type})")
