@@ -404,6 +404,9 @@ class TestPhaseTriggerring:
         """Test that completing Phase 1 marks Phase 2 as ready"""
         parent_issue = 600
 
+        # Ensure queue is not paused (so next phase gets triggered automatically)
+        phase_queue_service.set_paused(False)
+
         # Enqueue 2 phases
         phase1_id = phase_queue_service.enqueue(
             parent_issue=parent_issue,
