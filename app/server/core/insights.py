@@ -15,14 +15,28 @@ def generate_insights(table_name: str, column_names: list[str] | None = None) ->
         validate_identifier(table_name, "table")
 
         adapter = get_database_adapter()
+        db_type = adapter.get_db_type()
+
         with adapter.get_connection() as conn:
-            # Get table schema using safe query execution
-            cursor_info = execute_query_safely(
-                conn,
-                "PRAGMA table_info({table})",
-                identifier_params={'table': table_name}
-            )
-            columns_info = cursor_info.fetchall()
+            # Get table schema using database-specific queries
+            if db_type == "postgresql":
+                cursor_info = conn.cursor()
+                cursor_info.execute("""
+                    SELECT column_name, data_type, is_nullable
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = %s
+                    ORDER BY ordinal_position
+                """, (table_name,))
+                columns_info = cursor_info.fetchall()
+                # Convert PostgreSQL format to SQLite-like format: [(cid, name, type, ...)]
+                columns_info = [(i, col[0], col[1], None, None, None) for i, col in enumerate(columns_info)]
+            else:  # sqlite
+                cursor_info = execute_query_safely(
+                    conn,
+                    "PRAGMA table_info({table})",
+                    identifier_params={'table': table_name}
+                )
+                columns_info = cursor_info.fetchall()
 
             # If no specific columns requested, analyze all
             if not column_names:

@@ -1,8 +1,9 @@
 import sqlite3
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from core.sql_processor import execute_sql_safely, get_database_schema
+from database import SQLiteAdapter
 
 
 @pytest.fixture
@@ -10,6 +11,7 @@ def test_db():
     """Create an in-memory test database with sample data"""
     # Create in-memory database
     conn = sqlite3.connect(':memory:')
+    conn.row_factory = sqlite3.Row  # Enable dict-like row access
     cursor = conn.cursor()
 
     # Create test tables
@@ -41,9 +43,25 @@ def test_db():
 
     conn.commit()
 
-    # Patch the database connection to use our in-memory database
-    with patch('utils.db_connection.sqlite3.connect') as mock_connect:
-        mock_connect.return_value = conn
+    # Create a mock SQLite adapter that uses our in-memory database
+    mock_adapter = MagicMock(spec=SQLiteAdapter)
+    mock_adapter.get_db_type.return_value = "sqlite"
+
+    # Mock get_connection to return our test connection
+    from contextlib import contextmanager
+    @contextmanager
+    def mock_get_connection():
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            raise
+
+    mock_adapter.get_connection = mock_get_connection
+
+    # Patch get_database_adapter to return our mock adapter
+    with patch('core.sql_processor.get_database_adapter') as mock_get_adapter:
+        mock_get_adapter.return_value = mock_adapter
         yield conn
 
     conn.close()
@@ -115,7 +133,9 @@ class TestSQLProcessor:
         result = execute_sql_safely(sql_query)
 
         assert result['error'] is not None
-        assert "no such table" in result['error'].lower()
+        # Accept both SQLite and PostgreSQL error messages
+        assert ("no such table" in result['error'].lower() or
+                "does not exist" in result['error'].lower())
         assert result['results'] == []
         assert result['columns'] == []
 
@@ -149,16 +169,45 @@ class TestSQLProcessor:
 
     def test_get_database_schema_empty_database(self):
         # Test with empty in-memory database
-        with patch('utils.db_connection.sqlite3.connect') as mock_connect:
-            conn = sqlite3.connect(':memory:')
-            mock_connect.return_value = conn
+        conn = sqlite3.connect(':memory:')
 
+        # Create a mock SQLite adapter
+        mock_adapter = MagicMock(spec=SQLiteAdapter)
+        mock_adapter.get_db_type.return_value = "sqlite"
+
+        from contextlib import contextmanager
+        @contextmanager
+        def mock_get_connection():
+            try:
+                yield conn
+            except Exception:
+                conn.rollback()
+                raise
+
+        mock_adapter.get_connection = mock_get_connection
+
+        with patch('core.sql_processor.get_database_adapter') as mock_get_adapter:
+            mock_get_adapter.return_value = mock_adapter
             result = get_database_schema()
             assert result == {'tables': {}}
 
+        conn.close()
+
     def test_get_database_schema_error(self):
         # Test database connection error
-        with patch('utils.db_connection.sqlite3.connect', side_effect=sqlite3.Error("Connection failed")):
+        mock_adapter = MagicMock(spec=SQLiteAdapter)
+        mock_adapter.get_db_type.return_value = "sqlite"
+
+        from contextlib import contextmanager
+        @contextmanager
+        def mock_get_connection():
+            raise sqlite3.Error("Connection failed")
+            yield  # This won't be reached
+
+        mock_adapter.get_connection = mock_get_connection
+
+        with patch('core.sql_processor.get_database_adapter') as mock_get_adapter:
+            mock_get_adapter.return_value = mock_adapter
             result = get_database_schema()
 
             assert result == {'tables': {}, 'error': 'Connection failed'}

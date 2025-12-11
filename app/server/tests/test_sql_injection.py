@@ -218,18 +218,40 @@ class TestSQLProcessorSecurity:
         assert result['error'] is not None
         assert "Security error" in result['error']
 
-    @patch('utils.db_connection.sqlite3.connect')
-    def test_execute_sql_safely_allows_select(self, mock_connect):
+    def test_execute_sql_safely_allows_select(self):
         """Test that safe SELECT queries are allowed"""
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_connect.return_value = mock_conn
-        mock_conn.cursor.return_value = mock_cursor
-        mock_cursor.fetchall.return_value = []
+        import sqlite3
+        from database import SQLiteAdapter
 
-        result = execute_sql_safely("SELECT * FROM users WHERE id = 1")
-        assert result['error'] is None
-        mock_cursor.execute.assert_called_once()
+        # Create in-memory database with test table
+        conn = sqlite3.connect(':memory:')
+        conn.row_factory = sqlite3.Row  # Enable dict-like row access
+        cursor = conn.cursor()
+        cursor.execute('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)')
+        cursor.execute("INSERT INTO users (name) VALUES ('test')")
+        conn.commit()
+
+        # Create mock adapter
+        mock_adapter = MagicMock(spec=SQLiteAdapter)
+        mock_adapter.get_db_type.return_value = "sqlite"
+
+        from contextlib import contextmanager
+        @contextmanager
+        def mock_get_connection():
+            try:
+                yield conn
+            except Exception:
+                conn.rollback()
+                raise
+
+        mock_adapter.get_connection = mock_get_connection
+
+        with patch('core.sql_processor.get_database_adapter') as mock_get_adapter:
+            mock_get_adapter.return_value = mock_adapter
+            result = execute_sql_safely("SELECT * FROM users WHERE id = 1")
+            assert result['error'] is None
+
+        conn.close()
 
 
 class TestFileProcessorSecurity:
@@ -265,17 +287,39 @@ class TestInsightsSecurity:
             generate_insights("users'; DROP TABLE users; --")
         assert "Invalid" in str(exc_info.value)
 
-    @patch('utils.db_connection.sqlite3.connect')
-    def test_generate_insights_validates_column_names(self, mock_connect):
+    def test_generate_insights_validates_column_names(self):
         """Test that column names are validated"""
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_connect.return_value = mock_conn
-        mock_conn.cursor.return_value = mock_cursor
+        import sqlite3
+        from database import SQLiteAdapter
 
-        with pytest.raises(Exception, match=r".*") as exc_info:
-            generate_insights("users", ["name", "'; DROP TABLE users; --"])
-        assert "Invalid column name" in str(exc_info.value)
+        # Create in-memory database with test table
+        conn = sqlite3.connect(':memory:')
+        cursor = conn.cursor()
+        cursor.execute('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)')
+        conn.commit()
+
+        # Create mock adapter
+        mock_adapter = MagicMock(spec=SQLiteAdapter)
+        mock_adapter.get_db_type.return_value = "sqlite"
+
+        from contextlib import contextmanager
+        @contextmanager
+        def mock_get_connection():
+            try:
+                yield conn
+            except Exception:
+                conn.rollback()
+                raise
+
+        mock_adapter.get_connection = mock_get_connection
+
+        with patch('core.insights.get_database_adapter') as mock_get_adapter:
+            mock_get_adapter.return_value = mock_adapter
+            with pytest.raises(Exception, match=r".*") as exc_info:
+                generate_insights("users", ["name", "'; DROP TABLE users; --"])
+            assert "Invalid column name" in str(exc_info.value)
+
+        conn.close()
 
 
 class TestEndToEndSQLInjection:
