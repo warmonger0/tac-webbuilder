@@ -54,7 +54,7 @@ class TestScanAdwStates:
     def test_scan_adw_states_no_directory(self, tmp_path):
         """Test scanning when agents directory doesn't exist"""
         with patch('core.adw_monitor.get_agents_directory', return_value=tmp_path / "nonexistent"):
-            states = scan_adw_states()
+            states = scan_adw_states(use_cache=False)
             assert states == []
 
     def test_scan_adw_states_empty_directory(self, tmp_path):
@@ -63,7 +63,7 @@ class TestScanAdwStates:
         agents_dir.mkdir()
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            states = scan_adw_states()
+            states = scan_adw_states(use_cache=False)
             assert states == []
 
     def test_scan_adw_states_with_valid_state(self, tmp_path):
@@ -85,7 +85,7 @@ class TestScanAdwStates:
         state_file.write_text(json.dumps(state_data))
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            states = scan_adw_states()
+            states = scan_adw_states(use_cache=False)
             assert len(states) == 1
             assert states[0]["adw_id"] == "abc123"
             assert states[0]["issue_number"] == 42
@@ -103,7 +103,7 @@ class TestScanAdwStates:
         state_file.write_text("{ invalid json }")
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            states = scan_adw_states()
+            states = scan_adw_states(use_cache=False)
             assert states == []
 
     def test_scan_adw_states_multiple_workflows(self, tmp_path):
@@ -121,7 +121,7 @@ class TestScanAdwStates:
             state_file.write_text(json.dumps(state_data))
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            states = scan_adw_states()
+            states = scan_adw_states(use_cache=False)
             assert len(states) == 3
 
 
@@ -269,9 +269,10 @@ class TestPhaseProgress:
         agents_dir.mkdir()
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            phase, progress, phase_names = calculate_phase_progress("nonexistent", {})
+            phase, progress, phase_names, total_phases = calculate_phase_progress("nonexistent", {})
             assert phase is None
             assert progress == 0.0
+            assert total_phases == 9
 
     def test_calculate_phase_progress_no_phases(self, tmp_path):
         """Test progress with no completed phases"""
@@ -282,9 +283,10 @@ class TestPhaseProgress:
         adw_dir.mkdir()
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            phase, progress, phase_names = calculate_phase_progress("abc123", {})
+            phase, progress, phase_names, total_phases = calculate_phase_progress("abc123", {})
             assert phase is None
             assert progress == 0.0
+            assert total_phases == 9
 
     def test_calculate_phase_progress_some_phases(self, tmp_path):
         """Test progress with some completed phases"""
@@ -294,14 +296,16 @@ class TestPhaseProgress:
         adw_dir = agents_dir / "abc123"
         adw_dir.mkdir()
 
-        # Create phase directories
-        (adw_dir / "plan_phase").mkdir()
-        (adw_dir / "build_phase").mkdir()
+        # Create phase directories with adw_ prefix (matching actual implementation)
+        (adw_dir / "adw_plan_phase").mkdir()
+        (adw_dir / "adw_build_phase").mkdir()
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            phase, progress, phase_names = calculate_phase_progress("abc123", {})
+            phase, progress, phase_names, total_phases = calculate_phase_progress("abc123", {})
             # 2 phases out of 9 = 22.2%
             assert progress == 22.2
+            assert total_phases == 9
+            assert len(phase_names) == 2
 
     def test_calculate_phase_progress_current_phase(self, tmp_path):
         """Test progress with current phase"""
@@ -311,17 +315,18 @@ class TestPhaseProgress:
         adw_dir = agents_dir / "abc123"
         adw_dir.mkdir()
 
-        # Create one completed phase
-        (adw_dir / "plan_phase").mkdir()
+        # Create one completed phase with adw_ prefix
+        (adw_dir / "adw_plan_phase").mkdir()
 
         state = {"current_phase": "build"}
 
         with patch('core.adw_monitor.get_agents_directory', return_value=agents_dir):
-            phase, progress, phase_names = calculate_phase_progress("abc123", state)
+            phase, progress, phase_names, total_phases = calculate_phase_progress("abc123", state)
             assert phase == "build"
-            # 1 phase completed (12.5%) + 0.5 * 12.5% for current phase = 18.75%
+            # 1 phase completed out of 9 (11.1%) + 0.5 * (100/9)% for current phase = ~16.7%
             # But we round to 1 decimal place
-            assert progress > 12.5  # Should include partial progress
+            assert progress > 11.1  # Should include partial progress
+            assert total_phases == 9
 
 
 class TestCostExtraction:
@@ -430,6 +435,13 @@ class TestAggregateAdwMonitorData:
 
     def test_aggregate_adw_monitor_data_empty(self, tmp_path):
         """Test aggregation with no workflows"""
+        # Clear cache before test
+        from core.adw_monitor import _monitor_cache, _state_scan_cache
+        _monitor_cache["data"] = None
+        _monitor_cache["timestamp"] = None
+        _state_scan_cache["states"] = None
+        _state_scan_cache["timestamp"] = None
+
         agents_dir = tmp_path / "agents"
         agents_dir.mkdir()
 
@@ -447,9 +459,11 @@ class TestAggregateAdwMonitorData:
     def test_aggregate_adw_monitor_data_with_workflows(self, tmp_path):
         """Test aggregation with multiple workflows"""
         # Clear cache before test
-        from core.adw_monitor import _monitor_cache
+        from core.adw_monitor import _monitor_cache, _state_scan_cache
         _monitor_cache["data"] = None
         _monitor_cache["timestamp"] = None
+        _state_scan_cache["states"] = None
+        _state_scan_cache["timestamp"] = None
 
         agents_dir = tmp_path / "agents"
         agents_dir.mkdir()
