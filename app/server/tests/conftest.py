@@ -75,15 +75,34 @@ def pytest_configure(config):
 
 
 @pytest.fixture(autouse=True)
-def reset_database_adapter():
+def reset_database_adapter(request):
     """
     Reset the database adapter singleton before each test.
 
     This ensures each test gets a fresh adapter instance, preventing
     state leakage between tests. This is necessary because the adapter
     is a global singleton that maintains connection pools.
+
+    For E2E tests: Skips adapter reset to avoid closing connection pools
+    while TestClient is still active. E2E fixtures manage their own lifecycle.
     """
-    # Reset before test
+    # Check if this is an E2E test
+    is_e2e_test = False
+    if hasattr(request, 'node'):
+        # Check for e2e marker
+        if request.node.get_closest_marker('e2e'):
+            is_e2e_test = True
+        # Also check if test file is in e2e directory
+        test_file = str(request.node.fspath)
+        if '/e2e/' in test_file or '\\e2e\\' in test_file:
+            is_e2e_test = True
+
+    # Skip adapter reset for E2E tests - they manage their own lifecycle
+    if is_e2e_test:
+        yield
+        return
+
+    # Reset before test (only for non-E2E tests)
     try:
         from database import factory
         # Close any existing adapter
@@ -99,7 +118,7 @@ def reset_database_adapter():
 
     yield  # Test runs here
 
-    # Reset after test
+    # Reset after test (only for non-E2E tests)
     try:
         from database import factory
         # Close the adapter used by the test
@@ -367,7 +386,7 @@ def cleanup_db_files():
 
 
 @pytest.fixture(autouse=True)
-def cleanup_workflow_history_data():
+def cleanup_workflow_history_data(request):
     """
     Automatically clean workflow_history table data before and after each test.
 
@@ -375,7 +394,23 @@ def cleanup_workflow_history_data():
     and prevent UNIQUE constraint violations on adw_id.
 
     Supports both SQLite (local files) and PostgreSQL (via adapter).
+
+    For E2E tests: Skipped - E2E tests use e2e_test_db_cleanup fixture instead.
     """
+    # Check if this is an E2E test
+    is_e2e_test = False
+    if hasattr(request, 'node'):
+        if request.node.get_closest_marker('e2e'):
+            is_e2e_test = True
+        test_file = str(request.node.fspath)
+        if '/e2e/' in test_file or '\\e2e\\' in test_file:
+            is_e2e_test = True
+
+    # Skip for E2E tests - they use e2e_test_db_cleanup instead
+    if is_e2e_test:
+        yield
+        return
+
     def cleanup_test_records():
         """Helper to clean ALL test records from SQLite and PostgreSQL databases"""
         # First, try cleaning via database adapter (works for both SQLite and PostgreSQL)
@@ -452,14 +487,30 @@ def cleanup_workflow_history_data():
 
 
 @pytest.fixture(autouse=True)
-def cleanup_phase_queue_data():
+def cleanup_phase_queue_data(request):
     """
     Automatically clean phase_queue table data before and after each test.
 
     This fixture runs automatically for every test to ensure test isolation.
 
     Uses database adapter to support both SQLite and PostgreSQL.
+
+    For E2E tests: Skipped - E2E tests use e2e_test_db_cleanup fixture instead.
     """
+    # Check if this is an E2E test
+    is_e2e_test = False
+    if hasattr(request, 'node'):
+        if request.node.get_closest_marker('e2e'):
+            is_e2e_test = True
+        test_file = str(request.node.fspath)
+        if '/e2e/' in test_file or '\\e2e\\' in test_file:
+            is_e2e_test = True
+
+    # Skip for E2E tests - they use e2e_test_db_cleanup instead
+    if is_e2e_test:
+        yield
+        return
+
     # Import here to avoid circular dependencies during test collection
     try:
         from database import get_database_adapter

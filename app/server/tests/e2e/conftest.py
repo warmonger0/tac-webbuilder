@@ -236,11 +236,14 @@ def e2e_database(e2e_test_environment, monkeypatch_session):
 
     yield db_path
 
-    # Cleanup: Reset database adapter cache (important for session-scoped fixture)
+    # Cleanup: Close database adapter at END of session only
+    # This runs after ALL E2E tests have completed
     try:
         from database.factory import close_database_adapter
         close_database_adapter()
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.debug(f"Failed to close database adapter at session end: {e}")
         pass
 
 
@@ -382,10 +385,12 @@ def mock_external_services_e2e():
             mocks = mock_external_services_e2e
             # External API calls are mocked but system behavior is real
     """
-    mocks = {}
+    # Create all patches using contextlib.ExitStack to manage multiple context managers
+    with contextlib.ExitStack() as stack:
+        mocks = {}
 
-    # Mock GitHub API
-    with patch('core.github_poster.GitHubPoster') as mock_github:
+        # Mock GitHub API
+        mock_github = stack.enter_context(patch('core.github_poster.GitHubPoster'))
         github_instance = Mock()
         github_instance.post_comment.return_value = {
             "id": 12345,
@@ -403,39 +408,39 @@ def mock_external_services_e2e():
         mocks["github"] = github_instance
 
         # Mock OpenAI API
-        with patch('openai.ChatCompletion.create') as mock_openai:
-            mock_openai.return_value = {
-                "choices": [
-                    {
-                        "message": {
-                            "content": "SELECT * FROM users WHERE created_at > '2025-01-01'",
-                        }
+        mock_openai = stack.enter_context(patch('openai.ChatCompletion.create'))
+        mock_openai.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": "SELECT * FROM users WHERE created_at > '2025-01-01'",
                     }
-                ],
-                "usage": {
-                    "prompt_tokens": 200,
-                    "completion_tokens": 100,
-                    "total_tokens": 300,
-                },
-            }
-            mocks["openai"] = mock_openai
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 200,
+                "completion_tokens": 100,
+                "total_tokens": 300,
+            },
+        }
+        mocks["openai"] = mock_openai
 
-            # Mock Anthropic API
-            with patch('anthropic.Anthropic') as mock_anthropic:
-                anthropic_client = Mock()
-                anthropic_message = Mock()
-                anthropic_message.content = [
-                    Mock(text="SELECT * FROM workflow_history WHERE status = 'completed'")
-                ]
-                anthropic_message.usage = Mock(
-                    input_tokens=200,
-                    output_tokens=100,
-                )
-                anthropic_client.messages.create.return_value = anthropic_message
-                mock_anthropic.return_value = anthropic_client
-                mocks["anthropic"] = anthropic_client
+        # Mock Anthropic API
+        mock_anthropic = stack.enter_context(patch('anthropic.Anthropic'))
+        anthropic_client = Mock()
+        anthropic_message = Mock()
+        anthropic_message.content = [
+            Mock(text="SELECT * FROM workflow_history WHERE status = 'completed'")
+        ]
+        anthropic_message.usage = Mock(
+            input_tokens=200,
+            output_tokens=100,
+        )
+        anthropic_client.messages.create.return_value = anthropic_message
+        mock_anthropic.return_value = anthropic_client
+        mocks["anthropic"] = anthropic_client
 
-                yield mocks
+        yield mocks
 
 
 # ============================================================================

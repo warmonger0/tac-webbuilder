@@ -31,8 +31,9 @@ class TestWorkflowCreationJourney:
         2. User checks workflow status
         3. User retrieves workflow details
         """
-        # Step 1: Create workflow
+        # All API calls need to be inside patch context
         with patch('core.workflow_history_utils.database.DB_PATH', e2e_database):
+            # Step 1: Create workflow
             create_response = e2e_test_client.post("/api/v1/workflows/create", json={
                 "nl_input": sample_workflow_data["nl_input"],
                 "issue_number": sample_workflow_data["issue_number"],

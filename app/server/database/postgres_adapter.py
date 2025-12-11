@@ -76,6 +76,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
         """Close connection pool"""
         if self._pool:
             self._pool.closeall()
+            self._pool = None  # Reset to allow lazy re-initialization
 
     def health_check(self) -> bool:
         """Check PostgreSQL health"""
