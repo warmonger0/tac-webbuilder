@@ -26,9 +26,9 @@ class PhaseQueueRepository:
         """
         self.adapter = get_database_adapter()
 
-    def insert_phase(self, item: PhaseQueueItem) -> None:
+    def create(self, item: PhaseQueueItem) -> PhaseQueueItem:
         """
-        Insert a phase into the database.
+        Create a new phase queue item.
 
         Automatically sets:
         - queue_position (based on ROWID for FIFO ordering)
@@ -36,7 +36,10 @@ class PhaseQueueRepository:
         - ready_timestamp (if status is 'ready')
 
         Args:
-            item: PhaseQueueItem to insert
+            item: PhaseQueueItem to create
+
+        Returns:
+            Created PhaseQueueItem with queue_id populated
 
         Raises:
             Exception: If database operation fails
@@ -74,22 +77,23 @@ class PhaseQueueRepository:
                         item.created_at if item.status == 'ready' else None,
                     ),
                 )
+                return item
         except Exception as e:
-            logger.error(f"[ERROR] Failed to insert phase: {str(e)}")
+            logger.error(f"[ERROR] Failed to create phase: {str(e)}")
             logger.error(f"[ERROR] Exception type: {type(e).__name__}")
             logger.error(f"[ERROR] Exception repr: {repr(e)}")
             logger.error(f"[ERROR] Full traceback:\n{traceback.format_exc()}")
             raise
 
-    def find_by_id(self, queue_id: str) -> PhaseQueueItem | None:
+    def get_by_id(self, queue_id: str) -> PhaseQueueItem | None:
         """
-        Find a phase by queue_id.
+        Get phase queue item by queue_id.
 
         Args:
-            queue_id: Queue ID to find
+            queue_id: Primary key to search for
 
         Returns:
-            PhaseQueueItem or None if not found
+            PhaseQueueItem if found, None otherwise
         """
         try:
             with self.adapter.get_connection() as conn:
@@ -104,18 +108,19 @@ class PhaseQueueRepository:
             return PhaseQueueItem.from_db_row(row) if row else None
 
         except Exception as e:
-            logger.error(f"[ERROR] Failed to find phase by ID: {str(e)}")
+            logger.error(f"[ERROR] Failed to get phase by ID: {str(e)}")
             raise
 
-    def find_by_parent(self, parent_issue: int) -> list[PhaseQueueItem]:
+    def get_all_by_parent_issue(self, parent_issue: int, limit: int = 100) -> list[PhaseQueueItem]:
         """
-        Find all phases for a parent issue.
+        Get all phases for a parent issue.
 
         Args:
-            parent_issue: Parent GitHub issue number
+            parent_issue: Parent GitHub issue number to filter by
+            limit: Maximum records to return
 
         Returns:
-            List of PhaseQueueItems ordered by phase number
+            List of matching phase queue items ordered by phase number
         """
         try:
             with self.adapter.get_connection() as conn:
@@ -126,15 +131,16 @@ class PhaseQueueRepository:
                     SELECT * FROM phase_queue
                     WHERE parent_issue = {ph}
                     ORDER BY phase_number ASC
+                    LIMIT {ph}
                     """,
-                    (parent_issue,)
+                    (parent_issue, limit)
                 )
                 rows = cursor.fetchall()
 
             return [PhaseQueueItem.from_db_row(row) for row in rows]
 
         except Exception as e:
-            logger.error(f"[ERROR] Failed to find phases by parent: {str(e)}")
+            logger.error(f"[ERROR] Failed to get phases by parent issue: {str(e)}")
             raise
 
     def find_by_depends_on_phase(self, parent_issue: int, depends_on_phase: int) -> PhaseQueueItem | None:
@@ -196,28 +202,35 @@ class PhaseQueueRepository:
             logger.error(f"[ERROR] Failed to find ready phases: {str(e)}")
             raise
 
-    def find_all(self) -> list[PhaseQueueItem]:
+    def get_all(self, limit: int = 100, offset: int = 0) -> list[PhaseQueueItem]:
         """
-        Find all phases in the queue.
+        Get all phase queue items with pagination.
+
+        Args:
+            limit: Maximum records to return
+            offset: Number of records to skip
 
         Returns:
-            List of all PhaseQueueItems ordered by parent issue and phase number
+            List of phase queue items ordered by parent issue and phase number
         """
         try:
             with self.adapter.get_connection() as conn:
                 cursor = conn.cursor()
+                ph = self.adapter.placeholder()
                 cursor.execute(
-                    """
+                    f"""
                     SELECT * FROM phase_queue
                     ORDER BY parent_issue ASC, phase_number ASC
-                    """
+                    LIMIT {ph} OFFSET {ph}
+                    """,
+                    (limit, offset)
                 )
                 rows = cursor.fetchall()
 
             return [PhaseQueueItem.from_db_row(row) for row in rows]
 
         except Exception as e:
-            logger.error(f"[ERROR] Failed to find all phases: {str(e)}")
+            logger.error(f"[ERROR] Failed to get all phases: {str(e)}")
             raise
 
     def update_status(self, queue_id: str, status: str, adw_id: str | None = None) -> bool:
@@ -329,12 +342,12 @@ class PhaseQueueRepository:
             logger.error(f"[ERROR] Failed to update error message: {str(e)}")
             raise
 
-    def delete_phase(self, queue_id: str) -> bool:
+    def delete(self, queue_id: str) -> bool:
         """
-        Delete a phase from the queue.
+        Delete phase queue item by queue_id.
 
         Args:
-            queue_id: Queue ID to delete
+            queue_id: Primary key of item to delete
 
         Returns:
             True if deleted, False if not found

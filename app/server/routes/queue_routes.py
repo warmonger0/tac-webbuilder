@@ -287,7 +287,7 @@ async def _dequeue_phase_handler(queue_id: str, phase_queue_service) -> DequeueR
 async def _execute_phase_handler(queue_id: str, phase_queue_service) -> ExecutePhaseResponse:
     """Handler for execute phase endpoint."""
     # Get phase from queue
-    phase = phase_queue_service.repository.find_by_id(queue_id)
+    phase = phase_queue_service.repository.get_by_id(queue_id)
 
     if not phase:
         raise HTTPException(404, f"Queue ID {queue_id} not found")

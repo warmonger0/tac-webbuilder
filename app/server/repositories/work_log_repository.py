@@ -19,7 +19,7 @@ class WorkLogRepository:
     def __init__(self):
         self.adapter = get_database_adapter()
 
-    def create_entry(self, entry: WorkLogEntryCreate) -> WorkLogEntry:
+    def create(self, entry: WorkLogEntryCreate) -> WorkLogEntry:
         """
         Create a new work log entry.
 
@@ -214,7 +214,7 @@ class WorkLogRepository:
             logger.error(f"Failed to get work log count: {e}")
             raise
 
-    def delete_entry(self, entry_id: int) -> bool:
+    def delete(self, entry_id: int) -> bool:
         """
         Delete a work log entry.
 

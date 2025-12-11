@@ -90,7 +90,7 @@ class PhaseQueueService:
         )
 
         try:
-            self.repository.insert_phase(item)
+            self.repository.create(item)
             logger.info(
                 f"[SUCCESS] Enqueued Phase {phase_number} for issue #{parent_issue} "
                 f"(queue_id: {queue_id}, status: {status})"
@@ -115,7 +115,7 @@ class PhaseQueueService:
             Exception: If database operation fails
         """
         try:
-            deleted = self.repository.delete_phase(queue_id)
+            deleted = self.repository.delete(queue_id)
 
             if deleted:
                 logger.info(f"[SUCCESS] Dequeued phase (queue_id: {queue_id})")
@@ -245,7 +245,7 @@ class PhaseQueueService:
             Exception: If database operation fails
         """
         try:
-            items = self.repository.find_by_parent(parent_issue)
+            items = self.repository.get_all_by_parent_issue(parent_issue)
             logger.info(f"[SUCCESS] Retrieved {len(items)} phases for issue #{parent_issue}")
             return items
 
@@ -264,7 +264,7 @@ class PhaseQueueService:
             Exception: If database operation fails
         """
         try:
-            items = self.repository.find_all()
+            items = self.repository.get_all()
             logger.info(f"[SUCCESS] Retrieved {len(items)} phases from queue")
             return items
 

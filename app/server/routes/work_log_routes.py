@@ -36,7 +36,7 @@ def init_work_log_routes(repository: WorkLogRepository | None = None):
         Validates that summary is at most 280 characters.
         """
         try:
-            return repo.create_entry(entry)
+            return repo.create(entry)
         except ValueError as e:
             logger.warning(f"Validation error creating work log: {e}")
             raise HTTPException(status_code=400, detail=str(e))
@@ -108,7 +108,7 @@ def init_work_log_routes(repository: WorkLogRepository | None = None):
             500: If database operation fails
         """
         try:
-            deleted = repo.delete_entry(entry_id)
+            deleted = repo.delete(entry_id)
             if not deleted:
                 raise HTTPException(status_code=404, detail=f"Work log entry {entry_id} not found")
         except HTTPException:

@@ -62,7 +62,7 @@ class TestWorkLogRepositoryCreate:
         mock_adapter.get_connection.return_value.__enter__.return_value = mock_conn
 
         # Execute
-        result = repository.create_entry(entry_create)
+        result = repository.create(entry_create)
 
         # Assert
         assert isinstance(result, WorkLogEntry)
@@ -109,7 +109,7 @@ class TestWorkLogRepositoryCreate:
         mock_conn.cursor.return_value = mock_cursor
         mock_adapter.get_connection.return_value.__enter__.return_value = mock_conn
 
-        result = repository.create_entry(entry_create)
+        result = repository.create(entry_create)
 
         assert result.tags == []
 
@@ -198,7 +198,7 @@ class TestWorkLogRepositoryDelete:
         mock_conn.cursor.return_value = mock_cursor
         mock_adapter.get_connection.return_value.__enter__.return_value = mock_conn
 
-        result = repository.delete_entry(1)
+        result = repository.delete(1)
 
         assert result is True
         # Verify SQL used placeholder
@@ -214,7 +214,7 @@ class TestWorkLogRepositoryDelete:
         mock_conn.cursor.return_value = mock_cursor
         mock_adapter.get_connection.return_value.__enter__.return_value = mock_conn
 
-        result = repository.delete_entry(999)
+        result = repository.delete(999)
 
         assert result is False
 

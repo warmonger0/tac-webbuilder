@@ -38,7 +38,7 @@ class PhaseDependencyTracker:
             Exception: If database operation fails
         """
         # Get completed phase info
-        completed_phase = self.repository.find_by_id(completed_queue_id)
+        completed_phase = self.repository.get_by_id(completed_queue_id)
         if not completed_phase:
             logger.warning(f"[WARNING] Queue ID not found: {completed_queue_id}")
             return None
@@ -55,7 +55,7 @@ class PhaseDependencyTracker:
 
         # Find next phase in sequence
         next_phase_number = completed_phase_number + 1
-        all_phases = self.repository.find_by_parent(parent_issue)
+        all_phases = self.repository.get_all_by_parent_issue(parent_issue)
 
         next_phase = None
         for phase in all_phases:
@@ -89,7 +89,7 @@ class PhaseDependencyTracker:
             Exception: If database operation fails
         """
         # Get failed phase info
-        failed_phase = self.repository.find_by_id(failed_queue_id)
+        failed_phase = self.repository.get_by_id(failed_queue_id)
         if not failed_phase:
             logger.warning(f"[WARNING] Queue ID not found: {failed_queue_id}")
             return []
@@ -106,7 +106,7 @@ class PhaseDependencyTracker:
         )
 
         # Find and block all subsequent phases
-        all_phases = self.repository.find_by_parent(parent_issue)
+        all_phases = self.repository.get_all_by_parent_issue(parent_issue)
         blocked_ids = []
         block_reason = f"Phase {failed_phase_number} failed: {error_message}"
 
