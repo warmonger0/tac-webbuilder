@@ -831,3 +831,31 @@ def response_validator():
             assert "detail" in data or "error" in data
 
     return ResponseValidator()
+
+
+# ============================================================================
+# Sample Test Data Fixtures
+# ============================================================================
+
+
+@pytest.fixture
+def sample_workflow_data():
+    """
+    Provide sample workflow data for E2E testing.
+
+    Returns a dictionary with common workflow fields.
+
+    Usage:
+        def test_workflow(sample_workflow_data):
+            nl_input = sample_workflow_data["nl_input"]
+            # Use in workflow creation tests
+    """
+    return {
+        "adw_id": "E2E-SAMPLE-001",
+        "issue_number": 42,
+        "nl_input": "Create user authentication system",
+        "github_url": "https://github.com/test/repo/issues/42",
+        "workflow_template": "adw_sdlc_iso",
+        "model_used": "claude-sonnet-4-5",
+        "status": "pending",
+    }

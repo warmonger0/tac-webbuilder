@@ -33,6 +33,7 @@ def temp_workflow_db():
         db_path = os.path.join(tmpdir, "test_workflow_history.db")
 
         conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row  # Enable dict-like row access
         conn.execute("""
             CREATE TABLE IF NOT EXISTS workflow_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,6 +43,7 @@ def temp_workflow_db():
                 error_message TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                end_time TEXT,
                 phase_number INTEGER,
                 parent_workflow_id TEXT,
                 is_multi_phase INTEGER DEFAULT 0
@@ -75,11 +77,24 @@ def mock_websocket_manager():
 @pytest.fixture
 def phase_coordinator(phase_queue_service, temp_workflow_db, mock_websocket_manager):
     """Create PhaseCoordinator with test dependencies"""
-    return PhaseCoordinator(
-        phase_queue_service=phase_queue_service,
-        poll_interval=0.1,  # Fast polling for tests
-        websocket_manager=mock_websocket_manager
-    )
+    from database.sqlite_adapter import SQLiteAdapter
+    from unittest.mock import patch
+
+    # Create adapter for workflow database
+    workflow_adapter = SQLiteAdapter(db_path=temp_workflow_db)
+
+    # Patch get_database_adapter to return our workflow adapter for detector
+    with patch('services.phase_coordination.workflow_completion_detector.get_database_adapter', return_value=workflow_adapter):
+        coordinator = PhaseCoordinator(
+            phase_queue_service=phase_queue_service,
+            poll_interval=0.1,  # Fast polling for tests
+            websocket_manager=mock_websocket_manager
+        )
+
+    # Manually inject the adapter into the detector
+    coordinator.detector.adapter = workflow_adapter
+
+    return coordinator
 
 
 # ============================================================================
@@ -95,13 +110,15 @@ def add_workflow(
 ):
     """Add a workflow to workflow_history"""
     conn = sqlite3.connect(workflow_db_path)
+    # Set end_time only for completed/failed status (for phantom detection)
+    end_time = datetime.now().isoformat() if status in ('completed', 'failed') else None
     conn.execute(
         """
         INSERT INTO workflow_history (
             workflow_id, issue_number, status, error_message,
-            created_at, updated_at
+            created_at, updated_at, end_time
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
             f"wf-{issue_number}",
@@ -110,6 +127,7 @@ def add_workflow(
             error_message,
             datetime.now().isoformat(),
             datetime.now().isoformat(),
+            end_time,
         ),
     )
     conn.commit()
@@ -294,8 +312,30 @@ class TestWorkflowDetection:
 
     async def test_get_workflow_status(self, phase_coordinator, temp_workflow_db):
         """Test _get_workflow_status() helper method"""
-        # Add workflow
-        add_workflow(temp_workflow_db, 401, status="completed")
+        from datetime import datetime
+
+        # Add workflow with end_time for completed status
+        conn = sqlite3.connect(temp_workflow_db)
+        conn.execute(
+            """
+            INSERT INTO workflow_history (
+                workflow_id, issue_number, status, error_message,
+                created_at, updated_at, end_time
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "wf-401",
+                401,
+                "completed",
+                None,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+            ),
+        )
+        conn.commit()
+        conn.close()
 
         # Get status
         status = phase_coordinator._get_workflow_status(401)
@@ -307,10 +347,31 @@ class TestWorkflowDetection:
 
     async def test_get_workflow_error(self, phase_coordinator, temp_workflow_db):
         """Test _get_workflow_error() helper method"""
+        from datetime import datetime
         error_msg = "Test error message"
 
-        # Add failed workflow
-        add_workflow(temp_workflow_db, 501, status="failed", error_message=error_msg)
+        # Add failed workflow with end_time
+        conn = sqlite3.connect(temp_workflow_db)
+        conn.execute(
+            """
+            INSERT INTO workflow_history (
+                workflow_id, issue_number, status, error_message,
+                created_at, updated_at, end_time
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "wf-501",
+                501,
+                "failed",
+                error_msg,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+            ),
+        )
+        conn.commit()
+        conn.close()
 
         # Get error
         error = phase_coordinator._get_workflow_error(501)

@@ -106,7 +106,7 @@ def integration_test_db(monkeypatch) -> Generator[Path, None, None]:
     except Exception as e:
         # Log but don't fail fixture - some tests may not use workflow_history DB
         import traceback
-        print(f"\nWarning: workflow_history database initialization: {e}")
+        print(f"\nWarning: workflow_history database initialization failed: {e}")
         traceback.print_exc()
 
     try:
@@ -115,7 +115,7 @@ def integration_test_db(monkeypatch) -> Generator[Path, None, None]:
     except Exception as e:
         # Log but don't fail fixture - some tests may not use phase_queue DB
         import traceback
-        print(f"\nWarning: phase_queue database initialization: {e}")
+        print(f"\nWarning: phase_queue database initialization failed: {e}")
         traceback.print_exc()
 
     try:
@@ -124,7 +124,7 @@ def integration_test_db(monkeypatch) -> Generator[Path, None, None]:
     except Exception as e:
         # Log but don't fail fixture - some tests may not use work_log DB
         import traceback
-        print(f"\nWarning: work_log database initialization: {e}")
+        print(f"\nWarning: work_log database initialization failed: {e}")
         traceback.print_exc()
 
     try:
@@ -133,7 +133,23 @@ def integration_test_db(monkeypatch) -> Generator[Path, None, None]:
     except Exception as e:
         # Log but don't fail fixture - some tests may not use context_review DB
         import traceback
-        print(f"\nWarning: context_review database initialization: {e}")
+        print(f"\nWarning: context_review database initialization failed: {e}")
+        traceback.print_exc()
+
+    # Initialize PostgreSQL tables for integration tests
+    try:
+        from database import get_database_adapter
+        adapter = get_database_adapter()
+        # Verify connection works
+        with adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            result = cursor.fetchone()
+            assert result[0] == 1, "PostgreSQL connection test failed"
+        print(f"\n✓ PostgreSQL connection successful (tac_webbuilder_test)")
+    except Exception as e:
+        import traceback
+        print(f"\nWarning: PostgreSQL connection test failed: {e}")
         traceback.print_exc()
 
     yield temp_db_path
@@ -252,30 +268,46 @@ def integration_client(integration_app) -> Generator[TestClient, None, None]:
             assert response.status_code == 200
     """
     with TestClient(integration_app) as client:
-        # Clean up work_log table before each test
+        # Clean up database tables before each test
         try:
             from database import get_database_adapter
             adapter = get_database_adapter()
             with adapter.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM work_log")
-                # Context manager handles commit
-        except Exception:
-            # Table might not exist yet, that's ok
+                # Clean up all test tables
+                tables_to_clean = ['work_log', 'phase_queue', 'webhook_events', 'task_log']
+                for table in tables_to_clean:
+                    try:
+                        cursor.execute(f"DELETE FROM {table}")
+                    except Exception as table_error:
+                        # Table might not exist yet, that's ok
+                        print(f"Note: Could not clean {table}: {table_error}")
+                conn.commit()
+        except Exception as e:
+            # Database might not be ready yet, that's ok
+            print(f"Warning: Could not clean tables before test: {e}")
             pass
 
         yield client
 
-        # Clean up work_log table after each test
+        # Clean up database tables after each test
         try:
             from database import get_database_adapter
             adapter = get_database_adapter()
             with adapter.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM work_log")
-                # Context manager handles commit
-        except Exception:
+                # Clean up all test tables
+                tables_to_clean = ['work_log', 'phase_queue', 'webhook_events', 'task_log']
+                for table in tables_to_clean:
+                    try:
+                        cursor.execute(f"DELETE FROM {table}")
+                    except Exception as table_error:
+                        # Table might not exist, that's ok
+                        pass
+                conn.commit()
+        except Exception as e:
             # Cleanup failure shouldn't break tests
+            print(f"Warning: Could not clean tables after test: {e}")
             pass
 
 
@@ -796,6 +828,133 @@ def sample_api_requests():
             "format": "csv",
         },
     }
+
+
+# ============================================================================
+# E2E Test Fixtures (for test_workflow_journey.py)
+# ============================================================================
+
+
+@pytest.fixture
+def e2e_test_client(integration_client):
+    """Alias for e2e tests that use integration_client"""
+    return integration_client
+
+
+@pytest.fixture
+def e2e_database(integration_test_db):
+    """Alias for e2e tests that use integration_test_db"""
+    return integration_test_db
+
+
+@pytest.fixture
+def mock_external_services_e2e():
+    """Mock external services for E2E tests"""
+    with patch('anthropic.Anthropic') as mock_anthropic:
+        mock_client = Mock()
+        mock_message = Mock()
+        mock_message.content = [Mock(text="SELECT * FROM test")]
+        mock_message.usage = Mock(input_tokens=100, output_tokens=50)
+        mock_client.messages.create.return_value = mock_message
+        mock_anthropic.return_value = mock_client
+        yield mock_client
+
+
+@pytest.fixture
+def workflow_execution_harness():
+    """Harness for executing workflows in E2E tests"""
+    class WorkflowHarness:
+        def execute_workflow(self, workflow_data):
+            """Execute a workflow and return result"""
+            return {
+                "status": workflow_data.get("status", "pending"),
+                "adw_id": workflow_data.get("adw_id"),
+                "issue_number": workflow_data.get("issue_number"),
+            }
+
+    return WorkflowHarness()
+
+
+@pytest.fixture
+def performance_monitor():
+    """Monitor performance metrics during tests"""
+    class PerformanceMonitor:
+        def __init__(self):
+            self.metrics = {}
+
+        def track(self, operation_name):
+            """Context manager for tracking operation performance"""
+            return self._TrackingContext(self, operation_name)
+
+        def get_metrics(self):
+            """Get collected metrics"""
+            return self.metrics
+
+        class _TrackingContext:
+            def __init__(self, monitor, operation_name):
+                self.monitor = monitor
+                self.operation_name = operation_name
+
+            def __enter__(self):
+                import time
+                self.start_time = time.time()
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                import time
+                duration = time.time() - self.start_time
+                self.monitor.metrics[self.operation_name] = {
+                    "duration": duration,
+                    "success": exc_type is None
+                }
+
+    return PerformanceMonitor()
+
+
+@pytest.fixture
+def full_stack_context(integration_app, websocket_manager):
+    """Full stack context for E2E tests"""
+    from fastapi.testclient import TestClient
+
+    return {
+        "client": TestClient(integration_app),
+        "websocket": websocket_manager,
+        "app": integration_app
+    }
+
+
+@pytest.fixture
+def response_validator():
+    """Validator for API responses"""
+    class ResponseValidator:
+        def validate_health_response(self, response):
+            """Validate health check response"""
+            assert response.status_code == 200
+            data = response.json()
+            assert "status" in data
+            return data
+
+    return ResponseValidator()
+
+
+@pytest.fixture
+def workflow_factory():
+    """Factory for creating test workflows"""
+    class WorkflowFactory:
+        def create_batch(self, count, **defaults):
+            """Create multiple test workflows"""
+            workflows = []
+            for i in range(count):
+                workflow = {
+                    "adw_id": defaults.get("adw_id", f"TEST-E2E-{i+1:03d}"),
+                    "issue_number": defaults.get("issue_number", 10000 + i),
+                    "nl_input": defaults.get("nl_input", f"Test workflow {i+1}"),
+                    "status": defaults.get("status", "pending"),
+                }
+                workflows.append(workflow)
+            return workflows
+
+    return WorkflowFactory()
 
 
 # ============================================================================

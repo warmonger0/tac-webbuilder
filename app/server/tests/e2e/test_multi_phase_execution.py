@@ -132,10 +132,12 @@ def phase_coordinator(phase_queue_service, temp_phase_db, temp_workflow_db, mock
             websocket_manager=mock_websocket_manager
         )
 
-    # Ensure adapters are set correctly (patching should have worked, but override just in case)
+    # Ensure adapters are set correctly
+    # temp_phase_db and temp_workflow_db are already SQLiteAdapter instances
     if hasattr(phase_queue_service, 'repository'):
         phase_queue_service.repository.adapter = temp_phase_db
 
+    # Manually inject the workflow adapter into the detector
     coordinator.detector.adapter = temp_workflow_db
 
     return coordinator
