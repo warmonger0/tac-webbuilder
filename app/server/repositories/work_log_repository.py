@@ -68,7 +68,7 @@ class WorkLogRepository:
                         tags_json,
                     ),
                 )
-                conn.commit()
+                # Don't commit here - let context manager handle it
 
                 if db_type == "sqlite":
                     # SQLite: Use lastrowid and fetch the created row
@@ -78,14 +78,16 @@ class WorkLogRepository:
                         (entry_id,)
                     )
                     result = cursor.fetchone()
-                    timestamp = result[1]
-                    created_at = result[2]
+                    # Use column names - sqlite3.Row supports dictionary access
+                    timestamp = result['timestamp']
+                    created_at = result['created_at']
                 else:
-                    # PostgreSQL: Use RETURNING clause
+                    # PostgreSQL: Use RETURNING clause - fetch before commit
+                    # RealDictCursor returns dict-like objects
                     result = cursor.fetchone()
-                    entry_id = result[0]
-                    timestamp = result[1]
-                    created_at = result[2]
+                    entry_id = result['id']
+                    timestamp = result['timestamp']
+                    created_at = result['created_at']
 
                 logger.info(f"Created work log entry {entry_id} for session {entry.session_id}")
 
@@ -131,18 +133,19 @@ class WorkLogRepository:
 
                 entries = []
                 for row in rows:
-                    tags = json.loads(row[7]) if row[7] else []
+                    # Use column names - works with both sqlite3.Row and RealDictRow
+                    tags = json.loads(row['tags']) if row['tags'] else []
                     entries.append(
                         WorkLogEntry(
-                            id=row[0],
-                            timestamp=row[1],
-                            session_id=row[2],
-                            summary=row[3],
-                            chat_file_link=row[4],
-                            issue_number=row[5],
-                            workflow_id=row[6],
+                            id=row['id'],
+                            timestamp=row['timestamp'],
+                            session_id=row['session_id'],
+                            summary=row['summary'],
+                            chat_file_link=row['chat_file_link'],
+                            issue_number=row['issue_number'],
+                            workflow_id=row['workflow_id'],
                             tags=tags,
-                            created_at=row[8],
+                            created_at=row['created_at'],
                         )
                     )
 
@@ -178,18 +181,19 @@ class WorkLogRepository:
 
                 entries = []
                 for row in rows:
-                    tags = json.loads(row[7]) if row[7] else []
+                    # Use column names - works with both sqlite3.Row and RealDictRow
+                    tags = json.loads(row['tags']) if row['tags'] else []
                     entries.append(
                         WorkLogEntry(
-                            id=row[0],
-                            timestamp=row[1],
-                            session_id=row[2],
-                            summary=row[3],
-                            chat_file_link=row[4],
-                            issue_number=row[5],
-                            workflow_id=row[6],
+                            id=row['id'],
+                            timestamp=row['timestamp'],
+                            session_id=row['session_id'],
+                            summary=row['summary'],
+                            chat_file_link=row['chat_file_link'],
+                            issue_number=row['issue_number'],
+                            workflow_id=row['workflow_id'],
                             tags=tags,
-                            created_at=row[8],
+                            created_at=row['created_at'],
                         )
                     )
 
@@ -234,7 +238,7 @@ class WorkLogRepository:
             with self.adapter.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(query, (entry_id,))
-                conn.commit()
+                # Context manager handles commit
 
                 deleted = cursor.rowcount > 0
                 if deleted:

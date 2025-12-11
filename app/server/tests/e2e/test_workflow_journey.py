@@ -236,28 +236,28 @@ class TestMultiWorkflowJourney:
         # Create test workflows using factory
         workflows = workflow_factory.create_batch(5, status="completed")
 
-        # Insert workflows into database
+        # Insert workflows into database using adapter
         try:
-            import sqlite3
-            conn = sqlite3.connect(str(e2e_database), timeout=10.0)
-            cursor = conn.cursor()
+            from database.factory import get_database_adapter
+            adapter = get_database_adapter()
+            ph = adapter.placeholder()
 
             for workflow in workflows:
-                cursor.execute("""
-                    INSERT INTO workflow_history (
-                        adw_id, issue_number, nl_input, status
-                    ) VALUES (?, ?, ?, ?)
-                """, (
-                    workflow["adw_id"],
-                    workflow["issue_number"],
-                    workflow["nl_input"],
-                    workflow["status"],
-                ))
-
-            conn.commit()
-            conn.close()
+                with adapter.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(f"""
+                        INSERT INTO workflow_history (
+                            adw_id, issue_number, nl_input, status
+                        ) VALUES ({ph}, {ph}, {ph}, {ph})
+                    """, (
+                        workflow["adw_id"],
+                        workflow["issue_number"],
+                        workflow["nl_input"],
+                        workflow["status"],
+                    ))
+                    conn.commit()
         except Exception as e:
-            # Database might be already populated or locked
+            # Database might be already populated or have unique constraint violations
             import logging
             logging.warning(f"Failed to insert test workflows: {e}")
 

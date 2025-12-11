@@ -252,7 +252,31 @@ def integration_client(integration_app) -> Generator[TestClient, None, None]:
             assert response.status_code == 200
     """
     with TestClient(integration_app) as client:
+        # Clean up work_log table before each test
+        try:
+            from database import get_database_adapter
+            adapter = get_database_adapter()
+            with adapter.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM work_log")
+                # Context manager handles commit
+        except Exception:
+            # Table might not exist yet, that's ok
+            pass
+
         yield client
+
+        # Clean up work_log table after each test
+        try:
+            from database import get_database_adapter
+            adapter = get_database_adapter()
+            with adapter.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM work_log")
+                # Context manager handles commit
+        except Exception:
+            # Cleanup failure shouldn't break tests
+            pass
 
 
 # ============================================================================

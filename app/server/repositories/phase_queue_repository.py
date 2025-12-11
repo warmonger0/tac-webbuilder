@@ -11,6 +11,7 @@ import traceback
 from datetime import datetime
 
 from database import get_database_adapter
+from database.sqlite_adapter import SQLiteAdapter
 from models.phase_queue_item import PhaseQueueItem
 
 logger = logging.getLogger(__name__)
@@ -19,13 +20,18 @@ logger = logging.getLogger(__name__)
 class PhaseQueueRepository:
     """Repository for phase queue database operations"""
 
-    def __init__(self):
+    def __init__(self, db_path: str | None = None):
         """
         Initialize repository.
 
-        Uses database adapter from factory (SQLite or PostgreSQL based on DB_TYPE env var).
+        Args:
+            db_path: Optional path to SQLite database. If provided, uses SQLiteAdapter with this path.
+                    Otherwise uses database adapter from factory (SQLite or PostgreSQL based on DB_TYPE env var).
         """
-        self.adapter = get_database_adapter()
+        if db_path:
+            self.adapter = SQLiteAdapter(db_path=db_path)
+        else:
+            self.adapter = get_database_adapter()
 
     def create(self, item: PhaseQueueItem) -> PhaseQueueItem:
         """

@@ -18,8 +18,6 @@ Test Coverage:
 - TC-005: Cost estimate accuracy validation
 """
 
-import contextlib
-import sqlite3
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -134,36 +132,11 @@ class TestCompleteGitHubIssueFlow:
 
         Clears workflow_history table (except seed data) before each test to ensure
         tests don't interfere with each other.
+
+        Uses database adapter for PostgreSQL/SQLite compatibility.
         """
-        # Cleanup before test
-        try:
-            if isinstance(e2e_test_db_cleanup, str | bytes):
-                db_path = e2e_test_db_cleanup
-            else:
-                db_path = str(e2e_test_db_cleanup)
-
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-
-            # Delete any test records (not in the original seed data: E2E-001, E2E-002, E2E-003)
-            cursor.execute("""
-                DELETE FROM workflow_history
-                WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-            """)
-
-            # Also clear adw_locks if the table exists
-            with contextlib.suppress(sqlite3.OperationalError):
-                cursor.execute("""
-                    DELETE FROM adw_locks
-                    WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-                """)
-
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            import logging
-            logging.warning(f"Failed to cleanup before test: {e}")
-
+        # Cleanup is handled by e2e_test_db_cleanup fixture
+        # This fixture just ensures it's applied before each test method
         return
 
     def test_complete_nl_request_to_issue_creation(
@@ -544,36 +517,11 @@ class TestGitHubIssueFlowEdgeCases:
 
         Clears workflow_history table (except seed data) before each test to ensure
         tests don't interfere with each other.
+
+        Uses database adapter for PostgreSQL/SQLite compatibility.
         """
-        # Cleanup before test
-        try:
-            if isinstance(e2e_test_db_cleanup, str | bytes):
-                db_path = e2e_test_db_cleanup
-            else:
-                db_path = str(e2e_test_db_cleanup)
-
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-
-            # Delete any test records (not in the original seed data: E2E-001, E2E-002, E2E-003)
-            cursor.execute("""
-                DELETE FROM workflow_history
-                WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-            """)
-
-            # Also clear adw_locks if the table exists
-            with contextlib.suppress(sqlite3.OperationalError):
-                cursor.execute("""
-                    DELETE FROM adw_locks
-                    WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-                """)
-
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            import logging
-            logging.warning(f"Failed to cleanup before test: {e}")
-
+        # Cleanup is handled by e2e_test_db_cleanup fixture
+        # This fixture just ensures it's applied before each test method
         return
 
     @pytest.fixture
@@ -820,36 +768,11 @@ class TestGitHubIssueFlowDataPersistence:
 
         Clears workflow_history table (except seed data) before each test to ensure
         tests don't interfere with each other.
+
+        Uses database adapter for PostgreSQL/SQLite compatibility.
         """
-        # Cleanup before test
-        try:
-            if isinstance(e2e_test_db_cleanup, str | bytes):
-                db_path = e2e_test_db_cleanup
-            else:
-                db_path = str(e2e_test_db_cleanup)
-
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-
-            # Delete any test records (not in the original seed data: E2E-001, E2E-002, E2E-003)
-            cursor.execute("""
-                DELETE FROM workflow_history
-                WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-            """)
-
-            # Also clear adw_locks if the table exists
-            with contextlib.suppress(sqlite3.OperationalError):
-                cursor.execute("""
-                    DELETE FROM adw_locks
-                    WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-                """)
-
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            import logging
-            logging.warning(f"Failed to cleanup before test: {e}")
-
+        # Cleanup is handled by e2e_test_db_cleanup fixture
+        # This fixture just ensures it's applied before each test method
         return
 
     def test_cost_estimate_saved_correctly(
@@ -955,36 +878,11 @@ class TestGitHubIssueFlowPerformance:
 
         Clears workflow_history table (except seed data) before each test to ensure
         tests don't interfere with each other.
+
+        Uses database adapter for PostgreSQL/SQLite compatibility.
         """
-        # Cleanup before test
-        try:
-            if isinstance(e2e_test_db_cleanup, str | bytes):
-                db_path = e2e_test_db_cleanup
-            else:
-                db_path = str(e2e_test_db_cleanup)
-
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-
-            # Delete any test records (not in the original seed data: E2E-001, E2E-002, E2E-003)
-            cursor.execute("""
-                DELETE FROM workflow_history
-                WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-            """)
-
-            # Also clear adw_locks if the table exists
-            with contextlib.suppress(sqlite3.OperationalError):
-                cursor.execute("""
-                    DELETE FROM adw_locks
-                    WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-                """)
-
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            import logging
-            logging.warning(f"Failed to cleanup before test: {e}")
-
+        # Cleanup is handled by e2e_test_db_cleanup fixture
+        # This fixture just ensures it's applied before each test method
         return
 
     def test_request_processing_performance(

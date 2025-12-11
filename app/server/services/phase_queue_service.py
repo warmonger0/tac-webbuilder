@@ -31,6 +31,7 @@ class PhaseQueueService:
         self,
         repository: PhaseQueueRepository | None = None,
         dependency_tracker: PhaseDependencyTracker | None = None,
+        db_path: str | None = None,
     ):
         """
         Initialize PhaseQueueService.
@@ -38,11 +39,16 @@ class PhaseQueueService:
         Args:
             repository: PhaseQueueRepository instance (or creates default)
             dependency_tracker: PhaseDependencyTracker instance (or creates default)
+            db_path: Optional path to SQLite database. If provided, creates repository with this path.
 
         Note:
-            Database type (SQLite/PostgreSQL) is determined by DB_TYPE environment variable.
+            Database type (SQLite/PostgreSQL) is determined by DB_TYPE environment variable,
+            unless db_path is provided (which uses SQLite).
         """
-        self.repository = repository or PhaseQueueRepository()
+        if repository is None:
+            self.repository = PhaseQueueRepository(db_path=db_path) if db_path else PhaseQueueRepository()
+        else:
+            self.repository = repository
         self.dependency_tracker = dependency_tracker or PhaseDependencyTracker(self.repository)
         db_type = self.repository.adapter.get_db_type()
         logger.info(f"[INIT] PhaseQueueService initialized (database: {db_type})")

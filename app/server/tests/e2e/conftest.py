@@ -132,10 +132,10 @@ def e2e_database(e2e_test_environment, monkeypatch_session):
 
     init_db()
 
-    # Add seed data for realistic testing
-    import sqlite3
-    conn = sqlite3.connect(str(db_path))
-    cursor = conn.cursor()
+    # Add seed data for realistic testing using database adapter
+    from database.factory import get_database_adapter
+
+    adapter = get_database_adapter()
 
     seed_workflows = [
         {
@@ -182,30 +182,57 @@ def e2e_database(e2e_test_environment, monkeypatch_session):
         },
     ]
 
-    for workflow in seed_workflows:
-        cursor.execute("""
-            INSERT INTO workflow_history (
-                adw_id, issue_number, nl_input, github_url, workflow_template,
-                model_used, status, duration_seconds, input_tokens, output_tokens,
-                total_tokens, actual_cost_total
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            workflow["adw_id"],
-            workflow["issue_number"],
-            workflow["nl_input"],
-            workflow["github_url"],
-            workflow["workflow_template"],
-            workflow["model_used"],
-            workflow["status"],
-            workflow["duration_seconds"],
-            workflow["input_tokens"],
-            workflow["output_tokens"],
-            workflow["total_tokens"],
-            workflow["actual_cost_total"],
-        ))
+    # Insert seed data with ON CONFLICT handling for both SQLite and PostgreSQL
+    db_type = adapter.get_db_type()
 
-    conn.commit()
-    conn.close()
+    for workflow in seed_workflows:
+        try:
+            # Use database adapter for cross-database compatibility
+            with adapter.get_connection() as conn:
+                cursor = conn.cursor()
+                # Use adapter's placeholder for cross-database compatibility
+                ph = adapter.placeholder()
+
+                # Build INSERT query with ON CONFLICT handling
+                if db_type == "postgresql":
+                    # PostgreSQL: ON CONFLICT DO NOTHING
+                    query = f"""
+                        INSERT INTO workflow_history (
+                            adw_id, issue_number, nl_input, github_url, workflow_template,
+                            model_used, status, duration_seconds, input_tokens, output_tokens,
+                            total_tokens, actual_cost_total
+                        ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                        ON CONFLICT (adw_id) DO NOTHING
+                    """
+                else:
+                    # SQLite: INSERT OR IGNORE
+                    query = f"""
+                        INSERT OR IGNORE INTO workflow_history (
+                            adw_id, issue_number, nl_input, github_url, workflow_template,
+                            model_used, status, duration_seconds, input_tokens, output_tokens,
+                            total_tokens, actual_cost_total
+                        ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    """
+
+                cursor.execute(query, (
+                    workflow["adw_id"],
+                    workflow["issue_number"],
+                    workflow["nl_input"],
+                    workflow["github_url"],
+                    workflow["workflow_template"],
+                    workflow["model_used"],
+                    workflow["status"],
+                    workflow["duration_seconds"],
+                    workflow["input_tokens"],
+                    workflow["output_tokens"],
+                    workflow["total_tokens"],
+                    workflow["actual_cost_total"],
+                ))
+                conn.commit()
+        except Exception as e:
+            # Log but continue - may be duplicate key if already inserted
+            import logging
+            logging.debug(f"Seed data insertion (may be duplicate): {e}")
 
     yield db_path
 
@@ -424,35 +451,44 @@ def e2e_test_db_cleanup(e2e_database):
     Prevents UNIQUE constraint violations by clearing workflow_history table
     between tests while keeping the database initialized and seed data.
 
+    Uses database adapter for PostgreSQL/SQLite compatibility.
+
     Usage:
         def test_github_flow(e2e_test_client, e2e_test_db_cleanup):
             # Database is clean for this test
             response = e2e_test_client.post("/api/v1/request", json={...})
             # Cleanup happens automatically after test
     """
-    import sqlite3
+    from database.factory import get_database_adapter
 
     # Cleanup BEFORE test to ensure clean state
     try:
-        conn = sqlite3.connect(str(e2e_database), timeout=10.0)
-        cursor = conn.cursor()
+        adapter = get_database_adapter()
+        ph = adapter.placeholder()
 
         # Delete any records created during previous tests
-        cursor.execute("""
-            DELETE FROM workflow_history
-            WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-        """)
+        with adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                DELETE FROM workflow_history
+                WHERE adw_id NOT IN ({ph}, {ph}, {ph})
+            """, ('E2E-001', 'E2E-002', 'E2E-003'))
+            conn.commit()
 
         # Also clear adw_locks if the table exists
-        with contextlib.suppress(sqlite3.OperationalError):
-            cursor.execute("""
-                DELETE FROM adw_locks
-                WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-            """)
+        try:
+            with adapter.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"""
+                    DELETE FROM adw_locks
+                    WHERE adw_id NOT IN ({ph}, {ph}, {ph})
+                """, ('E2E-001', 'E2E-002', 'E2E-003'))
+                conn.commit()
+        except Exception:
+            # Table may not exist
+            pass
 
-        conn.commit()
-        conn.close()
-        time.sleep(0.1)  # Allow DB lock to fully release
+        time.sleep(0.1)  # Allow any pending operations to complete
     except Exception as e:
         import logging
         logging.warning(f"Failed to cleanup E2E test database before test: {e}")
@@ -461,23 +497,30 @@ def e2e_test_db_cleanup(e2e_database):
 
     # Cleanup AFTER test as well
     try:
-        conn = sqlite3.connect(str(e2e_database), timeout=10.0)
-        cursor = conn.cursor()
+        adapter = get_database_adapter()
+        ph = adapter.placeholder()
 
-        cursor.execute("""
-            DELETE FROM workflow_history
-            WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-        """)
+        with adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                DELETE FROM workflow_history
+                WHERE adw_id NOT IN ({ph}, {ph}, {ph})
+            """, ('E2E-001', 'E2E-002', 'E2E-003'))
+            conn.commit()
 
-        with contextlib.suppress(sqlite3.OperationalError):
-            cursor.execute("""
-                DELETE FROM adw_locks
-                WHERE adw_id NOT IN ('E2E-001', 'E2E-002', 'E2E-003')
-            """)
+        try:
+            with adapter.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"""
+                    DELETE FROM adw_locks
+                    WHERE adw_id NOT IN ({ph}, {ph}, {ph})
+                """, ('E2E-001', 'E2E-002', 'E2E-003'))
+                conn.commit()
+        except Exception:
+            # Table may not exist
+            pass
 
-        conn.commit()
-        conn.close()
-        time.sleep(0.1)  # Allow DB lock to fully release
+        time.sleep(0.1)  # Allow any pending operations to complete
     except Exception as e:
         import logging
         logging.warning(f"Failed to cleanup E2E test database after test: {e}")

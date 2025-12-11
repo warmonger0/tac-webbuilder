@@ -4,55 +4,79 @@ Tests for MultiPhaseIssueHandler
 Tests multi-phase issue creation, pattern passing, and queue integration.
 """
 
-import os
+import asyncio
+import sqlite3
+import sys
 import tempfile
-from unittest.mock import MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
+
 from core.data_models import Phase, SubmitRequestData
 from services.multi_phase_issue_handler import MultiPhaseIssueHandler
 from services.phase_queue_service import PhaseQueueService
 
+# Ensure pytest-asyncio mode is set
+pytestmark = pytest.mark.asyncio
+
 
 @pytest.fixture
-def temp_db():
-    """Create a temporary database for testing"""
+def temp_db(monkeypatch):
+    """Create a temporary database for testing with proper PostgreSQL adapter setup"""
     with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = os.path.join(tmpdir, "test_multi_phase.db")
+        db_path = Path(tmpdir) / "test_multi_phase.db"
 
-        # Initialize database with schema
-        import sqlite3
-        conn = sqlite3.connect(db_path)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS phase_queue (
-              queue_id TEXT PRIMARY KEY,
-              parent_issue INTEGER NOT NULL,
-              phase_number INTEGER NOT NULL,
-              issue_number INTEGER,
-              status TEXT CHECK(status IN ('queued', 'ready', 'running', 'completed', 'blocked', 'failed')) DEFAULT 'queued',
-              depends_on_phase INTEGER,
-              phase_data TEXT,
-              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-              error_message TEXT,
-              adw_id TEXT,
-              pr_number INTEGER,
-              priority INTEGER DEFAULT 50,
-              queue_position INTEGER,
-              ready_timestamp TEXT,
-              started_timestamp TEXT
-            )
-        """)
-        conn.commit()
-        conn.close()
+        # Set environment variables for PostgreSQL adapter
+        monkeypatch.setenv("POSTGRES_HOST", "localhost")
+        monkeypatch.setenv("POSTGRES_PORT", "5432")
+        monkeypatch.setenv("POSTGRES_DB", "tac_webbuilder_test")
+        monkeypatch.setenv("POSTGRES_USER", "tac_user")
+        monkeypatch.setenv("POSTGRES_PASSWORD", "changeme")
+        monkeypatch.setenv("DB_TYPE", "postgresql")
+
+        # Reset database adapter cache to pick up env vars
+        try:
+            from database.factory import close_database_adapter
+            close_database_adapter()
+        except Exception:
+            pass
+
+        # Initialize database schema
+        try:
+            from services.phase_queue_schema import init_phase_queue_db
+            init_phase_queue_db()
+        except Exception as e:
+            # Log but don't fail - test might be using mock
+            print(f"Warning: phase_queue database initialization: {e}")
 
         yield db_path
 
 
 @pytest.fixture
 def queue_service(temp_db):
-    """Create PhaseQueueService instance"""
-    return PhaseQueueService(db_path=temp_db)
+    """Create PhaseQueueService instance for each test"""
+    # Reset adapter cache before creating service to ensure clean state
+    try:
+        from database.factory import close_database_adapter
+        close_database_adapter()
+    except Exception:
+        pass
+
+    service = PhaseQueueService()
+
+    # Cleanup: clear all phases from database after test
+    yield service
+
+    # Delete all phases with parent_issue=0 (used in tests)
+    try:
+        from database import get_database_adapter
+        adapter = get_database_adapter()
+        with adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM phase_queue WHERE parent_issue = 0")
+    except Exception:
+        pass  # Ignore cleanup errors
 
 
 @pytest.fixture
