@@ -34,23 +34,22 @@ def temp_workflow_db():
 
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row  # Enable dict-like row access
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS workflow_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                workflow_id TEXT UNIQUE NOT NULL,
-                issue_number INTEGER,
-                status TEXT CHECK(status IN ('pending', 'running', 'completed', 'failed')) DEFAULT 'pending',
-                error_message TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                end_time TEXT,
-                phase_number INTEGER,
-                parent_workflow_id TEXT,
-                is_multi_phase INTEGER DEFAULT 0
-            )
-        """)
-        conn.commit()
-        conn.close()
+        # Use standard schema initialization instead of manual SQL
+        from database.sqlite_adapter import SQLiteAdapter
+        from core.workflow_history_utils.database import init_db
+        from core.workflow_history_utils.database import schema as schema_module
+        from unittest.mock import patch
+
+        adapter = SQLiteAdapter(db_path=db_path)
+
+        # Temporarily patch the schema module to use our test database
+        original_adapter = schema_module._db_adapter
+        schema_module._db_adapter = adapter
+
+        try:
+            init_db()
+        finally:
+            schema_module._db_adapter = original_adapter
 
         yield db_path
 
@@ -78,21 +77,26 @@ def mock_websocket_manager():
 def phase_coordinator(phase_queue_service, temp_workflow_db, mock_websocket_manager):
     """Create PhaseCoordinator with test dependencies"""
     from database.sqlite_adapter import SQLiteAdapter
-    from unittest.mock import patch
 
     # Create adapter for workflow database
     workflow_adapter = SQLiteAdapter(db_path=temp_workflow_db)
 
-    # Patch get_database_adapter to return our workflow adapter for detector
-    with patch('services.phase_coordination.workflow_completion_detector.get_database_adapter', return_value=workflow_adapter):
-        coordinator = PhaseCoordinator(
-            phase_queue_service=phase_queue_service,
-            poll_interval=0.1,  # Fast polling for tests
-            websocket_manager=mock_websocket_manager
-        )
+    # Create coordinator (detector will use factory adapter initially)
+    coordinator = PhaseCoordinator(
+        phase_queue_service=phase_queue_service,
+        poll_interval=0.1,  # Fast polling for tests
+        websocket_manager=mock_websocket_manager
+    )
 
-    # Manually inject the adapter into the detector
+    # Manually inject the workflow adapter into the detector
+    # This ensures the detector queries the test workflow database
     coordinator.detector.adapter = workflow_adapter
+
+    # DEBUG: Verify the adapter is correctly set
+    print(f"\n[DEBUG FIXTURE] Created adapter with db_path: {temp_workflow_db}")
+    print(f"[DEBUG FIXTURE] Detector adapter db_path: {coordinator.detector.adapter.db_path}")
+    assert coordinator.detector.adapter.db_path == temp_workflow_db, \
+        f"Adapter injection failed: {coordinator.detector.adapter.db_path} != {temp_workflow_db}"
 
     return coordinator
 
@@ -115,7 +119,7 @@ def add_workflow(
     conn.execute(
         """
         INSERT INTO workflow_history (
-            workflow_id, issue_number, status, error_message,
+            adw_id, issue_number, status, error_message,
             created_at, updated_at, end_time
         )
         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -287,6 +291,9 @@ class TestWorkflowDetection:
         mock_websocket_manager
     ):
         """Test that only running phases are checked"""
+        # Pause the queue to prevent auto-start of ready phases
+        phase_queue_service.set_paused(True)
+
         # Create phase but leave it in 'ready' status
         queue_id = phase_queue_service.enqueue(
             parent_issue=300,
@@ -303,7 +310,7 @@ class TestWorkflowDetection:
         # Check for completions
         await phase_coordinator._check_workflow_completions()
 
-        # Verify phase status unchanged
+        # Verify phase status unchanged (should stay 'ready' because queue is paused)
         phase = get_phase_by_id(phase_queue_service, queue_id)
         assert phase.status == "ready"
 
@@ -319,7 +326,7 @@ class TestWorkflowDetection:
         conn.execute(
             """
             INSERT INTO workflow_history (
-                workflow_id, issue_number, status, error_message,
+                adw_id, issue_number, status, error_message,
                 created_at, updated_at, end_time
             )
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -355,7 +362,7 @@ class TestWorkflowDetection:
         conn.execute(
             """
             INSERT INTO workflow_history (
-                workflow_id, issue_number, status, error_message,
+                adw_id, issue_number, status, error_message,
                 created_at, updated_at, end_time
             )
             VALUES (?, ?, ?, ?, ?, ?, ?)
