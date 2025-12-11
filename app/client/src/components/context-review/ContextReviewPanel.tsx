@@ -5,7 +5,6 @@
  * additional files and context to improve workflow accuracy.
  */
 
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, CheckCircle2, FileCode, Loader2, Sparkles } from 'lucide-react';
 import { LoadingState } from '../common/LoadingState';
@@ -81,8 +80,8 @@ export function ContextReviewPanel({ reviewId, onClose }: ContextReviewPanelProp
     queryKey: ['context-review', reviewId],
     queryFn: () => fetchContextAnalysis(reviewId!),
     // Conditional refetch: Poll every 3s while analyzing, stop when complete
-    refetchInterval: (data) => {
-      return data?.status === 'analyzing' ? 3000 : false;
+    refetchInterval: (query) => {
+      return query?.state?.data?.status === 'analyzing' ? 3000 : false;
     },
     // Only run query if reviewId exists
     enabled: !!reviewId,

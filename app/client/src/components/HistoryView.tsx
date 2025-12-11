@@ -41,7 +41,7 @@ export function HistoryView() {
         </h2>
         {isConnected && (
           <div className="text-xs text-gray-500">
-            Live updates • {connectionQuality} • Last update: {new Date(lastUpdated).toLocaleTimeString()}
+            Live updates • {connectionQuality} • Last update: {lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : 'Never'}
           </div>
         )}
       </div>
@@ -80,7 +80,7 @@ export function HistoryView() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-600">{item.project}</div>
+                    <div className="text-sm text-gray-600">{item.workflow_template || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4">
                     {item.issue_number && item.github_url ? (
@@ -101,7 +101,7 @@ export function HistoryView() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm text-gray-600">
-                      {formatDate(item.timestamp)}
+                      {formatDate(item.created_at)}
                     </div>
                   </td>
                 </tr>
