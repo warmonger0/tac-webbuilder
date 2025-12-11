@@ -135,14 +135,23 @@ class TestInitDB:
         """Test that init_db creates the database directory if it doesn't exist."""
         mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
 
-        with patch('core.workflow_history_utils.database.DB_PATH') as mock_db_path:
-            mock_parent = Mock()
-            mock_db_path.parent = mock_parent
+        # For SQLite (which is the default in the fixture), init_db creates the db directory
+        # The fixture sets get_db_type to return "sqlite", so the path logic will execute
+        # We need to patch Path at the init_db level to intercept the mkdir call
+        with patch('core.workflow_history_utils.database.schema.Path') as mock_path_class:
+            # Create a mock path object that supports the / operator
+            mock_db_path = MagicMock()
+            # Make Path(__file__).parent.parent.parent.parent return a chainable mock
+            mock_file_path = MagicMock()
+            mock_path_class.return_value = mock_file_path
+            # Chain: Path(__file__).parent.parent.parent.parent / "db"
+            mock_db_dir = MagicMock()
+            mock_file_path.parent.parent.parent.parent.__truediv__.return_value = mock_db_dir
 
             init_db()
 
             # Verify directory creation was called
-            mock_parent.mkdir.assert_called_once_with(parents=True, exist_ok=True)
+            mock_db_dir.mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
     def test_creates_workflow_history_table(self, mock_get_db_connection, caplog):
         """Test that init_db creates the workflow_history table."""
@@ -187,10 +196,14 @@ class TestInitDB:
         # Simulate column doesn't exist (raise OperationalError)
         mock_cursor.execute.side_effect = [
             None,  # CREATE TABLE
-            None, None, None, None, None, None,  # CREATE INDEX calls
-            sqlite3.OperationalError("no such column: gh_issue_state"),  # SELECT check
+            None, None, None, None, None, None,  # CREATE INDEX calls (6 indexes)
+            sqlite3.OperationalError("no such column: gh_issue_state"),  # SELECT gh_issue_state check
             None,  # ALTER TABLE (add column)
+            None,  # SELECT phantom records query
         ]
+
+        # Mock empty phantom records result
+        mock_cursor.fetchall.return_value = []
 
         init_db()
 
@@ -919,13 +932,9 @@ class TestGetWorkflowHistory:
         """Test getting workflows with default pagination (limit=20, offset=0)."""
         mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
 
-        # Mock count query result
-        mock_cursor.fetchone.side_effect = [
-            {"total": 50},  # Total count
-        ]
-
-        # Mock paginated results
-        mock_cursor.fetchall.return_value = [
+        # Override the execute_side_effect for this test
+        # We need to control both fetchone (count) and fetchall (results)
+        test_results = [
             {
                 "id": 1,
                 "adw_id": "test-001",
@@ -943,8 +952,15 @@ class TestGetWorkflowHistory:
                 "error_phase_distribution": None,
                 "anomaly_flags": None,
                 "optimization_recommendations": None,
+                "hour_of_day": None,
+                "day_of_week": None,
             }
         ]
+
+        # Reset execute side_effect to None so we can control returns directly
+        mock_cursor.execute.side_effect = None
+        mock_cursor.fetchone.return_value = {"total": 50}
+        mock_cursor.fetchall.return_value = test_results
 
         with caplog.at_level(logging.DEBUG):
             results, total_count = get_workflow_history()
@@ -1178,7 +1194,13 @@ class TestGetWorkflowHistory:
         """Test that JSON fields are properly parsed in result list."""
         mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
 
+        # Reset execute side_effect to None so we can control returns directly
+        mock_cursor.execute.side_effect = None
+
+        # Mock count query (fetchone)
         mock_cursor.fetchone.return_value = {"total": 2}
+
+        # Mock result rows (fetchall)
         mock_cursor.fetchall.return_value = [
             {
                 "id": 1,
@@ -1197,6 +1219,8 @@ class TestGetWorkflowHistory:
                 "retry_reasons": None,
                 "error_phase_distribution": None,
                 "optimization_recommendations": None,
+                "hour_of_day": 10,
+                "day_of_week": 1,
             },
             {
                 "id": 2,
@@ -1215,6 +1239,8 @@ class TestGetWorkflowHistory:
                 "retry_reasons": None,
                 "error_phase_distribution": None,
                 "optimization_recommendations": None,
+                "hour_of_day": None,
+                "day_of_week": None,
             }
         ]
 
@@ -1257,15 +1283,20 @@ class TestGetHistoryAnalytics:
         """Test calculating analytics with existing workflows."""
         mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
 
-        # Mock query results in order
+        # Mock query results in order (9 fetchone calls total)
         mock_cursor.fetchone.side_effect = [
-            {"total": 100},  # Total workflows
-            {"avg_duration": 450.5},  # Average duration
-            {"avg_cost": 0.35, "total_cost": 35.0},  # Cost analytics
-            {"avg_tokens": 5500.0, "avg_cache_efficiency": 65.5},  # Token analytics
+            {"total": 100},  # 1. Total workflows
+            {"avg_duration": 450.5},  # 2. Average duration
+            {"avg_cost": 0.35, "total_cost": 35.0},  # 3. Cost analytics
+            {"avg_cost_per_completion": 0.38},  # 4. Avg cost per completion (NEW!)
+            {"avg_cost": 0.40},  # 5. Last 7 days avg cost
+            {"avg_cost": 0.36},  # 6. Previous 7 days avg cost
+            {"avg_cost": 0.37},  # 7. Last 30 days avg cost
+            {"avg_cost": 0.34},  # 8. Previous 30 days avg cost
+            {"avg_tokens": 5500.0, "avg_cache_efficiency": 65.5},  # 9. Token analytics
         ]
 
-        # Mock status counts
+        # Mock status counts (3 fetchall calls total)
         mock_cursor.fetchall.side_effect = [
             [
                 {"status": "completed", "count": 70},
@@ -1295,6 +1326,7 @@ class TestGetHistoryAnalytics:
         assert analytics["avg_duration_seconds"] == 450.5
         assert analytics["avg_cost"] == 0.35
         assert analytics["total_cost"] == 35.0
+        assert analytics["avg_cost_per_completion"] == 0.38
         assert analytics["avg_tokens"] == 5500.0
         assert analytics["avg_cache_efficiency"] == 65.5
 
@@ -1322,14 +1354,20 @@ class TestGetHistoryAnalytics:
         """Test calculating analytics with no workflows returns zeros."""
         mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
 
-        # Mock empty results
+        # Mock empty results (9 fetchone calls total)
         mock_cursor.fetchone.side_effect = [
-            {"total": 0},  # No workflows
-            {"avg_duration": None},
-            {"avg_cost": None, "total_cost": None},
-            {"avg_tokens": None, "avg_cache_efficiency": None},
+            {"total": 0},  # 1. No workflows
+            {"avg_duration": None},  # 2. No duration
+            {"avg_cost": None, "total_cost": None},  # 3. No cost
+            {"avg_cost_per_completion": None},  # 4. No completion cost
+            {"avg_cost": None},  # 5. No 7-day current
+            {"avg_cost": None},  # 6. No 7-day previous
+            {"avg_cost": None},  # 7. No 30-day current
+            {"avg_cost": None},  # 8. No 30-day previous
+            {"avg_tokens": None, "avg_cache_efficiency": None},  # 9. No tokens
         ]
 
+        # Mock empty counts (3 fetchall calls total)
         mock_cursor.fetchall.side_effect = [
             [],  # No status counts
             [],  # No model counts
@@ -1345,6 +1383,7 @@ class TestGetHistoryAnalytics:
         assert analytics["avg_duration_seconds"] == 0.0
         assert analytics["avg_cost"] == 0.0
         assert analytics["total_cost"] == 0.0
+        assert analytics["avg_cost_per_completion"] == 0.0
         assert analytics["avg_tokens"] == 0.0
         assert analytics["avg_cache_efficiency"] == 0.0
         assert analytics["workflows_by_status"] == {}
@@ -1355,13 +1394,20 @@ class TestGetHistoryAnalytics:
         """Test success rate is calculated correctly."""
         mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
 
+        # Mock query results (9 fetchone calls total)
         mock_cursor.fetchone.side_effect = [
-            {"total": 200},  # Total workflows
-            {"avg_duration": 300.0},
-            {"avg_cost": 0.25, "total_cost": 50.0},
-            {"avg_tokens": 4000.0, "avg_cache_efficiency": 50.0},
+            {"total": 200},  # 1. Total workflows
+            {"avg_duration": 300.0},  # 2. Avg duration
+            {"avg_cost": 0.25, "total_cost": 50.0},  # 3. Cost analytics
+            {"avg_cost_per_completion": 0.26},  # 4. Avg cost per completion
+            {"avg_cost": 0.27},  # 5. Last 7 days
+            {"avg_cost": 0.25},  # 6. Previous 7 days
+            {"avg_cost": 0.26},  # 7. Last 30 days
+            {"avg_cost": 0.24},  # 8. Previous 30 days
+            {"avg_tokens": 4000.0, "avg_cache_efficiency": 50.0},  # 9. Token analytics
         ]
 
+        # Mock counts (3 fetchall calls total)
         mock_cursor.fetchall.side_effect = [
             [
                 {"status": "completed", "count": 150},  # 150/200 = 75%
@@ -1382,13 +1428,20 @@ class TestGetHistoryAnalytics:
         """Test that average duration only includes completed workflows."""
         mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
 
+        # Mock query results (9 fetchone calls total)
         mock_cursor.fetchone.side_effect = [
-            {"total": 100},
-            {"avg_duration": 500.0},  # Only from completed workflows
-            {"avg_cost": 0.30, "total_cost": 30.0},
-            {"avg_tokens": 5000.0, "avg_cache_efficiency": 60.0},
+            {"total": 100},  # 1. Total
+            {"avg_duration": 500.0},  # 2. Only from completed workflows
+            {"avg_cost": 0.30, "total_cost": 30.0},  # 3. Cost
+            {"avg_cost_per_completion": 0.31},  # 4. Completion cost
+            {"avg_cost": 0.32},  # 5. Last 7 days
+            {"avg_cost": 0.29},  # 6. Previous 7 days
+            {"avg_cost": 0.31},  # 7. Last 30 days
+            {"avg_cost": 0.28},  # 8. Previous 30 days
+            {"avg_tokens": 5000.0, "avg_cache_efficiency": 60.0},  # 9. Tokens
         ]
 
+        # Mock counts (3 fetchall calls total)
         mock_cursor.fetchall.side_effect = [
             [{"status": "completed", "count": 50}],
             [],
@@ -1397,7 +1450,7 @@ class TestGetHistoryAnalytics:
 
         get_history_analytics()
 
-        # Verify query filters for completed status (3rd query executed)
+        # Verify query filters for completed status (2nd query executed - after COUNT)
         # Query execution order: 1. COUNT(*) 2. GROUP BY status 3. AVG(duration) for completed
         avg_duration_query = mock_cursor.execute.call_args_list[2][0][0]
         assert "WHERE status = 'completed'" in avg_duration_query
@@ -1407,13 +1460,20 @@ class TestGetHistoryAnalytics:
         """Test that analytics filters out zero/null costs and tokens."""
         mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
 
+        # Mock query results (9 fetchone calls total)
         mock_cursor.fetchone.side_effect = [
-            {"total": 50},
-            {"avg_duration": 400.0},
-            {"avg_cost": 0.40, "total_cost": 20.0},
-            {"avg_tokens": 6000.0, "avg_cache_efficiency": 70.0},
+            {"total": 50},  # 1. Total
+            {"avg_duration": 400.0},  # 2. Duration
+            {"avg_cost": 0.40, "total_cost": 20.0},  # 3. Cost
+            {"avg_cost_per_completion": 0.42},  # 4. Completion cost
+            {"avg_cost": 0.43},  # 5. Last 7 days
+            {"avg_cost": 0.39},  # 6. Previous 7 days
+            {"avg_cost": 0.41},  # 7. Last 30 days
+            {"avg_cost": 0.38},  # 8. Previous 30 days
+            {"avg_tokens": 6000.0, "avg_cache_efficiency": 70.0},  # 9. Tokens
         ]
 
+        # Mock counts (3 fetchall calls total)
         mock_cursor.fetchall.side_effect = [
             [{"status": "completed", "count": 40}],
             [],
@@ -1423,13 +1483,13 @@ class TestGetHistoryAnalytics:
         get_history_analytics()
 
         # Verify cost query filters (6th query executed)
-        # Query order: 1.COUNT 2.status 3.duration 4.model 5.template 6.cost 7.tokens
+        # Query order: 1.COUNT 2.status 3.duration 4.model 5.template 6.cost 7.completion_cost 8.trends 9.tokens
         cost_query = mock_cursor.execute.call_args_list[5][0][0]
         assert "actual_cost_total IS NOT NULL" in cost_query
         assert "actual_cost_total > 0" in cost_query
 
-        # Verify token query filters (7th query executed)
-        token_query = mock_cursor.execute.call_args_list[6][0][0]
+        # Verify token query filters (last query executed)
+        token_query = mock_cursor.execute.call_args_list[-1][0][0]
         assert "total_tokens IS NOT NULL" in token_query
         assert "total_tokens > 0" in token_query
 
@@ -1437,14 +1497,20 @@ class TestGetHistoryAnalytics:
         """Test that analytics returns all expected keys in the dictionary."""
         mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
 
-        # Minimal mock data
+        # Minimal mock data (9 fetchone calls total)
         mock_cursor.fetchone.side_effect = [
-            {"total": 1},
-            {"avg_duration": 100.0},
-            {"avg_cost": 0.10, "total_cost": 0.10},
-            {"avg_tokens": 1000.0, "avg_cache_efficiency": 50.0},
+            {"total": 1},  # 1. Total
+            {"avg_duration": 100.0},  # 2. Duration
+            {"avg_cost": 0.10, "total_cost": 0.10},  # 3. Cost
+            {"avg_cost_per_completion": 0.10},  # 4. Completion cost
+            {"avg_cost": 0.11},  # 5. Last 7 days
+            {"avg_cost": 0.09},  # 6. Previous 7 days
+            {"avg_cost": 0.10},  # 7. Last 30 days
+            {"avg_cost": 0.09},  # 8. Previous 30 days
+            {"avg_tokens": 1000.0, "avg_cache_efficiency": 50.0},  # 9. Tokens
         ]
 
+        # Mock counts (3 fetchall calls total)
         mock_cursor.fetchall.side_effect = [
             [{"status": "completed", "count": 1}],
             [{"model_used": "test-model", "count": 1}],
@@ -1465,6 +1531,9 @@ class TestGetHistoryAnalytics:
             "workflows_by_status",
             "avg_cost",
             "total_cost",
+            "avg_cost_per_completion",
+            "cost_trend_7day",
+            "cost_trend_30day",
             "avg_tokens",
             "avg_cache_efficiency",
         ]
@@ -1547,10 +1616,10 @@ class TestEdgeCasesAndErrorHandling:
 
     def test_connection_error_propagates(self, mock_get_db_connection):
         """Test that database connection errors propagate correctly."""
-        mock_get_conn, mock_conn, mock_cursor = mock_get_db_connection
+        mock_adapter, mock_conn, mock_cursor = mock_get_db_connection
 
-        # Simulate connection error
-        mock_get_conn.side_effect = sqlite3.OperationalError("Unable to open database")
+        # Simulate connection error by making get_connection().__enter__ raise the error
+        mock_adapter.get_connection.return_value.__enter__.side_effect = sqlite3.OperationalError("Unable to open database")
 
         with pytest.raises(sqlite3.OperationalError, match="Unable to open database"):
             init_db()
