@@ -19,14 +19,10 @@ Example:
 """
 
 import json
-import sqlite3
+import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
-
-
-# Database path
-DB_PATH = Path(__file__).parent.parent.parent / "app" / "server" / "db" / "workflow_history.db"
 
 
 @dataclass
@@ -49,23 +45,46 @@ class ADWTool:
 class ToolRegistry:
     """Registry for discovering and managing ADW tools."""
 
-    def __init__(self, db_path: Path = DB_PATH):
-        """
-        Initialize tool registry.
+    def __init__(self):
+        """Initialize tool registry with database adapter."""
+        # Import database adapter from app/server
+        project_root = Path(__file__).parent.parent.parent
+        sys.path.insert(0, str(project_root / "app" / "server"))
 
-        Args:
-            db_path: Path to SQLite database
-        """
-        self.db_path = db_path
-        self._ensure_db_exists()
+        from database import get_database_adapter
+        self.adapter = get_database_adapter()
+        self._ensure_tables_exist()
 
-    def _ensure_db_exists(self):
-        """Ensure database and tables exist."""
-        if not self.db_path.exists():
-            raise FileNotFoundError(
-                f"Database not found at {self.db_path}. "
-                "Run migrations first: python scripts/run_migrations.py"
-            )
+        # Clean up sys.path
+        if str(project_root / "app" / "server") in sys.path:
+            sys.path.remove(str(project_root / "app" / "server"))
+
+    def _ensure_tables_exist(self):
+        """Ensure database tables exist (adw_tools, tool_calls)."""
+        with self.adapter.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Create tool_calls table if it doesn't exist (adw_tools should already exist)
+            db_type = self.adapter.get_db_type()
+            if db_type == "postgresql":
+                pk_definition = "id SERIAL PRIMARY KEY"
+            else:  # sqlite
+                pk_definition = "id INTEGER PRIMARY KEY AUTOINCREMENT"
+
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS tool_calls (
+                    {pk_definition},
+                    tool_call_id TEXT NOT NULL UNIQUE,
+                    workflow_id TEXT NOT NULL,
+                    tool_name TEXT NOT NULL,
+                    tool_params TEXT,
+                    success INTEGER NOT NULL,
+                    result_data TEXT,
+                    duration_seconds REAL,
+                    completed_at TEXT NOT NULL
+                )
+            """)
+            conn.commit()
 
     def get_all_tools(self, status_filter: Optional[str] = "active") -> List[ADWTool]:
         """
@@ -77,36 +96,45 @@ class ToolRegistry:
         Returns:
             List of ADWTool objects
         """
-        conn = sqlite3.connect(str(self.db_path))
-        conn.row_factory = sqlite3.Row
+        with self.adapter.get_connection() as conn:
+            cursor = conn.cursor()
 
-        if status_filter:
-            cursor = conn.execute(
-                "SELECT * FROM adw_tools WHERE status = ? ORDER BY tool_name",
-                (status_filter,)
-            )
-        else:
-            cursor = conn.execute("SELECT * FROM adw_tools ORDER BY tool_name")
+            if status_filter:
+                cursor.execute(
+                    "SELECT * FROM adw_tools WHERE status = %s ORDER BY tool_name"
+                    if self.adapter.get_db_type() == "postgresql"
+                    else "SELECT * FROM adw_tools WHERE status = ? ORDER BY tool_name",
+                    (status_filter,)
+                )
+            else:
+                cursor.execute("SELECT * FROM adw_tools ORDER BY tool_name")
 
-        tools = []
-        for row in cursor.fetchall():
-            tools.append(ADWTool(
-                tool_name=row["tool_name"],
-                description=row["description"],
-                tool_schema=json.loads(row["tool_schema"]),
-                script_path=row["script_path"],
-                input_patterns=json.loads(row["input_patterns"]) if row["input_patterns"] else [],
-                output_format=json.loads(row["output_format"]) if row["output_format"] else {},
-                status=row["status"],
-                avg_duration_seconds=row["avg_duration_seconds"],
-                avg_tokens_consumed=row["avg_tokens_consumed"],
-                avg_cost_usd=row["avg_cost_usd"],
-                success_rate=row["success_rate"],
-                total_invocations=row["total_invocations"]
-            ))
+            tools = []
+            rows = cursor.fetchall()
 
-        conn.close()
-        return tools
+            # Get column names for row access
+            if rows:
+                column_names = [desc[0] for desc in cursor.description]
+                for row in rows:
+                    # Convert row to dict for easier access
+                    row_dict = dict(zip(column_names, row)) if isinstance(row, tuple) else row
+
+                    tools.append(ADWTool(
+                        tool_name=row_dict["tool_name"],
+                        description=row_dict["description"],
+                        tool_schema=json.loads(row_dict["tool_schema"]),
+                        script_path=row_dict["script_path"],
+                        input_patterns=json.loads(row_dict["input_patterns"]) if row_dict["input_patterns"] else [],
+                        output_format=json.loads(row_dict["output_format"]) if row_dict["output_format"] else {},
+                        status=row_dict["status"],
+                        avg_duration_seconds=row_dict["avg_duration_seconds"],
+                        avg_tokens_consumed=row_dict["avg_tokens_consumed"],
+                        avg_cost_usd=row_dict["avg_cost_usd"],
+                        success_rate=row_dict["success_rate"],
+                        total_invocations=row_dict["total_invocations"]
+                    ))
+
+            return tools
 
     def get_tool(self, tool_name: str) -> Optional[ADWTool]:
         """
@@ -135,35 +163,41 @@ class ToolRegistry:
             True if successful, False otherwise
         """
         try:
-            conn = sqlite3.connect(str(self.db_path))
-            conn.execute("""
-                INSERT INTO adw_tools (
-                    tool_name, description, tool_schema, script_path,
-                    input_patterns, output_format, status,
-                    avg_duration_seconds, avg_tokens_consumed,
-                    avg_cost_usd, success_rate, total_invocations
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                tool.tool_name,
-                tool.description,
-                json.dumps(tool.tool_schema),
-                tool.script_path,
-                json.dumps(tool.input_patterns),
-                json.dumps(tool.output_format),
-                tool.status,
-                tool.avg_duration_seconds,
-                tool.avg_tokens_consumed,
-                tool.avg_cost_usd,
-                tool.success_rate,
-                tool.total_invocations
-            ))
-            conn.commit()
-            conn.close()
-            return True
-        except sqlite3.IntegrityError:
-            # Tool already exists
-            return False
+            with self.adapter.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Use appropriate placeholder for database type
+                placeholder = "%s" if self.adapter.get_db_type() == "postgresql" else "?"
+                placeholders = ", ".join([placeholder] * 12)
+
+                cursor.execute(f"""
+                    INSERT INTO adw_tools (
+                        tool_name, description, tool_schema, script_path,
+                        input_patterns, output_format, status,
+                        avg_duration_seconds, avg_tokens_consumed,
+                        avg_cost_usd, success_rate, total_invocations
+                    ) VALUES ({placeholders})
+                """, (
+                    tool.tool_name,
+                    tool.description,
+                    json.dumps(tool.tool_schema),
+                    tool.script_path,
+                    json.dumps(tool.input_patterns),
+                    json.dumps(tool.output_format),
+                    tool.status,
+                    tool.avg_duration_seconds,
+                    tool.avg_tokens_consumed,
+                    tool.avg_cost_usd,
+                    tool.success_rate,
+                    tool.total_invocations
+                ))
+                conn.commit()
+                return True
         except Exception as e:
+            # Check if it's an integrity error (tool already exists)
+            error_str = str(e).lower()
+            if "unique" in error_str or "integrity" in error_str or "duplicate" in error_str:
+                return False
             print(f"Error registering tool: {e}")
             return False
 
@@ -185,31 +219,32 @@ class ToolRegistry:
             cost_usd: Cost in USD
             success: Whether execution was successful
         """
-        conn = sqlite3.connect(str(self.db_path))
+        with self.adapter.get_connection() as conn:
+            cursor = conn.cursor()
 
-        # Build update statement dynamically
-        updates = []
-        params = []
+            # Build update statement dynamically
+            updates = []
+            params = []
+            placeholder = "%s" if self.adapter.get_db_type() == "postgresql" else "?"
 
-        if duration_seconds is not None:
-            updates.append("avg_duration_seconds = (avg_duration_seconds * total_invocations + ?) / (total_invocations + 1)")
-            params.append(duration_seconds)
+            if duration_seconds is not None:
+                updates.append(f"avg_duration_seconds = (avg_duration_seconds * total_invocations + {placeholder}) / (total_invocations + 1)")
+                params.append(duration_seconds)
 
-        if tokens_consumed is not None:
-            updates.append("avg_tokens_consumed = (avg_tokens_consumed * total_invocations + ?) / (total_invocations + 1)")
-            params.append(tokens_consumed)
+            if tokens_consumed is not None:
+                updates.append(f"avg_tokens_consumed = (avg_tokens_consumed * total_invocations + {placeholder}) / (total_invocations + 1)")
+                params.append(tokens_consumed)
 
-        if cost_usd is not None:
-            updates.append("avg_cost_usd = (avg_cost_usd * total_invocations + ?) / (total_invocations + 1)")
-            params.append(cost_usd)
+            if cost_usd is not None:
+                updates.append(f"avg_cost_usd = (avg_cost_usd * total_invocations + {placeholder}) / (total_invocations + 1)")
+                params.append(cost_usd)
 
-        if updates:
-            params.append(tool_name)
-            sql = f"UPDATE adw_tools SET {', '.join(updates)} WHERE tool_name = ?"
-            conn.execute(sql, params)
+            if updates:
+                params.append(tool_name)
+                sql = f"UPDATE adw_tools SET {', '.join(updates)} WHERE tool_name = {placeholder}"
+                cursor.execute(sql, params)
 
-        conn.commit()
-        conn.close()
+            conn.commit()
 
     def get_tools_for_llm(self) -> List[Dict]:
         """
@@ -403,25 +438,28 @@ class ToolRegistry:
 
         tool_call_id = f"tc-{uuid.uuid4().hex[:8]}"
 
-        conn = sqlite3.connect(str(self.db_path))
-        conn.execute("""
-            INSERT INTO tool_calls (
-                tool_call_id, workflow_id, tool_name,
-                tool_params, success, result_data,
-                duration_seconds, completed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            tool_call_id,
-            workflow_id,
-            tool_name,
-            json.dumps(params),
-            1 if success else 0,
-            json.dumps(result),
-            duration,
-            datetime.now().isoformat()
-        ))
-        conn.commit()
-        conn.close()
+        with self.adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            placeholder = "%s" if self.adapter.get_db_type() == "postgresql" else "?"
+            placeholders = ", ".join([placeholder] * 8)
+
+            cursor.execute(f"""
+                INSERT INTO tool_calls (
+                    tool_call_id, workflow_id, tool_name,
+                    tool_params, success, result_data,
+                    duration_seconds, completed_at
+                ) VALUES ({placeholders})
+            """, (
+                tool_call_id,
+                workflow_id,
+                tool_name,
+                json.dumps(params),
+                1 if success else 0,
+                json.dumps(result),
+                duration,
+                datetime.now().isoformat()
+            ))
+            conn.commit()
 
 
 # Pre-defined tool definitions

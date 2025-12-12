@@ -342,23 +342,21 @@ def validate_review_data_integrity(
 
     logger.warning("⚠️  Review shows empty data - validating if legitimate")
 
-    # Step 1: Check database record count
-    db_path = os.path.join(worktree_path, "app/server/db/workflow_history.db")
-
-    if not os.path.exists(db_path):
-        logger.info("No database file exists - empty state is legitimate")
-        return True, None
-
+    # Step 1: Check database record count using PostgreSQL adapter
     try:
-        result = subprocess.run(
-            ["sqlite3", db_path, "SELECT COUNT(*) FROM workflow_history;"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+        # Import database adapter from worktree context
+        sys.path.insert(0, os.path.join(worktree_path, "app/server"))
+        from database import get_database_adapter
 
-        if result.returncode == 0 and result.stdout.strip():
-            db_count = int(result.stdout.strip())
+        adapter = get_database_adapter()
+        db_type = adapter.get_db_type()
+        logger.info(f"Checking database (type: {db_type}) for workflow records")
+
+        with adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM workflow_history")
+            result = cursor.fetchone()
+            db_count = result[0] if isinstance(result, tuple) else result.get('count', 0)
             logger.info(f"Database contains {db_count} workflow records")
 
             if db_count > 0:
@@ -407,13 +405,17 @@ def validate_review_data_integrity(
 
                 return False, error_msg
 
-        logger.info("Database is empty - empty state is legitimate")
-        return True, None
+            logger.info("Database is empty - empty state is legitimate")
+            return True, None
 
     except Exception as e:
         logger.warning(f"Could not check database: {e}")
         # If we can't check DB, allow review to proceed
         return True, None
+    finally:
+        # Clean up sys.path
+        if os.path.join(worktree_path, "app/server") in sys.path:
+            sys.path.remove(os.path.join(worktree_path, "app/server"))
 
 
 def build_review_summary(review_result: ReviewResult) -> str:
