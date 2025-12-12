@@ -319,6 +319,11 @@ function FeatureItem({ feature }: { feature: PlannedFeature }) {
               {feature.priority.toUpperCase()}
             </span>
           )}
+          {feature.estimated_hours && feature.estimated_hours <= 2.0 && !isCompleted && (
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">
+              ⚡ QUICK WIN
+            </span>
+          )}
         </div>
 
         {/* Completion info */}
