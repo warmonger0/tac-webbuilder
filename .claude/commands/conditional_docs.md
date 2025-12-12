@@ -253,6 +253,15 @@
     - Creating database migrations that rename columns in SQLite
     - Understanding temporal analytics columns (hour_of_day, day_of_week)
     - Fixing schema mismatches between Python models and database tables
+- `app_docs/feature-170-postgresql-pattern-predictions-migration.md` - PostgreSQL migration 010 for pattern predictions tracking, SQLite to PostgreSQL syntax conversion, migration application and verification
+  - Conditions:
+    - Applying database migrations to PostgreSQL
+    - Converting SQLite migrations to PostgreSQL syntax
+    - Working with pattern_predictions or operation_patterns tables
+    - Implementing pattern validation loop features
+    - Troubleshooting PostgreSQL migration issues
+    - Understanding foreign key relationships in pattern tracking
+    - Verifying database schema after migrations
 
 ### Templates & Integration Features
 - `app_docs/feature-0f04f66d-project-templates-docs.md` - Project templates, scaffolding scripts, setup_new_project.sh
