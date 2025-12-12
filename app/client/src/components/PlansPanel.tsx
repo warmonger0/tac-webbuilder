@@ -68,9 +68,31 @@ export function PlansPanel() {
     return true;
   }) || [];
 
+  // Priority sort order: high > medium > low
+  const priorityOrder = { high: 1, medium: 2, low: 3 };
+
+  // Sort function for planned/in-progress: priority DESC, then estimated_hours ASC
+  const sortByPriority = (a: PlannedFeature, b: PlannedFeature) => {
+    // Sort by priority first (high to low)
+    const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] || 99;
+    const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] || 99;
+    if (priorityA !== priorityB) return priorityA - priorityB;
+
+    // Then by estimated hours (ascending - quick wins first)
+    const hoursA = a.estimated_hours || 999;
+    const hoursB = b.estimated_hours || 999;
+    return hoursA - hoursB;
+  };
+
   // Group features by status
-  const inProgress = filteredFeatures.filter(f => f.status === 'in_progress');
-  const planned = filteredFeatures.filter(f => f.status === 'planned');
+  const inProgress = filteredFeatures
+    .filter(f => f.status === 'in_progress')
+    .sort(sortByPriority);
+
+  const planned = filteredFeatures
+    .filter(f => f.status === 'planned')
+    .sort(sortByPriority);
+
   const completed = filteredFeatures.filter(f => f.status === 'completed')
     .sort((a, b) => {
       // Sort by completed_at DESC (most recent first)

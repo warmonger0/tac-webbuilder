@@ -225,6 +225,22 @@
     - Designing new automation workflows based on detected patterns
     - Setting up observability for new workflow types
 
+### Error Handling & Recovery Features
+- `app_docs/design-error-handling-protocol.md` [~750 lines, ~5,000 tokens] - Comprehensive error handling sub-agent protocol design
+  - Conditions:
+    - Implementing error handling for ADW workflow failures
+    - Designing error analysis sub-agents
+    - Working with workflow abort detection and recovery
+    - Adding "failed" status to Plans Panel
+    - Creating one-click fix workflows
+    - Implementing cleanup operations after workflow failures
+    - Understanding error classification and root cause analysis
+    - Working with error reporting and GitHub integration
+    - Building fix prompt generation system
+    - Integrating error handling with Closed-Loop Automation System (Feature #99)
+    - Troubleshooting workflow failure scenarios
+    - Adding error analytics and monitoring
+
 ### Analytics & Insights Features
 - `app_docs/feature-a7c948e2-insights-recommendations.md` - Phase 3D anomaly detection, optimization recommendations, workflow analytics insights, complexity detection, statistical thresholds
   - Conditions:
@@ -262,6 +278,16 @@
     - Troubleshooting PostgreSQL migration issues
     - Understanding foreign key relationships in pattern tracking
     - Verifying database schema after migrations
+- `app_docs/feature-dde14b2-workflow-history-postgresql-migration.md` - Workflow history PostgreSQL-only architecture, eliminating hardcoded SQLite paths, database adapter integration in ADW workflows, ToolRegistry refactoring
+  - Conditions:
+    - Working with ADW workflow database integration
+    - Migrating workflows from SQLite to PostgreSQL
+    - Refactoring hardcoded database paths to use database adapter
+    - Working with adws/adw_review_iso.py or adws/adw_modules/tool_registry.py
+    - Troubleshooting ADW workflow data persistence
+    - Understanding database adapter pattern implementation
+    - Creating database-agnostic queries with parameter placeholders (%s vs ?)
+    - Working with workflow_history, adw_tools, or tool_calls tables
 
 ### Templates & Integration Features
 - `app_docs/feature-0f04f66d-project-templates-docs.md` - Project templates, scaffolding scripts, setup_new_project.sh
