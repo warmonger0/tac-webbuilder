@@ -15,11 +15,11 @@ class PhaseQueueItem:
     def __init__(
         self,
         queue_id: str,
-        parent_issue: int,
+        feature_id: int,
         phase_number: int,
         issue_number: int | None = None,
         status: str = "queued",
-        depends_on_phase: int | None = None,
+        depends_on_phases: list[int] | None = None,
         phase_data: dict[str, Any] | None = None,
         created_at: str | None = None,
         updated_at: str | None = None,
@@ -32,11 +32,11 @@ class PhaseQueueItem:
         started_timestamp: str | None = None,
     ):
         self.queue_id = queue_id
-        self.parent_issue = parent_issue
+        self.feature_id = feature_id
         self.phase_number = phase_number
         self.issue_number = issue_number
         self.status = status
-        self.depends_on_phase = depends_on_phase
+        self.depends_on_phases = depends_on_phases or []
         self.phase_data = phase_data or {}
         self.created_at = created_at or datetime.now().isoformat()
         self.updated_at = updated_at or datetime.now().isoformat()
@@ -58,11 +58,11 @@ class PhaseQueueItem:
 
         return {
             "queue_id": self.queue_id,
-            "parent_issue": self.parent_issue,
+            "feature_id": self.feature_id,
             "phase_number": self.phase_number,
             "issue_number": self.issue_number,
             "status": self.status,
-            "depends_on_phase": self.depends_on_phase,
+            "depends_on_phases": self.depends_on_phases,
             "phase_data": self.phase_data,
             "created_at": to_iso(self.created_at),
             "updated_at": to_iso(self.updated_at),
@@ -84,6 +84,18 @@ class PhaseQueueItem:
         else:
             phase_data = {}
 
+        # Handle depends_on_phases (JSONB in PostgreSQL, TEXT in SQLite)
+        depends_on_phases_raw = row.get("depends_on_phases")
+        if depends_on_phases_raw:
+            if isinstance(depends_on_phases_raw, str):
+                depends_on_phases = json.loads(depends_on_phases_raw)
+            elif isinstance(depends_on_phases_raw, list):
+                depends_on_phases = depends_on_phases_raw
+            else:
+                depends_on_phases = []
+        else:
+            depends_on_phases = []
+
         # Safely access optional fields (may not exist in older database schemas)
         def safe_get(key, default=None):
             try:
@@ -93,11 +105,11 @@ class PhaseQueueItem:
 
         return cls(
             queue_id=row["queue_id"],
-            parent_issue=row["parent_issue"],
+            feature_id=row["feature_id"],
             phase_number=row["phase_number"],
             issue_number=row["issue_number"],
             status=row["status"],
-            depends_on_phase=row["depends_on_phase"],
+            depends_on_phases=depends_on_phases,
             phase_data=phase_data,
             created_at=row["created_at"],
             updated_at=row["updated_at"],

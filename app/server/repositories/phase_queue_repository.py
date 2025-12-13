@@ -61,21 +61,25 @@ class PhaseQueueRepository:
                 next_position = row['next_pos'] if isinstance(row, dict) else row[0]
 
                 ph = self.adapter.placeholder()
+
+                # Serialize depends_on_phases as JSON
+                depends_on_phases_json = json.dumps(item.depends_on_phases)
+
                 cursor.execute(
                     f"""
                     INSERT INTO phase_queue (
-                        queue_id, parent_issue, phase_number, status,
-                        depends_on_phase, phase_data, created_at, updated_at,
+                        queue_id, feature_id, phase_number, status,
+                        depends_on_phases, phase_data, created_at, updated_at,
                         priority, queue_position, ready_timestamp
                     )
                     VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                     """,
                     (
                         item.queue_id,
-                        item.parent_issue,
+                        item.feature_id,
                         item.phase_number,
                         item.status,
-                        item.depends_on_phase,
+                        depends_on_phases_json,
                         json.dumps(item.phase_data),
                         item.created_at,
                         item.updated_at,
@@ -118,12 +122,12 @@ class PhaseQueueRepository:
             logger.error(f"[ERROR] Failed to get phase by ID: {str(e)}")
             raise
 
-    def get_all_by_parent_issue(self, parent_issue: int, limit: int = 100) -> list[PhaseQueueItem]:
+    def get_all_by_feature_id(self, feature_id: int, limit: int = 100) -> list[PhaseQueueItem]:
         """
-        Get all phases for a parent issue.
+        Get all phases for a feature.
 
         Args:
-            parent_issue: Parent GitHub issue number to filter by
+            feature_id: Feature ID to filter by (from planned_features table)
             limit: Maximum records to return
 
         Returns:
@@ -136,52 +140,79 @@ class PhaseQueueRepository:
                 cursor.execute(
                     f"""
                     SELECT * FROM phase_queue
-                    WHERE parent_issue = {ph}
+                    WHERE feature_id = {ph}
                     ORDER BY phase_number ASC
                     LIMIT {ph}
                     """,
-                    (parent_issue, limit)
+                    (feature_id, limit)
                 )
                 rows = cursor.fetchall()
 
             return [PhaseQueueItem.from_db_row(row) for row in rows]
 
         except Exception as e:
-            logger.error(f"[ERROR] Failed to get phases by parent issue: {str(e)}")
+            logger.error(f"[ERROR] Failed to get phases by feature_id: {str(e)}")
             raise
 
-    def find_by_depends_on_phase(self, parent_issue: int, depends_on_phase: int) -> PhaseQueueItem | None:
+    def find_phases_depending_on(self, feature_id: int, phase_number: int) -> list[PhaseQueueItem]:
         """
-        Find a phase that depends on a specific phase number.
+        Find all phases that depend on a specific phase number.
 
-        This is optimized for finding the next phase in a workflow sequence
+        This is optimized for finding the next phases in a workflow sequence
         instead of fetching all phases and looping (N+1 pattern).
 
+        Note: depends_on_phases is a JSONB array, so we need to check if
+        phase_number exists in that array.
+
         Args:
-            parent_issue: Parent GitHub issue number
-            depends_on_phase: Phase number that the target phase depends on
+            feature_id: Feature ID to filter by
+            phase_number: Phase number that target phases depend on
 
         Returns:
-            PhaseQueueItem if found, None otherwise
+            List of PhaseQueueItems that depend on the specified phase
         """
         try:
             with self.adapter.get_connection() as conn:
                 ph = self.adapter.placeholder()
                 cursor = conn.cursor()
-                cursor.execute(
-                    f"""
-                    SELECT * FROM phase_queue
-                    WHERE parent_issue = {ph} AND depends_on_phase = {ph}
-                    LIMIT 1
-                    """,
-                    (parent_issue, depends_on_phase)
-                )
-                row = cursor.fetchone()
 
-            return PhaseQueueItem.from_db_row(row) if row else None
+                # Query depends on database type (PostgreSQL vs SQLite)
+                db_type = self.adapter.db_type if hasattr(self.adapter, 'db_type') else 'sqlite'
+
+                if db_type == 'postgresql':
+                    # PostgreSQL: Use JSONB contains operator
+                    cursor.execute(
+                        f"""
+                        SELECT * FROM phase_queue
+                        WHERE feature_id = {ph}
+                        AND depends_on_phases @> {ph}::jsonb
+                        """,
+                        (feature_id, json.dumps([phase_number]))
+                    )
+                else:
+                    # SQLite: Parse JSON and check array contains
+                    cursor.execute(
+                        f"""
+                        SELECT * FROM phase_queue
+                        WHERE feature_id = {ph}
+                        """,
+                        (feature_id,)
+                    )
+                    # Filter in Python for SQLite (less efficient but works)
+                    rows = cursor.fetchall()
+                    filtered_rows = []
+                    for row in rows:
+                        depends_on_phases_raw = row.get("depends_on_phases", "[]")
+                        depends_on_phases = json.loads(depends_on_phases_raw) if isinstance(depends_on_phases_raw, str) else depends_on_phases_raw
+                        if phase_number in depends_on_phases:
+                            filtered_rows.append(row)
+                    return [PhaseQueueItem.from_db_row(row) for row in filtered_rows]
+
+                rows = cursor.fetchall()
+                return [PhaseQueueItem.from_db_row(row) for row in rows]
 
         except Exception as e:
-            logger.error(f"[ERROR] Failed to find phase by depends_on_phase: {str(e)}")
+            logger.error(f"[ERROR] Failed to find phases depending on phase: {str(e)}")
             raise
 
     def find_ready_phases(self) -> list[PhaseQueueItem]:
@@ -198,7 +229,7 @@ class PhaseQueueRepository:
                     """
                     SELECT * FROM phase_queue
                     WHERE status = 'ready' AND issue_number IS NULL
-                    ORDER BY parent_issue ASC, phase_number ASC
+                    ORDER BY feature_id ASC, phase_number ASC
                     """
                 )
                 rows = cursor.fetchall()
@@ -218,7 +249,7 @@ class PhaseQueueRepository:
             offset: Number of records to skip
 
         Returns:
-            List of phase queue items ordered by parent issue and phase number
+            List of phase queue items ordered by feature_id and phase number
         """
         try:
             with self.adapter.get_connection() as conn:
@@ -227,7 +258,7 @@ class PhaseQueueRepository:
                 cursor.execute(
                     f"""
                     SELECT * FROM phase_queue
-                    ORDER BY parent_issue ASC, phase_number ASC
+                    ORDER BY feature_id ASC, phase_number ASC
                     LIMIT {ph} OFFSET {ph}
                     """,
                     (limit, offset)
