@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Prompt Generator - Session 1: Basic Template Substitution
+Prompt Generator - Session 2: With Codebase Analysis
 
 Generates implementation prompts from planned_features database using template.
 
@@ -9,11 +9,11 @@ Usage:
     python3 scripts/generate_prompt.py 104                 # Generate prompt for feature 104
     python3 scripts/generate_prompt.py 49                  # Generate prompt for bug 49
 
-Session 1 Scope:
+Session 2 Scope:
 - Basic template substitution (type, ID, title, priority, hours)
 - Filename generation (QUICK_WIN vs TYPE logic)
 - Query planned_features database
-- NO codebase analysis (Session 2)
+- Codebase analysis (find relevant files, functions, test locations)
 """
 
 import argparse
@@ -25,6 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "app" / "server"))
 
 from services.planned_features_service import PlannedFeaturesService
+from utils.codebase_analyzer import CodebaseAnalyzer
 
 
 class PromptGenerator:
@@ -33,6 +34,7 @@ class PromptGenerator:
     def __init__(self):
         """Initialize generator with service and template."""
         self.service = PlannedFeaturesService()
+        self.analyzer = CodebaseAnalyzer()
         self.template_path = Path(__file__).parent.parent / ".claude" / "templates" / "IMPLEMENTATION_PROMPT_TEMPLATE.md"
 
         if not self.template_path.exists():
@@ -82,8 +84,11 @@ class PromptGenerator:
         if not feature:
             raise ValueError(f"Feature #{feature_id} not found in database")
 
+        # Analyze codebase for relevant context (Session 2)
+        context = self.analyzer.find_relevant_files(feature)
+
         # Fill template with feature data
-        prompt_content = self._fill_template(feature)
+        prompt_content = self._fill_template(feature, context)
 
         # Generate filename
         filename = self._generate_filename(feature)
@@ -97,18 +102,19 @@ class PromptGenerator:
         print(f"   Type: {feature.item_type.capitalize()}")
         print(f"   Priority: {feature.priority or 'Medium'}")
         print(f"   Estimated: {feature.estimated_hours}h" if feature.estimated_hours else "   Estimated: TBD")
+        print(f"   Context: {len(context['backend_files'])} backend, {len(context['frontend_files'])} frontend files")
 
         return prompt_content
 
-    def _fill_template(self, feature) -> str:
+    def _fill_template(self, feature, context: dict) -> str:
         """
-        Fill template placeholders with feature data.
+        Fill template placeholders with feature data and codebase context.
 
-        Session 1: Basic substitution only.
-        Session 2: Will add codebase analysis.
+        Session 2: Adds codebase analysis section.
 
         Args:
             feature: PlannedFeature object
+            context: Codebase analysis context
 
         Returns:
             Filled template content
@@ -129,7 +135,84 @@ class PromptGenerator:
         for placeholder, value in replacements.items():
             content = content.replace(placeholder, value)
 
+        # Insert codebase context section after Task Summary (after line 8)
+        codebase_section = self._generate_codebase_section(feature, context)
+
+        # Find the "## Problem Statement" section and insert context before it
+        problem_statement_pos = content.find("## Problem Statement")
+        if problem_statement_pos != -1:
+            content = (
+                content[:problem_statement_pos] +
+                codebase_section + "\n\n" +
+                content[problem_statement_pos:]
+            )
+
         return content
+
+    def _generate_codebase_section(self, feature, context: dict) -> str:
+        """
+        Generate codebase context section from analysis.
+
+        Args:
+            feature: PlannedFeature object
+            context: Codebase analysis context
+
+        Returns:
+            Markdown section with codebase context
+        """
+        sections = ["## Codebase Context (Auto-Generated)", ""]
+
+        # Relevant Backend Files
+        if context["backend_files"]:
+            sections.append("### Relevant Backend Files")
+            sections.append("")
+            for file_path, score in context["backend_files"]:
+                sections.append(f"- `{file_path}` (relevance: {score:.1f})")
+            sections.append("")
+
+        # Relevant Frontend Files
+        if context["frontend_files"]:
+            sections.append("### Relevant Frontend Files")
+            sections.append("")
+            for file_path, score in context["frontend_files"]:
+                sections.append(f"- `{file_path}` (relevance: {score:.1f})")
+            sections.append("")
+
+        # Related Functions
+        if context["related_functions"]:
+            sections.append("### Related Functions")
+            sections.append("")
+            for file_path, func_name in context["related_functions"]:
+                sections.append(f"- `{func_name}()` in `{file_path}`")
+            sections.append("")
+
+        # Suggested Test Files
+        if context["test_files"]:
+            sections.append("### Suggested Test Files")
+            sections.append("")
+            for test_path in context["test_files"]:
+                sections.append(f"- `{test_path}` (may need creation)")
+            sections.append("")
+
+        # Implementation Suggestions
+        if context["suggested_locations"]:
+            sections.append("### Implementation Suggestions")
+            sections.append("")
+            for suggestion in context["suggested_locations"]:
+                sections.append(f"- {suggestion}")
+            sections.append("")
+
+        # If no context found, add note
+        if not any([
+            context["backend_files"],
+            context["frontend_files"],
+            context["related_functions"],
+            context["suggested_locations"]
+        ]):
+            sections.append("*No specific codebase matches found. This may be a new feature area.*")
+            sections.append("")
+
+        return "\n".join(sections)
 
     def _generate_filename(self, feature) -> str:
         """
