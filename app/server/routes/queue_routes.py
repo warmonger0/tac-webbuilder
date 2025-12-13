@@ -590,14 +590,41 @@ def _launch_workflow(next_phase) -> tuple[str, bool]:
     return adw_id, True
 
 
-def init_webhook_routes(phase_queue_service, github_poster):
+def init_webhook_routes(phase_queue_service, github_poster, websocket_manager=None):
     """
     Initialize webhook routes with service dependencies.
 
     Args:
         phase_queue_service: PhaseQueueService instance
         github_poster: GitHubPoster instance for creating issues
+        websocket_manager: Optional WebSocket ConnectionManager for event broadcasting
     """
+
+    async def _broadcast_workflow_completed(request: 'WorkflowCompleteRequest'):
+        """Helper to broadcast workflow_completed event via WebSocket."""
+        if websocket_manager:
+            try:
+                from datetime import datetime
+
+                await websocket_manager.broadcast({
+                    "type": "workflow_completed",
+                    "data": {
+                        "queue_id": request.queue_id,
+                        "feature_id": request.parent_issue,  # Will be feature_id after migration
+                        "phase_number": request.phase_number,
+                        "status": request.status,  # "completed" or "failed"
+                        "adw_id": request.adw_id,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                })
+
+                logger.info(
+                    f"[WEBHOOK] Broadcasted workflow_completed event: "
+                    f"queue_id={request.queue_id}, status={request.status}"
+                )
+            except Exception as e:
+                # Don't fail webhook if broadcast fails
+                logger.error(f"[WEBHOOK] Failed to broadcast event: {e}")
 
     @webhook_router.post("/workflow-complete", response_model=WorkflowCompleteResponse)
     async def workflow_complete(
@@ -702,17 +729,20 @@ def init_webhook_routes(phase_queue_service, github_poster):
             # Check if we should trigger next phase
             if not request.trigger_next or request.status != "completed":
                 logger.info(f"[WEBHOOK] Not triggering next phase (trigger_next={request.trigger_next}, status={request.status})")
+                await _broadcast_workflow_completed(request)
                 return response
 
             # Check if queue is paused
             if phase_queue_service.is_paused():
                 logger.info("[WEBHOOK] Queue is paused, skipping auto-trigger")
                 response.message += ". Queue is paused, next phase not triggered"
+                await _broadcast_workflow_completed(request)
                 return response
 
             # Validate required fields
             if not request.parent_issue or not request.phase_number:
                 logger.warning("[WEBHOOK] Cannot trigger next phase: missing parent_issue or phase_number")
+                await _broadcast_workflow_completed(request)
                 return response
 
             # Find next phase
@@ -720,6 +750,7 @@ def init_webhook_routes(phase_queue_service, github_poster):
 
             if not next_phase:
                 response.message += ". No more phases in queue"
+                await _broadcast_workflow_completed(request)
                 return response
 
             logger.info(
@@ -743,6 +774,7 @@ def init_webhook_routes(phase_queue_service, github_poster):
 
             if not success:
                 response.message += ". Next phase ready but workflow script not found"
+                await _broadcast_workflow_completed(request)
                 return response
 
             # Mark phase as running
@@ -790,6 +822,9 @@ def init_webhook_routes(phase_queue_service, github_poster):
                 ))
             except Exception as log_error:
                 logger.warning(f"Failed to create TaskLog entry: {log_error}")
+
+            # ✅ Emit WebSocket event for PhaseCoordinator
+            await _broadcast_workflow_completed(request)
 
             return response
 
