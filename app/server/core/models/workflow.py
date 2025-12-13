@@ -76,6 +76,9 @@ class WorkflowHistoryItem(BaseModel):
     workflow_template: str | None = Field(None, description="Workflow template name")
     model_used: str | None = Field(None, description="Model used for workflow")
     status: Literal["pending", "running", "completed", "failed"] = Field(..., description="Workflow status")
+    branch_name: str | None = Field(None, description="Git branch name for this workflow")
+    plan_file: str | None = Field(None, description="Path to plan file (if completed planning)")
+    issue_class: str | None = Field(None, description="Issue classification (e.g., /bug, /feature, /chore)")
 
     # Time tracking
     start_time: str | None = Field(None, description="Start time (ISO format)")

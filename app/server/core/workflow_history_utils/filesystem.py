@@ -59,6 +59,9 @@ def _extract_workflow_metadata(adw_id: str, adw_dir: Path, state_data: dict) -> 
         "worktree_path": str(adw_dir),
         "backend_port": state_data.get("backend_port"),
         "frontend_port": state_data.get("frontend_port"),
+        "branch_name": state_data.get("branch_name"),
+        "plan_file": state_data.get("plan_file"),
+        "issue_class": state_data.get("issue_class"),
     }
 
 
