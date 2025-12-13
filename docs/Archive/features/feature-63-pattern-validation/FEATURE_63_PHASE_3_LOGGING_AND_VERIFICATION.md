@@ -79,10 +79,20 @@ Files:
 
 Location: app/server/core/pattern_validator.py"
 
+# Push to origin
+git push origin main
+
 # Mark complete
 curl -X PATCH http://localhost:8002/api/v1/planned-features/63 \
   -H "Content-Type: application/json" \
   -d '{"status": "completed", "actual_hours": 3.0, "completed_at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "completion_notes": "Pattern validation loop complete (3 phases)."}'
+
+# Cleanup prompt files (all phases complete)
+mkdir -p docs/Archive/features/feature-63-pattern-validation
+mv FEATURE_63_*.md TRACKING_FEATURE_63.md docs/Archive/features/feature-63-pattern-validation/
+git add docs/Archive/features/feature-63-pattern-validation/
+git commit -m "chore: Archive Feature #63 prompt files (3 phases complete)"
+git push origin main
 ```
 
 ## Success Criteria
