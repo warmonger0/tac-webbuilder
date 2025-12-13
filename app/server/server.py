@@ -47,7 +47,7 @@ from services.health_service import HealthService
 from services.phase_coordinator import PhaseCoordinator
 from services.phase_queue_service import PhaseQueueService
 from services.service_controller import ServiceController
-from services.websocket_manager import ConnectionManager
+from services.websocket_manager import get_connection_manager
 from services.workflow_service import WorkflowService
 
 # Load .env file from server directory
@@ -132,8 +132,8 @@ app_start_time = datetime.now()
 # Ensure database directory exists
 os.makedirs("db", exist_ok=True)
 
-# Initialize services
-manager = ConnectionManager()
+# Initialize services - use singleton to prevent multiple instances across reloads
+manager = get_connection_manager()
 # Increase cache to 60s to avoid expensive filesystem scans on every request
 # The sync scans 116+ agent directories which takes ~10s
 # Disable background sync - workflows write directly to DB and WebSocket broadcasts changes

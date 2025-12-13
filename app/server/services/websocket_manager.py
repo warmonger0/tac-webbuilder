@@ -130,7 +130,10 @@ class ConnectionManager:
             self.event_subscribers[event_type] = []
 
         self.event_subscribers[event_type].append(handler)
-        logger.info(f"[WS] Handler subscribed to '{event_type}' events")
+        logger.info(
+            f"[WS] Handler '{handler.__name__}' subscribed to '{event_type}' events. "
+            f"Total subscribers for '{event_type}': {len(self.event_subscribers[event_type])}"
+        )
 
     async def broadcast(self, message: dict) -> None:
         """
@@ -181,6 +184,7 @@ class ConnectionManager:
 
         # 2. Dispatch to event subscribers
         event_type = message.get("type")
+
         if event_type and event_type in self.event_subscribers:
             subscribers = self.event_subscribers[event_type]
             logger.debug(f"[WS] Dispatching to {len(subscribers)} '{event_type}' subscribers")
@@ -194,3 +198,27 @@ class ConnectionManager:
                         f"[WS] Event handler error for '{event_type}': {e}",
                         exc_info=True
                     )
+
+
+# Global singleton instance
+# This ensures all imports use the same instance across module reloads
+_global_manager: ConnectionManager | None = None
+
+
+def get_connection_manager() -> ConnectionManager:
+    """
+    Get or create the global ConnectionManager singleton.
+
+    Returns:
+        The global ConnectionManager instance
+
+    Example:
+        >>> from services.websocket_manager import get_connection_manager
+        >>> manager = get_connection_manager()
+        >>> manager.subscribe("my_event", handler)
+    """
+    global _global_manager
+    if _global_manager is None:
+        _global_manager = ConnectionManager()
+        logger.info("[WS] Created global ConnectionManager singleton")
+    return _global_manager
