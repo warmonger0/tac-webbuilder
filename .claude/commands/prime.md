@@ -123,6 +123,10 @@ cd app/client && bun test              # 149 tests
 ./scripts/run_analytics.sh analyze_errors.py --report          # Error analysis
 ./scripts/run_analytics.sh analyze_costs.py --report           # Cost analytics
 ./scripts/health_check.sh                                      # Full system health check
+
+# Developer Tools
+./scripts/gen_prompt.sh --list         # List all planned features (Feature #104)
+./scripts/gen_prompt.sh 49             # Generate implementation prompt for issue 49
 ```
 
 ## Health Checks & Observability (Session 18)

@@ -309,6 +309,17 @@
   - Finished session and want to update `/prime` command
   - Need to update quick start guides or reference documentation
 
+### Developer Productivity Tools
+- `scripts/gen_prompt.sh` - Plan-to-Prompt Generator (Feature #104)
+  - Conditions:
+    - Converting planned features from Panel 5 into implementation prompts
+    - Starting work on a new feature from the roadmap
+    - Need structured prompts with codebase context and test locations
+    - Want to save 15-18 min per prompt by automating template generation
+  - Usage: `./scripts/gen_prompt.sh --list` or `./scripts/gen_prompt.sh 49`
+  - Generates: `QUICK_WIN_{id}_{title}.md` or `{TYPE}_{id}_{title}.md` in project root
+  - Includes: Codebase analysis (relevant files, functions, test locations)
+
 ---
 
 ## Loading Strategy Tips
