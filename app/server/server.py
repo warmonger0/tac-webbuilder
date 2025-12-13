@@ -88,15 +88,19 @@ async def lifespan(app: FastAPI):
     await background_task_manager.start_all()
     logger.info("[STARTUP] Workflow, routes, and history watchers started")
 
-    # PhaseCoordinator polling disabled - webhook handles phase coordination via /workflow-complete endpoint
-    # await phase_coordinator.start()
-    # logger.info("[STARTUP] PhaseCoordinator started")
+    # Start PhaseCoordinator (event-driven mode)
+    await phase_coordinator.start()
+    logger.info("[STARTUP] PhaseCoordinator started (event-driven mode)")
+
+    # Subscribe PhaseCoordinator to workflow completion events
+    manager.subscribe("workflow_completed", phase_coordinator.handle_workflow_completion)
+    logger.info("[STARTUP] PhaseCoordinator subscribed to workflow_completed events")
 
     yield
 
     # Shutdown: Stop background tasks
     logger.info("[SHUTDOWN] Application shutting down, stopping background tasks...")
-    # await phase_coordinator.stop()  # Not started, no need to stop
+    await phase_coordinator.stop()
     await background_task_manager.stop_all()
     workflow_service.stop_background_sync()
     logger.info("[SHUTDOWN] All background tasks stopped")
@@ -153,7 +157,7 @@ phase_queue_service = PhaseQueueService()
 github_poster = GitHubPoster()
 phase_coordinator = PhaseCoordinator(
     phase_queue_service=phase_queue_service,
-    poll_interval=10.0,
+    max_concurrent_adws=3,  # Concurrency limit for parallel ADW execution
     websocket_manager=manager,
     github_poster=github_poster
 )

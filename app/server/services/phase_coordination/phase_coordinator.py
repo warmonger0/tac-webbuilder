@@ -1,19 +1,21 @@
 """
 PhaseCoordinator Service
 
-Background service that monitors workflow completions and coordinates
-sequential execution of multi-phase workflows.
+Event-driven service that coordinates parallel execution of multi-phase workflows.
 
 Responsibilities:
-- Poll workflow_history for completed/failed workflows
-- Match workflows to phases in queue by issue_number
-- Mark phases complete/failed and trigger next phase
+- Handle workflow completion events from WebSocket broadcasts
+- Resolve phase dependencies and find newly ready phases
+- Enforce concurrency limits (max 3 ADWs running concurrently)
+- Create isolated GitHub issues (no parent dependencies)
+- Launch ADWs in parallel when ready
 - Broadcast WebSocket events for real-time updates
 - Post GitHub comments on phase transitions
 """
 
 import asyncio
 import contextlib
+import json
 import logging
 from datetime import datetime
 
@@ -27,16 +29,16 @@ logger = logging.getLogger(__name__)
 
 class PhaseCoordinator:
     """
-    Coordinates sequential execution of multi-phase workflows.
+    Coordinates parallel execution of multi-phase workflows (event-driven).
 
-    Polls workflow_history every N seconds to detect completions,
-    updates phase queue, and triggers next phases.
+    Handles workflow completion events, resolves dependencies,
+    and launches up to 3 ADWs concurrently.
     """
 
     def __init__(
         self,
         phase_queue_service: PhaseQueueService,
-        poll_interval: float = 10.0,
+        max_concurrent_adws: int = 3,
         websocket_manager = None,
         github_poster = None
     ):
@@ -45,7 +47,7 @@ class PhaseCoordinator:
 
         Args:
             phase_queue_service: PhaseQueueService instance
-            poll_interval: Polling interval in seconds (default: 10.0)
+            max_concurrent_adws: Maximum concurrent ADWs (default: 3)
             websocket_manager: WebSocket manager for real-time updates (optional)
             github_poster: GitHubPoster for just-in-time issue creation (optional)
 
@@ -53,12 +55,11 @@ class PhaseCoordinator:
             Database type (SQLite/PostgreSQL) is determined by DB_TYPE environment variable.
         """
         self.phase_queue_service = phase_queue_service
-        self.poll_interval = poll_interval
+        self.max_concurrent_adws = max_concurrent_adws
         self.websocket_manager = websocket_manager
         self.github_poster = github_poster
         self._is_running = False
         self._task: asyncio.Task | None = None
-        self._processed_workflows = set()  # Track processed workflow IDs
 
         # Initialize helper components (use database factory)
         self.detector = WorkflowCompletionDetector()
@@ -66,216 +67,444 @@ class PhaseCoordinator:
 
         logger.info(
             f"[INIT] PhaseCoordinator initialized "
-            f"(poll_interval={poll_interval}s)"
+            f"(max_concurrent_adws={max_concurrent_adws}, event-driven mode)"
         )
 
     async def start(self):
-        """Start the background polling task"""
+        """Start the coordinator (event-driven mode, no polling)"""
         if self._is_running:
             logger.warning("[WARNING] PhaseCoordinator already running")
             return
 
         self._is_running = True
-        self._task = asyncio.create_task(self._poll_loop())
-        logger.info("[START] PhaseCoordinator background task started")
+        logger.info("[START] PhaseCoordinator started (event-driven mode)")
 
     async def stop(self):
-        """Stop the background polling task"""
+        """Stop the coordinator"""
         if not self._is_running:
             return
 
         self._is_running = False
-        if self._task:
-            self._task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._task
-        logger.info("[STOP] PhaseCoordinator background task stopped")
+        logger.info("[STOP] PhaseCoordinator stopped")
 
-    async def _poll_loop(self):
-        """Main polling loop - runs continuously"""
-        logger.info("[POLL] PhaseCoordinator polling loop started")
-
-        while self._is_running:
-            try:
-                await self._check_workflow_completions()
-            except Exception as e:
-                logger.error(f"[ERROR] PhaseCoordinator polling error: {str(e)}")
-
-            # Wait for next poll interval
-            await asyncio.sleep(self.poll_interval)
-
-    async def _check_workflow_completions(self):
+    async def handle_workflow_completion(self, event_data: dict):
         """
-        Check for completed/failed workflows and update phase queue.
+        Handle workflow completion event (main entry point).
 
-        For each workflow with status='completed' or 'failed':
-        1. Find corresponding phase by issue_number
-        2. Mark phase complete/failed
-        3. Trigger next phase if applicable
-        4. Broadcast WebSocket event
+        Called by WebSocket manager when workflow_completed event is broadcast.
 
-        Also handles just-in-time issue creation for ready phases without issues.
+        Args:
+            event_data: {
+                "queue_id": "1",
+                "feature_id": 104,
+                "phase_number": 1,
+                "status": "completed" or "failed",
+                "adw_id": "adw-abc123",
+                "timestamp": "2025-12-13T10:30:00"
+            }
         """
         try:
-            # First, create issues for ready phases that don't have them yet
-            await self._create_missing_issues()
+            queue_id = event_data.get("queue_id")
+            feature_id = event_data.get("feature_id")
+            phase_number = event_data.get("phase_number")
+            status = event_data.get("status")
+            adw_id = event_data.get("adw_id")
 
-            # Second, auto-start ready phases if queue is not paused
-            if not self.phase_queue_service.is_paused():
-                await self._auto_start_ready_phases()
+            logger.info(
+                f"[EVENT] Workflow completion event received: "
+                f"queue_id={queue_id}, feature_id={feature_id}, "
+                f"phase={phase_number}, status={status}"
+            )
 
-            # Get all running phases from queue
-            running_phases = self._get_running_phases()
+            # Find newly ready phases (dependency resolution)
+            ready_phases = self._find_newly_ready_phases(feature_id)
 
-            if not running_phases:
-                # No running phases to monitor
+            if not ready_phases:
+                logger.info(
+                    f"[EVENT] No newly ready phases for feature #{feature_id}"
+                )
                 return
 
-            # Check each running phase's workflow status
-            for phase_row in running_phases:
-                await self._process_phase_completion(phase_row)
+            # Get current running count (across ALL features)
+            running_count = self._get_running_count()
+            available_slots = max(0, self.max_concurrent_adws - running_count)
+
+            logger.info(
+                f"[EVENT] Found {len(ready_phases)} ready phases. "
+                f"Running: {running_count}/{self.max_concurrent_adws}, "
+                f"Available slots: {available_slots}"
+            )
+
+            # Launch phases in parallel (up to available slots)
+            launched = 0
+            for phase_row in ready_phases[:available_slots]:
+                try:
+                    await self._launch_phase(phase_row)
+                    launched += 1
+                except Exception as e:
+                    logger.error(
+                        f"[ERROR] Failed to launch phase {phase_row['phase_number']}: {e}"
+                    )
+
+            if launched > 0:
+                logger.info(
+                    f"[EVENT] Successfully launched {launched} phase(s) in parallel"
+                )
+
+            # Log queued phases (if any)
+            queued_count = len(ready_phases) - launched
+            if queued_count > 0:
+                logger.info(
+                    f"[EVENT] {queued_count} ready phase(s) queued "
+                    f"(concurrency limit reached)"
+                )
 
         except Exception as e:
-            logger.error(f"[ERROR] Failed to check workflow completions: {str(e)}")
+            logger.error(f"[ERROR] handle_workflow_completion failed: {e}")
+            import traceback
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-    def _get_running_phases(self):
+    def _find_newly_ready_phases(self, feature_id: int) -> list[dict]:
         """
-        Get all running phases from queue.
+        Find all phases that are now ready to execute.
+
+        A phase is ready when:
+        1. status = 'queued'
+        2. ALL phases in depends_on_phases are 'completed'
+        3. No concurrency check (handled by caller)
+
+        Args:
+            feature_id: Feature ID to check
 
         Returns:
-            List of phase rows with queue_id, issue_number, parent_issue, phase_number
+            List of phase rows with queue_id, phase_number, depends_on_phases, phase_data
+        """
+        with self.phase_queue_service.repository.adapter.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get all queued phases for this feature
+            cursor.execute(
+                """
+                SELECT queue_id, phase_number, depends_on_phases, phase_data
+                FROM phase_queue
+                WHERE feature_id = %s AND status = 'queued'
+                """,
+                (feature_id,)
+            )
+            queued_phases = cursor.fetchall()
+
+            ready_phases = []
+            for phase in queued_phases:
+                dependencies_json = phase["depends_on_phases"]
+
+                # Parse dependencies (JSONB → Python list)
+                if dependencies_json is None or dependencies_json == '[]':
+                    dependencies = []
+                else:
+                    try:
+                        if isinstance(dependencies_json, str):
+                            dependencies = json.loads(dependencies_json)
+                        elif isinstance(dependencies_json, list):
+                            dependencies = dependencies_json
+                        else:
+                            dependencies = []
+                    except (json.JSONDecodeError, TypeError):
+                        logger.warning(
+                            f"[WARN] Failed to parse depends_on_phases for "
+                            f"phase {phase['phase_number']}: {dependencies_json}"
+                        )
+                        dependencies = []
+
+                # No dependencies → always ready
+                if not dependencies:
+                    logger.debug(
+                        f"[READY] Phase {phase['phase_number']} has no dependencies → READY"
+                    )
+                    ready_phases.append(phase)
+                    continue
+
+                # Check if ALL dependencies are completed
+                all_complete = True
+                for dep_phase_num in dependencies:
+                    cursor.execute(
+                        """
+                        SELECT status FROM phase_queue
+                        WHERE feature_id = %s AND phase_number = %s
+                        """,
+                        (feature_id, dep_phase_num)
+                    )
+                    dep_row = cursor.fetchone()
+
+                    # Dependency not found OR not completed → block
+                    if not dep_row or dep_row["status"] != "completed":
+                        all_complete = False
+                        logger.debug(
+                            f"[BLOCKED] Phase {phase['phase_number']} waiting for "
+                            f"Phase {dep_phase_num} (status: {dep_row['status'] if dep_row else 'NOT_FOUND'})"
+                        )
+                        break
+
+                if all_complete:
+                    logger.debug(
+                        f"[READY] Phase {phase['phase_number']} dependencies met → READY"
+                    )
+                    ready_phases.append(phase)
+
+            return ready_phases
+
+    def _get_running_count(self) -> int:
+        """
+        Get count of currently running phases (across ALL features).
+
+        Returns:
+            Number of phases with status='running'
         """
         with self.phase_queue_service.repository.adapter.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT queue_id, issue_number, parent_issue, phase_number
+                SELECT COUNT(*) as count
                 FROM phase_queue
-                WHERE status = 'running' AND issue_number IS NOT NULL
+                WHERE status = 'running'
                 """
             )
-            return cursor.fetchall()
+            row = cursor.fetchone()
+            return row["count"] if row else 0
 
-    async def _process_phase_completion(self, phase_row):
+    async def _launch_phase(self, phase_row: dict):
         """
-        Process completion or failure of a single phase.
+        Launch a single phase: create isolated issue + start ADW.
 
         Args:
-            phase_row: Database row with queue_id, issue_number, parent_issue, phase_number
+            phase_row: Database row with queue_id, phase_number, depends_on_phases, phase_data
         """
         queue_id = phase_row["queue_id"]
-        issue_number = phase_row["issue_number"]
-        parent_issue = phase_row["parent_issue"]
         phase_number = phase_row["phase_number"]
+        phase_data_json = phase_row["phase_data"]
 
-        # Check workflow_history for this issue
-        workflow_status = self.detector.get_workflow_status(issue_number)
-
-        if workflow_status == "completed":
-            await self._handle_phase_success(
-                queue_id, phase_number, issue_number, parent_issue
-            )
-
-        elif workflow_status == "failed":
-            error_msg = self.detector.get_workflow_error(issue_number)
-            await self._handle_phase_failure(
-                queue_id, phase_number, issue_number, parent_issue, error_msg
-            )
-
-    async def _handle_phase_success(
-        self, queue_id: str, phase_number: int, issue_number: int, parent_issue: int
-    ):
-        """
-        Handle successful phase completion.
-
-        Args:
-            queue_id: Queue ID
-            phase_number: Phase number
-            issue_number: Child issue number
-            parent_issue: Parent issue number
-        """
-        logger.info(
-            f"[SUCCESS] Phase {phase_number} completed "
-            f"(issue #{issue_number}, parent #{parent_issue})"
-        )
-
-        # Check if queue is paused
-        is_paused = self.phase_queue_service.is_paused()
-
-        if is_paused:
-            # Queue is paused - mark phase complete but don't trigger next phase
-            logger.info(
-                f"[PAUSED] Queue is paused. Phase {phase_number} marked complete, "
-                f"but next phase will not auto-trigger"
-            )
-            # Just update status to completed without triggering next phase
-            self.phase_queue_service.update_status(queue_id, "completed")
-            next_phase_triggered = False
+        # Parse phase_data
+        if isinstance(phase_data_json, str):
+            phase_data = json.loads(phase_data_json)
+        elif isinstance(phase_data_json, dict):
+            phase_data = phase_data_json
         else:
-            # Queue is running - mark phase complete and trigger next phase automatically
-            next_phase_triggered = self.phase_queue_service.mark_phase_complete(queue_id)
+            logger.error(f"[ERROR] Invalid phase_data type: {type(phase_data_json)}")
+            return
 
-            # If next phase was triggered, create its GitHub issue just-in-time
-            if next_phase_triggered and self.github_poster:
-                await self._create_next_phase_issue(parent_issue, phase_number + 1)
+        logger.info(f"[LAUNCH] Launching Phase {phase_number} (queue_id={queue_id})")
 
-        # Broadcast WebSocket event
-        await self._broadcast_queue_update(queue_id, "completed", parent_issue)
+        # 1. Create isolated GitHub issue (if not exists)
+        issue_number = await self._create_isolated_issue(phase_row)
+        if not issue_number:
+            logger.error(f"[ERROR] Failed to create issue for Phase {phase_number}")
+            return
 
-        # Post GitHub comment
-        await self.notifier.post_phase_comment(
-            parent_issue, phase_number, issue_number, "completed"
-        )
+        # 2. Start ADW workflow
+        await self._auto_start_phase(queue_id, issue_number, phase_data)
 
-    async def _handle_phase_failure(
-        self,
-        queue_id: str,
-        phase_number: int,
-        issue_number: int,
-        parent_issue: int,
-        error_msg: str | None
-    ):
+    async def _create_isolated_issue(self, phase_row: dict) -> int | None:
         """
-        Handle failed phase.
+        Create isolated GitHub issue (NO parent).
+
+        Args:
+            phase_row: Database row with queue_id, phase_number, phase_data
+
+        Returns:
+            Issue number if created, None if failed
+        """
+        if not self.github_poster:
+            logger.warning("[WARN] github_poster not configured, cannot create issue")
+            return None
+
+        try:
+            queue_id = phase_row["queue_id"]
+            phase_number = phase_row["phase_number"]
+
+            # Parse phase_data
+            phase_data_json = phase_row["phase_data"]
+            if isinstance(phase_data_json, str):
+                phase_data = json.loads(phase_data_json)
+            elif isinstance(phase_data_json, dict):
+                phase_data = phase_data_json
+            else:
+                logger.error(f"[ERROR] Invalid phase_data type: {type(phase_data_json)}")
+                return None
+
+            # Get feature info
+            feature_id = self._get_feature_id_for_queue(queue_id)
+            if not feature_id:
+                logger.error(f"[ERROR] Failed to get feature_id for queue_id={queue_id}")
+                return None
+
+            feature_title = self._get_feature_title(feature_id)
+            total_phases = phase_data.get("total_phases", "?")
+            phase_title = phase_data.get("title", f"Phase {phase_number}")
+            prompt_content = phase_data.get("content", "")
+            external_docs = phase_data.get("externalDocs", [])
+
+            # Build issue body (isolated, no parent reference)
+            issue_title = f"{phase_title}"
+            issue_body = f"""# {phase_title}
+
+**Feature**: {feature_title} (planned_features #{feature_id})
+**Phase**: {phase_number} of {total_phases}
+
+## Description
+
+{prompt_content}
+"""
+
+            if external_docs:
+                issue_body += f"""
+## Referenced Documents
+
+{chr(10).join(f'- `{doc}`' for doc in external_docs)}
+"""
+
+            issue_body += """
+
+---
+**Tracking**: See Panel 5 for full feature progress
+"""
+
+            # Create GitHub issue (NO parent_issue parameter)
+            from core.data_models import GitHubIssue
+
+            github_issue = GitHubIssue(
+                title=issue_title,
+                body=issue_body,
+                labels=[f"feature-{feature_id}", f"phase-{phase_number}", "multi-phase"],
+                classification="feature",
+                workflow="adw_sdlc_complete_iso",
+                model_set="base"
+            )
+
+            issue_number = self.github_poster.post_issue(github_issue, confirm=False)
+            logger.info(
+                f"[CREATED] Isolated issue #{issue_number} for "
+                f"Feature #{feature_id} Phase {phase_number}"
+            )
+
+            # Update phase_queue with issue number
+            self.phase_queue_service.update_issue_number(queue_id, issue_number)
+
+            return issue_number
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to create isolated issue: {e}")
+            import traceback
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
+            return None
+
+    def _get_feature_id_for_queue(self, queue_id: str) -> int | None:
+        """Get feature_id for a queue_id"""
+        with self.phase_queue_service.repository.adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT feature_id FROM phase_queue WHERE queue_id = %s",
+                (queue_id,)
+            )
+            row = cursor.fetchone()
+            return row["feature_id"] if row else None
+
+    def _get_feature_title(self, feature_id: int) -> str:
+        """Get feature title from planned_features table"""
+        with self.phase_queue_service.repository.adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT title FROM planned_features WHERE id = %s",
+                (feature_id,)
+            )
+            row = cursor.fetchone()
+            return row["title"] if row else f"Feature #{feature_id}"
+
+    async def _auto_start_phase(self, queue_id: str, issue_number: int, phase_data: dict):
+        """
+        Start ADW workflow for a phase.
 
         Args:
             queue_id: Queue ID
-            phase_number: Phase number
-            issue_number: Child issue number
-            parent_issue: Parent issue number
-            error_msg: Error message
+            issue_number: GitHub issue number
+            phase_data: Phase metadata dict
         """
-        logger.error(
-            f"[FAILED] Phase {phase_number} failed "
-            f"(issue #{issue_number}, parent #{parent_issue}): {error_msg}"
-        )
+        try:
+            import os
+            import subprocess
+            import uuid
 
-        # Mark phase failed (blocks dependent phases)
-        blocked_ids = self.phase_queue_service.mark_phase_failed(
-            queue_id,
-            error_msg or "Workflow execution failed"
-        )
+            from routes.queue_routes import determine_workflow_for_phase
 
-        # Broadcast WebSocket event for failed phase
-        await self._broadcast_queue_update(queue_id, "failed", parent_issue)
+            # Generate ADW ID
+            adw_id = f"adw-{uuid.uuid4().hex[:8]}"
 
-        # Broadcast events for blocked phases
-        for blocked_id in blocked_ids:
-            await self._broadcast_queue_update(blocked_id, "blocked", parent_issue)
+            # Determine workflow
+            workflow, model_set = determine_workflow_for_phase(phase_data)
 
-        # Post GitHub comment
-        await self.notifier.post_phase_comment(
-            parent_issue, phase_number, issue_number, "failed", error_msg
-        )
+            # Build command
+            # __file__ is in app/server/services/phase_coordination/phase_coordinator.py
+            # Go up: phase_coordination -> services -> server -> app -> repo_root
+            services_dir = os.path.dirname(os.path.abspath(__file__))  # services/phase_coordination
+            services_parent = os.path.dirname(services_dir)  # services
+            server_dir = os.path.dirname(services_parent)  # app/server
+            app_dir = os.path.dirname(server_dir)  # app
+            repo_root = os.path.dirname(app_dir)  # repo root
 
-    async def _broadcast_queue_update(self, queue_id: str, status: str, parent_issue: int):
+            # Validate repo_root exists
+            if not os.path.exists(repo_root):
+                logger.error(f"[AUTO-START] Repository root not found: {repo_root}")
+                return
+
+            adws_dir = os.path.join(repo_root, "adws")
+            workflow_script = os.path.join(adws_dir, f"{workflow}.py")
+
+            if not os.path.exists(workflow_script):
+                logger.error(f"[AUTO-START] Workflow script not found: {workflow_script}")
+                return
+
+            cmd = ["uv", "run", workflow_script, str(issue_number), adw_id]
+
+            logger.info(
+                f"[AUTO-START] Launching {workflow} "
+                f"(issue #{issue_number}, adw_id: {adw_id})"
+            )
+
+            # Mark phase as running BEFORE launching subprocess (prevent race condition)
+            self.phase_queue_service.update_status(queue_id, "running", adw_id=adw_id)
+
+            # Launch workflow in background
+            try:
+                subprocess.Popen(
+                    cmd,
+                    cwd=repo_root,
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,  # Don't capture - let it go to parent logs
+                    stderr=subprocess.DEVNULL,
+                )
+                logger.info(
+                    f"[AUTO-START] Successfully started workflow "
+                    f"(issue #{issue_number}, adw_id: {adw_id})"
+                )
+            except (FileNotFoundError, PermissionError, OSError) as subprocess_error:
+                # Subprocess failed to launch - revert status back to queued
+                logger.error(
+                    f"[AUTO-START] Subprocess launch failed: "
+                    f"{type(subprocess_error).__name__}: {str(subprocess_error)}"
+                )
+                self.phase_queue_service.update_status(queue_id, "queued", adw_id=None)
+
+        except Exception as e:
+            logger.error(f"[AUTO-START] Failed to start phase: {str(e)}")
+            import traceback
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
+
+    async def _broadcast_queue_update(self, queue_id: str, status: str, feature_id: int):
         """
         Broadcast WebSocket event for queue update.
 
         Args:
             queue_id: Queue ID that was updated
             status: New status (completed, failed, blocked, ready, etc.)
-            parent_issue: Parent issue number
+            feature_id: Feature ID (references planned_features.id)
         """
         if not self.websocket_manager:
             return
@@ -285,7 +514,7 @@ class PhaseCoordinator:
                 "type": "queue_update",
                 "queue_id": queue_id,
                 "status": status,
-                "parent_issue": parent_issue,
+                "feature_id": feature_id,
                 "timestamp": datetime.now().isoformat()
             }
 
@@ -324,228 +553,7 @@ class PhaseCoordinator:
             logger.error(f"[ERROR] Failed to get ready phases: {str(e)}")
             return []
 
-    async def _create_missing_issues(self):
-        """
-        Create GitHub issues for ready phases that don't have issue numbers yet.
-
-        This handles the case where phases become ready but don't have issues created,
-        such as when the queue was paused or the system was restarted.
-        """
-        if not self.github_poster:
-            return
-
-        try:
-            # Get all ready phases without issue numbers
-            all_phases = self.phase_queue_service.get_all_queued()
-            ready_phases_without_issues = [
-                phase for phase in all_phases
-                if phase.status == "ready" and not phase.issue_number
-            ]
-
-            for phase in ready_phases_without_issues:
-                logger.info(
-                    f"[AUTO-CREATE] Creating issue for ready Phase {phase.phase_number} "
-                    f"(parent #{phase.parent_issue})"
-                )
-                await self._create_next_phase_issue(phase.parent_issue, phase.phase_number)
-
-        except Exception as e:
-            logger.error(f"[ERROR] Failed to create missing issues: {str(e)}")
-
-    async def _auto_start_ready_phases(self):
-        """
-        Automatically start execution of ready phases that have issue numbers.
-
-        This enables automatic workflow execution when:
-        - Phase status is 'ready'
-        - Phase has a GitHub issue number
-        - Queue is not paused
-        """
-        try:
-            import os
-            import subprocess
-            import uuid
-
-            from routes.queue_routes import determine_workflow_for_phase
-
-            # Get all ready phases with issue numbers
-            all_phases = self.phase_queue_service.get_all_queued()
-            ready_phases_to_start = [
-                phase for phase in all_phases
-                if phase.status == "ready" and phase.issue_number
-            ]
-
-            for phase in ready_phases_to_start:
-                logger.info(
-                    f"[AUTO-START] Starting Phase {phase.phase_number} "
-                    f"(parent #{phase.parent_issue}, issue #{phase.issue_number})"
-                )
-
-                try:
-                    # Generate ADW ID
-                    adw_id = f"adw-{uuid.uuid4().hex[:8]}"
-
-                    # Determine workflow
-                    workflow, model_set = determine_workflow_for_phase(phase.phase_data)
-
-                    # Build command
-                    # __file__ is in app/server/services/phase_coordination/phase_coordinator.py
-                    # Go up: phase_coordination -> services -> server -> app -> repo_root
-                    services_dir = os.path.dirname(os.path.abspath(__file__))  # services/phase_coordination
-                    services_parent = os.path.dirname(services_dir)  # services
-                    server_dir = os.path.dirname(services_parent)  # app/server
-                    app_dir = os.path.dirname(server_dir)  # app
-                    repo_root = os.path.dirname(app_dir)  # repo root
-
-                    # Validate repo_root exists
-                    if not os.path.exists(repo_root):
-                        logger.error(f"[AUTO-START] Repository root not found: {repo_root}")
-                        continue
-
-                    adws_dir = os.path.join(repo_root, "adws")
-                    workflow_script = os.path.join(adws_dir, f"{workflow}.py")
-
-                    if not os.path.exists(workflow_script):
-                        logger.error(f"[AUTO-START] Workflow script not found: {workflow_script}")
-                        continue
-
-                    cmd = ["uv", "run", workflow_script, str(phase.issue_number), adw_id]
-
-                    logger.info(
-                        f"[AUTO-START] Launching {workflow} for Phase {phase.phase_number} "
-                        f"(issue #{phase.issue_number}, adw_id: {adw_id})"
-                    )
-
-                    # Mark phase as running BEFORE launching subprocess (prevent race condition)
-                    self.phase_queue_service.update_status(phase.queue_id, "running", adw_id=adw_id)
-
-                    # Launch workflow in background
-                    try:
-                        subprocess.Popen(
-                            cmd,
-                            cwd=repo_root,
-                            start_new_session=True,
-                            stdout=subprocess.DEVNULL,  # Don't capture - let it go to parent logs
-                            stderr=subprocess.DEVNULL,
-                        )
-                        logger.info(
-                            f"[AUTO-START] Successfully started Phase {phase.phase_number} "
-                            f"(issue #{phase.issue_number}, adw_id: {adw_id})"
-                        )
-                    except (FileNotFoundError, PermissionError, OSError) as subprocess_error:
-                        # Subprocess failed to launch - revert status back to ready
-                        logger.error(
-                            f"[AUTO-START] Subprocess launch failed for Phase {phase.phase_number}: "
-                            f"{type(subprocess_error).__name__}: {str(subprocess_error)}"
-                        )
-                        self.phase_queue_service.update_status(phase.queue_id, "ready", adw_id=None)
-                        continue
-
-                except Exception as e:
-                    logger.error(
-                        f"[AUTO-START] Failed to start Phase {phase.phase_number}: {str(e)}"
-                    )
-                    import traceback
-                    logger.error(f"Traceback:\n{traceback.format_exc()}")
-
-        except Exception as e:
-            logger.error(f"[ERROR] Failed to auto-start ready phases: {str(e)}")
-
-    async def _create_next_phase_issue(self, parent_issue: int, next_phase_number: int):
-        """
-        Create GitHub issue for next phase (just-in-time creation).
-
-        Args:
-            parent_issue: Parent issue number
-            next_phase_number: Phase number to create issue for
-        """
-        try:
-            # Find the next phase in queue
-            all_phases = self.phase_queue_service.get_all_queued()
-            next_phase = None
-            for phase in all_phases:
-                if (phase.parent_issue == parent_issue and
-                    phase.phase_number == next_phase_number):
-                    next_phase = phase
-                    break
-
-            if not next_phase:
-                logger.warning(
-                    f"[WARNING] No phase found for parent #{parent_issue}, "
-                    f"phase {next_phase_number}"
-                )
-                return
-
-            # Check if issue already created
-            if next_phase.issue_number:
-                logger.info(
-                    f"[SKIP] Phase {next_phase_number} already has issue "
-                    f"#{next_phase.issue_number}"
-                )
-                return
-
-            # Get phase data
-            phase_data = next_phase.phase_data
-            total_phases = phase_data.get("total_phases", "?")
-            title = phase_data.get("title", f"Phase {next_phase_number}")
-            content = phase_data.get("content", "")
-            external_docs = phase_data.get("externalDocs", [])
-
-            # Create child issue
-            from core.data_models import GitHubIssue
-
-            phase_title = f"Phase {next_phase_number}: {title}"
-            phase_body = f"""# Phase {next_phase_number} of {total_phases}
-
-**Execution Order:** After Phase {next_phase_number - 1}
-
-## Description
-
-{content}
-
-"""
-            if external_docs:
-                phase_body += f"""
-## Referenced Documents
-
-{chr(10).join(f'- `{doc}`' for doc in external_docs)}
-
-"""
-
-            # Add workflow command to trigger ADW automatically
-            phase_body += """
----
-
-**Workflow:** adw_plan_iso with base model
-"""
-
-            phase_issue = GitHubIssue(
-                title=phase_title,
-                body=phase_body,
-                labels=[f"phase-{next_phase_number}", "multi-phase"],
-                classification="feature",
-                workflow="adw_sdlc_iso",
-                model_set="base"
-            )
-
-            phase_issue_number = self.github_poster.post_issue(phase_issue, confirm=False)
-            logger.info(
-                f"[CREATED] Just-in-time issue #{phase_issue_number} for "
-                f"Phase {next_phase_number}"
-            )
-
-            # Update queue with issue number
-            self.phase_queue_service.update_issue_number(
-                next_phase.queue_id,
-                phase_issue_number
-            )
-
-        except Exception as e:
-            logger.error(
-                f"[ERROR] Failed to create just-in-time issue for Phase "
-                f"{next_phase_number}: {str(e)}"
-            )
-
+    # Legacy wrapper methods for backwards compatibility with tests
     def _get_workflow_status(self, issue_number: int) -> str | None:
         """
         Get workflow status from workflow_history by issue number.
