@@ -1,14 +1,15 @@
 # Analytics & ROI Tracking Quick Reference
 
-## Overview (Sessions 9-13)
-**Five analytics systems for measuring automation impact:**
+## Overview (Sessions 9-13, Feature #63)
+**Six analytics systems for measuring automation impact:**
 - **Session 9:** Cost Attribution Analytics
 - **Session 10:** Error Analytics
 - **Session 11:** Latency Analytics
 - **Session 12:** Closed-Loop ROI Tracking
 - **Session 13:** Confidence Updating System
+- **Feature #63:** Pattern Prediction Accuracy Analytics
 
-All analytics systems are CLI-based and query the `hook_events` and `pattern_approvals` tables.
+All analytics systems are CLI-based and query the `hook_events`, `pattern_approvals`, and `pattern_predictions` tables.
 
 ## 1. Cost Attribution Analytics (Session 9)
 
@@ -205,6 +206,59 @@ python scripts/confidence_updater.py --manual
 - `cost_savings_log` table (implementation outcomes)
 - `operation_patterns` table (historical data)
 
+## 6. Pattern Prediction Accuracy Analytics (Feature #63)
+
+**Purpose:** Measure accuracy of pattern predictions against actual workflow detections
+
+**CLI:** `scripts/analytics/query_prediction_accuracy.py`
+
+**Usage:**
+```bash
+# Full accuracy report
+python scripts/analytics/query_prediction_accuracy.py --report
+
+# Overall accuracy only
+python scripts/analytics/query_prediction_accuracy.py
+```
+
+**Metrics Calculated:**
+- Overall prediction accuracy (% correct)
+- Accuracy by pattern type (build, test, fix, etc.)
+- Total predictions vs validated predictions
+- True positives, false positives, false negatives
+- Pattern-level accuracy breakdown
+
+**Workflow:**
+```
+Request Received → Patterns Predicted
+    ↓
+Workflow Executes → Actual Patterns Detected
+    ↓
+Validator Compares Predicted vs Actual
+    ↓
+Accuracy Metrics Calculated
+    ↓
+pattern_predictions.was_correct Updated
+    ↓
+operation_patterns.prediction_accuracy Updated
+```
+
+**Output:**
+- Summary table: Total predictions, correct, overall accuracy
+- Pattern-level table: Accuracy by pattern signature
+- Grouped by pattern type (build, test, fix)
+- Console-formatted tables with color
+
+**Data Sources:**
+- `pattern_predictions` table (predicted patterns, was_correct)
+- `operation_patterns` table (pattern signatures, prediction_accuracy)
+- Validation results from `core/pattern_validator.py`
+
+**Implementation:**
+- **Phase 1:** Pattern validator module (`core/pattern_validator.py`)
+- **Phase 2:** Integration with pattern detector, analytics script
+- **Phase 3:** Structured logging for observability
+
 ## Common Analytics Workflows
 
 ### Daily Analytics Review
@@ -215,6 +269,7 @@ python scripts/cost_attribution.py --days 1 --report
 python scripts/error_analytics.py --report
 python scripts/latency_analytics.py --threshold 3000 --report
 python scripts/roi_tracker.py --report
+python scripts/analytics/query_prediction_accuracy.py --report
 python scripts/confidence_updater.py --auto
 ```
 
@@ -291,6 +346,7 @@ logs/
 | Investigate failures | `error_analytics.py` |
 | Find performance bottlenecks | `latency_analytics.py` |
 | Measure pattern ROI | `roi_tracker.py` |
+| Measure prediction accuracy | `query_prediction_accuracy.py` |
 | Improve pattern accuracy | `confidence_updater.py` |
 
 ## When to Load Full Documentation

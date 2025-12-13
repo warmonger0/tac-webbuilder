@@ -49,6 +49,7 @@ def validate_predictions(
     Returns:
         ValidationResult with accuracy metrics
     """
+    logger.info(f"[Validator] Starting validation for request {request_id}")
     cursor = db_connection.cursor()
 
     # 1. Fetch predictions for this request
@@ -86,6 +87,10 @@ def validate_predictions(
     correct_count = len(true_positives)
     accuracy = correct_count / len(predicted_set) if predicted_set else 0.0
 
+    logger.info(f"[Validator] {request_id}: Predicted={len(predicted_set)}, "
+               f"Actual={len(actual_set)}, TP={correct_count}, FP={len(false_positives)}, "
+               f"FN={len(false_negatives)}, Accuracy={accuracy:.1%}")
+
     # 4. Update pattern_predictions.was_correct
     details = {}
     for signature, pred_id in predicted_map.items():
@@ -114,6 +119,8 @@ def validate_predictions(
         """, (pattern_sig,))
 
     db_connection.commit()
+
+    logger.info(f"[Validator] Complete: {accuracy:.1%} accuracy")
 
     # 6. Return results
     return ValidationResult(
