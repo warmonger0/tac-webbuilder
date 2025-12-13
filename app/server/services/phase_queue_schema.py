@@ -34,26 +34,48 @@ def init_phase_queue_db():
             timestamp_default = "CURRENT_TIMESTAMP"
 
         # Create phase_queue table
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS phase_queue (
-                queue_id TEXT PRIMARY KEY,
-                parent_issue INTEGER NOT NULL,
-                phase_number INTEGER NOT NULL,
-                issue_number INTEGER,
-                status TEXT CHECK(status IN ('queued', 'ready', 'running', 'completed', 'blocked', 'failed')) DEFAULT 'queued',
-                depends_on_phase INTEGER,
-                phase_data TEXT,
-                created_at TIMESTAMP DEFAULT {timestamp_default},
-                updated_at TIMESTAMP DEFAULT {timestamp_default},
-                error_message TEXT,
-                adw_id TEXT,
-                pr_number INTEGER,
-                priority INTEGER DEFAULT 50,
-                queue_position INTEGER,
-                ready_timestamp TIMESTAMP,
-                started_timestamp TIMESTAMP
-            )
-        """)
+        if db_type == "postgresql":
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS phase_queue (
+                    queue_id TEXT PRIMARY KEY,
+                    feature_id INTEGER NOT NULL,
+                    phase_number INTEGER NOT NULL,
+                    issue_number INTEGER,
+                    status TEXT CHECK(status IN ('queued', 'ready', 'running', 'completed', 'blocked', 'failed')) DEFAULT 'queued',
+                    depends_on_phases JSONB DEFAULT '[]'::jsonb,
+                    phase_data JSONB,
+                    created_at TIMESTAMP DEFAULT {timestamp_default},
+                    updated_at TIMESTAMP DEFAULT {timestamp_default},
+                    error_message TEXT,
+                    adw_id TEXT,
+                    pr_number INTEGER,
+                    priority INTEGER DEFAULT 50,
+                    queue_position INTEGER,
+                    ready_timestamp TIMESTAMP,
+                    started_timestamp TIMESTAMP
+                )
+            """)
+        else:  # sqlite
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS phase_queue (
+                    queue_id TEXT PRIMARY KEY,
+                    feature_id INTEGER NOT NULL,
+                    phase_number INTEGER NOT NULL,
+                    issue_number INTEGER,
+                    status TEXT CHECK(status IN ('queued', 'ready', 'running', 'completed', 'blocked', 'failed')) DEFAULT 'queued',
+                    depends_on_phases TEXT DEFAULT '[]',
+                    phase_data TEXT,
+                    created_at TIMESTAMP DEFAULT {timestamp_default},
+                    updated_at TIMESTAMP DEFAULT {timestamp_default},
+                    error_message TEXT,
+                    adw_id TEXT,
+                    pr_number INTEGER,
+                    priority INTEGER DEFAULT 50,
+                    queue_position INTEGER,
+                    ready_timestamp TIMESTAMP,
+                    started_timestamp TIMESTAMP
+                )
+            """)
 
         # Create indexes
         cursor.execute("""
@@ -61,15 +83,11 @@ def init_phase_queue_db():
         """)
 
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_phase_queue_parent ON phase_queue(parent_issue)
+            CREATE INDEX IF NOT EXISTS idx_phase_queue_feature ON phase_queue(feature_id)
         """)
 
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_phase_queue_issue ON phase_queue(issue_number)
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_phase_queue_depends ON phase_queue(depends_on_phase)
         """)
 
         cursor.execute("""
