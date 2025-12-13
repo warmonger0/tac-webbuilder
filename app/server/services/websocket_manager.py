@@ -37,17 +37,26 @@ class ConnectionManager:
     all connected clients. It also tracks the last known state for workflows, routes,
     and history to prevent redundant broadcasts when state hasn't changed.
 
+    Additionally, this class supports event subscription for internal listeners
+    (e.g., PhaseCoordinator) to receive event notifications without WebSocket connections.
+
     Attributes:
         active_connections: Set of currently active WebSocket connections
         last_workflow_state: Last broadcast workflow state (used to prevent redundant broadcasts)
         last_routes_state: Last broadcast routes state (used to prevent redundant broadcasts)
         last_history_state: Last broadcast history state (used to prevent redundant broadcasts)
+        last_adw_monitor_state: Last broadcast ADW monitor state (used to prevent redundant broadcasts)
+        event_subscribers: Dict mapping event types to lists of async handler callables
 
     Example:
         >>> manager = ConnectionManager()
         >>> await manager.connect(websocket)
         >>> await manager.broadcast({"type": "update", "data": "Hello"})
         >>> manager.disconnect(websocket)
+        >>> # Event subscription
+        >>> async def my_handler(event_data: dict):
+        ...     print(f"Event: {event_data}")
+        >>> manager.subscribe("workflow_completed", my_handler)
     """
 
     def __init__(self):
@@ -57,6 +66,9 @@ class ConnectionManager:
         self.last_routes_state: dict | None = None
         self.last_history_state: dict | None = None
         self.last_adw_monitor_state: str | None = None
+
+        # Event subscription system for internal listeners (e.g., PhaseCoordinator)
+        self.event_subscribers: dict[str, list[callable]] = {}
 
     async def connect(self, websocket: WebSocket) -> None:
         """
@@ -95,9 +107,34 @@ class ConnectionManager:
         self.active_connections.discard(websocket)
         logger.debug(f"[WS] Client disconnected. Total connections: {len(self.active_connections)}")
 
+    def subscribe(self, event_type: str, handler: callable) -> None:
+        """
+        Subscribe a handler to an event type.
+
+        This method registers an async callable to be invoked whenever an event
+        of the specified type is broadcast. Multiple handlers can subscribe to
+        the same event type. Handlers receive the event data dict as their only
+        parameter.
+
+        Args:
+            event_type: Event type to subscribe to (e.g., "workflow_completed")
+            handler: Async callable that receives event data dict
+
+        Example:
+            >>> async def my_handler(event_data: dict):
+            ...     print(f"Received: {event_data}")
+            >>> manager.subscribe("workflow_completed", my_handler)
+            [WS] Handler subscribed to 'workflow_completed' events
+        """
+        if event_type not in self.event_subscribers:
+            self.event_subscribers[event_type] = []
+
+        self.event_subscribers[event_type].append(handler)
+        logger.info(f"[WS] Handler subscribed to '{event_type}' events")
+
     async def broadcast(self, message: dict) -> None:
         """
-        Broadcast a message to all active WebSocket connections.
+        Broadcast a message to all active WebSocket connections AND event subscribers.
 
         This method attempts to send the provided message to all connected clients.
         If a send operation fails (e.g., due to a disconnected client), the error
@@ -105,35 +142,55 @@ class ConnectionManager:
         attempting to send to all clients, any disconnected clients are automatically
         removed from the active connections set.
 
+        Additionally, the message is dispatched to any registered event subscribers
+        based on the message type.
+
         Args:
             message: Dictionary containing the message to broadcast (will be sent as JSON)
 
         Example:
-            >>> await manager.broadcast({"type": "workflow_update", "status": "running"})
+            >>> await manager.broadcast({"type": "workflow_completed", "data": {...}})
             [WS] Broadcasting message to 3 clients
+            [WS] Dispatching to 2 workflow_completed subscribers
             [WS] Broadcast successful to 3 clients
 
         Note:
             - Failed connections are automatically cleaned up
             - Individual client errors don't prevent broadcasts to other clients
             - All exceptions during broadcast are logged with full details
+            - Event subscribers are called asynchronously and errors are logged
         """
-        if not self.active_connections:
-            return
+        # 1. Broadcast to WebSocket clients (existing logic)
+        if self.active_connections:
+            logger.debug(f"[WS] Broadcasting message to {len(self.active_connections)} clients")
+            disconnected = set()
 
-        logger.debug(f"[WS] Broadcasting message to {len(self.active_connections)} clients")
-        disconnected = set()
+            for connection in self.active_connections:
+                try:
+                    await connection.send_json(message)
+                except Exception as e:
+                    logger.error(f"[WS] Error broadcasting to client: {e}")
+                    disconnected.add(connection)
 
-        for connection in self.active_connections:
-            try:
-                await connection.send_json(message)
-            except Exception as e:
-                logger.error(f"[WS] Error broadcasting to client: {e}")
-                disconnected.add(connection)
+            # Clean up disconnected clients
+            for connection in disconnected:
+                self.disconnect(connection)
 
-        # Clean up disconnected clients
-        for connection in disconnected:
-            self.disconnect(connection)
+            if not disconnected:
+                logger.debug(f"[WS] Broadcast successful to {len(self.active_connections)} clients")
 
-        if not disconnected:
-            logger.debug(f"[WS] Broadcast successful to {len(self.active_connections)} clients")
+        # 2. Dispatch to event subscribers
+        event_type = message.get("type")
+        if event_type and event_type in self.event_subscribers:
+            subscribers = self.event_subscribers[event_type]
+            logger.debug(f"[WS] Dispatching to {len(subscribers)} '{event_type}' subscribers")
+
+            event_data = message.get("data", {})
+            for handler in subscribers:
+                try:
+                    await handler(event_data)
+                except Exception as e:
+                    logger.error(
+                        f"[WS] Event handler error for '{event_type}': {e}",
+                        exc_info=True
+                    )
