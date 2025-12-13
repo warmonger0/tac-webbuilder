@@ -8,6 +8,7 @@ import logging
 import re
 
 from .pattern_signatures import extract_operation_signature
+from .pattern_validator import validate_predictions
 
 logger = logging.getLogger(__name__)
 
@@ -455,4 +456,66 @@ def process_workflow_for_patterns(workflow: dict) -> dict:
     return {
         "patterns": patterns,
         "characteristics": characteristics
+    }
+
+
+def process_and_validate_workflow(workflow: dict, db_connection=None) -> dict:
+    """
+    Process workflow for patterns and validate predictions if applicable.
+
+    This function combines pattern detection with validation:
+    1. Detects patterns in the workflow
+    2. If request_id exists, validates predictions against actual patterns
+    3. Returns detection results and optional validation results
+
+    Args:
+        workflow: Complete workflow dictionary with optional request_id
+        db_connection: Database connection for validation (optional)
+
+    Returns:
+        Dictionary with detection and validation results:
+        {
+            'patterns': ['test:pytest:backend'],
+            'characteristics': {...},
+            'validation': ValidationResult or None
+        }
+
+    Example:
+        >>> workflow = {
+        ...     "request_id": "req-123",
+        ...     "workflow_id": "wf-456",
+        ...     "nl_input": "Run backend tests with pytest",
+        ...     "duration_seconds": 120
+        ... }
+        >>> result = process_and_validate_workflow(workflow, db_conn)
+        >>> result['validation'].accuracy
+        0.85
+    """
+    # Detect patterns
+    detection_result = process_workflow_for_patterns(workflow)
+    patterns = detection_result["patterns"]
+
+    # Validate predictions if request_id exists and DB connection provided
+    validation_result = None
+    request_id = workflow.get("request_id")
+
+    if request_id and db_connection:
+        workflow_id = workflow.get("workflow_id", workflow.get("id", "unknown"))
+        try:
+            validation_result = validate_predictions(
+                request_id=request_id,
+                workflow_id=str(workflow_id),
+                actual_patterns=patterns,
+                db_connection=db_connection
+            )
+            logger.info(
+                f"[Validator] {request_id}: {validation_result.accuracy:.1%} accuracy "
+                f"({validation_result.correct}/{validation_result.total_predicted} correct)"
+            )
+        except Exception as e:
+            logger.error(f"[Validator] Failed for {request_id}: {e}", exc_info=True)
+
+    return {
+        **detection_result,
+        "validation": validation_result
     }
