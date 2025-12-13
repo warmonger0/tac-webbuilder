@@ -156,6 +156,35 @@ export async function deletePlannedFeature(id: number): Promise<void> {
   );
 }
 
+/**
+ * Start event-driven automation for a planned feature
+ *
+ * Analyzes the feature, creates phase breakdown, and launches ADWs automatically.
+ */
+export interface AutomationSummary {
+  feature_id: number;
+  feature_title: string;
+  total_phases: number;
+  phases_created: Array<{
+    queue_id: string;
+    phase_number: number;
+    title: string;
+    status: string;
+    depends_on_phases: number[];
+    estimated_hours: number;
+  }>;
+  ready_phases: number;
+  queued_phases: number;
+  message: string;
+}
+
+export async function startAutomation(id: number): Promise<AutomationSummary> {
+  return fetchJSON<AutomationSummary>(
+    `${API_BASE}/planned-features/${id}/start-automation`,
+    { method: 'POST' }
+  );
+}
+
 // ============================================================================
 // Client namespace export
 // ============================================================================
@@ -168,4 +197,5 @@ export const plannedFeaturesClient = {
   create,
   update,
   delete: deletePlannedFeature,
+  startAutomation,
 };

@@ -11,13 +11,29 @@ Endpoints:
 - POST   /api/planned-features       - Create new feature
 - PATCH  /api/planned-features/{id}  - Update feature
 - DELETE /api/planned-features/{id}  - Delete feature (soft delete)
+- POST   /api/planned-features/{id}/start-automation - Start event-driven phase automation
 """
 
+import json
 import logging
+import sys
+import uuid
+from datetime import datetime
+from pathlib import Path
 
 from core.models import PlannedFeature, PlannedFeatureCreate, PlannedFeatureUpdate
 from fastapi import APIRouter, HTTPException, Query
+from models.phase_queue_item import PhaseQueueItem
+from repositories.phase_queue_repository import PhaseQueueRepository
 from services.planned_features_service import PlannedFeaturesService
+
+# Add scripts directory to path for PhaseAnalyzer
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "scripts"))
+
+try:
+    from plan_phases import PhaseAnalyzer
+except ImportError:
+    PhaseAnalyzer = None  # Handle gracefully if script not available
 
 logger = logging.getLogger(__name__)
 
@@ -284,4 +300,146 @@ async def delete_planned_feature(feature_id: int):
         raise
     except Exception as e:
         logger.error(f"[DELETE /api/planned-features/{feature_id}] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{feature_id}/start-automation")
+async def start_automation(feature_id: int):
+    """
+    Start event-driven phase automation for a planned feature.
+
+    This endpoint:
+    1. Analyzes the feature to determine optimal phase breakdown
+    2. Creates phase queue items with dependencies
+    3. Triggers the PhaseCoordinator via event-driven architecture
+
+    Path parameters:
+    - feature_id: Feature ID from planned_features table
+
+    Returns:
+        Summary of phases created with queue IDs
+
+    Raises:
+        404: Feature not found
+        400: PhaseAnalyzer not available or feature analysis failed
+        500: Phase creation failed
+    """
+    try:
+        # Check if PhaseAnalyzer is available
+        if PhaseAnalyzer is None:
+            logger.error(
+                f"[POST /api/planned-features/{feature_id}/start-automation] PhaseAnalyzer not available"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="PhaseAnalyzer not available. Check scripts/plan_phases.py is accessible."
+            )
+
+        # Verify feature exists
+        service = PlannedFeaturesService()
+        feature = service.get_by_id(feature_id)
+        if not feature:
+            logger.warning(
+                f"[POST /api/planned-features/{feature_id}/start-automation] Feature not found"
+            )
+            raise HTTPException(status_code=404, detail="Feature not found")
+
+        # Analyze feature and generate phase breakdown
+        logger.info(
+            f"[POST /api/planned-features/{feature_id}/start-automation] Analyzing feature..."
+        )
+        analyzer = PhaseAnalyzer()
+        phases = analyzer.analyze_feature(feature_id)
+
+        if not phases:
+            logger.warning(
+                f"[POST /api/planned-features/{feature_id}/start-automation] No phases generated"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="Feature analysis did not produce any phases"
+            )
+
+        # Create phase queue items
+        logger.info(
+            f"[POST /api/planned-features/{feature_id}/start-automation] Creating {len(phases)} phase queue items..."
+        )
+        repository = PhaseQueueRepository()
+        created_phases = []
+
+        for phase in phases:
+            # Generate unique queue_id
+            queue_id = f"{feature_id}_{phase.phase_number}_{uuid.uuid4().hex[:8]}"
+
+            # Determine initial status: 'ready' if no dependencies, else 'queued'
+            initial_status = 'ready' if not phase.depends_on else 'queued'
+
+            # Convert depends_on from List[Tuple[int, int]] to List[int] (just phase numbers)
+            # Note: In the new architecture, we track phase_number dependencies within the same feature
+            depends_on_phase_numbers = [dep_phase_num for _, dep_phase_num in phase.depends_on]
+
+            # Create phase data with detailed information
+            phase_data = {
+                "title": phase.title,
+                "description": phase.description,
+                "estimated_hours": phase.estimated_hours,
+                "files_to_modify": phase.files_to_modify,
+                "total_phases": phase.total_phases,
+                "prompt_filename": phase.filename,
+            }
+
+            # Create PhaseQueueItem
+            queue_item = PhaseQueueItem(
+                queue_id=queue_id,
+                feature_id=feature_id,
+                phase_number=phase.phase_number,
+                status=initial_status,
+                depends_on_phases=depends_on_phase_numbers,
+                phase_data=phase_data,
+                priority=50,  # Normal priority
+            )
+
+            # Insert into database
+            created_item = repository.create(queue_item)
+            created_phases.append({
+                "queue_id": created_item.queue_id,
+                "phase_number": phase.phase_number,
+                "title": phase.title,
+                "status": initial_status,
+                "depends_on_phases": depends_on_phase_numbers,
+                "estimated_hours": phase.estimated_hours,
+            })
+
+            logger.info(
+                f"[POST /api/planned-features/{feature_id}/start-automation] Created phase {phase.phase_number}/{phase.total_phases}: {queue_id}"
+            )
+
+        # Update feature status to 'in_progress'
+        service.update(feature_id, PlannedFeatureUpdate(status='in_progress'))
+
+        # Return summary
+        summary = {
+            "feature_id": feature_id,
+            "feature_title": feature.title,
+            "total_phases": len(phases),
+            "phases_created": created_phases,
+            "ready_phases": sum(1 for p in created_phases if p["status"] == "ready"),
+            "queued_phases": sum(1 for p in created_phases if p["status"] == "queued"),
+            "message": f"Successfully created {len(phases)} phases. PhaseCoordinator will automatically launch ready phases.",
+        }
+
+        logger.info(
+            f"[POST /api/planned-features/{feature_id}/start-automation] Automation started successfully"
+        )
+
+        return summary
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"[POST /api/planned-features/{feature_id}/start-automation] Error: {e}"
+        )
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

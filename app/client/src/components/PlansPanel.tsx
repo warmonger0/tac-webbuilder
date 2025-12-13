@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlannedFeature, plannedFeaturesClient, PlannedFeaturesStats } from '../api/plannedFeaturesClient';
 import { apiConfig } from '../config/api';
 
@@ -221,6 +221,8 @@ interface FeatureListSectionProps {
   emptyMessage: string;
   showAllCompleted?: boolean;
   onToggleShowAll?: () => void;
+  onStartAutomation?: (id: number) => void;
+  startingAutomationId?: number | null;
 }
 
 function FeatureListSection({
@@ -230,7 +232,9 @@ function FeatureListSection({
   features,
   emptyMessage,
   showAllCompleted,
-  onToggleShowAll
+  onToggleShowAll,
+  onStartAutomation,
+  startingAutomationId
 }: FeatureListSectionProps) {
   const displayedFeatures = showAllCompleted !== undefined && !showAllCompleted
     ? features.slice(0, 15)
@@ -247,7 +251,12 @@ function FeatureListSection({
         ) : (
           <>
             {displayedFeatures.map(feature => (
-              <FeatureItem key={feature.id} feature={feature} />
+              <FeatureItem
+                key={feature.id}
+                feature={feature}
+                onStartAutomation={onStartAutomation}
+                isStartingAutomation={startingAutomationId === feature.id}
+              />
             ))}
             {showAllCompleted !== undefined && onToggleShowAll && features.length > 15 && (
               <button
@@ -409,9 +418,18 @@ function FeatureItemDescription({
 /**
  * Individual feature/session item component
  */
-function FeatureItem({ feature }: { feature: PlannedFeature }) {
+function FeatureItem({
+  feature,
+  onStartAutomation,
+  isStartingAutomation
+}: {
+  feature: PlannedFeature;
+  onStartAutomation?: (id: number) => void;
+  isStartingAutomation?: boolean;
+}) {
   const isCompleted = feature.status === 'completed';
   const isInProgress = feature.status === 'in_progress';
+  const isPlanned = feature.status === 'planned';
 
   return (
     <div className="flex items-start">
@@ -444,6 +462,16 @@ function FeatureItem({ feature }: { feature: PlannedFeature }) {
           description={feature.description}
           completionNotes={feature.completion_notes}
         />
+        {/* Start Automation button for planned features */}
+        {isPlanned && onStartAutomation && (
+          <button
+            onClick={() => onStartAutomation(feature.id)}
+            disabled={isStartingAutomation}
+            className="mt-2 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {isStartingAutomation ? '⏳ Starting...' : '🚀 Start Automation'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -458,6 +486,9 @@ export function PlansPanel() {
   const [showAllCompleted, setShowAllCompleted] = useState(false);
   const [filterPriority, setFilterPriority] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string | null>(null);
+  const [automationMessage, setAutomationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const queryClient = useQueryClient();
 
   // Fetch all features
   const {
@@ -485,6 +516,38 @@ export function PlansPanel() {
     refetchOnWindowFocus: true,
   });
 
+  // Start automation mutation
+  const startAutomationMutation = useMutation({
+    mutationFn: (featureId: number) => plannedFeaturesClient.startAutomation(featureId),
+    onSuccess: (data) => {
+      // Invalidate queries to refetch updated data
+      queryClient.invalidateQueries({ queryKey: ['planned-features'] });
+      queryClient.invalidateQueries({ queryKey: ['planned-features-stats'] });
+
+      // Show success message
+      setAutomationMessage({
+        type: 'success',
+        text: `✅ ${data.message} (${data.ready_phases} ready, ${data.queued_phases} queued)`
+      });
+
+      // Clear message after 10 seconds
+      setTimeout(() => setAutomationMessage(null), 10000);
+    },
+    onError: (error: Error) => {
+      setAutomationMessage({
+        type: 'error',
+        text: `❌ Failed to start automation: ${error.message}`
+      });
+
+      // Clear message after 10 seconds
+      setTimeout(() => setAutomationMessage(null), 10000);
+    }
+  });
+
+  const handleStartAutomation = (featureId: number) => {
+    startAutomationMutation.mutate(featureId);
+  };
+
   if (isLoading) {
     return <LoadingState message="Loading plans..." />;
   }
@@ -505,6 +568,17 @@ export function PlansPanel() {
       <h2 className="text-2xl font-bold text-gray-900 mb-6">
         Pending Work Items
       </h2>
+
+      {/* Automation message banner */}
+      {automationMessage && (
+        <div className={`mb-6 p-4 rounded-lg ${
+          automationMessage.type === 'success'
+            ? 'bg-green-50 border border-green-200 text-green-800'
+            : 'bg-red-50 border border-red-200 text-red-800'
+        }`}>
+          <p className="text-sm">{automationMessage.text}</p>
+        </div>
+      )}
 
       <PlanFilters
         filterPriority={filterPriority}
@@ -537,6 +611,8 @@ export function PlansPanel() {
         colorClass="text-purple-700"
         features={planned}
         emptyMessage="No planned items"
+        onStartAutomation={handleStartAutomation}
+        startingAutomationId={startAutomationMutation.isPending ? startAutomationMutation.variables : null}
       />
 
       <FeatureListSection
