@@ -164,7 +164,7 @@ def integration_test_db(monkeypatch) -> Generator[Path, None, None]:
             cursor.execute("SELECT 1")
             result = cursor.fetchone()
             assert result[0] == 1, "PostgreSQL connection test failed"
-        print(f"\n✓ PostgreSQL connection successful (tac_webbuilder_test)")
+        print("\n✓ PostgreSQL connection successful (tac_webbuilder_test)")
     except Exception as e:
         import traceback
         print(f"\nWarning: PostgreSQL connection test failed: {e}")
@@ -326,7 +326,7 @@ def integration_client(integration_app) -> Generator[TestClient, None, None]:
                             cursor.execute(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE")
                         else:
                             cursor.execute(f"DELETE FROM {table}")
-                    except Exception as table_error:
+                    except Exception:
                         # Table might not exist, that's ok
                         pass
         except Exception as e:

@@ -76,11 +76,15 @@ Eve,32,Boston"""
         # Import the real functions before patching
         from core.file_processor import (
             convert_csv_to_sqlite as real_csv,
+        )
+        from core.file_processor import (
             convert_json_to_sqlite as real_json,
+        )
+        from core.file_processor import (
             convert_jsonl_to_sqlite as real_jsonl,
         )
-        from utils.db_connection import get_connection as real_conn
         from database.sqlite_adapter import SQLiteAdapter
+        from utils.db_connection import get_connection as real_conn
 
         # Create wrapper functions that use the test database
         def csv_with_test_db(content, table):
@@ -920,11 +924,15 @@ Eve,32,Boston"""
         # Import the real functions before patching
         from core.file_processor import (
             convert_csv_to_sqlite as real_csv,
+        )
+        from core.file_processor import (
             convert_json_to_sqlite as real_json,
+        )
+        from core.file_processor import (
             convert_jsonl_to_sqlite as real_jsonl,
         )
-        from utils.db_connection import get_connection as real_conn
         from database.sqlite_adapter import SQLiteAdapter
+        from utils.db_connection import get_connection as real_conn
 
         # Create wrapper functions that use the test database
         def csv_with_test_db(content, table):
