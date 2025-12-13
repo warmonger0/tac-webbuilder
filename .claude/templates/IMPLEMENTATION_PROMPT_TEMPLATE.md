@@ -1,291 +1,239 @@
 # [Type] #[ID]: [Title]
 
-## Task Summary
-**Issue**: [One-line description]
-**Priority**: [High/Medium/Low]
-**Type**: [Bug/Feature/Enhancement/Session]
-**Estimated Time**: [X hours]
-**Status**: Planned → In Progress
+## LENGTH GUIDELINES
 
-## Problem Statement
+**Target prompt length based on task time:**
+- 0.5h task: ~60-80 lines
+- 1.0h task: ~100-120 lines
+- 1.5h task: ~120-150 lines
+- 2.0h+ task: ~150-200 lines max
 
-### Current Behavior
-[Describe what's happening now - include evidence from codebase]
+**Keep it concise:**
+- ❌ Don't write full code blocks (show key snippets only)
+- ❌ Don't include exhaustive troubleshooting sections
+- ❌ Don't explain obvious things
+- ✅ DO provide concrete commands
+- ✅ DO show critical logic points
+- ✅ DO structure with clear workflow steps
 
-### Expected Behavior
-[Describe what should happen]
+**Example:** See `FEATURE_104_SESSION_1_BASIC_GENERATOR.md` (95 lines for 1h task)
 
-### Impact
-[Why this matters - user impact, technical debt, etc.]
+---
 
-## Root Cause
-[Technical explanation of why the problem exists]
+## Context
+Load: `/prime`
+[Add dependencies if any: "Depends on: [prerequisite]"]
 
-## Solution
+## Task
+[One sentence describing what to build]
 
-### Overview
-[High-level solution approach in 2-3 sentences]
+## Workflow
 
-### Technical Details
-[Detailed implementation steps with code examples]
-
-## Implementation Steps
-
-### Step 1: Investigation & Setup
+### 1. Investigate (X min)
 ```bash
 # Verify current state
-# Check relevant files
-# Understand the scope
+# Check dependencies
+# Understand scope
 ```
 
-### Step 2-N: Implementation
-[Detailed steps with commands and code changes]
+### 2. Implement (X min)
 
-### Final Step: Verification Checklist
+**Key changes:**
+- File/location to modify
+- Core logic (brief code snippet if needed)
+- Critical implementation points
 
-**Pre-Commit Checklist**:
+```python
+# Only show essential code snippets
+# Not full implementations
+```
+
+### 3. Test (X min)
 ```bash
-# 1. Linting
-cd /Users/Warmonger0/tac/tac-webbuilder/app/[client|server]
+# Test commands
+# Expected outcomes
+```
+
+### 4. Quality & Ship (X min)
+```bash
+# Linting
+cd app/[client|server]
 [Frontend: npx eslint ./src --fix]
-[Backend: ruff check . --fix]
+[Backend: .venv/bin/ruff check . --fix]
 
-# 2. Type checking
+# Type checking
 [Frontend: npx tsc --noEmit]
-[Backend: mypy . --ignore-missing-imports]
+[Backend: .venv/bin/mypy . --ignore-missing-imports]
 
-# 3. Tests
-[Frontend: bun test]
-[Backend: POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_DB=tac_webbuilder POSTGRES_USER=tac_user POSTGRES_PASSWORD=changeme DB_TYPE=postgresql .venv/bin/pytest tests/ -v]
+# Full test suite
+[Frontend: cd app/client && bun test]
+[Backend: cd app/server && env POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_DB=tac_webbuilder POSTGRES_USER=tac_user POSTGRES_PASSWORD=changeme DB_TYPE=postgresql .venv/bin/pytest tests/ -v]
 
-# 4. Build (if frontend)
-[Frontend: bun run build]
-
-# 5. Manual testing
-[Start servers and verify functionality]
-
-# 6. Update Plans Panel
-curl -X PATCH http://localhost:8002/api/v1/planned-features/[ID] \
-  -H "Content-Type: application/json" \
-  -d '{
-    "status": "in_progress",
-    "started_at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"
-  }'
-
-# 7. Commit with professional message (NO AI REFERENCES)
+# Commit (NO AI REFERENCES)
 git add [files]
-git commit -m "[type]: [description]
+git commit -m "[type]: [Short description]
 
-[Problem/Solution/Result format - see template below]"
+Problem:
+- [What was wrong]
 
-# 8. Update documentation
-/updatedocs
+Solution:
+- [What changed]
+- [Key decisions]
 
-# 9. Mark Plans Panel as completed
-curl -X PATCH http://localhost:8002/api/v1/planned-features/[ID] \
-  -H "Content-Type: application/json" \
-  -d '{
-    "status": "completed",
-    "actual_hours": [X.X],
-    "completed_at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",
-    "completion_notes": "[Brief summary of what was done]"
-  }'
+Result:
+- [What works now]
+
+Files:
+- [file1] ([changes])
+
+Location: [primary file]"
+
+# Push to origin
+git push origin main
+
+# Update documentation (if applicable - see guidelines below)
+[Run /updatedocs if new features/APIs/architecture changes]
+
+# Cleanup prompt files
+[For multi-phase features: Keep prompts until ALL phases complete]
+[For single-phase/session features: Archive after completion]
+mkdir -p docs/Archive/sessions/[session-name]
+git mv FEATURE_[ID]_*.md docs/Archive/sessions/[session-name]/
+git commit -m "chore: Archive Feature #[ID] prompt files"
+git push origin main
 ```
 
 ## Success Criteria
+- ✅ [Specific check 1]
+- ✅ [Specific check 2]
+- ✅ 0 linting/type errors
+- ✅ All tests passing
+- ✅ Changes pushed to origin
+- ✅ Prompt files cleaned up
 
-### Code Quality
-- ✅ **Linting**: 0 errors, 0 warnings
-- ✅ **Type Safety**: 0 TypeScript/mypy errors
-- ✅ **Tests**: All existing tests pass, new tests added for new functionality
-- ✅ **Build**: Successful build (frontend if applicable)
+## Time: Xh
 
-### Functionality
-- ✅ **Feature Works**: Manual testing confirms expected behavior
-- ✅ **No Regressions**: Existing features still work
-- ✅ **Edge Cases**: Handled appropriately
+## Next
+[Next phase/task if applicable]
 
-### Documentation & Tracking
-- ✅ **Plans Panel Updated**: Status changed to completed, actual hours recorded
-- ✅ **Documentation Updated**: /updatedocs run if needed (see guidelines below)
-- ✅ **Commit Message**: Professional, no AI references, clear problem/solution/result
+---
 
-### /updatedocs Guidelines
+## OPTIONAL SECTIONS (use sparingly)
 
-**When to run /updatedocs:**
+### Problem Statement (only if complex)
+**Current:** [What's wrong]
+**Expected:** [What should happen]
+**Impact:** [Why it matters]
 
-YES - Always update docs for:
-- New features that users/developers will interact with
-- New API endpoints or significant endpoint changes
+### Files Modified (only if many files)
+- `file1` - [changes]
+- `file2` - [changes]
+
+### /updatedocs Decision
+**Run /updatedocs if:**
+- New features/API endpoints
 - Architecture changes
-- New workflows or ADWs
-- Configuration changes
 - Breaking changes
 
-NO - Skip docs update for:
-- Bug fixes (unless they change usage patterns)
+**Skip if:**
+- Bug fixes
 - Internal refactoring
-- Minor UI tweaks
-- Code quality improvements (linting, typing)
 - Test additions
 
-**If unsure**: Run `/updatedocs` and let it analyze whether updates are needed.
+---
 
-## Commit Message Template
+## COMMIT MESSAGE FORMAT
 
 ```
 [type]: [Short description - max 50 chars]
 
-[Detailed description of the problem]
-
 Problem:
 - [What was wrong]
 - [Why it mattered]
-- [What triggered this work]
 
 Solution:
 - [What you changed]
 - [How it solves the problem]
-- [Key technical decisions]
 
 Result:
 - [What works now]
-- [Performance/quality improvements]
-- [Any remaining work]
+- [Impact]
 
-Files Changed:
+Files:
 - [file1] ([brief description])
 - [file2] ([brief description])
-
-[If applicable]
-Testing:
-- [Test results]
-- [Coverage improvements]
 
 Location: [primary file]:[line numbers]
 ```
 
 **Type options**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `style`
 
-## Files Modified
+---
 
-### Expected Changes
-- `[file1]` - [description]
-- `[file2]` - [description]
+## CLEANUP GUIDELINES
 
-### New Files (if any)
-- `[file1]` - [description]
+### Prompt File Archiving
 
-## Testing Strategy
+**When to archive:**
+- ✅ Feature/session FULLY complete (all phases)
+- ✅ Plans Panel marked as "completed"
+- ✅ All commits pushed to origin
+- ✅ Documentation updated
 
-### Unit Tests
+**Where to archive:**
 ```bash
-# Test specific functionality
-[Test commands]
+# Session-based (FEATURE_104_SESSION_1, FEATURE_104_SESSION_2, etc.)
+docs/Archive/sessions/feature-[id]-[short-name]/
+
+# Phase-based (FEATURE_63_PHASE_1, FEATURE_63_PHASE_2, etc.)
+docs/Archive/features/feature-[id]-[short-name]/
 ```
 
-### Integration Tests
+**Archive commands:**
 ```bash
-# Test component interactions
-[Test commands]
+# For session-based features (all sessions complete)
+mkdir -p docs/Archive/sessions/feature-104-prompt-generator
+git mv FEATURE_104_*.md docs/Archive/sessions/feature-104-prompt-generator/
+git commit -m "chore: Archive Feature #104 prompt files (3 sessions complete)"
+git push origin main
+
+# For phase-based features (all phases complete)
+mkdir -p docs/Archive/features/feature-63-pattern-validation
+git mv FEATURE_63_*.md docs/Archive/features/feature-63-pattern-validation/
+git commit -m "chore: Archive Feature #63 prompt files (3 phases complete)"
+git push origin main
+
+# For single-phase features/bugs/quick-wins
+mkdir -p docs/Archive/features/feature-[id]-[short-name]
+git mv FEATURE_[ID]_*.md QUICK_WIN_[ID]_*.md docs/Archive/features/feature-[id]-[short-name]/
+git commit -m "chore: Archive Feature #[ID] prompt files"
+git push origin main
 ```
 
-### E2E/Manual Tests
-```bash
-# User-facing verification
-[Steps to verify]
-```
-
-## Expected Time Breakdown
-- **Investigation**: [X] minutes
-- **Implementation**: [X] minutes
-- **Testing**: [X] minutes
-- **Documentation**: [X] minutes
-- **Linting/Quality**: [X] minutes
-- **Commit/Cleanup**: [X] minutes
-
-**Total**: [X] hours ✅
-
-## Session Summary Template
-
-After completion, provide this summary:
-
-```markdown
-# Session Summary: [Type] #[ID] - [Title] ✅
-
-## What Was Done
-- [Change 1]
-- [Change 2]
-- [Change 3]
-
-## Results
-- ✅ Linting: [X errors → 0, X warnings → 0]
-- ✅ Type Safety: [X errors → 0]
-- ✅ Tests: [X passing, Y added]
-- ✅ Build: [Success/N/A]
-- ✅ Documentation: [Updated via /updatedocs / No update needed]
-- ✅ Plans Panel: [#ID] updated (planned → completed, [X]h actual)
-
-## Files Changed
-1. [file1] ([description])
-2. [file2] ([description])
-
-## Testing
-- [Test results]
-- [Manual verification]
-
-## Documentation Updates
-[If /updatedocs run, summarize changes]
-[If skipped, explain why per guidelines]
-
-## Time Spent
-Approximately [X] hours ([within/under/over] estimate)
-
-## Next Task
-#[NextID]: [Next task title] ([Xh], [priority], [type])
-```
+**DO NOT archive:**
+- ❌ Prompts for incomplete multi-phase features
+- ❌ Tracking files (TRACKING_*.md, HANDOFF_*.md)
+- ❌ Reference documentation
 
 ---
 
-## Quick Reference Commands
+## PLANS PANEL UPDATES
 
+**Mark in progress:**
 ```bash
-# Project root
-cd /Users/Warmonger0/tac/tac-webbuilder
+curl -X PATCH http://localhost:8002/api/v1/planned-features/[ID] \
+  -H "Content-Type: application/json" \
+  -d '{"status": "in_progress", "started_at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"}'
+```
 
-# Frontend linting
-cd app/client && npx eslint ./src --fix
-
-# Frontend type check
-cd app/client && npx tsc --noEmit
-
-# Frontend tests
-cd app/client && bun test
-
-# Frontend build
-cd app/client && bun run build
-
-# Backend linting
-cd app/server && ruff check . --fix
-
-# Backend type check
-cd app/server && mypy . --ignore-missing-imports
-
-# Backend tests
-cd app/server && POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_DB=tac_webbuilder POSTGRES_USER=tac_user POSTGRES_PASSWORD=changeme DB_TYPE=postgresql .venv/bin/pytest tests/ -v
-
-# Update Plans Panel (in progress)
-curl -X PATCH http://localhost:8002/api/v1/planned-features/[ID] -H "Content-Type: application/json" -d '{"status": "in_progress", "started_at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"}'
-
-# Update Plans Panel (completed)
-curl -X PATCH http://localhost:8002/api/v1/planned-features/[ID] -H "Content-Type: application/json" -d '{"status": "completed", "actual_hours": [X.X], "completed_at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "completion_notes": "[summary]"}'
-
-# Update documentation
-/updatedocs
-
-# Start backend
-cd app/server && .venv/bin/python3 server.py
-
-# Start frontend
-cd app/client && bun run dev
+**Mark completed:**
+```bash
+curl -X PATCH http://localhost:8002/api/v1/planned-features/[ID] \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "completed",
+    "actual_hours": [X.X],
+    "completed_at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",
+    "completion_notes": "[Brief summary]"
+  }'
 ```
