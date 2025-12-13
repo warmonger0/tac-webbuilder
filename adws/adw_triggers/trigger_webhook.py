@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run
 # /// script
-# dependencies = ["fastapi", "uvicorn", "python-dotenv", "anthropic", "pydantic", "psycopg2-binary"]
+# dependencies = ["fastapi", "uvicorn", "python-dotenv", "anthropic", "pydantic", "psycopg2-binary", "httpx"]
 # ///
 
 """
@@ -21,32 +21,37 @@ import os
 import re
 import subprocess
 import sys
-import asyncio
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-from typing import Optional, Dict, List
-from fastapi import FastAPI, Request, BackgroundTasks
-from dotenv import load_dotenv
+
 import uvicorn
+from dotenv import load_dotenv
+from fastapi import BackgroundTasks, FastAPI, Request
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from adw_modules.utils import make_adw_id, setup_logger, get_safe_subprocess_env
-from adw_modules.github import make_issue_comment, ADW_BOT_IDENTIFIER, get_repo_url, extract_repo_path
-from adw_modules.workflow_ops import extract_adw_info, AVAILABLE_ADW_WORKFLOWS
+from adw_modules.github import (
+    ADW_BOT_IDENTIFIER,
+    extract_repo_path,
+    get_repo_url,
+    make_issue_comment,
+)
 from adw_modules.state import ADWState
+from adw_modules.utils import get_safe_subprocess_env, make_adw_id, setup_logger
+from adw_modules.workflow_ops import AVAILABLE_ADW_WORKFLOWS, extract_adw_info
 
 # Add app/server to path for ADW lock and quota imports
 app_server_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "app", "server")
 sys.path.insert(0, app_server_path)
 
-from core.adw_lock import acquire_lock, update_lock_status, release_lock
+from core.adw_lock import acquire_lock
 from core.api_quota import can_start_adw, log_quota_warning
 
 # Lightweight webhook validation (no heavy dependencies)
-from webhook_validator import validate_webhook, WebhookValidationError
+from webhook_validator import WebhookValidationError, validate_webhook
 
 # Load environment variables
 load_dotenv()
@@ -73,10 +78,17 @@ app = FastAPI(
 # Thread pool for background classification with timeout
 executor = ThreadPoolExecutor(max_workers=4)
 
-# Note: Observability logging moved to backend (app/server/routes/queue_routes.py)
-# to avoid heavy dependencies in lightweight webhook server
+# Note: Observability logging architecture (Phase 1 complete)
+# - Webhook server stays lightweight (no heavy dependencies)
+# - POSTs events to backend API for persistent observability
+# - Backend uses StructuredLogger to write to task_logs and structured.jsonl
+# - See: docs/features/webhook-observability-decision.md
 
-# Global stats tracking
+# Configuration for observability
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8002")
+OBSERVABILITY_ENDPOINT = f"{BACKEND_API_URL}/api/v1/observability/log-webhook-event"
+
+# Global stats tracking (in-memory, supplemented by persistent observability)
 webhook_stats = {
     "start_time": time.time(),
     "total_received": 0,
@@ -87,6 +99,62 @@ webhook_stats = {
 }
 
 print(f"Starting ADW Webhook Trigger on port {PORT}")
+
+
+async def log_to_observability(
+    adw_id: str | None,
+    issue_number: int,
+    message: str,
+    webhook_type: str,
+    phase_status: str,
+    duration_seconds: float | None = None,
+    event_data: dict | None = None
+) -> None:
+    """
+    Log webhook event to backend observability system (non-blocking).
+
+    This function POSTs to the backend API which handles persistent logging
+    via StructuredLogger and TaskLog entries. The webhook server stays
+    lightweight by delegating observability to the backend.
+
+    Args:
+        adw_id: ADW ID (may be None for initial webhook)
+        issue_number: GitHub issue number
+        message: Descriptive message
+        webhook_type: Type of webhook ('github_issue', 'workflow_complete')
+        phase_status: Status ('received', 'processed', 'failed')
+        duration_seconds: Optional processing time
+        event_data: Optional metadata dict
+
+    Note:
+        - Non-blocking: Errors logged to stderr but never fail webhook
+        - Phase 1: Basic structure (endpoint not yet implemented)
+        - Phase 2: Full integration with backend endpoint
+    """
+    try:
+        # Prepare payload for backend observability API
+        payload = {
+            "adw_id": adw_id,
+            "issue_number": issue_number,
+            "message": message,
+            "webhook_type": webhook_type,
+            "phase_status": phase_status,
+            "duration_seconds": duration_seconds,
+            "event_data": event_data or {}
+        }
+
+        # TODO Phase 2: Uncomment when backend endpoint is implemented
+        # import httpx
+        # async with httpx.AsyncClient(timeout=5.0) as client:
+        #     response = await client.post(OBSERVABILITY_ENDPOINT, json=payload)
+        #     response.raise_for_status()
+
+        # Phase 1: Log intent (backend endpoint not yet created)
+        print(f"📊 [Observability] Would log: {webhook_type}/{phase_status} for issue #{issue_number} (payload ready: {len(payload)} fields)")
+
+    except Exception as e:
+        # Never fail webhook due to observability issues
+        print(f"⚠️ Observability logging failed (non-critical): {e}", file=sys.stderr)
 
 
 def count_active_worktrees() -> int:
@@ -113,7 +181,7 @@ def get_disk_usage() -> float:
         return 0.0
 
 
-def can_launch_workflow(workflow: str, issue_number: int, provided_adw_id: Optional[str]) -> tuple[bool, Optional[str]]:
+def can_launch_workflow(workflow: str, issue_number: int, provided_adw_id: str | None) -> tuple[bool, str | None]:
     """Comprehensive pre-flight check before launching workflow.
 
     Returns:
@@ -626,7 +694,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
 
             # Ignore issues from ADW bot to prevent loops
             if ADW_BOT_IDENTIFIER in issue_body:
-                print(f"⏭️  Ignoring ADW bot issue to prevent loop")
+                print("⏭️  Ignoring ADW bot issue to prevent loop")
             # Check if body contains ADW workflow command (not just adw_modules, adw_triggers, etc.)
             # Only trigger on patterns like "adw_plan_iso", "adw_build_iso", etc.
             elif re.search(r'\badw_[a-z]+(?:_[a-z]+)*_iso\b', issue_body.lower()):
@@ -667,7 +735,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
 
             # Ignore comments from ADW bot to prevent loops
             if ADW_BOT_IDENTIFIER in comment_body:
-                print(f"⏭️  Ignoring ADW bot comment to prevent loop")
+                print("⏭️  Ignoring ADW bot comment to prevent loop")
             # Check if comment contains ADW workflow command (not just adw_modules, adw_triggers, etc.)
             # Only trigger on patterns like "adw_plan_iso", "adw_build_iso", etc.
             elif re.search(r'\badw_[a-z]+(?:_[a-z]+)*_iso\b', comment_body.lower()):
@@ -837,8 +905,8 @@ async def health():
 
 if __name__ == "__main__":
     print(f"Starting server on http://0.0.0.0:{PORT}")
-    print(f"Webhook endpoint: POST /gh-webhook")
-    print(f"Fast health check: GET /ping")
-    print(f"Full health check: GET /health")
+    print("Webhook endpoint: POST /gh-webhook")
+    print("Fast health check: GET /ping")
+    print("Full health check: GET /health")
 
     uvicorn.run(app, host="0.0.0.0", port=PORT)
