@@ -26,6 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from datetime import datetime
 
+import httpx
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Request
@@ -143,14 +144,11 @@ async def log_to_observability(
             "event_data": event_data or {}
         }
 
-        # TODO Phase 2: Uncomment when backend endpoint is implemented
-        # import httpx
-        # async with httpx.AsyncClient(timeout=5.0) as client:
-        #     response = await client.post(OBSERVABILITY_ENDPOINT, json=payload)
-        #     response.raise_for_status()
-
-        # Phase 1: Log intent (backend endpoint not yet created)
-        print(f"📊 [Observability] Would log: {webhook_type}/{phase_status} for issue #{issue_number} (payload ready: {len(payload)} fields)")
+        # Phase 2: Send to backend observability endpoint
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(OBSERVABILITY_ENDPOINT, json=payload)
+            response.raise_for_status()
+            print(f"✅ [Observability] Logged: {webhook_type}/{phase_status} for issue #{issue_number}")
 
     except Exception as e:
         # Never fail webhook due to observability issues
@@ -290,8 +288,19 @@ async def process_webhook_background(
         print(f"🔄 Background processing: {trigger_source} for issue #{issue_number}")
         error_logger.info(f"Processing {trigger_source} for issue #{issue_number}")
 
-        # Note: Observability logging happens in backend (queue_routes.py)
-        # Webhook server kept lightweight - no database dependencies
+        # Log webhook received event
+        await log_to_observability(
+            adw_id=None,  # Not yet assigned
+            issue_number=issue_number,
+            message=f"Webhook received: {trigger_source}",
+            webhook_type="github_issue",
+            phase_status="received",
+            event_data={
+                "event_type": event_type,
+                "action": action,
+                "trigger_source": trigger_source,
+            },
+        )
 
         # Use temporary ID for classification
         temp_id = make_adw_id()
@@ -565,8 +574,23 @@ async def process_webhook_background(
         print(f"Logs will be written to: agents/{adw_id}/{workflow}/execution.log")
         error_logger.info(f"Successfully launched {workflow} for issue #{issue_number} with ADW ID {adw_id}")
 
-        # Note: Observability logging happens in backend (queue_routes.py)
+        # Calculate processing time
         elapsed_time = time.time() - start_time
+
+        # Log successful processing
+        await log_to_observability(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            message=f"Workflow launched successfully: {workflow}",
+            webhook_type="github_issue",
+            phase_status="processed",
+            duration_seconds=elapsed_time,
+            event_data={
+                "workflow": workflow,
+                "model_set": model_set,
+                "trigger_source": trigger_source,
+            },
+        )
 
         # Track success
         webhook_stats["successful"] += 1
@@ -589,8 +613,23 @@ async def process_webhook_background(
         error_logger.error(f"Error: {e}")
         error_logger.error(f"Traceback:\n{tb}")
 
-        # Note: Observability logging happens in backend (queue_routes.py)
+        # Calculate processing time
         elapsed_time = time.time() - start_time
+
+        # Log failure to observability
+        await log_to_observability(
+            adw_id=adw_id,
+            issue_number=issue_number,
+            message=f"Webhook processing failed: {str(e)[:200]}",
+            webhook_type="github_issue",
+            phase_status="failed",
+            duration_seconds=elapsed_time,
+            event_data={
+                "workflow": workflow or "unknown",
+                "error": str(e)[:500],
+                "trigger_source": trigger_source,
+            },
+        )
 
         # Track failure
         webhook_stats["failed"] += 1

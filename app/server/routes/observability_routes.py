@@ -1,7 +1,7 @@
 """
 Observability API Routes
 
-Endpoints for task logs and user prompts.
+Endpoints for task logs, user prompts, and webhook event logging.
 """
 
 import logging
@@ -17,12 +17,30 @@ from core.models.observability import (
     UserPromptWithProgress,
 )
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 from repositories.task_log_repository import TaskLogRepository
 from repositories.user_prompt_repository import UserPromptRepository
+from services.structured_logger import StructuredLogger
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/observability", tags=["Observability"])
+
+
+# =========================================================================
+# Webhook Event Models
+# =========================================================================
+
+class WebhookLogRequest(BaseModel):
+    """Request model for webhook observability logging."""
+
+    adw_id: str | None = Field(None, description="ADW ID if applicable")
+    issue_number: int = Field(..., description="GitHub issue number")
+    message: str = Field(..., description="Log message")
+    webhook_type: str = Field(..., description="Type of webhook (github_issue, workflow_complete, etc.)")
+    phase_status: str = Field(..., description="Phase status (received, processed, failed)")
+    duration_seconds: float | None = Field(None, description="Processing time in seconds")
+    event_data: dict = Field(default_factory=dict, description="Additional event data")
 
 
 def init_observability_routes(
@@ -148,6 +166,76 @@ def init_observability_routes(
         except Exception as e:
             logger.error(f"Error retrieving user prompt {request_id}: {e}")
             raise HTTPException(status_code=500, detail="Failed to retrieve user prompt")
+
+    # =========================================================================
+    # Webhook Event Routes
+    # =========================================================================
+
+    @router.post("/log-webhook-event")
+    async def log_webhook_event(request: WebhookLogRequest) -> dict:
+        """
+        Log webhook event to observability system.
+
+        Called by external webhook server to persist observability data.
+        This endpoint receives events from the lightweight webhook server
+        and logs them using StructuredLogger + TaskLog for pattern analysis.
+        """
+        try:
+            # Initialize StructuredLogger
+            structured_logger = StructuredLogger()
+
+            # Determine log level based on phase_status
+            level_map = {
+                "received": "info",
+                "processed": "info",
+                "failed": "error",
+            }
+            level = level_map.get(request.phase_status.lower(), "info")
+
+            # Log to structured logger
+            structured_logger.log_webhook_event(
+                adw_id=request.adw_id,
+                issue_number=request.issue_number,
+                message=request.message,
+                webhook_type=request.webhook_type,
+                level=level,
+                event_data=request.event_data,
+                duration_seconds=request.duration_seconds,
+            )
+
+            # Create task log entry for pattern analysis (if ADW ID provided)
+            if request.adw_id:
+                # Map webhook phase_status to TaskLog status
+                status_map = {
+                    "received": "started",
+                    "processed": "completed",
+                    "failed": "failed",
+                }
+                task_status = status_map.get(request.phase_status.lower(), "started")
+
+                task_log_entry = TaskLogCreate(
+                    adw_id=request.adw_id,
+                    issue_number=request.issue_number,
+                    workflow_template=request.event_data.get("workflow", "unknown"),
+                    phase_name="webhook_event",
+                    phase_status=task_status,
+                    log_message=request.message,
+                    duration_seconds=request.duration_seconds,
+                )
+                task_repo.create(task_log_entry)
+
+            return {
+                "status": "logged",
+                "message": "Webhook event logged successfully",
+                "webhook_type": request.webhook_type,
+            }
+
+        except Exception as e:
+            # Don't fail webhook processing if logging fails
+            logger.error(f"Failed to log webhook event: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to log webhook event: {str(e)}"
+            ) from e
 
     # =========================================================================
     # Task Log Routes
