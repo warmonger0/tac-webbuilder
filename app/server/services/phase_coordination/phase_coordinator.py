@@ -486,6 +486,22 @@ class PhaseCoordinator:
             # Mark phase as running BEFORE launching subprocess (prevent race condition)
             self.phase_queue_service.update_status(queue_id, "running", adw_id=adw_id)
 
+            # Prepare environment with GitHub token
+            env = os.environ.copy()
+            try:
+                # Get GitHub token from gh CLI
+                github_token = subprocess.check_output(
+                    ["gh", "auth", "token"],
+                    stderr=subprocess.DEVNULL
+                ).decode().strip()
+                env["GITHUB_TOKEN"] = github_token
+                logger.info("[AUTO-START] GitHub token loaded from gh CLI")
+            except (subprocess.CalledProcessError, FileNotFoundError) as token_error:
+                logger.warning(
+                    f"[AUTO-START] Could not get GitHub token: {token_error}. "
+                    "ADW may fail authentication."
+                )
+
             # Launch workflow in background
             try:
                 subprocess.Popen(
@@ -494,6 +510,7 @@ class PhaseCoordinator:
                     start_new_session=True,
                     stdout=subprocess.DEVNULL,  # Don't capture - let it go to parent logs
                     stderr=subprocess.DEVNULL,
+                    env=env,  # Pass environment with GITHUB_TOKEN
                 )
                 logger.info(
                     f"[AUTO-START] Successfully started workflow "
