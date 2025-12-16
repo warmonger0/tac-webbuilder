@@ -495,7 +495,8 @@ class PhaseCoordinator:
                     stderr=subprocess.DEVNULL
                 ).decode().strip()
                 env["GITHUB_TOKEN"] = github_token
-                logger.info("[AUTO-START] GitHub token loaded from gh CLI")
+                env["GH_TOKEN"] = github_token  # gh CLI prefers GH_TOKEN
+                logger.info("[AUTO-START] GitHub token loaded from gh CLI (GITHUB_TOKEN + GH_TOKEN)")
             except (subprocess.CalledProcessError, FileNotFoundError) as token_error:
                 logger.warning(
                     f"[AUTO-START] Could not get GitHub token: {token_error}. "
@@ -504,17 +505,22 @@ class PhaseCoordinator:
 
             # Launch workflow in background
             try:
-                subprocess.Popen(
-                    cmd,
-                    cwd=repo_root,
-                    start_new_session=True,
-                    stdout=subprocess.DEVNULL,  # Don't capture - let it go to parent logs
-                    stderr=subprocess.DEVNULL,
-                    env=env,  # Pass environment with GITHUB_TOKEN
-                )
+                # Capture stdout/stderr to log file for debugging
+                log_file = os.path.join(repo_root, "agents", adw_id, "subprocess.log")
+                os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+                with open(log_file, "w") as log:
+                    subprocess.Popen(
+                        cmd,
+                        cwd=repo_root,
+                        start_new_session=True,
+                        stdout=log,
+                        stderr=subprocess.STDOUT,  # Combine stderr with stdout
+                        env=env,  # Pass environment with GITHUB_TOKEN
+                    )
                 logger.info(
                     f"[AUTO-START] Successfully started workflow "
-                    f"(issue #{issue_number}, adw_id: {adw_id})"
+                    f"(issue #{issue_number}, adw_id: {adw_id}, log: {log_file})"
                 )
             except (FileNotFoundError, PermissionError, OSError) as subprocess_error:
                 # Subprocess failed to launch - revert status back to queued
