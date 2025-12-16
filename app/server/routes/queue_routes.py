@@ -90,11 +90,11 @@ router = APIRouter(prefix="/queue", tags=["Phase Queue"])
 class PhaseQueueItemResponse(BaseModel):
     """Response model for phase queue item"""
     queue_id: str = Field(..., description="Unique queue identifier")
-    parent_issue: int = Field(..., description="Parent GitHub issue number")
+    feature_id: int = Field(..., description="Feature ID from planned_features table")
     phase_number: int = Field(..., description="Phase number")
     issue_number: int | None = Field(None, description="Child GitHub issue number")
     status: str = Field(..., description="Phase status")
-    depends_on_phase: int | None = Field(None, description="Phase number this depends on")
+    depends_on_phases: list[int] = Field(default_factory=list, description="List of phase numbers this depends on")
     phase_data: dict = Field(..., description="Phase metadata")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
@@ -111,9 +111,9 @@ class QueueListResponse(BaseModel):
 
 class EnqueueRequest(BaseModel):
     """Request to enqueue a phase"""
-    parent_issue: int = Field(
+    feature_id: int = Field(
         ge=0,
-        description="Parent GitHub issue number (0 for hopper workflows)"
+        description="Feature ID from planned_features table (0 for legacy workflows)"
     )
     phase_number: int = Field(
         ge=1,
@@ -123,10 +123,9 @@ class EnqueueRequest(BaseModel):
     phase_data: dict = Field(
         description="Phase metadata {title, content, externalDocs, workflow_type, adw_id}"
     )
-    depends_on_phase: int | None = Field(
-        default=None,
-        ge=1,
-        description="Phase number this phase depends on"
+    depends_on_phases: list[int] = Field(
+        default_factory=list,
+        description="List of phase numbers this phase depends on"
     )
 
     @field_validator('phase_data')
