@@ -90,7 +90,7 @@ class PhaseCoordinator:
                     f"[STARTUP] Processing ready phase: queue_id={phase.queue_id}, "
                     f"feature_id={phase.feature_id}, phase={phase.phase_number}"
                 )
-                await self.process_ready_phase(phase)
+                await self._launch_phase(phase.to_dict())
         else:
             logger.info("[STARTUP] No ready phases found")
 
