@@ -159,16 +159,17 @@ class EnqueueRequest(BaseModel):
 
         return v
 
-    @field_validator('depends_on_phase')
+    @field_validator('depends_on_phases')
     @classmethod
-    def validate_depends_on_phase(cls, v: int | None, info) -> int | None:
-        """Ensure depends_on_phase is less than phase_number."""
-        if v is not None and 'phase_number' in info.data:
+    def validate_depends_on_phases(cls, v: list[int], info) -> list[int]:
+        """Ensure all dependencies are valid phase numbers less than current phase."""
+        if v and 'phase_number' in info.data:
             phase_number = info.data['phase_number']
-            if v >= phase_number:
-                raise ValueError(
-                    f"depends_on_phase ({v}) must be less than phase_number ({phase_number})"
-                )
+            for dep_phase in v:
+                if dep_phase >= phase_number:
+                    raise ValueError(
+                        f"Dependency phase {dep_phase} must be less than current phase_number ({phase_number})"
+                    )
         return v
 
 
