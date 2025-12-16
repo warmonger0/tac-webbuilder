@@ -79,6 +79,21 @@ class PhaseCoordinator:
         self._is_running = True
         logger.info("[START] PhaseCoordinator started (event-driven mode)")
 
+        # Perform initial scan for ready phases on startup
+        logger.info("[STARTUP] Performing initial scan for ready phases...")
+        ready_phases = self.phase_queue_service.repository.find_ready_phases()
+
+        if ready_phases:
+            logger.info(f"[STARTUP] Found {len(ready_phases)} ready phase(s) to process")
+            for phase in ready_phases:
+                logger.info(
+                    f"[STARTUP] Processing ready phase: queue_id={phase.queue_id}, "
+                    f"feature_id={phase.feature_id}, phase={phase.phase_number}"
+                )
+                await self.process_ready_phase(phase)
+        else:
+            logger.info("[STARTUP] No ready phases found")
+
     async def stop(self):
         """Stop the coordinator"""
         if not self._is_running:
