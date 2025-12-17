@@ -183,29 +183,55 @@ class StateValidator:
             workflows = repo.get_all_by_feature_id(issue_number)
 
             if not workflows:
-                errors.append(f"Workflow not found for issue {issue_number}")
-                return ValidationResult(False, errors, warnings)
-
-            # Use the first workflow (there should only be one per issue)
-            workflow = workflows[0]
+                # No database record - this is a standalone ADW run
+                # Fall back to file-based validation without database SSoT
+                warnings.append(f"No database record for issue {issue_number} - using file-based validation (standalone mode)")
+                workflow = None
+            else:
+                # Use the first workflow (there should only be one per issue)
+                workflow = workflows[0]
         except Exception as e:
-            errors.append(f"Failed to query database: {str(e)}")
-            return ValidationResult(False, errors, warnings)
+            # Database query failed - fall back to file-based validation
+            warnings.append(f"Database query failed: {str(e)} - using file-based validation")
+            workflow = None
 
         # Get execution metadata
         state = {}
         worktree_path = None
+        adw_id = None
 
-        if workflow.adw_id:
-            worktree_path = self._get_worktree_path(workflow.adw_id)
-            if worktree_path:
-                state_file = Path(worktree_path) / 'adw_state.json'
-                if state_file.exists():
-                    try:
-                        with open(state_file) as f:
-                            state = json.load(f)
-                    except Exception as e:
-                        warnings.append(f"Failed to load state file: {str(e)}")
+        if workflow and workflow.adw_id:
+            adw_id = workflow.adw_id
+            worktree_path = self._get_worktree_path(adw_id)
+        else:
+            # No database record - try to find worktree by searching agent directories
+            agents_dir = Path('/Users/Warmonger0/tac/tac-webbuilder/agents')
+            if agents_dir.exists():
+                # Find most recent agent directory for this issue
+                for agent_dir in sorted(agents_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+                    if agent_dir.is_dir():
+                        state_file = agent_dir / 'adw_state.json'
+                        if state_file.exists():
+                            try:
+                                with open(state_file) as f:
+                                    temp_state = json.load(f)
+                                    if str(temp_state.get('issue_number')) == str(issue_number):
+                                        adw_id = temp_state.get('adw_id')
+                                        worktree_path = temp_state.get('worktree_path')
+                                        state = temp_state
+                                        warnings.append(f"Found worktree via file search: {adw_id}")
+                                        break
+                            except Exception:
+                                continue
+
+        if worktree_path and not state:
+            state_file = Path(worktree_path) / 'adw_state.json'
+            if state_file.exists():
+                try:
+                    with open(state_file) as f:
+                        state = json.load(f)
+                except Exception as e:
+                    warnings.append(f"Failed to load state file: {str(e)}")
 
         # Validate phase-specific outputs
         validation_method = getattr(self, f'_validate_{self.phase}_outputs', None)
