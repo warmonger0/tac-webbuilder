@@ -10,6 +10,8 @@ import type {
   PreflightCheckResult,
   PreflightBlockingFailure,
   PreflightWarning,
+  DryRunResult,
+  DryRunPhase,
 } from '../api/systemClient';
 
 interface PreflightCheckModalProps {
@@ -99,6 +101,11 @@ export function PreflightCheckModal({
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Workflow Dry-Run (if present) */}
+          {results.dry_run && (
+            <DryRunSection dryRun={results.dry_run} />
           )}
 
           {/* Check Details */}
@@ -242,6 +249,114 @@ function WarningCard({ warning }: { warning: PreflightWarning }) {
             ))}
           </ul>
         </details>
+      )}
+    </div>
+  );
+}
+
+function DryRunSection({ dryRun }: { dryRun: DryRunResult }) {
+  return (
+    <div className="space-y-3">
+      <h4 className="font-semibold text-blue-800 flex items-center gap-2">
+        <span className="text-xl">📋</span>
+        Workflow Plan
+      </h4>
+
+      {/* Summary */}
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-sm text-gray-600">Total Phases</p>
+            <p className="text-lg font-bold text-blue-900">{dryRun.summary.total_phases}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Estimated Cost</p>
+            <p className="text-lg font-bold text-blue-900">{dryRun.summary.total_cost}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Estimated Time</p>
+            <p className="text-lg font-bold text-blue-900">{dryRun.summary.total_time}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">High Risk Phases</p>
+            <p className="text-lg font-bold text-red-900">{dryRun.summary.high_risk_phases}</p>
+          </div>
+        </div>
+        {dryRun.pattern_info.matched && (
+          <p className="text-xs text-gray-600 mt-2">
+            ⚡ Using cached pattern: {dryRun.pattern_info.source}
+          </p>
+        )}
+      </div>
+
+      {/* Phase Breakdown */}
+      <details className="border border-blue-200 rounded-lg">
+        <summary className="p-3 cursor-pointer hover:bg-blue-50 font-medium text-blue-900">
+          View Phase Details ({dryRun.phases.length} phases)
+        </summary>
+        <div className="p-3 space-y-3 border-t border-blue-200">
+          {dryRun.phases.map((phase) => (
+            <PhaseCard key={phase.phase_number} phase={phase} />
+          ))}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function PhaseCard({ phase }: { phase: DryRunPhase }) {
+  const riskColor = {
+    low: 'bg-green-100 text-green-800 border-green-300',
+    medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    high: 'bg-red-100 text-red-800 border-red-300',
+  }[phase.risk_level];
+
+  return (
+    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-gray-900">
+              Phase {phase.phase_number}: {phase.title}
+            </span>
+            <span className={`text-xs px-2 py-0.5 rounded border ${riskColor}`}>
+              {phase.risk_level}
+            </span>
+          </div>
+          {phase.description && (
+            <p className="text-sm text-gray-600 mt-1">{phase.description}</p>
+          )}
+        </div>
+        <div className="text-right ml-4">
+          <p className="text-sm font-semibold text-blue-700">{phase.estimated_cost}</p>
+          <p className="text-xs text-gray-500">{phase.estimated_time}</p>
+        </div>
+      </div>
+
+      {phase.files_to_modify.length > 0 && (
+        <details className="mt-2">
+          <summary className="text-xs text-blue-600 cursor-pointer hover:underline">
+            Files to modify ({phase.files_to_modify.length})
+          </summary>
+          <ul className="list-disc pl-5 mt-1 text-xs text-gray-600 space-y-0.5">
+            {phase.files_to_modify.slice(0, 5).map((file, idx) => (
+              <li key={idx} className="font-mono">
+                {file}
+              </li>
+            ))}
+            {phase.files_to_modify.length > 5 && (
+              <li className="text-gray-500">
+                ...and {phase.files_to_modify.length - 5} more
+              </li>
+            )}
+          </ul>
+        </details>
+      )}
+
+      {phase.depends_on.length > 0 && (
+        <p className="text-xs text-gray-500 mt-2">
+          Depends on: Phase{phase.depends_on.length > 1 ? 's' : ''} {phase.depends_on.join(', ')}
+        </p>
       )}
     </div>
   );

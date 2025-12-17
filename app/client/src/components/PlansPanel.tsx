@@ -561,10 +561,13 @@ export function PlansPanel() {
     setIsRunningPreflight(true);
 
     try {
-      // Run pre-flight checks (skip tests for faster UX, include issue number if available)
+      // Run pre-flight checks (skip tests for faster UX, include dry-run and issue number)
       const results = await systemClient.getPreflightChecks({
         skipTests: true,
         issueNumber: feature.github_issue_number,
+        runDryRun: true,
+        featureId: feature.id,
+        featureTitle: feature.title,
       });
 
       setPreflightResults(results);

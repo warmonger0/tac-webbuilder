@@ -88,6 +88,38 @@ export interface IssueValidation {
   duplicate_of: number[];
 }
 
+export interface DryRunPhase {
+  phase_number: number;
+  title: string;
+  description: string;
+  estimated_cost: string;
+  estimated_time: string;
+  estimated_tokens: number;
+  files_to_modify: string[];
+  risk_level: 'low' | 'medium' | 'high';
+  depends_on: number[];
+}
+
+export interface DryRunSummary {
+  total_phases: number;
+  total_cost: string;
+  total_time: string;
+  total_tokens: number;
+  high_risk_phases: number;
+  approval_recommended: boolean;
+}
+
+export interface DryRunResult {
+  feature_id: number;
+  feature_title: string;
+  phases: DryRunPhase[];
+  summary: DryRunSummary;
+  pattern_info: {
+    matched: boolean;
+    source: string | null;
+  };
+}
+
 export interface PreflightChecksResponse {
   passed: boolean;
   blocking_failures: PreflightBlockingFailure[];
@@ -95,6 +127,7 @@ export interface PreflightChecksResponse {
   checks_run: PreflightCheckResult[];
   total_duration_ms: number;
   issue_validation?: IssueValidation;
+  dry_run?: DryRunResult;
 }
 
 /**
@@ -120,10 +153,16 @@ export interface PreflightChecksResponse {
 export async function getPreflightChecks(params?: {
   skipTests?: boolean;
   issueNumber?: number;
+  runDryRun?: boolean;
+  featureId?: number;
+  featureTitle?: string;
 }): Promise<PreflightChecksResponse> {
   const queryParams = new URLSearchParams();
   if (params?.skipTests) queryParams.append('skip_tests', 'true');
   if (params?.issueNumber) queryParams.append('issue_number', params.issueNumber.toString());
+  if (params?.runDryRun) queryParams.append('run_dry_run', 'true');
+  if (params?.featureId) queryParams.append('feature_id', params.featureId.toString());
+  if (params?.featureTitle) queryParams.append('feature_title', params.featureTitle);
 
   const url = queryParams.toString()
     ? `${API_BASE}/preflight-checks?${queryParams}`

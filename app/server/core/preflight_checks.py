@@ -27,13 +27,22 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def run_preflight_checks(skip_tests: bool = False, issue_number: int | None = None) -> dict[str, Any]:
+def run_preflight_checks(
+    skip_tests: bool = False,
+    issue_number: int | None = None,
+    run_dry_run: bool = False,
+    feature_id: int | None = None,
+    feature_title: str | None = None
+) -> dict[str, Any]:
     """
     Run all pre-flight checks before launching an ADW workflow.
 
     Args:
         skip_tests: If True, skip the test suite check (useful for testing)
         issue_number: Optional GitHub issue number to validate for duplicate work
+        run_dry_run: If True, run workflow dry-run for cost/time estimation
+        feature_id: Required if run_dry_run is True - feature ID to analyze
+        feature_title: Optional feature title for dry-run display
 
     Returns:
         {
@@ -41,7 +50,8 @@ def run_preflight_checks(skip_tests: bool = False, issue_number: int | None = No
             "blocking_failures": [{"check": str, "error": str, "fix": str}],
             "warnings": [{"check": str, "message": str, "impact": str}],
             "checks_run": [{"check": str, "status": str, "duration_ms": int}],
-            "total_duration_ms": int
+            "total_duration_ms": int,
+            "dry_run": {...} | None  # Present if run_dry_run=True
         }
     """
     import time
@@ -229,6 +239,47 @@ def run_preflight_checks(skip_tests: bool = False, issue_number: int | None = No
 
         issue_validation = resolution_result
 
+    # Check 11: Workflow Dry-Run (optional, for cost/time estimation)
+    dry_run_result = None
+    if run_dry_run:
+        if not feature_id:
+            logger.warning("Dry-run requested but no feature_id provided")
+        else:
+            check_start = time.time()
+            try:
+                from core.workflow_dry_run import run_workflow_dry_run, format_dry_run_for_display
+
+                dry_run_data = run_workflow_dry_run(feature_id, feature_title or f"Feature #{feature_id}")
+
+                if dry_run_data["success"]:
+                    dry_run_result = format_dry_run_for_display(dry_run_data["result"])
+                    checks_run.append({
+                        "check": "workflow_dry_run",
+                        "status": "pass",
+                        "duration_ms": int((time.time() - check_start) * 1000),
+                        "details": f"{dry_run_result['summary']['total_phases']} phases, {dry_run_result['summary']['total_cost']}"
+                    })
+                else:
+                    checks_run.append({
+                        "check": "workflow_dry_run",
+                        "status": "warn",
+                        "duration_ms": int((time.time() - check_start) * 1000),
+                        "details": "Dry-run failed"
+                    })
+                    warnings.append({
+                        "check": "Workflow Dry-Run",
+                        "message": f"Could not estimate workflow cost: {dry_run_data.get('error', 'Unknown error')}",
+                        "impact": "Proceeding without cost estimate"
+                    })
+            except Exception as e:
+                logger.error(f"Error running dry-run: {e}", exc_info=True)
+                checks_run.append({
+                    "check": "workflow_dry_run",
+                    "status": "warn",
+                    "duration_ms": int((time.time() - check_start) * 1000),
+                    "details": "Exception occurred"
+                })
+
     total_duration = int((time.time() - start_time) * 1000)
 
     passed = len(blocking_failures) == 0
@@ -246,6 +297,10 @@ def run_preflight_checks(skip_tests: bool = False, issue_number: int | None = No
     # Add issue validation data if checked
     if issue_validation:
         result["issue_validation"] = issue_validation
+
+    # Add dry-run result if performed
+    if dry_run_result:
+        result["dry_run"] = dry_run_result
 
     return result
 

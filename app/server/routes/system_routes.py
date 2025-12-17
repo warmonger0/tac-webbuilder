@@ -227,7 +227,10 @@ def init_system_routes(health_service, service_controller, app_start_time):
     @router.get("/preflight-checks")
     async def run_preflight_health_checks(
         skip_tests: bool = Query(False),
-        issue_number: int | None = Query(None, description="GitHub issue number to check for duplicate work")
+        issue_number: int | None = Query(None, description="GitHub issue number to check for duplicate work"),
+        run_dry_run: bool = Query(False, description="Run workflow dry-run for cost/time estimation"),
+        feature_id: int | None = Query(None, description="Feature ID for dry-run analysis"),
+        feature_title: str | None = Query(None, description="Feature title for dry-run display")
     ) -> dict:
         """
         Run pre-flight checks before launching ADW workflows.
@@ -237,21 +240,36 @@ def init_system_routes(health_service, service_controller, app_start_time):
         - Port availability (9100-9114, 9200-9214)
         - Git repository state (uncommitted changes)
         - Disk space (minimum 1GB free)
+        - Worktree availability (max 15 active)
         - Python environment (uv availability)
+        - Observability database (PostgreSQL connection)
+        - Hook events recording (data capture working)
+        - Pattern analysis system (analytics functional)
         - Issue already resolved (if issue_number provided)
+        - Workflow dry-run (if run_dry_run=True and feature_id provided)
 
         Args:
             skip_tests: Skip the test suite check (for faster checks)
             issue_number: GitHub issue number to validate for duplicate work
+            run_dry_run: Run workflow dry-run for cost/time estimation
+            feature_id: Required if run_dry_run=True - feature ID to analyze
+            feature_title: Optional feature title for dry-run display
 
         Returns:
-            Pre-flight check results with pass/fail status and detailed diagnostics
+            Pre-flight check results with pass/fail status, detailed diagnostics, and optional dry-run plan
         """
         try:
-            result = run_preflight_checks(skip_tests=skip_tests, issue_number=issue_number)
+            result = run_preflight_checks(
+                skip_tests=skip_tests,
+                issue_number=issue_number,
+                run_dry_run=run_dry_run,
+                feature_id=feature_id,
+                feature_title=feature_title
+            )
             status = "✅ PASSED" if result["passed"] else "❌ FAILED"
             issue_info = f" (issue #{issue_number})" if issue_number else ""
-            logger.info(f"Pre-flight checks{issue_info}: {status} ({result['total_duration_ms']}ms)")
+            dry_run_info = " [dry-run included]" if run_dry_run and result.get("dry_run") else ""
+            logger.info(f"Pre-flight checks{issue_info}{dry_run_info}: {status} ({result['total_duration_ms']}ms)")
             return result
         except Exception as e:
             logger.error(f"Pre-flight check error: {str(e)}")
