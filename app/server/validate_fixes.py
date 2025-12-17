@@ -2,14 +2,15 @@
 """
 Validation script to verify all TypeError fixes are correct.
 """
-import sys
 import ast
+import sys
 from pathlib import Path
+
 
 def validate_python_syntax(file_path):
     """Validate that a Python file has correct syntax."""
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path) as f:
             ast.parse(f.read())
         return True, "OK"
     except SyntaxError as e:
@@ -20,7 +21,7 @@ def validate_python_syntax(file_path):
 def check_parameter_exists(file_path, class_name, param_name):
     """Check if a class __init__ has a specific parameter."""
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path) as f:
             tree = ast.parse(f.read())
 
         for node in ast.walk(tree):
@@ -105,7 +106,7 @@ files_to_check = [
 ]
 
 for file_path in files_to_check:
-    with open(file_path, 'r') as f:
+    with open(file_path) as f:
         content = f.read()
         if 'from database.sqlite_adapter import SQLiteAdapter' in content:
             print(f"  ✓ {Path(file_path).name} imports SQLiteAdapter correctly")

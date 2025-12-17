@@ -1,12 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
-  formatErrorMessage,
-  logError,
-  getErrorStatusCode,
   createErrorDetails,
-  isNetworkError,
+  formatErrorMessage,
+  getErrorStatusCode,
   isAuthError,
+  isNetworkError,
   isNotFoundError,
+  logError,
 } from '../errorHandler';
 
 describe('errorHandler', () => {

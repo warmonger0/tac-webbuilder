@@ -246,7 +246,7 @@ async def _update_phase_handler(request: PhaseUpdateRequest, websocket_manager) 
             except Exception as e:
                 logger.error(f"[PHASE_UPDATE] WebSocket broadcast failed: {e}")
         else:
-            logger.debug(f"[PHASE_UPDATE] No active WebSocket connections, skipping broadcast")
+            logger.debug("[PHASE_UPDATE] No active WebSocket connections, skipping broadcast")
 
         return PhaseUpdateResponse(
             success=True,

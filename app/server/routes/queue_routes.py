@@ -7,14 +7,14 @@ import os
 import subprocess
 import time
 
+from core.models.observability import TaskLogCreate
 from core.nl_processor import suggest_adw_workflow
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
-from repositories.webhook_event_repository import WebhookEventRepository
-from utils.webhook_security import validate_webhook_request
-from services.structured_logger import StructuredLogger
 from repositories.task_log_repository import TaskLogRepository
-from core.models.observability import TaskLogCreate
+from repositories.webhook_event_repository import WebhookEventRepository
+from services.structured_logger import StructuredLogger
+from utils.webhook_security import validate_webhook_request
 
 logger = logging.getLogger(__name__)
 
@@ -799,7 +799,7 @@ def init_webhook_routes(phase_queue_service, github_poster, websocket_manager=No
             structured_logger.log_webhook_event(
                 adw_id=request.adw_id,
                 issue_number=request.parent_issue,
-                message=f"Workflow complete webhook processed successfully",
+                message="Workflow complete webhook processed successfully",
                 webhook_type="workflow_complete",
                 duration_seconds=elapsed_time,
                 event_data={

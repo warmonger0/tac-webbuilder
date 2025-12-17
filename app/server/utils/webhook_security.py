@@ -1,10 +1,10 @@
 """Webhook security utilities for signature validation."""
-import hmac
 import hashlib
-import os
-from typing import Optional
-from fastapi import Request, HTTPException
+import hmac
 import logging
+import os
+
+from fastapi import HTTPException, Request
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def get_webhook_secret(webhook_type: str = "github") -> str:
 def verify_github_signature(
     payload_body: bytes,
     signature_header: str,
-    secret: Optional[str] = None
+    secret: str | None = None
 ) -> bool:
     """Verify GitHub webhook HMAC-SHA256 signature.
 

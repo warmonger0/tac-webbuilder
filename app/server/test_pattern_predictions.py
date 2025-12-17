@@ -15,11 +15,12 @@ os.environ["POSTGRES_PASSWORD"] = "changeme"
 # Import after environment is set
 from database.factory import get_database_adapter
 
+
 def test_pattern_predictions():
     """Test that pattern_predictions table is accessible"""
     adapter = get_database_adapter()
 
-    print(f"Testing pattern_predictions table access...")
+    print("Testing pattern_predictions table access...")
     print(f"Database: {adapter.get_db_type()}")
     print()
 
@@ -27,14 +28,14 @@ def test_pattern_predictions():
         # Test 1: Query pattern_predictions table
         results = adapter.execute_query("SELECT COUNT(*) as count FROM pattern_predictions")
         count = results[0]['count'] if isinstance(results[0], dict) else results[0][0]
-        print(f"✓ pattern_predictions table accessible")
+        print("✓ pattern_predictions table accessible")
         print(f"  Current record count: {count}")
         print()
 
         # Test 2: Query operation_patterns table
         results = adapter.execute_query("SELECT COUNT(*) as count FROM operation_patterns")
         count = results[0]['count'] if isinstance(results[0], dict) else results[0][0]
-        print(f"✓ operation_patterns table accessible")
+        print("✓ operation_patterns table accessible")
         print(f"  Current record count: {count}")
         print()
 
@@ -46,14 +47,14 @@ def test_pattern_predictions():
             AND constraint_type = 'FOREIGN KEY'
         """)
         if results:
-            print(f"✓ Foreign key constraints verified")
+            print("✓ Foreign key constraints verified")
             for row in results:
                 if isinstance(row, dict):
                     print(f"  {row['constraint_name']}: {row['constraint_type']}")
                 else:
                     print(f"  {row[1]}: {row[2]}")
         else:
-            print(f"✓ Foreign key constraints exist (checked via pg_constraint)")
+            print("✓ Foreign key constraints exist (checked via pg_constraint)")
 
         print()
         print("✓ All pattern_predictions tests passed!")

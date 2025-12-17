@@ -16,6 +16,7 @@ os.environ["POSTGRES_PASSWORD"] = "changeme"
 # Import after environment is set
 from database.factory import get_database_adapter
 
+
 def apply_migration():
     """Apply migration 010 to PostgreSQL"""
     migration_file = Path(__file__).parent / "db" / "migrations" / "010_add_pattern_predictions_postgres.sql"
@@ -25,7 +26,7 @@ def apply_migration():
         sys.exit(1)
 
     # Read migration SQL
-    with open(migration_file, 'r') as f:
+    with open(migration_file) as f:
         migration_sql = f.read()
 
     # Get database adapter

@@ -15,6 +15,7 @@ os.environ["POSTGRES_PASSWORD"] = "changeme"
 # Import after environment is set
 from database.factory import get_database_adapter
 
+
 def verify_tables():
     """Verify migration 010 tables exist"""
     adapter = get_database_adapter()
@@ -71,7 +72,7 @@ def verify_tables():
                     if missing:
                         print(f"  ⚠ Missing columns: {', '.join(missing)}")
                     else:
-                        print(f"  ✓ All expected columns present")
+                        print("  ✓ All expected columns present")
 
                     # Check indexes
                     cursor.execute("""

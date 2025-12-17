@@ -14,7 +14,6 @@ Responsibilities:
 """
 
 import asyncio
-import contextlib
 import json
 import logging
 from datetime import datetime
@@ -506,10 +505,10 @@ class PhaseCoordinator:
                 # Write gh CLI auth config with token
                 hosts_yml = os.path.join(gh_config_dir, "hosts.yml")
                 with open(hosts_yml, "w") as f:
-                    f.write(f"github.com:\n")
+                    f.write("github.com:\n")
                     f.write(f"    oauth_token: {github_token}\n")
-                    f.write(f"    user: \"\"\n")
-                    f.write(f"    git_protocol: https\n")
+                    f.write("    user: \"\"\n")
+                    f.write("    git_protocol: https\n")
 
                 env["GH_CONFIG_DIR"] = gh_config_dir
 

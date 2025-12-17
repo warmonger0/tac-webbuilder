@@ -261,7 +261,8 @@ def save_workflow_pattern(pattern: dict[str, Any]) -> int | None:
                 # Get the inserted ID
                 if adapter.get_db_type() == "postgresql":
                     cursor.execute("SELECT lastval()")
-                    pattern_id = cursor.fetchone()[0]
+                    result = cursor.fetchone()
+                    pattern_id = result['lastval'] if isinstance(result, dict) else result[0]
                 else:
                     pattern_id = cursor.lastrowid
 

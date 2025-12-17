@@ -250,6 +250,18 @@
     - Modifying workflow_analytics.py or workflow_history.py
     - Adding new recommendation categories or anomaly types
 
+- `app_docs/feature-pattern-caching-workflow-dry-run.md` - Workflow pattern caching system, intelligent similarity matching (70% threshold), dry-run speed optimization (<1s for 80% of requests), operation_patterns table usage
+  - Conditions:
+    - Working with pre-flight checks or workflow dry-run analysis
+    - Implementing pattern learning or matching algorithms
+    - Optimizing dry-run performance or cost estimation
+    - Working with app/server/core/workflow_dry_run.py or workflow_pattern_cache.py
+    - Troubleshooting pattern cache hits/misses
+    - Adding pattern extraction from completed workflows
+    - Understanding running averages for pattern statistics
+    - Implementing similarity matching with SequenceMatcher
+    - Working with operation_patterns database schema
+
 ### Routes & Validation Features
 - `app_docs/feature-04a76d25-validation-optimization-routes-viz.md` - API routes visualization, AST parsing, routes_analyzer.py, Routes tab UI
 - `app_docs/feature-4fc73599-api-routes-display.md` - Dynamic API routes introspection, /api/routes endpoint, route display functionality, FastAPI route discovery
