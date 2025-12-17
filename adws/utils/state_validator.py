@@ -231,11 +231,16 @@ class StateValidator:
                                 with open(state_file) as f:
                                     temp_state = json.load(f)
                                     if str(temp_state.get('issue_number')) == str(issue_number):
-                                        adw_id = temp_state.get('adw_id')
-                                        worktree_path = temp_state.get('worktree_path')
-                                        state = temp_state
-                                        warnings.append(f"Found worktree via file search: {adw_id}")
-                                        break
+                                        temp_worktree_path = temp_state.get('worktree_path')
+                                        # Verify the worktree actually exists before accepting it
+                                        if temp_worktree_path and Path(temp_worktree_path).exists():
+                                            adw_id = temp_state.get('adw_id')
+                                            worktree_path = temp_worktree_path
+                                            state = temp_state
+                                            warnings.append(f"Found worktree via file search: {adw_id}")
+                                            break
+                                        else:
+                                            logger.debug(f"[validate_outputs] Skipping {agent_dir.name}: worktree doesn't exist at {temp_worktree_path}")
                             except Exception:
                                 continue
 
