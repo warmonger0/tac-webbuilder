@@ -128,7 +128,8 @@ def get_or_create_state(issue_number: int, adw_id: Optional[str], logger: loggin
         # Try to find state by issue number
         from app.server.repositories.phase_queue_repository import PhaseQueueRepository
         repo = PhaseQueueRepository()
-        workflow = repo.find_by_issue_number(issue_number)
+        workflows = repo.get_all_by_feature_id(issue_number)
+        workflow = workflows[0] if workflows else None
 
         if workflow and workflow.adw_id:
             state = ADWState.load(workflow.adw_id, logger)
@@ -198,7 +199,8 @@ def get_worktree_path(issue_number: int, adw_id: Optional[str] = None) -> Option
         # Try to get from database first
         from app.server.repositories.phase_queue_repository import PhaseQueueRepository
         repo = PhaseQueueRepository()
-        workflow = repo.find_by_issue_number(issue_number)
+        workflows = repo.get_all_by_feature_id(issue_number)
+        workflow = workflows[0] if workflows else None
 
         if workflow and workflow.adw_id:
             adw_id = workflow.adw_id
