@@ -213,21 +213,44 @@ async def _update_phase_handler(request: PhaseUpdateRequest, websocket_manager) 
     logger.info(f"[PHASE_UPDATE] Received phase update: adw_id={request.adw_id}, phase={request.current_phase}, status={request.status}")
 
     try:
-        # Update state file
-        from adw_modules.state import ADWState
-        from adw_modules.utils import setup_logger
+        # Update DATABASE (SSoT for coordination state: status and current_phase)
+        # See docs/adw/state-management-ssot.md for architecture details
+        from repositories.phase_queue_repository import PhaseQueueRepository
 
-        state_logger = setup_logger(request.adw_id, "phase_update_api")
-        state = ADWState.load(request.adw_id, state_logger)
+        repo = PhaseQueueRepository()
 
-        if state:
-            state.update(current_phase=request.current_phase, status=request.status)
-            if request.metadata:
-                state.update(**request.metadata)
-            state.save("phase_update_api")
-            logger.info(f"[PHASE_UPDATE] Updated state file for {request.adw_id}")
+        # Find workflow by adw_id
+        workflow = repo.find_by_adw_id(request.adw_id)
+
+        if workflow:
+            # Update coordination state in database (SSoT)
+            repo.update_phase(
+                queue_id=workflow.queue_id,
+                current_phase=request.current_phase,
+                status=request.status
+            )
+            logger.info(f"[PHASE_UPDATE] Updated database for {request.adw_id}: phase={request.current_phase}, status={request.status}")
         else:
-            logger.warning(f"[PHASE_UPDATE] State file not found for {request.adw_id}, skipping state update")
+            logger.warning(f"[PHASE_UPDATE] Workflow not found in database for {request.adw_id}, skipping phase update")
+
+        # Update state file with execution metadata only (if provided)
+        # NOTE: Status and current_phase are NOT stored in state file (database is SSoT)
+        if request.metadata:
+            from adw_modules.state import ADWState
+            from adw_modules.utils import setup_logger
+
+            state_logger = setup_logger(request.adw_id, "phase_update_api")
+            state = ADWState.load(request.adw_id, state_logger)
+
+            if state:
+                # Filter out forbidden fields (status, current_phase) - they belong in database
+                execution_metadata = {k: v for k, v in request.metadata.items() if k not in ['status', 'current_phase']}
+                if execution_metadata:
+                    state.update(**execution_metadata)
+                    state.save("phase_update_api")
+                    logger.info(f"[PHASE_UPDATE] Updated execution metadata in state file for {request.adw_id}")
+            else:
+                logger.warning(f"[PHASE_UPDATE] State file not found for {request.adw_id}, skipping metadata update")
 
         # Immediately broadcast via WebSocket
         broadcasted = False
