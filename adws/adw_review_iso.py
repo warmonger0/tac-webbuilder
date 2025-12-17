@@ -344,8 +344,9 @@ def validate_review_data_integrity(
 
     # Step 1: Check database record count using PostgreSQL adapter
     try:
-        # Import database adapter from worktree context
-        sys.path.insert(0, os.path.join(worktree_path, "app/server"))
+        # Set up database imports using helper function
+        from adw_modules.utils import setup_database_imports
+        setup_database_imports()
         from database import get_database_adapter
 
         adapter = get_database_adapter()

@@ -113,7 +113,11 @@ class StateValidator:
 
         # Get workflow state from database (SSoT for coordination)
         try:
-            from app.server.repositories.phase_queue_repository import PhaseQueueRepository
+            # Set up database imports using helper function
+            from adw_modules.utils import setup_database_imports
+            setup_database_imports()
+
+            from repositories.phase_queue_repository import PhaseQueueRepository
             repo = PhaseQueueRepository()
             workflow = repo.find_by_issue_number(issue_number)
 
@@ -165,7 +169,11 @@ class StateValidator:
 
         # Get workflow state
         try:
-            from app.server.repositories.phase_queue_repository import PhaseQueueRepository
+            # Set up database imports using helper function
+            from adw_modules.utils import setup_database_imports
+            setup_database_imports()
+
+            from repositories.phase_queue_repository import PhaseQueueRepository
             repo = PhaseQueueRepository()
             workflow = repo.find_by_issue_number(issue_number)
 

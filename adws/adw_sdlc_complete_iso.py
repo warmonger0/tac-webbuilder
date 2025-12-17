@@ -225,10 +225,11 @@ def run_phase_with_retry(
                 if critical:
                     # For critical phases, fail the workflow
                     cleanup_failed_workflow(
-                        issue_number=issue_number,
                         adw_id=adw_id,
-                        phase=phase_name.lower(),
-                        reason=f"Phase crashed after {max_retries + 1} attempts: {str(e)}",
+                        issue_number=issue_number,
+                        branch_name=None,
+                        phase_name=phase_name.lower(),
+                        error_details=f"Phase crashed after {max_retries + 1} attempts: {str(e)}",
                         logger=logger
                     )
                     print(f"❌ {phase_name} phase crashed: {e}")
@@ -243,10 +244,11 @@ def run_phase_with_retry(
     if critical:
         logger.error(f"{phase_name} phase failed after all retries")
         cleanup_failed_workflow(
-            issue_number=issue_number,
             adw_id=adw_id,
-            phase=phase_name.lower(),
-            reason=f"Phase failed after {max_retries + 1} attempts",
+            issue_number=issue_number,
+            branch_name=None,
+            phase_name=phase_name.lower(),
+            error_details=f"Phase failed after {max_retries + 1} attempts",
             logger=logger
         )
         print(f"❌ {phase_name} phase failed after all retries")

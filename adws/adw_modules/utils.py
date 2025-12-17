@@ -240,3 +240,30 @@ def get_safe_subprocess_env() -> Dict[str, str]:
     
     # Filter out None values
     return {k: v for k, v in safe_env_vars.items() if v is not None}
+
+
+def setup_database_imports() -> None:
+    """Set up sys.path to allow importing from app/server for database access.
+
+    This ensures ADW modules can import database adapters and repositories
+    regardless of where the script is executed from (main repo or worktree).
+
+    Usage:
+        setup_database_imports()
+        from repositories.phase_queue_repository import PhaseQueueRepository
+        from database import get_database_adapter
+
+    Note:
+        - Idempotent: Safe to call multiple times
+        - Adds app/server to sys.path if not already present
+        - Use this pattern in all ADW modules needing database access
+    """
+    from pathlib import Path
+
+    # Get project root (3 levels up from adws/adw_modules/utils.py)
+    project_root = Path(__file__).parent.parent.parent
+    app_server_path = str(project_root / "app" / "server")
+
+    # Add to sys.path if not already present (idempotent)
+    if app_server_path not in sys.path:
+        sys.path.insert(0, app_server_path)

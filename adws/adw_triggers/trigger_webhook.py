@@ -41,12 +41,11 @@ from adw_modules.github import (
     make_issue_comment,
 )
 from adw_modules.state import ADWState
-from adw_modules.utils import get_safe_subprocess_env, make_adw_id, setup_logger
+from adw_modules.utils import get_safe_subprocess_env, make_adw_id, setup_logger, setup_database_imports
 from adw_modules.workflow_ops import AVAILABLE_ADW_WORKFLOWS, extract_adw_info
 
-# Add app/server to path for ADW lock and quota imports
-app_server_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "app", "server")
-sys.path.insert(0, app_server_path)
+# Set up app/server path for database and core imports
+setup_database_imports()
 
 from core.adw_lock import acquire_lock
 from core.api_quota import can_start_adw, log_quota_warning
@@ -745,8 +744,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
             # Update workflow history database with new GitHub issue state
             print(f"📝 Issue #{issue_number} {action} - updating workflow history")
             try:
-                # Import here to avoid circular dependency
-                sys.path.insert(0, app_server_path)
+                # Import here to avoid circular dependency (path already set up)
                 from core.workflow_history import update_workflow_history_by_issue
 
                 # Update all workflows for this issue number

@@ -47,17 +47,13 @@ class ToolRegistry:
 
     def __init__(self):
         """Initialize tool registry with database adapter."""
-        # Import database adapter from app/server
-        project_root = Path(__file__).parent.parent.parent
-        sys.path.insert(0, str(project_root / "app" / "server"))
+        # Set up database imports using helper function
+        from .utils import setup_database_imports
+        setup_database_imports()
 
         from database import get_database_adapter
         self.adapter = get_database_adapter()
         self._ensure_tables_exist()
-
-        # Clean up sys.path
-        if str(project_root / "app" / "server") in sys.path:
-            sys.path.remove(str(project_root / "app" / "server"))
 
     def _ensure_tables_exist(self):
         """Ensure database tables exist (adw_tools, tool_calls)."""
