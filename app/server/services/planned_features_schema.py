@@ -53,10 +53,9 @@ def init_planned_features_db():
             cursor = conn.cursor()
 
             if db_type == "postgresql":
-                # Execute each statement separately for PostgreSQL
-                statements = [s.strip() for s in schema.split(";") if s.strip()]
-                for statement in statements:
-                    cursor.execute(statement)
+                # Execute the entire schema as one script for PostgreSQL
+                # Don't split by semicolon - it breaks function definitions with $$ blocks
+                cursor.execute(schema)
             else:
                 # SQLite can handle executescript
                 cursor.executescript(schema)
