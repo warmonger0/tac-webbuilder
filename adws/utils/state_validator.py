@@ -202,9 +202,18 @@ class StateValidator:
 
         if workflow and workflow.adw_id:
             adw_id = workflow.adw_id
+            logger.debug(f"[validate_outputs] Found workflow in DB with adw_id={adw_id}")
             worktree_path = self._get_worktree_path(adw_id)
-        else:
-            # No database record - try to find worktree by searching agent directories
+            logger.debug(f"[validate_outputs] _get_worktree_path returned: {worktree_path}")
+
+            # If worktree not found, database may have stale/wrong adw_id
+            # Fall back to searching agents/ directories by issue_number
+            if not worktree_path:
+                warnings.append(f"Worktree not found for DB adw_id={adw_id}, searching by issue_number")
+                workflow = None  # Trigger fallback search
+
+        if not workflow or not worktree_path:
+            # No database record OR worktree not found - try to find by searching agent directories
             # Get project root (this file is at project_root/adws/utils/state_validator.py)
             project_root = Path(__file__).parent.parent.parent
             agents_dir = project_root / 'agents'
@@ -633,14 +642,24 @@ class StateValidator:
         # Get project root (this file is at project_root/adws/utils/state_validator.py)
         project_root = Path(__file__).parent.parent.parent
 
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"[_get_worktree_path] adw_id={adw_id}, project_root={project_root}")
+
         # Try multiple possible locations (use absolute paths)
         possible_paths = [
             project_root / "trees" / adw_id,
             project_root / "trees" / f"adw-{adw_id}",
         ]
 
-        for path in possible_paths:
-            if path.exists():
-                return str(path.absolute())
+        logger.debug(f"[_get_worktree_path] Checking paths: {[str(p) for p in possible_paths]}")
 
+        for path in possible_paths:
+            logger.debug(f"[_get_worktree_path] Checking {path}: exists={path.exists()}")
+            if path.exists():
+                result = str(path.absolute())
+                logger.debug(f"[_get_worktree_path] Found worktree: {result}")
+                return result
+
+        logger.debug(f"[_get_worktree_path] No worktree found for {adw_id}")
         return None
