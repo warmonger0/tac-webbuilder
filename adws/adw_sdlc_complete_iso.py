@@ -41,10 +41,11 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from adw_modules.workflow_ops import ensure_adw_id, format_issue_message, trigger_cost_sync, broadcast_phase_update
 from adw_modules.github import make_issue_comment, fetch_issue, get_repo_url, extract_repo_path
-from adw_modules.cleanup_operations import cleanup_shipped_issue
+from adw_modules.cleanup_operations import cleanup_shipped_issue, cleanup_stale_workflow
 from adw_modules.utils import setup_logger
 from adw_modules.failure_cleanup import cleanup_failed_workflow
 from adw_modules.state import ADWState
+from adw_modules.preflight_checks import run_all_preflight_checks
 
 # Circuit breaker: Detect repetitive patterns indicating a loop
 MAX_RECENT_COMMENTS_TO_CHECK = 15  # Look at last N comments
@@ -266,9 +267,10 @@ def main():
     skip_resolution = "--skip-resolution" in sys.argv
     use_external = "--no-external" not in sys.argv
     use_optimized_plan = "--use-optimized-plan" in sys.argv
+    clean_start = "--clean-start" in sys.argv
 
     # Remove flags from argv
-    for flag in ["--skip-e2e", "--skip-resolution", "--no-external", "--use-optimized-plan"]:
+    for flag in ["--skip-e2e", "--skip-resolution", "--no-external", "--use-optimized-plan", "--clean-start"]:
         if flag in sys.argv:
             sys.argv.remove(flag)
 
@@ -291,12 +293,96 @@ def main():
         print("  --skip-resolution: Skip automatic resolution of review failures")
         print("  --no-external: Disable external tools (higher token usage)")
         print("  --use-optimized-plan: Use inverted context flow planner (77% cost reduction)")
+        print("  --clean-start: Remove all previous state for this issue before starting")
         print("\nNote: External tools are ENABLED by default for 70-95% token reduction")
         print("      Ships to production ONLY after all phases pass")
+        print("\n⚠️  --clean-start will DELETE all previous agent dirs, worktrees, and database")
+        print("    entries for this issue. Use this to start completely fresh, discarding")
+        print("    all previous progress. Without this flag, workflows can resume from where")
+        print("    they left off (leveraging idempotency).")
         sys.exit(1)
 
     issue_number = sys.argv[1]
     adw_id = sys.argv[2] if len(sys.argv) > 2 else None
+
+    # Handle --clean-start flag: Remove all previous state for this issue
+    if clean_start:
+        print(f"\n{'='*60}")
+        print(f"🧹 CLEAN START MODE - Removing all previous state for issue #{issue_number}")
+        print(f"{'='*60}")
+
+        # Set up temporary logger for cleanup
+        temp_logger = setup_logger("cleanup", "stale_workflow_cleanup")
+
+        # Run cleanup
+        cleanup_result = cleanup_stale_workflow(
+            issue_number=int(issue_number),
+            dry_run=False,
+            logger=temp_logger
+        )
+
+        print(f"\n📊 Cleanup Results:")
+        print(f"  - Agent directories found: {cleanup_result['agent_dirs_found']}")
+        print(f"  - Agent directories removed: {cleanup_result['agent_dirs_removed']}")
+        print(f"  - Worktrees removed: {cleanup_result['worktrees_removed']}")
+        print(f"  - Database entries removed: {cleanup_result['db_entries_removed']}")
+
+        if cleanup_result['errors']:
+            print(f"  ⚠️  Errors encountered: {len(cleanup_result['errors'])}")
+            for error in cleanup_result['errors'][:3]:  # Show first 3 errors
+                print(f"    - {error}")
+
+        if cleanup_result['success']:
+            print(f"\n✅ Cleanup completed successfully: {cleanup_result['summary']}")
+        else:
+            print(f"\n⚠️  Cleanup completed with errors: {cleanup_result['summary']}")
+            print(f"Some errors occurred but workflow will continue with fresh state")
+
+        print(f"{'='*60}\n")
+
+    # PRE-FLIGHT CHECKS: Verify it's safe to start workflow
+    # Skip cooldown check if using --clean-start (intentional fresh start)
+    temp_logger = setup_logger("preflight", "preflight_checks")
+    preflight_result = run_all_preflight_checks(
+        issue_number=int(issue_number),
+        skip_cooldown=clean_start,  # Skip cooldown if clean start requested
+        logger=temp_logger
+    )
+
+    if not preflight_result.should_proceed:
+        print(f"\n{'='*60}")
+        print(f"❌ PRE-FLIGHT CHECK FAILED")
+        print(f"{'='*60}")
+        print(f"Reason: {preflight_result.reason}")
+        print(f"\nDetails:")
+        for key, value in preflight_result.details.items():
+            if isinstance(value, dict):
+                print(f"  {key}:")
+                for k, v in value.items():
+                    print(f"    - {k}: {v}")
+            else:
+                print(f"  {key}: {value}")
+        print(f"{'='*60}\n")
+
+        # Post to GitHub issue
+        try:
+            make_issue_comment(
+                issue_number,
+                f"🛑 **Workflow Start Prevented - Pre-flight Check Failed**\n\n"
+                f"**Reason:** {preflight_result.reason}\n\n"
+                f"**Details:** {json.dumps(preflight_result.details, indent=2)}\n\n"
+                f"**Next Steps:**\n"
+                f"- Verify the issue status and linked PRs\n"
+                f"- Check if work is already complete\n"
+                f"- Wait for active workflows to finish\n"
+                f"- Use `--clean-start` flag to override (with caution)"
+            )
+        except Exception as e:
+            print(f"Warning: Could not post pre-flight failure to GitHub: {e}")
+
+        sys.exit(1)
+
+    print(f"\n✅ Pre-flight checks passed - safe to proceed\n")
 
     # Ensure ADW ID exists with initialized state
     adw_id = ensure_adw_id(issue_number, adw_id)
@@ -320,9 +406,15 @@ def main():
     # Post initial message
     logger.info("Attempting to post initial GitHub comment...")
     try:
+        # Build cleanup status message
+        cleanup_msg = ""
+        if clean_start:
+            # Note: cleanup already ran above, just showing status in comment
+            cleanup_msg = f"\n\n🧹 **Clean Start Mode**: All previous state cleared before starting"
+
         make_issue_comment(
             issue_number,
-            f"{adw_id}_ops: 🎯 **Starting Complete SDLC Workflow**\n\n"
+            f"{adw_id}_ops: 🎯 **Starting Complete SDLC Workflow**{cleanup_msg}\n\n"
             "This workflow will execute ALL 10 phases:\n"
             "1. ✍️ Plan the implementation\n"
             "2. 📊 Validate baseline (detect inherited errors)\n"
@@ -338,7 +430,8 @@ def main():
             f"- External tools: {'✅ Enabled' if use_external else '❌ Disabled'}\n"
             f"- Optimized planner: {'✅ Enabled' if use_optimized_plan else '❌ Disabled'}\n"
             f"- Skip E2E: {'✅ Yes' if skip_e2e else '❌ No'}\n"
-            f"- Auto-resolution: {'❌ Disabled' if skip_resolution else '✅ Enabled'}",
+            f"- Auto-resolution: {'❌ Disabled' if skip_resolution else '✅ Enabled'}\n"
+            f"- Clean start: {'✅ Yes (fresh state)' if clean_start else '❌ No (can resume)'}",
         )
         logger.info("✅ Initial GitHub comment posted successfully")
     except Exception as e:

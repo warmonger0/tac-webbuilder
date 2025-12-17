@@ -104,111 +104,157 @@ def verify_merge_landed(
     pr_number: str,
     repo_path: str,
     target_branch: str,
-    logger: logging.Logger
+    logger: logging.Logger,
+    max_retries: int = 5
 ) -> Tuple[bool, Optional[str]]:
     """Verify that PR merge actually landed commits on target branch.
 
     This critical verification step ensures we don't have "phantom merges"
     where GitHub reports success but commits never land on main.
 
+    ENHANCEMENT: Now includes retry logic with exponential backoff to handle
+    GitHub API propagation delays. This prevents false "phantom merge" errors
+    when the merge succeeded but commits haven't propagated yet.
+
     Args:
         pr_number: PR number that was merged
         repo_path: Repository path (owner/repo)
         target_branch: Target branch to verify (usually 'main')
         logger: Logger instance
+        max_retries: Maximum retry attempts (default: 5 = up to 62s total)
 
     Returns:
         Tuple of (success, error_message)
     """
-    try:
-        logger.info(f"🔍 Verifying PR #{pr_number} landed on {target_branch}...")
+    import time
 
-        # Step 1: Get PR merge commit SHA
-        result = subprocess.run(
-            ["gh", "pr", "view", pr_number,
-             "--repo", repo_path,
-             "--json", "mergeCommit",
-             "--jq", ".mergeCommit.oid"],
-            capture_output=True,
-            text=True,
-            check=False
-        )
+    for attempt in range(max_retries):
+        try:
+            if attempt > 0:
+                # Exponential backoff: 2s, 4s, 8s, 16s, 32s
+                wait_time = 2 ** attempt
+                logger.info(f"⏳ Waiting {wait_time}s for GitHub API propagation (attempt {attempt + 1}/{max_retries})...")
+                time.sleep(wait_time)
 
-        if result.returncode != 0 or not result.stdout.strip():
-            error_msg = f"Failed to get merge commit for PR #{pr_number}"
-            logger.error(error_msg)
-            return False, error_msg
+            logger.info(f"🔍 Verifying PR #{pr_number} landed on {target_branch} (attempt {attempt + 1}/{max_retries})...")
 
-        merge_commit_sha = result.stdout.strip()
-        logger.info(f"Merge commit SHA: {merge_commit_sha}")
-
-        # Step 2: Fetch latest from origin BEFORE verification
-        # This ensures we have the latest state from remote
-        logger.info(f"Fetching latest changes from origin/{target_branch}...")
-        subprocess.run(["git", "fetch", "origin", target_branch], check=False)
-
-        # Step 3: Verify commit exists on target branch
-        # Use git branch --contains to check if merge commit is on target
-        result = subprocess.run(
-            ["git", "branch", "-r", "--contains", merge_commit_sha],
-            capture_output=True,
-            text=True,
-            check=False
-        )
-
-        if result.returncode != 0:
-            error_msg = f"Failed to check if commit {merge_commit_sha} is on {target_branch}"
-            logger.error(error_msg)
-            logger.error(f"Git error: {result.stderr}")
-            return False, error_msg
-
-        branches_containing_commit = result.stdout.strip()
-        expected_branch = f"origin/{target_branch}"
-
-        if expected_branch not in branches_containing_commit:
-            error_msg = (
-                f"❌ PHANTOM MERGE DETECTED!\n"
-                f"PR #{pr_number} reported as merged, but commit {merge_commit_sha} "
-                f"not found on {target_branch}\n"
-                f"Branches containing commit:\n{branches_containing_commit}"
-            )
-            logger.error(error_msg)
-            return False, error_msg
-
-        logger.info(f"✅ Verified: Commit {merge_commit_sha} exists on {expected_branch}")
-
-        # Step 4: Verify merge commit is ancestor of target branch HEAD
-        result = subprocess.run(
-            ["git", "log", f"origin/{target_branch}", "-1", "--format=%H"],
-            capture_output=True,
-            text=True,
-            check=False
-        )
-
-        if result.returncode == 0:
-            latest_commit = result.stdout.strip()
-            logger.info(f"Latest commit on origin/{target_branch}: {latest_commit}")
-
-            # Verify our merge commit is reachable from HEAD of target
+            # Step 1: Get PR merge commit SHA
             result = subprocess.run(
-                ["git", "merge-base", "--is-ancestor", merge_commit_sha, latest_commit],
+                ["gh", "pr", "view", pr_number,
+                 "--repo", repo_path,
+                 "--json", "mergeCommit",
+                 "--jq", ".mergeCommit.oid"],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+
+            if result.returncode != 0 or not result.stdout.strip():
+                # PR data retrieval failed - retry
+                if attempt < max_retries - 1:
+                    logger.warning(f"Failed to get PR merge commit (will retry)")
+                    continue
+                else:
+                    error_msg = f"Failed to get merge commit for PR #{pr_number} after {max_retries} attempts"
+                    logger.error(error_msg)
+                    return False, error_msg
+
+            merge_commit_sha = result.stdout.strip()
+            logger.info(f"Merge commit SHA: {merge_commit_sha}")
+
+            # Step 2: Fetch latest from origin BEFORE verification
+            # This ensures we have the latest state from remote
+            logger.info(f"Fetching latest changes from origin/{target_branch}...")
+            subprocess.run(["git", "fetch", "origin", target_branch], check=False)
+
+            # Step 3: Verify commit exists on target branch
+            # Use git branch --contains to check if merge commit is on target
+            result = subprocess.run(
+                ["git", "branch", "-r", "--contains", merge_commit_sha],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+
+            if result.returncode != 0:
+                # Git command failed - retry
+                if attempt < max_retries - 1:
+                    logger.warning(f"Git branch check failed (will retry)")
+                    logger.debug(f"Git error: {result.stderr}")
+                    continue
+                else:
+                    error_msg = f"Failed to check if commit {merge_commit_sha} is on {target_branch}"
+                    logger.error(error_msg)
+                    logger.error(f"Git error: {result.stderr}")
+                    return False, error_msg
+
+            branches_containing_commit = result.stdout.strip()
+            expected_branch = f"origin/{target_branch}"
+
+            if expected_branch not in branches_containing_commit:
+                # Commit not yet visible - retry
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        f"Commit {merge_commit_sha} not yet visible on {target_branch} "
+                        f"(GitHub API propagation delay, will retry)"
+                    )
+                    continue
+                else:
+                    # Final attempt failed - this is a real phantom merge
+                    error_msg = (
+                        f"❌ PHANTOM MERGE DETECTED!\n"
+                        f"PR #{pr_number} reported as merged, but commit {merge_commit_sha} "
+                        f"not found on {target_branch} after {max_retries} attempts ({2**(max_retries-1)}s wait)\n"
+                        f"Branches containing commit:\n{branches_containing_commit if branches_containing_commit else 'None'}"
+                    )
+                    logger.error(error_msg)
+                    return False, error_msg
+
+            logger.info(f"✅ Verified: Commit {merge_commit_sha} exists on {expected_branch}")
+
+            # Step 4: Verify merge commit is ancestor of target branch HEAD
+            result = subprocess.run(
+                ["git", "log", f"origin/{target_branch}", "-1", "--format=%H"],
+                capture_output=True,
+                text=True,
                 check=False
             )
 
             if result.returncode == 0:
-                logger.info(f"✅ Verified: {merge_commit_sha} is ancestor of {target_branch} HEAD")
-            else:
-                logger.warning(
-                    f"Merge commit may not be direct ancestor of HEAD, "
-                    f"but is present on {target_branch}"
+                latest_commit = result.stdout.strip()
+                logger.info(f"Latest commit on origin/{target_branch}: {latest_commit}")
+
+                # Verify our merge commit is reachable from HEAD of target
+                result = subprocess.run(
+                    ["git", "merge-base", "--is-ancestor", merge_commit_sha, latest_commit],
+                    check=False
                 )
 
-        return True, None
+                if result.returncode == 0:
+                    logger.info(f"✅ Verified: {merge_commit_sha} is ancestor of {target_branch} HEAD")
+                else:
+                    logger.warning(
+                        f"Merge commit may not be direct ancestor of HEAD, "
+                        f"but is present on {target_branch}"
+                    )
 
-    except Exception as e:
-        error_msg = f"Exception during merge verification: {e}"
-        logger.error(error_msg)
-        return False, error_msg
+            # Success! Verification passed
+            if attempt > 0:
+                logger.info(f"✅ Merge verification succeeded after {attempt + 1} attempts ({sum(2**i for i in range(attempt))}s total wait)")
+            return True, None
+
+        except Exception as e:
+            # Unexpected exception - retry
+            if attempt < max_retries - 1:
+                logger.warning(f"Exception during verification (will retry): {e}")
+                continue
+            else:
+                error_msg = f"Exception during merge verification after {max_retries} attempts: {e}"
+                logger.error(error_msg)
+                return False, error_msg
+
+    # Should never reach here (covered by max_retries logic above)
+    return False, f"Verification failed after {max_retries} attempts"
 
 
 def merge_pr_via_github(
