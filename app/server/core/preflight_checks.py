@@ -239,7 +239,7 @@ def run_preflight_checks(
 
         issue_validation = resolution_result
 
-    # Check 11: Workflow Dry-Run (optional, for cost/time estimation)
+    # Check 11: Workflow Dry-Run (optional, for cost/time estimation with pattern caching)
     dry_run_result = None
     if run_dry_run:
         if not feature_id:
@@ -249,7 +249,22 @@ def run_preflight_checks(
             try:
                 from core.workflow_dry_run import run_workflow_dry_run, format_dry_run_for_display
 
-                dry_run_data = run_workflow_dry_run(feature_id, feature_title or f"Feature #{feature_id}")
+                # Get feature description for better pattern matching
+                feature_description = None
+                try:
+                    from services.planned_features_service import PlannedFeaturesService
+                    service = PlannedFeaturesService()
+                    feature = service.get_by_id(feature_id)
+                    if feature:
+                        feature_description = feature.description
+                except Exception:
+                    pass  # Not critical if we can't get description
+
+                dry_run_data = run_workflow_dry_run(
+                    feature_id,
+                    feature_title or f"Feature #{feature_id}",
+                    feature_description
+                )
 
                 if dry_run_data["success"]:
                     dry_run_result = format_dry_run_for_display(dry_run_data["result"])
