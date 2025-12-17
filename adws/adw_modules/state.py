@@ -44,7 +44,7 @@ class ADWState:
             "worktree_path", "backend_port", "frontend_port", "model_set", "all_adws",
             "estimated_cost_total", "estimated_cost_breakdown",
             # Workflow context metadata
-            "workflow_template", "model_used", "start_time", "nl_input", "github_url",
+            "workflow_template", "model_used", "start_time", "end_time", "nl_input", "github_url",
             # Phase output metadata
             "baseline_errors", "external_build_results", "external_lint_results",
             "external_test_results", "review_results", "integration_checklist",

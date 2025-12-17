@@ -412,14 +412,12 @@ async def process_webhook_background(
                 adw_id=adw_id,
                 issue_number=str(issue_number),
                 model_set=model_set,
-                status="failed",
                 workflow_template=workflow,
                 model_used=model_used,
                 start_time=datetime.now().isoformat(),
                 end_time=datetime.now().isoformat(),
                 nl_input=content_to_check[:500],
                 github_url=github_url,
-                last_error=f"Preflight check failed: {preflight_error}"
             )
             state.save("webhook_trigger")
             print(f"💾 Created state file for failed workflow {adw_id} (issue #{issue_number})")
@@ -503,7 +501,6 @@ async def process_webhook_background(
                     adw_id=provided_adw_id,
                     issue_number=str(issue_number),
                     model_set=model_set,
-                    status="running",
                     workflow_template=workflow,
                     model_used=model_used,
                     start_time=start_time,
@@ -518,7 +515,6 @@ async def process_webhook_background(
                 adw_id=adw_id,
                 issue_number=str(issue_number),
                 model_set=model_set,
-                status="running",
                 workflow_template=workflow,
                 model_used=model_used,
                 start_time=start_time,

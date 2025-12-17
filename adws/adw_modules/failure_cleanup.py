@@ -76,7 +76,7 @@ def cleanup_failed_workflow(
     """
     logger.info(f"Starting failure cleanup for {adw_id} (phase: {phase_name})")
 
-    # Step 0: Mark workflow as failed in state
+    # Step 0: Update workflow end_time in state (status is in database)
     try:
         from .state import ADWState
         from datetime import datetime
@@ -85,15 +85,14 @@ def cleanup_failed_workflow(
         if state:
             end_time = datetime.now()
             state.update(
-                status="failed",
                 end_time=end_time.isoformat()
             )
             state.save("cleanup_failed_workflow")
-            logger.info("✅ Workflow status updated to 'failed'")
+            logger.info("✅ Workflow end_time recorded")
         else:
-            logger.warning("Could not load state to mark as failed")
+            logger.warning("Could not load state to record end_time")
     except Exception as e:
-        logger.warning(f"Failed to update workflow status: {e}")
+        logger.warning(f"Failed to update workflow end_time: {e}")
         # Don't let state update failure block the rest of cleanup
 
     # Step 1: Close PR if it exists

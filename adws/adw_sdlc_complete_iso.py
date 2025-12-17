@@ -689,17 +689,16 @@ def main():
     print(f"All 10 phases completed successfully!")
     print(f"✅ Code has been shipped to production and verified!")
 
-    # Mark workflow as completed
-    logger.info("Updating workflow status to 'completed'")
+    # Record workflow end_time (status is in database)
+    logger.info("Recording workflow end_time")
     state = ADWState.load(adw_id, logger)
     from datetime import datetime
     end_time = datetime.now()
     state.update(
-        status="completed",
         end_time=end_time.isoformat()
     )
     state.save("adw_sdlc_complete_iso")
-    logger.info("✅ Workflow status updated to 'completed'")
+    logger.info("✅ Workflow end_time recorded")
 
     # Trigger cost synchronization
     print(f"\n📊 Syncing workflow costs...")

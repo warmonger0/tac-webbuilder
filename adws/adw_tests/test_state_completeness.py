@@ -92,11 +92,10 @@ def test_state_file_persistence():
     test_state_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        # Create state with all required fields
+        # Create state with all required fields (status is in database, not state file)
         state = ADWState(test_adw_id)
         state.update(
             issue_number="999",
-            status="running",
             workflow_template="adw_test_iso",
             model_used="sonnet",
             start_time="2025-11-20T18:00:00",
