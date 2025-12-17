@@ -136,7 +136,7 @@ class StateValidator:
         state = {}
         worktree_path = None
 
-        if workflow.adw_id:
+        if workflow and workflow.adw_id:
             worktree_path = self._get_worktree_path(workflow.adw_id)
             if worktree_path:
                 state_file = Path(worktree_path) / 'adw_state.json'
@@ -498,9 +498,13 @@ class StateValidator:
         if not state_file.exists():
             errors.append("adw_state.json not created in worktree")
 
-        # Database must be updated (check via workflow object)
-        if not workflow.adw_id:
+        # Database check (skip for standalone runs without database records)
+        if workflow and not workflow.adw_id:
             errors.append("Workflow adw_id not set in database")
+        elif not workflow:
+            # Standalone mode - verify we have minimum required data in state
+            if not state.get('adw_id'):
+                errors.append("No adw_id in state (required for standalone runs)")
 
         return errors
 
