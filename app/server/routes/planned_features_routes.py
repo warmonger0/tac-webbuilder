@@ -14,11 +14,9 @@ Endpoints:
 - POST   /api/planned-features/{id}/start-automation - Start event-driven phase automation
 """
 
-import json
 import logging
 import sys
 import uuid
-from datetime import datetime
 from pathlib import Path
 
 from core.models import PlannedFeature, PlannedFeatureCreate, PlannedFeatureUpdate
@@ -26,6 +24,7 @@ from fastapi import APIRouter, HTTPException, Query
 from models.phase_queue_item import PhaseQueueItem
 from repositories.phase_queue_repository import PhaseQueueRepository
 from services.planned_features_service import PlannedFeaturesService
+from services.websocket_manager import get_connection_manager
 
 # Add scripts directory to path for PhaseAnalyzer
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "scripts"))
@@ -38,6 +37,29 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/planned-features", tags=["planned-features"])
+
+
+async def _broadcast_planned_features_update():
+    """Broadcast planned features update to all WebSocket clients"""
+    try:
+        manager = get_connection_manager()
+        service = PlannedFeaturesService()
+
+        # Get all features and stats
+        features = service.get_all(limit=200)
+        stats = service.get_statistics()
+
+        # Broadcast update
+        await manager.broadcast({
+            "type": "planned_features_update",
+            "data": {
+                "features": [f.model_dump() for f in features],
+                "stats": stats
+            }
+        })
+        logger.debug("[WS] Broadcast planned features update")
+    except Exception as e:
+        logger.error(f"[WS] Error broadcasting planned features update: {e}")
 
 
 @router.get("/", response_model=list[PlannedFeature])
@@ -199,6 +221,10 @@ async def create_planned_feature(feature_data: PlannedFeatureCreate):
         logger.info(
             f"[POST /api/planned-features] Created feature {feature.id}: {feature.title}"
         )
+
+        # Broadcast update to WebSocket clients
+        await _broadcast_planned_features_update()
+
         return feature
     except ValueError as e:
         logger.error(f"[POST /api/planned-features] Validation error: {e}")
@@ -253,6 +279,10 @@ async def update_planned_feature(feature_id: int, update_data: PlannedFeatureUpd
         logger.info(
             f"[PATCH /api/planned-features/{feature_id}] Updated feature"
         )
+
+        # Broadcast update to WebSocket clients
+        await _broadcast_planned_features_update()
+
         return feature
     except HTTPException:
         raise
@@ -295,6 +325,10 @@ async def delete_planned_feature(feature_id: int):
         logger.info(
             f"[DELETE /api/planned-features/{feature_id}] Soft deleted feature"
         )
+
+        # Broadcast update to WebSocket clients
+        await _broadcast_planned_features_update()
+
         return None
     except HTTPException:
         raise
@@ -416,6 +450,9 @@ async def start_automation(feature_id: int):
 
         # Update feature status to 'in_progress'
         service.update(feature_id, PlannedFeatureUpdate(status='in_progress'))
+
+        # Broadcast update to WebSocket clients
+        await _broadcast_planned_features_update()
 
         # Return summary
         summary = {

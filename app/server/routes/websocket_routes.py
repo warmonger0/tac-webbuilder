@@ -41,7 +41,7 @@ async def _handle_websocket_connection(websocket: WebSocket, manager, initial_da
         manager.disconnect(websocket)
 
 
-def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func, get_workflow_history_data_func, get_adw_state_func, get_adw_monitor_data_func, get_queue_data_func, get_system_status_data_func, get_webhook_status_data_func):
+def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func, get_workflow_history_data_func, get_adw_state_func, get_adw_monitor_data_func, get_queue_data_func, get_system_status_data_func, get_webhook_status_data_func, get_planned_features_data_func):
     """
     Initialize WebSocket routes with service dependencies.
 
@@ -133,3 +133,13 @@ def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func
             "data": webhook_status_data
         }
         await _handle_websocket_connection(websocket, manager, initial_data, "webhook status")
+
+    @router.websocket("/ws/planned-features")
+    async def websocket_planned_features(websocket: WebSocket) -> None:
+        """WebSocket endpoint for real-time planned features updates"""
+        planned_features_data = get_planned_features_data_func()
+        initial_data = {
+            "type": "planned_features_update",
+            "data": planned_features_data
+        }
+        await _handle_websocket_connection(websocket, manager, initial_data, "planned features")

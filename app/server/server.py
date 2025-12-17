@@ -15,8 +15,6 @@ from core.github_poster import GitHubPoster
 from core.workflow_history import (
     init_db as init_workflow_history_db,
 )
-from services.phase_queue_schema import init_phase_queue_db
-from services.work_log_schema import init_work_log_db
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,9 +43,11 @@ from services.background_tasks import BackgroundTaskManager
 from services.github_issue_service import GitHubIssueService
 from services.health_service import HealthService
 from services.phase_coordinator import PhaseCoordinator
+from services.phase_queue_schema import init_phase_queue_db
 from services.phase_queue_service import PhaseQueueService
 from services.service_controller import ServiceController
 from services.websocket_manager import get_connection_manager
+from services.work_log_schema import init_work_log_db
 from services.workflow_service import WorkflowService
 
 # Load .env file from server directory
@@ -271,6 +271,27 @@ async def get_system_status_data() -> dict:
     status = await _get_system_status_handler(health_service)
     return status.model_dump()
 
+def get_planned_features_data() -> dict:
+    """
+    Get planned features data for WebSocket broadcast.
+
+    Returns:
+        dict: Planned features with items and statistics
+    """
+    from services.planned_features_service import PlannedFeaturesService
+    service = PlannedFeaturesService()
+
+    # Get all features (limit 200 to match frontend)
+    features = service.get_all(limit=200)
+
+    # Get statistics
+    stats = service.get_statistics()
+
+    return {
+        "features": [f.model_dump() for f in features],
+        "stats": stats
+    }
+
 def get_webhook_status_data() -> dict:
     """
     Get webhook status data for WebSocket broadcast.
@@ -359,7 +380,7 @@ github_poster = GitHubPoster()
 queue_routes.init_webhook_routes(phase_queue_service, github_poster, manager)
 app.include_router(queue_routes.webhook_router, prefix="/api/v1")
 
-websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state, get_adw_monitor_data, get_queue_data, get_system_status_data, get_webhook_status_data)
+websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state, get_adw_monitor_data, get_queue_data, get_system_status_data, get_webhook_status_data, get_planned_features_data)
 app.include_router(websocket_routes.router, prefix="/api/v1")
 
 if __name__ == "__main__":

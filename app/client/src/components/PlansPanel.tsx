@@ -5,11 +5,12 @@
  */
 
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlannedFeature, plannedFeaturesClient, PlannedFeaturesStats } from '../api/plannedFeaturesClient';
 import { systemClient, PreflightChecksResponse } from '../api/systemClient';
 import { PreflightCheckModal } from './PreflightCheckModal';
 import { apiConfig } from '../config/api';
+import { usePlannedFeaturesWebSocket } from '../hooks/useWebSocket';
 
 // ============================================================================
 // Utility Functions
@@ -498,31 +499,18 @@ export function PlansPanel() {
 
   const queryClient = useQueryClient();
 
-  // Fetch all features
+  // WebSocket connection for real-time updates
   const {
-    data: features,
-    isLoading,
-    error
-  } = useQuery({
-    queryKey: ['planned-features'],
-    queryFn: () => plannedFeaturesClient.getAll({ limit: 200 }),
-    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes (plans data changes infrequently)
-    refetchIntervalInBackground: false, // Don't poll when tab hidden
-    refetchOnWindowFocus: true, // Refetch when user returns to tab
-  });
+    features,
+    stats,
+    isConnected,
+    connectionQuality,
+    lastUpdated: wsLastUpdated,
+  } = usePlannedFeaturesWebSocket();
 
-  // Fetch statistics
-  const {
-    data: stats,
-    isLoading: statsLoading,
-    error: statsError
-  } = useQuery({
-    queryKey: ['planned-features-stats'],
-    queryFn: () => plannedFeaturesClient.getStats(),
-    refetchInterval: 10 * 60 * 1000, // Refresh every 10 minutes
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
+  // Loading state: show loading only if no data yet
+  const isLoading = !features || features.length === 0;
+  const error = null; // WebSocket handles errors internally
 
   // Start automation mutation
   const startAutomationMutation = useMutation({
@@ -615,14 +603,11 @@ export function PlansPanel() {
     filterType
   );
 
-  // Handle manual refresh
+  // Handle manual refresh (for WebSocket reconnection)
   const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['planned-features'] });
-    queryClient.invalidateQueries({ queryKey: ['planned-features-stats'] });
+    // Force page reload to reconnect WebSocket
+    window.location.reload();
   };
-
-  // Get last updated timestamp from query data
-  const lastUpdated = queryClient.getQueryState(['planned-features'])?.dataUpdatedAt;
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -631,18 +616,35 @@ export function PlansPanel() {
           Pending Work Items
         </h2>
         <div className="flex items-center gap-3">
-          {lastUpdated && (
+          {/* WebSocket connection status */}
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-block w-2 h-2 rounded-full ${
+                isConnected
+                  ? connectionQuality === 'excellent'
+                    ? 'bg-green-500'
+                    : connectionQuality === 'good'
+                    ? 'bg-yellow-500'
+                    : 'bg-orange-500'
+                  : 'bg-red-500'
+              }`}
+              title={`Connection: ${isConnected ? connectionQuality : 'disconnected'}`}
+            />
             <span className="text-sm text-gray-500">
-              Last updated: {new Date(lastUpdated).toLocaleTimeString()}
+              {isConnected ? 'Live' : 'Disconnected'}
+              {wsLastUpdated && (
+                <> • {new Date(wsLastUpdated).toLocaleTimeString()}</>
+              )}
             </span>
-          )}
+          </div>
           <button
             onClick={handleRefresh}
             disabled={isLoading}
             className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5"
+            title="Reconnect WebSocket"
           >
             <span>🔄</span>
-            <span>Refresh</span>
+            <span>Reconnect</span>
           </button>
         </div>
       </div>
@@ -670,9 +672,9 @@ export function PlansPanel() {
       />
 
       <PlanStatistics
-        stats={stats}
-        isLoading={statsLoading}
-        error={statsError as Error | null}
+        stats={stats || undefined}
+        isLoading={false}
+        error={null}
       />
 
       <FeatureListSection

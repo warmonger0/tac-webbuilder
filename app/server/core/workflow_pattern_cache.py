@@ -72,7 +72,7 @@ def extract_workflow_pattern(
         "avg_cost_with_llm": total_cost,
         "avg_duration_minutes": total_time_minutes,
         "occurrence_count": 1,
-        "automation_status": "template",  # Mark as template for reuse
+        "automation_status": "detected",  # Mark as detected for caching
         "confidence_score": 50.0,  # Start with moderate confidence
     }
 
@@ -97,13 +97,13 @@ def find_similar_pattern(
     """
     try:
         adapter = get_database_adapter()
-        placeholder = adapter.get_placeholder()
+        ph = adapter.placeholder()
 
         with adapter.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Get all workflow patterns
-            cursor.execute(f"""
+            # Get all workflow patterns (looking for detected or candidate patterns)
+            query = f"""
                 SELECT
                     id,
                     pattern_signature,
@@ -114,11 +114,12 @@ def find_similar_pattern(
                     occurrence_count,
                     confidence_score
                 FROM operation_patterns
-                WHERE pattern_type = {placeholder}
-                AND automation_status = {placeholder}
+                WHERE pattern_type = {ph}
+                AND automation_status IN ({ph}, {ph})
                 ORDER BY occurrence_count DESC
                 LIMIT 50
-            """, ("workflow", "template"))
+            """
+            cursor.execute(query, ("workflow", "detected", "candidate"))
 
             patterns = cursor.fetchall()
 
@@ -186,17 +187,14 @@ def save_workflow_pattern(pattern: dict[str, Any]) -> int | None:
     """
     try:
         adapter = get_database_adapter()
-        placeholder = adapter.get_placeholder()
+        ph = adapter.placeholder()
 
         with adapter.get_connection() as conn:
             cursor = conn.cursor()
 
             # Check if pattern already exists
-            cursor.execute(f"""
-                SELECT id, occurrence_count
-                FROM operation_patterns
-                WHERE pattern_signature = {placeholder}
-            """, (pattern["pattern_signature"],))
+            query = f"SELECT id, occurrence_count FROM operation_patterns WHERE pattern_signature = {ph}"
+            cursor.execute(query, (pattern["pattern_signature"],))
 
             existing = cursor.fetchone()
 
@@ -206,16 +204,17 @@ def save_workflow_pattern(pattern: dict[str, Any]) -> int | None:
                 old_count = existing['occurrence_count'] if isinstance(existing, dict) else existing[1]
                 new_count = old_count + 1
 
-                cursor.execute(f"""
+                query = f"""
                     UPDATE operation_patterns
                     SET
-                        occurrence_count = {placeholder},
-                        avg_tokens_with_llm = (avg_tokens_with_llm * {placeholder} + {placeholder}) / {placeholder},
-                        avg_cost_with_llm = (avg_cost_with_llm * {placeholder} + {placeholder}) / {placeholder},
-                        avg_duration_minutes = (COALESCE(avg_duration_minutes, 0) * {placeholder} + {placeholder}) / {placeholder},
+                        occurrence_count = {ph},
+                        avg_tokens_with_llm = (avg_tokens_with_llm * {ph} + {ph}) / {ph},
+                        avg_cost_with_llm = (avg_cost_with_llm * {ph} + {ph}) / {ph},
+                        avg_duration_minutes = (COALESCE(avg_duration_minutes, 0) * {ph} + {ph}) / {ph},
                         last_seen = CURRENT_TIMESTAMP
-                    WHERE id = {placeholder}
-                """, (
+                    WHERE id = {ph}
+                """
+                cursor.execute(query, (
                     new_count,
                     old_count, pattern["avg_tokens_with_llm"], new_count,
                     old_count, pattern["avg_cost_with_llm"], new_count,
@@ -228,7 +227,7 @@ def save_workflow_pattern(pattern: dict[str, Any]) -> int | None:
 
             else:
                 # Insert new pattern
-                cursor.execute(f"""
+                query = f"""
                     INSERT INTO operation_patterns (
                         pattern_signature,
                         pattern_type,
@@ -242,11 +241,12 @@ def save_workflow_pattern(pattern: dict[str, Any]) -> int | None:
                         created_at,
                         last_seen
                     ) VALUES (
-                        {placeholder}, {placeholder}, {placeholder}, {placeholder},
-                        {placeholder}, {placeholder}, {placeholder}, {placeholder},
-                        {placeholder}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                        {ph}, {ph}, {ph}, {ph},
+                        {ph}, {ph}, {ph}, {ph},
+                        {ph}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                     )
-                """, (
+                """
+                cursor.execute(query, (
                     pattern["pattern_signature"],
                     pattern["pattern_type"],
                     pattern["typical_input_pattern"],
@@ -284,7 +284,8 @@ def _normalize_text(text: str) -> str:
     text = text.lower()
     text = re.sub(r'[^a-z0-9\s]', ' ', text)
     text = re.sub(r'\s+', '_', text)
-    return text.strip()
+    text = re.sub(r'_+', '_', text)  # Collapse multiple underscores
+    return text.strip('_')  # Remove leading/trailing underscores
 
 
 def _extract_keywords(text: str) -> list[str]:

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { type AdwMonitorSummary, type AdwWorkflowStatus, getAdwMonitor, getRoutes, getWorkflowHistory, listWorkflows } from '../api/client';
 import { getQueueData, type PhaseQueueItem } from '../api/queueClient';
+import { type PlannedFeature, type PlannedFeaturesStats, plannedFeaturesClient } from '../api/plannedFeaturesClient';
 import type { HistoryAnalytics, Route, WorkflowExecution, WorkflowHistoryItem } from '../types';
 import { useReliableWebSocket } from './useReliableWebSocket';
 import { apiConfig } from '../config/api';
@@ -374,6 +375,62 @@ export function useWebhookStatusWebSocket() {
 
   return {
     webhookStatus,
+    isConnected: connectionState.isConnected,
+    connectionQuality: connectionState.connectionQuality,
+    lastUpdated: connectionState.lastUpdated,
+    reconnectAttempts: connectionState.reconnectAttempts,
+  };
+}
+
+interface PlannedFeaturesWebSocketMessage {
+  type: 'planned_features_update';
+  data: {
+    features: PlannedFeature[];
+    stats: PlannedFeaturesStats;
+  };
+}
+
+export function usePlannedFeaturesWebSocket() {
+  const [features, setFeatures] = useState<PlannedFeature[]>([]);
+  const [stats, setStats] = useState<PlannedFeaturesStats | null>(null);
+
+  const wsUrl = apiConfig.websocket.plannedFeatures();
+
+  const connectionState = useReliableWebSocket<
+    { features: PlannedFeature[]; stats: PlannedFeaturesStats },
+    PlannedFeaturesWebSocketMessage
+  >({
+    url: wsUrl,
+    queryKey: ['planned-features'],
+    queryFn: async () => {
+      const features = await plannedFeaturesClient.getAll({ limit: 200 });
+      const stats = await plannedFeaturesClient.getStats();
+      return { features, stats };
+    },
+    onMessage: (message: any) => {
+      // Handle both WebSocket message format and HTTP polling response format
+      if (message.type === 'planned_features_update') {
+        // WebSocket message format
+        setFeatures(message.data.features);
+        setStats(message.data.stats);
+        if (DEBUG_WS) console.log('[WS] Received planned features update:', message.data.features.length, 'features');
+      } else if (message.features || Array.isArray(message)) {
+        // HTTP polling response format (fallback, should not happen in WebSocket-only mode)
+        if (Array.isArray(message)) {
+          setFeatures(message);
+          if (DEBUG_WS) console.log('[HTTP] Received planned features update:', message.length, 'features');
+        } else {
+          setFeatures(message.features);
+          setStats(message.stats);
+          if (DEBUG_WS) console.log('[HTTP] Received planned features update:', message.features.length, 'features');
+        }
+      }
+    },
+  });
+
+  return {
+    features,
+    stats,
     isConnected: connectionState.isConnected,
     connectionQuality: connectionState.connectionQuality,
     lastUpdated: connectionState.lastUpdated,
