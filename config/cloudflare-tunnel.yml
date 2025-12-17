@@ -1,0 +1,22 @@
+tunnel: 5e482074-4677-4f78-9a5b-301a27d9463f
+credentials-file: /Users/Warmonger0/.cloudflared/5e482074-4677-4f78-9a5b-301a27d9463f.json
+
+ingress:
+  # ADW Webhook Trigger Service (port 8001)
+  - hostname: webhook.directmyagent.com
+    service: http://localhost:8001
+
+  # Backend API Service (port 8002) - NEW
+  - hostname: api.directmyagent.com
+    service: http://localhost:8002
+
+  # Frontend Application (port 3000)
+  - hostname: tac-webbuilder.directmyagent.com
+    service: http://localhost:3000
+
+  # Frontend Application - www subdomain (port 3000)
+  - hostname: www.directmyagent.com
+    service: http://localhost:3000
+
+  # Catch-all (404 for unknown subdomains)
+  - service: http_status:404
