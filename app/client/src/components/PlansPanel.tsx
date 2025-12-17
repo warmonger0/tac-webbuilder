@@ -5,8 +5,10 @@
  */
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlannedFeature, plannedFeaturesClient, PlannedFeaturesStats } from '../api/plannedFeaturesClient';
+import { systemClient, PreflightChecksResponse } from '../api/systemClient';
+import { PreflightCheckModal } from './PreflightCheckModal';
 import { apiConfig } from '../config/api';
 
 // ============================================================================
@@ -469,7 +471,7 @@ function FeatureItem({
             disabled={isStartingAutomation}
             className="mt-2 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            {isStartingAutomation ? '⏳ Starting...' : '🚀 Start Automation'}
+            {isStartingAutomation ? '⏳ Running checks...' : '🚀 Start Automation'}
           </button>
         )}
       </div>
@@ -487,6 +489,12 @@ export function PlansPanel() {
   const [filterPriority, setFilterPriority] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string | null>(null);
   const [automationMessage, setAutomationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Pre-flight check modal state
+  const [showPreflightModal, setShowPreflightModal] = useState(false);
+  const [preflightResults, setPreflightResults] = useState<PreflightChecksResponse | null>(null);
+  const [pendingFeature, setPendingFeature] = useState<PlannedFeature | null>(null);
+  const [isRunningPreflight, setIsRunningPreflight] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -544,8 +552,49 @@ export function PlansPanel() {
     }
   });
 
-  const handleStartAutomation = (featureId: number) => {
-    startAutomationMutation.mutate(featureId);
+  // Run pre-flight checks before starting automation
+  const handleStartAutomation = async (featureId: number) => {
+    const feature = features?.find(f => f.id === featureId);
+    if (!feature) return;
+
+    setPendingFeature(feature);
+    setIsRunningPreflight(true);
+
+    try {
+      // Run pre-flight checks (skip tests for faster UX, include issue number if available)
+      const results = await systemClient.getPreflightChecks({
+        skipTests: true,
+        issueNumber: feature.github_issue_number,
+      });
+
+      setPreflightResults(results);
+      setShowPreflightModal(true);
+    } catch (error) {
+      setAutomationMessage({
+        type: 'error',
+        text: `❌ Pre-flight checks failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
+      setTimeout(() => setAutomationMessage(null), 10000);
+    } finally {
+      setIsRunningPreflight(false);
+    }
+  };
+
+  // Confirm and proceed with automation after pre-flight checks
+  const handlePreflightConfirm = () => {
+    if (pendingFeature) {
+      setShowPreflightModal(false);
+      startAutomationMutation.mutate(pendingFeature.id);
+      setPendingFeature(null);
+      setPreflightResults(null);
+    }
+  };
+
+  // Cancel automation
+  const handlePreflightCancel = () => {
+    setShowPreflightModal(false);
+    setPendingFeature(null);
+    setPreflightResults(null);
   };
 
   if (isLoading) {
@@ -563,11 +612,37 @@ export function PlansPanel() {
     filterType
   );
 
+  // Handle manual refresh
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['planned-features'] });
+    queryClient.invalidateQueries({ queryKey: ['planned-features-stats'] });
+  };
+
+  // Get last updated timestamp from query data
+  const lastUpdated = queryClient.getQueryState(['planned-features'])?.dataUpdatedAt;
+
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">
-        Pending Work Items
-      </h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">
+          Pending Work Items
+        </h2>
+        <div className="flex items-center gap-3">
+          {lastUpdated && (
+            <span className="text-sm text-gray-500">
+              Last updated: {new Date(lastUpdated).toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5"
+          >
+            <span>🔄</span>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
 
       {/* Automation message banner */}
       {automationMessage && (
@@ -612,7 +687,13 @@ export function PlansPanel() {
         features={planned}
         emptyMessage="No planned items"
         onStartAutomation={handleStartAutomation}
-        startingAutomationId={startAutomationMutation.isPending ? startAutomationMutation.variables : null}
+        startingAutomationId={
+          isRunningPreflight && pendingFeature
+            ? pendingFeature.id
+            : startAutomationMutation.isPending
+            ? startAutomationMutation.variables
+            : null
+        }
       />
 
       <FeatureListSection
@@ -631,6 +712,16 @@ export function PlansPanel() {
           Note: All items above are optional enhancements. System is fully functional and production-ready as-is.
         </p>
       </div>
+
+      {/* Pre-flight Check Modal */}
+      {showPreflightModal && preflightResults && pendingFeature && (
+        <PreflightCheckModal
+          results={preflightResults}
+          featureTitle={pendingFeature.title}
+          onConfirm={handlePreflightConfirm}
+          onCancel={handlePreflightCancel}
+        />
+      )}
     </div>
   );
 }

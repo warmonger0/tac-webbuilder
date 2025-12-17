@@ -54,6 +54,49 @@ export async function getSystemStatus(): Promise<any> {
   return fetchJSON<any>(`${API_BASE}/system-status`);
 }
 
+export interface PreflightCheckResult {
+  check: string;
+  status: 'pass' | 'fail' | 'warn';
+  duration_ms: number;
+  details?: string | number;
+}
+
+export interface PreflightBlockingFailure {
+  check: string;
+  error: string;
+  fix: string;
+  failing_tests?: string[];
+}
+
+export interface PreflightWarning {
+  check: string;
+  message: string;
+  impact: string;
+  evidence?: string[];
+  recommendation?: string;
+}
+
+export interface IssueValidation {
+  is_resolved: boolean;
+  confidence: number;
+  message: string;
+  summary: string;
+  evidence: string[];
+  recommendation: string;
+  closed_at: string | null;
+  related_commits: string[];
+  duplicate_of: number[];
+}
+
+export interface PreflightChecksResponse {
+  passed: boolean;
+  blocking_failures: PreflightBlockingFailure[];
+  warnings: PreflightWarning[];
+  checks_run: PreflightCheckResult[];
+  total_duration_ms: number;
+  issue_validation?: IssueValidation;
+}
+
 /**
  * Run pre-flight health checks before launching workflows.
  *
@@ -64,18 +107,29 @@ export async function getSystemStatus(): Promise<any> {
  * - Port availability (warning)
  * - Disk space (warning)
  * - Python environment (blocking)
+ * - Observability database (blocking)
+ * - Hook events recording (warning)
+ * - Pattern analysis system (warning)
+ * - Issue already resolved (warning, if issue_number provided)
  *
- * @param skipTests - Skip the test suite check for faster checks
+ * @param params - Configuration options
+ * @param params.skipTests - Skip the test suite check for faster checks
+ * @param params.issueNumber - GitHub issue number to check for duplicate work
  * @returns Pre-flight check results with blocking failures and warnings
  */
-export async function getPreflightChecks(skipTests: boolean = false): Promise<{
-  passed: boolean;
-  blocking_failures: Array<{ check: string; error: string; fix: string; failing_tests?: string[] }>;
-  warnings: Array<{ check: string; message: string; impact: string }>;
-  checks_run: Array<{ check: string; status: string; duration_ms: number; details?: string }>;
-  total_duration_ms: number;
-}> {
-  return fetchJSON<any>(`${API_BASE}/preflight-checks?skip_tests=${skipTests}`);
+export async function getPreflightChecks(params?: {
+  skipTests?: boolean;
+  issueNumber?: number;
+}): Promise<PreflightChecksResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.skipTests) queryParams.append('skip_tests', 'true');
+  if (params?.issueNumber) queryParams.append('issue_number', params.issueNumber.toString());
+
+  const url = queryParams.toString()
+    ? `${API_BASE}/preflight-checks?${queryParams}`
+    : `${API_BASE}/preflight-checks`;
+
+  return fetchJSON<PreflightChecksResponse>(url);
 }
 
 /**

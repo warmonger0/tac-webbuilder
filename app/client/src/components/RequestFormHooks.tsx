@@ -204,7 +204,7 @@ export function useRequestForm(): UseRequestFormReturn {
 
     // PRE-FLIGHT CHECKS: Run BEFORE creating issue
     try {
-      const preflightResult = await getPreflightChecks(true); // Skip tests for speed
+      const preflightResult = await getPreflightChecks({ skipTests: true }); // Skip tests for speed
 
       if (!preflightResult.passed) {
         // BLOCKING FAILURES - DO NOT SUBMIT
