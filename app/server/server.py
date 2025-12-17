@@ -84,6 +84,11 @@ async def lifespan(app: FastAPI):
     init_work_log_db()
     logger.info("[STARTUP] Work log database initialized")
 
+    # Initialize planned features database
+    from services.planned_features_schema import init_planned_features_db
+    init_planned_features_db()
+    logger.info("[STARTUP] Planned features database initialized")
+
     # Start background watchers using BackgroundTaskManager
     await background_task_manager.start_all()
     logger.info("[STARTUP] Workflow, routes, and history watchers started")

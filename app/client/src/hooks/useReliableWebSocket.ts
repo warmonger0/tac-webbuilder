@@ -70,36 +70,29 @@ export function useReliableWebSocket<T, M = any>({
     queryFnRef.current = queryFn;
   }, [queryFn]);
 
-  // Initial HTTP fetch + fallback polling
-  // Fetch data immediately on mount, then rely on WebSocket for updates
-  // Fall back to polling if WebSocket fails to connect
+  // Initial HTTP fetch - loads data immediately while WebSocket connects
+  // No continuous polling - WebSocket provides real-time updates once connected
   const { data: polledData } = useQuery({
     queryKey,
     queryFn: () => queryFnRef.current(),
-    refetchInterval: !state.isConnected ? pollingInterval : false, // Poll only when WebSocket disconnected
-    enabled: enabled, // Always fetch initial data
-    staleTime: 0, // Always fetch fresh data on mount
+    refetchInterval: false, // No polling - WebSocket handles updates
+    enabled: enabled, // Fetch initial data on mount
+    staleTime: Infinity, // Cache indefinitely - WebSocket keeps it fresh
   });
 
-  // Handle polled data (initial fetch + fallback)
+  // Handle initial polled data
   useEffect(() => {
     if (polledData) {
-      // Convert HTTP response to WebSocket message format
-      // The polledData is the raw API response (T), but onMessage expects a message (M)
-      // For most cases, polledData should already be in the correct format
-      // But we need to handle it carefully
+      // Send initial data through the message handler
       onMessageRef.current(polledData as any as M);
 
-      // Update state only if not connected (to show polling status)
-      if (!state.isConnected) {
-        setState((prev) => ({
-          ...prev,
-          lastUpdated: new Date(),
-          connectionQuality: 'poor',
-        }));
-      }
+      // Mark as loaded (even if WebSocket not connected yet)
+      setState((prev) => ({
+        ...prev,
+        lastUpdated: new Date(),
+      }));
     }
-  }, [polledData, state.isConnected]);
+  }, [polledData]);
 
   // Calculate exponential backoff delay
   const getReconnectDelay = useCallback((attempt: number): number => {

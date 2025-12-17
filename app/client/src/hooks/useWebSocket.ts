@@ -391,7 +391,7 @@ interface PlannedFeaturesWebSocketMessage {
 }
 
 export function usePlannedFeaturesWebSocket() {
-  const [features, setFeatures] = useState<PlannedFeature[]>([]);
+  const [features, setFeatures] = useState<PlannedFeature[] | null>(null);
   const [stats, setStats] = useState<PlannedFeaturesStats | null>(null);
 
   const wsUrl = apiConfig.websocket.plannedFeatures();
