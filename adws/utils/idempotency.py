@@ -310,7 +310,8 @@ def ensure_database_state(
         from app.server.repositories.phase_queue_repository import PhaseQueueRepository
 
         repo = PhaseQueueRepository()
-        workflow = repo.find_by_issue_number(issue_number)
+        workflows = repo.get_all_by_feature_id(issue_number)  # feature_id == issue_number
+        workflow = workflows[0] if workflows else None
 
         if not workflow:
             logger.error(f"Workflow not found in database for issue {issue_number}")
