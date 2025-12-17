@@ -68,17 +68,19 @@ class PhaseQueueRepository:
                 cursor.execute(
                     f"""
                     INSERT INTO phase_queue (
-                        queue_id, feature_id, phase_number, status,
+                        queue_id, feature_id, phase_number, issue_number, status, current_phase,
                         depends_on_phases, phase_data, created_at, updated_at,
-                        priority, queue_position, ready_timestamp
+                        priority, queue_position, ready_timestamp, adw_id
                     )
-                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                     """,
                     (
                         item.queue_id,
                         item.feature_id,
                         item.phase_number,
+                        item.issue_number,
                         item.status,
+                        getattr(item, 'current_phase', 'init'),
                         depends_on_phases_json,
                         json.dumps(item.phase_data),
                         item.created_at,
@@ -86,6 +88,7 @@ class PhaseQueueRepository:
                         getattr(item, 'priority', 50),  # Default to normal priority
                         next_position,
                         item.created_at if item.status == 'ready' else None,
+                        item.adw_id,
                     ),
                 )
                 return item
@@ -120,6 +123,32 @@ class PhaseQueueRepository:
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to get phase by ID: {str(e)}")
+            raise
+
+    def find_by_adw_id(self, adw_id: str) -> PhaseQueueItem | None:
+        """
+        Find phase queue item by ADW ID.
+
+        Args:
+            adw_id: ADW workflow identifier
+
+        Returns:
+            PhaseQueueItem if found, None otherwise
+        """
+        try:
+            with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT * FROM phase_queue WHERE adw_id = {ph} LIMIT 1",
+                    (adw_id,)
+                )
+                row = cursor.fetchone()
+
+            return PhaseQueueItem.from_db_row(row) if row else None
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to find phase by ADW ID: {str(e)}")
             raise
 
     def get_all_by_feature_id(self, feature_id: int, limit: int = 100) -> list[PhaseQueueItem]:
@@ -320,6 +349,40 @@ class PhaseQueueRepository:
 
         except Exception as e:
             logger.error(f"[ERROR] Failed to update status: {str(e)}")
+            raise
+
+    def update_phase(self, queue_id: str, current_phase: str, status: str) -> bool:
+        """
+        Update current phase and status (SSoT coordination state).
+
+        Args:
+            queue_id: Queue ID to update
+            current_phase: New phase name (e.g., 'plan', 'test', 'ship')
+            status: New status (e.g., 'running', 'completed', 'failed')
+
+        Returns:
+            True if updated, False if not found
+        """
+        try:
+            with self.adapter.get_connection() as conn:
+                ph = self.adapter.placeholder()
+                now_fn = self.adapter.now_function()
+
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE phase_queue
+                    SET current_phase = {ph},
+                        status = {ph},
+                        updated_at = {ph}
+                    WHERE queue_id = {ph}
+                    """,
+                    (current_phase, status, datetime.now().isoformat(), queue_id),
+                )
+                return cursor.rowcount > 0
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to update phase: {str(e)}")
             raise
 
     def update_issue_number(self, queue_id: str, issue_number: int) -> bool:

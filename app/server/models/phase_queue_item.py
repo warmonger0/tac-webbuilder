@@ -19,6 +19,7 @@ class PhaseQueueItem:
         phase_number: int,
         issue_number: int | None = None,
         status: str = "queued",
+        current_phase: str = "init",
         depends_on_phases: list[int] | None = None,
         phase_data: dict[str, Any] | None = None,
         created_at: str | None = None,
@@ -36,6 +37,7 @@ class PhaseQueueItem:
         self.phase_number = phase_number
         self.issue_number = issue_number
         self.status = status
+        self.current_phase = current_phase
         self.depends_on_phases = depends_on_phases or []
         self.phase_data = phase_data or {}
         self.created_at = created_at or datetime.now().isoformat()
@@ -62,6 +64,7 @@ class PhaseQueueItem:
             "phase_number": self.phase_number,
             "issue_number": self.issue_number,
             "status": self.status,
+            "current_phase": self.current_phase,
             "depends_on_phases": self.depends_on_phases,
             "phase_data": self.phase_data,
             "created_at": to_iso(self.created_at),
@@ -109,6 +112,7 @@ class PhaseQueueItem:
             phase_number=row["phase_number"],
             issue_number=row["issue_number"],
             status=row["status"],
+            current_phase=safe_get("current_phase", "init"),
             depends_on_phases=depends_on_phases,
             phase_data=phase_data,
             created_at=row["created_at"],
