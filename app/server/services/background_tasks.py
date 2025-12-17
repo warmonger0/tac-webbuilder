@@ -34,6 +34,7 @@ class BackgroundTaskManager:
         history_watch_interval: float = 10.0,
         adw_monitor_watch_interval: float = 2.0,
         queue_watch_interval: float = 2.0,
+        planned_features_watch_interval: float = 30.0,
     ):
         """
         Initialize the BackgroundTaskManager
@@ -46,6 +47,7 @@ class BackgroundTaskManager:
             history_watch_interval: Seconds between history checks (default: 10)
             adw_monitor_watch_interval: Seconds between ADW monitor checks (default: 2)
             queue_watch_interval: Seconds between queue checks (default: 2)
+            planned_features_watch_interval: Seconds between planned features checks (default: 30)
         """
         self.websocket_manager = websocket_manager
         self.workflow_service = workflow_service
@@ -54,6 +56,7 @@ class BackgroundTaskManager:
         self.history_watch_interval = history_watch_interval
         self.adw_monitor_watch_interval = adw_monitor_watch_interval
         self.queue_watch_interval = queue_watch_interval
+        self.planned_features_watch_interval = planned_features_watch_interval
 
         # Task references for cleanup
         self._tasks: list[asyncio.Task] = []
@@ -89,6 +92,7 @@ class BackgroundTaskManager:
             asyncio.create_task(self.watch_workflow_history()),
             # asyncio.create_task(self.watch_adw_monitor()),  # REMOVED - now event-driven
             asyncio.create_task(self.watch_queue()),
+            asyncio.create_task(self.watch_planned_features()),
         ]
 
         logger.info(
@@ -352,4 +356,67 @@ class BackgroundTaskManager:
 
         except asyncio.CancelledError:
             logger.info("[BACKGROUND_TASKS] Queue watcher cancelled")
+            raise  # Re-raise to properly handle cancellation
+
+    async def watch_planned_features(self) -> None:
+        """
+        Background task to watch for planned features changes and broadcast updates
+
+        This watcher:
+        - Checks every planned_features_watch_interval seconds (default: 30s)
+        - Only broadcasts if there are active WebSocket connections
+        - Only broadcasts if planned features state has changed
+        - Tracks state changes to prevent redundant broadcasts
+
+        This ensures Plans Panel shows real-time updates when:
+        - Workflows complete and update feature status
+        - GitHub issues are synced to planned_features
+        - Features are marked as completed/cancelled
+        """
+        try:
+            while True:
+                try:
+                    # Only do work if there are active connections
+                    if len(self.websocket_manager.active_connections) > 0:
+                        from services.planned_features_service import PlannedFeaturesService
+
+                        service = PlannedFeaturesService()
+
+                        # Get all features and stats
+                        features = service.get_all(limit=200)
+                        stats = service.get_statistics()
+
+                        # Convert to JSON for comparison
+                        current_state = json.dumps({
+                            "features": [f.model_dump() for f in features],
+                            "stats": stats
+                        }, sort_keys=True)
+
+                        # Only broadcast if state changed
+                        if current_state != getattr(self.websocket_manager, 'last_planned_features_state', None):
+                            self.websocket_manager.last_planned_features_state = current_state
+                            await self.websocket_manager.broadcast(
+                                {
+                                    "type": "planned_features_update",
+                                    "data": {
+                                        "features": [f.model_dump() for f in features],
+                                        "stats": stats
+                                    }
+                                }
+                            )
+                            logger.debug(
+                                f"[BACKGROUND_TASKS] Broadcasted planned features update to "
+                                f"{len(self.websocket_manager.active_connections)} clients"
+                            )
+
+                    await asyncio.sleep(self.planned_features_watch_interval)
+
+                except Exception as e:
+                    logger.error(
+                        f"[BACKGROUND_TASKS] Error in planned features watcher: {e}"
+                    )
+                    await asyncio.sleep(5)  # Back off on error
+
+        except asyncio.CancelledError:
+            logger.info("[BACKGROUND_TASKS] Planned features watcher cancelled")
             raise  # Re-raise to properly handle cancellation

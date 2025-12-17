@@ -203,13 +203,45 @@ def sync_workflow_history() -> int:
     # This phase is intentionally disabled for performance - re-enable only if needed
     logger.debug("[SYNC] Skipping similarity analysis (performance optimization)")
 
-    # Pattern Learning - Skip to avoid redundant processing on every sync
-    # Pattern detection is expensive and should only run:
-    # 1. During initial backfill (one-time)
-    # 2. When explicitly requested via API
-    # 3. NOT on every routine sync
-    # This phase is intentionally disabled for performance - re-enable only if needed
-    logger.debug("[SYNC] Skipping pattern learning (performance optimization)")
+    # Pattern Learning - Process completed workflows for pattern detection
+    # Only processes workflows that haven't been analyzed yet
+    # This enables continuous learning from new workflow completions
+    try:
+        from core.pattern_persistence import process_and_persist_workflow
+
+        # Get newly completed workflows
+        completed_workflows = [w for w in workflows if w.get('status') in ('completed', 'failed')]
+
+        # Process each completed workflow for patterns
+        patterns_detected_total = 0
+        for workflow in completed_workflows:
+            try:
+                # Check if this workflow has already been analyzed
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(*) as count FROM pattern_occurrences WHERE adw_id = ?",
+                    (workflow.get('adw_id'),)
+                )
+                already_analyzed = cursor.fetchone()['count'] > 0
+
+                if not already_analyzed:
+                    result = process_and_persist_workflow(workflow, conn)
+                    patterns_detected = result.get('patterns_detected', 0)
+                    patterns_detected_total += patterns_detected
+
+                    if patterns_detected > 0:
+                        logger.info(
+                            f"[PATTERN] Detected {patterns_detected} patterns "
+                            f"in {workflow.get('adw_id')}"
+                        )
+            except Exception as e:
+                logger.warning(f"[PATTERN] Learning failed for {workflow.get('adw_id')}: {e}")
+
+        if patterns_detected_total > 0:
+            logger.info(f"[PATTERN] Total patterns detected: {patterns_detected_total}")
+
+    except Exception as e:
+        logger.error(f"[PATTERN] Pattern learning failed: {e}")
 
     # Only log if we actually synced something
     if synced_count > 0:
