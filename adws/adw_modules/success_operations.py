@@ -6,6 +6,7 @@ This module provides functions to handle successful workflow completion:
 - Post success summaries
 - Mark workflows as complete
 - Update queue status to "completed"
+- Learn patterns from completed workflows (automatic pattern caching)
 
 Mirrors the structure of failure_cleanup.py for consistency.
 """
@@ -13,6 +14,7 @@ Mirrors the structure of failure_cleanup.py for consistency.
 import logging
 import subprocess
 import requests
+import sys
 from typing import Optional, Tuple
 
 from .github import make_issue_comment
@@ -20,6 +22,10 @@ from .workflow_ops import format_issue_message
 
 # Backend API configuration
 BACKEND_URL = "http://localhost:8000"
+
+# Add app/server to path for pattern caching imports
+sys.path.insert(0, '/Users/Warmonger0/tac/tac-webbuilder/app/server')
+from core.workflow_pattern_cache import save_completed_workflow_pattern  # noqa: E402
 
 
 def complete_queue_for_issue(issue_number: str, logger: logging.Logger) -> Tuple[bool, Optional[str]]:
@@ -86,6 +92,21 @@ def close_issue_on_success(
     queue_success, queue_error = complete_queue_for_issue(issue_number, logger)
     if not queue_success:
         logger.warning(f"Queue update failed but continuing with issue close: {queue_error}")
+
+    # Step 1.5: Learn pattern from completed workflow (automatic pattern caching)
+    try:
+        logger.info(f"Learning workflow pattern from completed issue #{issue_number}...")
+        pattern_saved = save_completed_workflow_pattern(
+            feature_id=int(issue_number),
+            logger=logger
+        )
+        if pattern_saved:
+            logger.info(f"✅ Pattern saved for future dry-run acceleration")
+        else:
+            logger.info("Pattern not saved (may already exist or insufficient data)")
+    except Exception as e:
+        # Best-effort - don't fail completion if pattern saving fails
+        logger.warning(f"Failed to save workflow pattern: {e}")
 
     try:
         # Step 2: Format success comment

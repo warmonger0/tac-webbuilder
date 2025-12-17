@@ -343,3 +343,97 @@ def _calculate_similarity(
     similarity = (title_sim * 0.7) + (desc_sim * 0.3)
 
     return similarity
+
+
+def save_completed_workflow_pattern(feature_id: int, logger=None) -> bool:
+    """
+    Learn pattern from a completed workflow (automatic pattern caching).
+
+    Fetches workflow data from database and saves the pattern for future dry-run acceleration.
+    Called automatically when workflows complete successfully.
+
+    Args:
+        feature_id: GitHub issue number
+        logger: Optional logger for progress messages
+
+    Returns:
+        True if pattern was saved, False if skipped or failed
+    """
+    import logging
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    try:
+        adapter = get_database_adapter()
+
+        # Fetch feature details from planned_features
+        with adapter.get_connection() as conn:
+            cursor = conn.cursor()
+            ph = adapter.placeholder()
+
+            cursor.execute(
+                f"SELECT id, title, description, status FROM planned_features WHERE id = {ph}",
+                (feature_id,)
+            )
+            feature = cursor.fetchone()
+
+            if not feature:
+                logger.warning(f"Feature #{feature_id} not found in planned_features")
+                return False
+
+            feature_title = feature['title'] if isinstance(feature, dict) else feature[1]
+            feature_desc = feature['description'] if isinstance(feature, dict) else feature[2]
+
+            # Fetch workflow statistics from workflow_history
+            cursor.execute(f"""
+                SELECT
+                    COUNT(*) as phase_count,
+                    SUM(total_tokens) as total_tokens,
+                    SUM(cost_usd) as total_cost,
+                    SUM(duration_seconds) as total_duration_seconds
+                FROM workflow_history
+                WHERE issue_number = {ph}
+                    AND status = 'completed'
+            """, (feature_id,))
+
+            stats = cursor.fetchone()
+
+            if not stats or (stats['phase_count'] if isinstance(stats, dict) else stats[0]) == 0:
+                logger.info(f"No completed workflow history for feature #{feature_id}")
+                return False
+
+            phase_count = stats['phase_count'] if isinstance(stats, dict) else stats[0]
+            total_tokens = (stats['total_tokens'] if isinstance(stats, dict) else stats[1]) or 0
+            total_cost = float((stats['total_cost'] if isinstance(stats, dict) else stats[2]) or 0.0)
+            total_duration_seconds = (stats['total_duration_seconds'] if isinstance(stats, dict) else stats[3]) or 0
+            total_time_minutes = int(total_duration_seconds / 60)
+
+            # Create mock phases list (we don't need detailed phase breakdown for pattern)
+            phases = [{"phase": i, "estimated_cost": total_cost / phase_count} for i in range(1, phase_count + 1)]
+
+            # Extract and save pattern
+            pattern = extract_workflow_pattern(
+                feature_id=feature_id,
+                feature_title=feature_title,
+                feature_description=feature_desc,
+                phases=phases,
+                total_cost=total_cost,
+                total_time_minutes=total_time_minutes,
+                total_tokens=total_tokens
+            )
+
+            # Save pattern to database
+            save_workflow_pattern(pattern)
+
+            logger.info(
+                f"Learned pattern: {pattern['signature']} "
+                f"({phase_count} phases, ${total_cost:.2f}, ~{total_time_minutes} min)"
+            )
+
+            return True
+
+    except Exception as e:
+        logger.error(f"Failed to save workflow pattern: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return False
