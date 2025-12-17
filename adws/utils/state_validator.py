@@ -200,6 +200,10 @@ class StateValidator:
         worktree_path = None
         adw_id = None
 
+        # Initialize logger for debug output
+        import logging
+        logger = logging.getLogger(__name__)
+
         if workflow and workflow.adw_id:
             adw_id = workflow.adw_id
             logger.debug(f"[validate_outputs] Found workflow in DB with adw_id={adw_id}")
