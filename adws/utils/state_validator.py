@@ -630,10 +630,13 @@ class StateValidator:
         Returns:
             Absolute path to worktree or None if not found
         """
-        # Try multiple possible locations
+        # Get project root (this file is at project_root/adws/utils/state_validator.py)
+        project_root = Path(__file__).parent.parent.parent
+
+        # Try multiple possible locations (use absolute paths)
         possible_paths = [
-            Path(f"trees/{adw_id}"),
-            Path(f"trees/adw-{adw_id}"),
+            project_root / "trees" / adw_id,
+            project_root / "trees" / f"adw-{adw_id}",
         ]
 
         for path in possible_paths:
