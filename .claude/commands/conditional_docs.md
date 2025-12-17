@@ -306,6 +306,16 @@
 - `templates/existing_webapp/integration_guide.md` - Integrating ADW into existing projects
 - `templates/template_structure.json` - Template structure definitions
 
+### GitHub Integration & Webhooks
+- `app_docs/feature-github-webhook-planned-features-sync.md`
+  - Conditions:
+    - Working with GitHub webhooks or real-time issue synchronization
+    - Implementing webhook handlers with HMAC signature verification
+    - Setting up Cloudflare Tunnel routes for public API access
+    - Troubleshooting planned features not syncing with GitHub issues
+    - Understanding WebSocket broadcast architecture for real-time UI updates
+    - Configuring bidirectional GitHub↔database sync
+
 ---
 
 ## Special Purpose Docs
