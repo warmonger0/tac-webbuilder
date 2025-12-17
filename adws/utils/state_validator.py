@@ -205,7 +205,9 @@ class StateValidator:
             worktree_path = self._get_worktree_path(adw_id)
         else:
             # No database record - try to find worktree by searching agent directories
-            agents_dir = Path('/Users/Warmonger0/tac/tac-webbuilder/agents')
+            # Get project root (this file is at project_root/adws/utils/state_validator.py)
+            project_root = Path(__file__).parent.parent.parent
+            agents_dir = project_root / 'agents'
             if agents_dir.exists():
                 # Find most recent agent directory for this issue
                 for agent_dir in sorted(agents_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
@@ -493,10 +495,21 @@ class StateValidator:
         elif Path(plan_file).stat().st_size < 100:
             errors.append(f"Plan file is suspiciously small (< 100 bytes): {plan_file}")
 
-        # Must have adw_state.json
-        state_file = worktree / 'adw_state.json'
-        if not state_file.exists():
-            errors.append("adw_state.json not created in worktree")
+        # Must have adw_state.json (check both locations)
+        # Primary location: agents/{adw_id}/adw_state.json (where ADWState saves)
+        # Fallback location: trees/{adw_id}/adw_state.json (legacy)
+        state_file_worktree = worktree / 'adw_state.json'
+
+        # Check for adw_id to locate state file in agents directory
+        adw_id_from_state = state.get('adw_id') if state else None
+        state_file_agents = None
+        if adw_id_from_state:
+            # Get project root (worktree is at project_root/trees/{adw_id})
+            project_root = worktree.parent.parent
+            state_file_agents = project_root / 'agents' / adw_id_from_state / 'adw_state.json'
+
+        if not state_file_worktree.exists() and not (state_file_agents and state_file_agents.exists()):
+            errors.append("adw_state.json not found in worktree or agents directory")
 
         # Database check (skip for standalone runs without database records)
         if workflow and not workflow.adw_id:
