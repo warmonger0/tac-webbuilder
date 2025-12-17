@@ -39,6 +39,7 @@ export function RequestFormCore() {
 
     // Staggered loading
     showHopperQueue,
+    showSystemStatus,
 
     // Drag and drop
     isDragging,
@@ -205,7 +206,13 @@ export function RequestFormCore() {
         <div className="flex flex-col lg:flex-row gap-4 items-stretch">
           {/* System Status */}
           <div className="lg:w-1/2 lg:flex-shrink-0">
-            <SystemStatusPanel />
+            {showSystemStatus ? (
+              <SystemStatusPanel />
+            ) : (
+              <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-lg shadow-xl border border-slate-700 p-4 flex items-center justify-center min-h-[200px]">
+                <div className="text-slate-500 text-xs animate-pulse">●</div>
+              </div>
+            )}
           </div>
 
           {/* Current Workflow */}

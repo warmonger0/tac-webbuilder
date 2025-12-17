@@ -37,6 +37,7 @@ export interface UseRequestFormReturn {
   // Staggered loading
   showAdwMonitor: boolean;
   showHopperQueue: boolean;
+  showSystemStatus: boolean;
 
   // Drag and drop
   isDragging: boolean;
@@ -62,7 +63,8 @@ export interface UseRequestFormReturn {
 export function useRequestForm(): UseRequestFormReturn {
   // Stagger panel loading to prevent initial load slowdown
   const showAdwMonitor = useStaggeredLoad(100);  // Load ADW monitor after 100ms
-  const showHopperQueue = useStaggeredLoad(400); // Load hopper queue after 400ms
+  const showHopperQueue = useStaggeredLoad(200); // Load hopper queue after 200ms (reduced from 400ms)
+  const showSystemStatus = useStaggeredLoad(300); // Load system status after 300ms (NEW - defer expensive preflight checks)
 
   // Form state
   const [nlInput, setNlInput] = useState('');
@@ -362,6 +364,7 @@ export function useRequestForm(): UseRequestFormReturn {
     // Staggered loading
     showAdwMonitor,
     showHopperQueue,
+    showSystemStatus,
 
     // Drag and drop
     isDragging,

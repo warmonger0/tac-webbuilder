@@ -70,28 +70,34 @@ export function useReliableWebSocket<T, M = any>({
     queryFnRef.current = queryFn;
   }, [queryFn]);
 
-  // Fallback polling DISABLED - WebSocket only
-  // If WebSocket fails, show error state instead of falling back to HTTP polling
+  // Initial HTTP fetch + fallback polling
+  // Fetch data immediately on mount, then rely on WebSocket for updates
+  // Fall back to polling if WebSocket fails to connect
   const { data: polledData } = useQuery({
     queryKey,
     queryFn: () => queryFnRef.current(),
-    refetchInterval: false, // DISABLED: No polling fallback
-    enabled: false, // DISABLED: WebSocket-only mode
+    refetchInterval: !state.isConnected ? pollingInterval : false, // Poll only when WebSocket disconnected
+    enabled: enabled, // Always fetch initial data
+    staleTime: 0, // Always fetch fresh data on mount
   });
 
-  // Handle polled data
+  // Handle polled data (initial fetch + fallback)
   useEffect(() => {
-    if (!state.isConnected && polledData) {
+    if (polledData) {
       // Convert HTTP response to WebSocket message format
       // The polledData is the raw API response (T), but onMessage expects a message (M)
       // For most cases, polledData should already be in the correct format
       // But we need to handle it carefully
       onMessageRef.current(polledData as any as M);
-      setState((prev) => ({
-        ...prev,
-        lastUpdated: new Date(),
-        connectionQuality: 'poor',
-      }));
+
+      // Update state only if not connected (to show polling status)
+      if (!state.isConnected) {
+        setState((prev) => ({
+          ...prev,
+          lastUpdated: new Date(),
+          connectionQuality: 'poor',
+        }));
+      }
     }
   }, [polledData, state.isConnected]);
 

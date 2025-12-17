@@ -43,6 +43,8 @@ export function PreflightCheckPanel() {
       }
       return response.json();
     },
+    // CRITICAL: Do NOT auto-fetch on mount - only run when user clicks "Run Checks"
+    enabled: false,
     // No auto-refresh - preflight checks should only run on-demand or before workflow launch
     refetchInterval: false,
     // Only fetch when component mounts, not on every window focus
