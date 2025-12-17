@@ -9,6 +9,8 @@
 
 Implemented an intelligent pattern matching system that learns from completed workflows to provide instant cost/time estimates for new features. This reduces dry-run analysis time from 10 seconds to under 1 second for 80% of requests after the learning phase, achieving a 70% overall speed improvement while maintaining estimation accuracy.
 
+**Status:** ✅ COMPLETE - Automatic learning integrated (Session: Dec 17, 2025)
+
 ## What Was Built
 
 - **Pattern Extraction Module**: Analyzes completed workflows to extract reusable patterns including phase structure, file counts, risk distribution, and resource usage
@@ -39,6 +41,12 @@ Implemented an intelligent pattern matching system that learns from completed wo
 - `app/server/migrations/add_avg_duration_minutes.py` (NEW, 69 lines): Database schema update
   - Adds avg_duration_minutes column to operation_patterns table
   - Supports both PostgreSQL and SQLite
+
+- `adws/adw_modules/success_operations.py` (+16 lines): **Automatic learning integration** (Commit 78990a7)
+  - Integrated `save_completed_workflow_pattern()` into ADW completion flow
+  - Called automatically in `close_issue_on_success()`
+  - Best-effort operation (doesn't fail workflow completion)
+  - Learns from planned_features + workflow_history tables
 
 ### Key Changes
 
@@ -85,19 +93,30 @@ if result["success"]:
     print(f"Pattern matched: {dry_run.pattern_matched}")
 ```
 
-**Saving Completed Workflows (Future Enhancement):**
+**Saving Completed Workflows (Automatic - Implemented):**
+
+Pattern learning is now fully automatic! When ADW workflows complete successfully:
 
 ```python
-from core.workflow_dry_run import save_completed_workflow_pattern
+# Automatically called in adw_modules/success_operations.py
+# Inside close_issue_on_success():
 
-# Call this when ADW workflow completes successfully
-pattern_id = save_completed_workflow_pattern(
-    feature_id=123,
-    feature_title="Add user authentication endpoint",
-    feature_description="Implement JWT-based auth with refresh tokens",
-    dry_run_result=original_dry_run_result  # From pre-flight checks
+from core.workflow_pattern_cache import save_completed_workflow_pattern
+
+# Triggered automatically on workflow completion
+pattern_saved = save_completed_workflow_pattern(
+    feature_id=int(issue_number),
+    logger=logger
 )
+
+# No manual intervention required!
+# System learns from:
+# - Feature details from planned_features table
+# - Workflow statistics from workflow_history table
+# - Aggregated cost, time, token usage
 ```
+
+**Implementation Status:** ✅ COMPLETE (Commit 78990a7)
 
 ## Configuration
 
@@ -192,11 +211,11 @@ With 100 dry-runs per month:
 
 ### Current Limitations
 
-1. **Pattern Learning Not Automated**: Currently patterns must be manually saved via `save_completed_workflow_pattern()`. Future enhancement will integrate with ADW completion handler.
+1. **Conservative Estimates for Cache Hits**: Cached patterns use "medium" risk level for all phases as a conservative default since file-level details aren't cached.
 
-2. **Conservative Estimates for Cache Hits**: Cached patterns use "medium" risk level for all phases as a conservative default since file-level details aren't cached.
+2. **No Pattern Pruning**: Old or rarely-used patterns remain in database indefinitely. Future enhancement needed for pattern lifecycle management.
 
-3. **No Pattern Pruning**: Old or rarely-used patterns remain in database indefinitely. Future enhancement needed for pattern lifecycle management.
+3. **E2E Testing Pending**: Cache hit requires completed workflow to test. Infrastructure complete, awaiting first real workflow completion.
 
 ### Pattern Matching Strategy
 
@@ -226,16 +245,16 @@ last_seen              TIMESTAMP
 
 ### Future Enhancements
 
-1. **Automatic Learning**: Integrate `save_completed_workflow_pattern()` into ADW completion handler to learn automatically
+1. **Pattern Quality Scoring**: Compare estimated vs actual costs to refine pattern accuracy over time
 
-2. **Pattern Quality Scoring**: Compare estimated vs actual costs to refine pattern accuracy over time
-
-3. **Pattern Analytics Dashboard**:
+2. **Pattern Analytics Dashboard**:
    - Most common patterns
    - Pattern accuracy metrics
    - Cache hit rate over time
 
-4. **Pattern Variants**: Support optimistic/pessimistic estimates based on historical variance
+3. **Pattern Variants**: Support optimistic/pessimistic estimates based on historical variance
+
+4. **Pattern Pruning**: Lifecycle management for old or low-quality patterns
 
 5. **Pattern Pruning**: Remove patterns that haven't been used in 90+ days or have low confidence scores
 
