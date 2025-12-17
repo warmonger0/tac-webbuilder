@@ -461,3 +461,91 @@ class PhaseQueueRepository:
         except Exception as e:
             logger.error(f"[ERROR] Failed to set config value: {str(e)}")
             raise
+
+    def try_acquire_workflow_lock(self, feature_id: int, adw_id: str) -> bool:
+        """
+        Try to acquire exclusive workflow lock for a feature.
+
+        Prevents multiple concurrent workflows on the same issue by checking
+        for existing active workflows before allowing a new one to start.
+
+        Args:
+            feature_id: GitHub issue number to lock
+            adw_id: ADW workflow ID requesting the lock
+
+        Returns:
+            True if lock acquired (safe to proceed), False if another workflow is active
+
+        Note:
+            This is a "soft lock" - it checks state but doesn't create a database lock.
+            The actual lock is enforced by creating a phase_queue entry with status 'running'.
+        """
+        try:
+            logger.info(f"Attempting to acquire workflow lock for feature {feature_id} (ADW: {adw_id})")
+
+            # Get all workflows for this feature
+            existing_workflows = self.get_all_by_feature_id(feature_id)
+
+            # Check for active workflows (not completed, failed, or cancelled)
+            active_statuses = [
+                "running", "planned", "building", "linting", "testing",
+                "reviewing", "documenting", "shipping", "cleaning_up", "verifying"
+            ]
+
+            active_workflows = [
+                w for w in existing_workflows
+                if w.status in active_statuses and w.adw_id != adw_id
+            ]
+
+            if active_workflows:
+                active = active_workflows[0]
+                logger.warning(
+                    f"Workflow lock denied: Feature {feature_id} already has active workflow "
+                    f"(ADW: {active.adw_id}, Phase: {active.phase_name}, Status: {active.status})"
+                )
+                return False
+
+            logger.info(f"Workflow lock acquired for feature {feature_id} (ADW: {adw_id})")
+            return True
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to check workflow lock: {str(e)}")
+            # On error, allow workflow to proceed (fail-open for safety)
+            logger.warning("Workflow lock check failed, allowing workflow to proceed")
+            return True
+
+    def release_workflow_lock(self, feature_id: int, adw_id: str) -> None:
+        """
+        Release workflow lock for a feature.
+
+        Note: In practice, the lock is released by updating phase_queue status
+        to a terminal state (completed, failed, cancelled). This method is
+        provided for explicit lock management if needed.
+
+        Args:
+            feature_id: GitHub issue number to unlock
+            adw_id: ADW workflow ID releasing the lock
+        """
+        try:
+            logger.info(f"Releasing workflow lock for feature {feature_id} (ADW: {adw_id})")
+
+            # Get workflows for this ADW
+            workflows = self.get_all_by_feature_id(feature_id)
+            adw_workflows = [w for w in workflows if w.adw_id == adw_id]
+
+            if not adw_workflows:
+                logger.warning(f"No workflows found for ADW {adw_id} on feature {feature_id}")
+                return
+
+            # Update all this ADW's workflows to completed/failed
+            # (This is normally done by phase completion, but we provide explicit release)
+            for workflow in adw_workflows:
+                if workflow.status not in ["completed", "failed", "cancelled"]:
+                    logger.info(f"Setting workflow {workflow.queue_id} to completed state for lock release")
+                    self.update_status(str(workflow.queue_id), "completed")
+
+            logger.info(f"Workflow lock released for feature {feature_id} (ADW: {adw_id})")
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to release workflow lock: {str(e)}")
+            # Don't raise - lock release failure shouldn't block workflow
