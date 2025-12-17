@@ -496,7 +496,24 @@ class PhaseCoordinator:
                 ).decode().strip()
                 env["GITHUB_TOKEN"] = github_token
                 env["GH_TOKEN"] = github_token  # gh CLI prefers GH_TOKEN
-                logger.info("[AUTO-START] GitHub token loaded from gh CLI (GITHUB_TOKEN + GH_TOKEN)")
+                env["GITHUB_PAT"] = github_token  # ADW code uses GITHUB_PAT
+
+                # Force gh CLI to use token auth only (no keychain)
+                # Create clean config dir and write token auth
+                gh_config_dir = os.path.join(repo_root, "agents", adw_id, ".gh-config")
+                os.makedirs(gh_config_dir, exist_ok=True)
+
+                # Write gh CLI auth config with token
+                hosts_yml = os.path.join(gh_config_dir, "hosts.yml")
+                with open(hosts_yml, "w") as f:
+                    f.write(f"github.com:\n")
+                    f.write(f"    oauth_token: {github_token}\n")
+                    f.write(f"    user: \"\"\n")
+                    f.write(f"    git_protocol: https\n")
+
+                env["GH_CONFIG_DIR"] = gh_config_dir
+
+                logger.info("[AUTO-START] GitHub token loaded and gh config written (GITHUB_TOKEN + GH_TOKEN + hosts.yml)")
             except (subprocess.CalledProcessError, FileNotFoundError) as token_error:
                 logger.warning(
                     f"[AUTO-START] Could not get GitHub token: {token_error}. "
@@ -509,15 +526,17 @@ class PhaseCoordinator:
                 log_file = os.path.join(repo_root, "agents", adw_id, "subprocess.log")
                 os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
-                with open(log_file, "w") as log:
-                    subprocess.Popen(
-                        cmd,
-                        cwd=repo_root,
-                        start_new_session=True,
-                        stdout=log,
-                        stderr=subprocess.STDOUT,  # Combine stderr with stdout
-                        env=env,  # Pass environment with GITHUB_TOKEN
-                    )
+                # Open log file without context manager so it stays open for subprocess
+                log_handle = open(log_file, "w")
+                subprocess.Popen(
+                    cmd,
+                    cwd=repo_root,
+                    start_new_session=True,
+                    stdout=log_handle,
+                    stderr=subprocess.STDOUT,  # Combine stderr with stdout
+                    env=env,  # Pass environment with GITHUB_TOKEN
+                    close_fds=False,  # Keep file descriptors open for subprocess
+                )
                 logger.info(
                     f"[AUTO-START] Successfully started workflow "
                     f"(issue #{issue_number}, adw_id: {adw_id}, log: {log_file})"
