@@ -119,11 +119,15 @@ class StateValidator:
 
             from repositories.phase_queue_repository import PhaseQueueRepository
             repo = PhaseQueueRepository()
-            workflow = repo.find_by_issue_number(issue_number)
+            # Get all phases for this issue (feature_id == issue_number in ADW context)
+            workflows = repo.get_all_by_feature_id(issue_number)
 
-            if not workflow:
+            if not workflows:
                 errors.append(f"Workflow not found for issue {issue_number}")
                 return ValidationResult(False, errors, warnings)
+
+            # Use the first workflow (there should only be one per issue)
+            workflow = workflows[0]
         except Exception as e:
             errors.append(f"Failed to query database: {str(e)}")
             return ValidationResult(False, errors, warnings)
@@ -175,11 +179,15 @@ class StateValidator:
 
             from repositories.phase_queue_repository import PhaseQueueRepository
             repo = PhaseQueueRepository()
-            workflow = repo.find_by_issue_number(issue_number)
+            # Get all phases for this issue (feature_id == issue_number in ADW context)
+            workflows = repo.get_all_by_feature_id(issue_number)
 
-            if not workflow:
+            if not workflows:
                 errors.append(f"Workflow not found for issue {issue_number}")
                 return ValidationResult(False, errors, warnings)
+
+            # Use the first workflow (there should only be one per issue)
+            workflow = workflows[0]
         except Exception as e:
             errors.append(f"Failed to query database: {str(e)}")
             return ValidationResult(False, errors, warnings)
