@@ -508,8 +508,9 @@ export function PlansPanel() {
     lastUpdated: wsLastUpdated,
   } = usePlannedFeaturesWebSocket();
 
-  // Loading state: show loading only if no data yet
-  const isLoading = !features || features.length === 0;
+  // Loading state: show loading only if features array is null/undefined (not yet fetched)
+  // An empty array [] is a valid state (no features in database)
+  const isLoading = features === undefined || features === null;
   const error = null; // WebSocket handles errors internally
 
   // Start automation mutation

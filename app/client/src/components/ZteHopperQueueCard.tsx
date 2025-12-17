@@ -13,9 +13,8 @@ export function ZteHopperQueueCard() {
   const [error, setError] = useState<string | null>(null);
 
   // Use shared WebSocket context for real-time updates
-  const { queueData, queueConnectionState } = useRequestFormWebSocket();
+  const { queueData } = useRequestFormWebSocket();
   const { phases, paused: isPaused } = queueData;
-  const { isConnected } = queueConnectionState;
 
   // Local state for tracking pause status updates
   const [localIsPaused, setLocalIsPaused] = useState(isPaused);
@@ -25,9 +24,9 @@ export function ZteHopperQueueCard() {
     setLocalIsPaused(isPaused);
   }
 
-  // Loading is true when not connected
-  const loading = !isConnected && phases.length === 0;
-  const configLoading = !isConnected;
+  // Don't block on WebSocket connection - show empty state immediately
+  const loading = false; // WebSocket will update asynchronously
+  const configLoading = false;
 
   const handleTogglePause = async (paused: boolean) => {
     try {

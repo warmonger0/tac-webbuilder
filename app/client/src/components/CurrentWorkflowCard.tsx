@@ -7,7 +7,7 @@ export function CurrentWorkflowCard() {
   // Use shared WebSocket context for real-time updates
   const { adwMonitorData, adwConnectionState } = useRequestFormWebSocket();
   const { workflows } = adwMonitorData;
-  const { isConnected } = adwConnectionState;
+  const { isConnected } = adwConnectionState; // Used for connection indicator in UI
 
   // Select current workflow (prioritize running > paused) - ONLY show active workflows
   const workflow = useMemo(() => {
@@ -19,7 +19,8 @@ export function CurrentWorkflowCard() {
       || null; // Show "No Active Workflow" if only failed/completed workflows exist
   }, [workflows]);
 
-  const loading = !isConnected && workflows.length === 0;
+  // Don't block on WebSocket connection - show empty state immediately
+  const loading = false; // WebSocket will update asynchronously
 
   const renderIcon = (iconName: string, status: 'pending' | 'active' | 'completed' = 'pending') => {
     const iconClass = `w-6 h-6 transition-all duration-300 ${
