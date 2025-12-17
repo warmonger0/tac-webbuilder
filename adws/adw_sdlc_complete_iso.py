@@ -309,8 +309,8 @@ def main():
 
     state = ADWState.load(adw_id, logger)
     state.update(
-        workflow_template="adw_sdlc_complete_iso",
-        status="running"
+        workflow_template="adw_sdlc_complete_iso"
+        # Note: status managed by PhaseQueueRepository (database is SSoT)
     )
     state.save("adw_sdlc_complete_iso")
     logger.info("✅ Updated state to show full SDLC workflow active")
