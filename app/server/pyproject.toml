@@ -65,7 +65,7 @@ integration = [
 ]
 
 [tool.setuptools]
-packages = ["app", "core", "services", "utils"]
+packages = ["core", "services", "utils", "models", "repositories", "routes", "database"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
