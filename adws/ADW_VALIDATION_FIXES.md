@@ -163,13 +163,16 @@ packages = ["core", "services", "utils", "models", "repositories", "routes", "da
 - ❌ Database queries: Failed with missing method error
 - ❌ Standalone ADW runs: Failed requiring database records
 - ❌ Worktree setup: Failed with package directory error
+- ❌ Retry loops: False validation failures triggered unnecessary retries
 
-### After Fixes
+### After Fixes (Issues #214, #216)
 - ✅ Plan phase validation: Psycopg2 imports successfully
 - ✅ Database queries: Uses correct repository method
 - ✅ Standalone ADW runs: Falls back to file-based validation
 - ✅ Worktree setup: Backend installs successfully
-- ⚠️ Full workflow test: Requires clean issue (previous test issues hit loop detection)
+- ✅ No retries: Plan phase validates correctly on first attempt
+- ✅ PR creation: Issue #214 → PR #215, Issue #216 → PR #217
+- ✅ Full workflow: Progressed through Plan → Validate → Build → Lint → Test phases
 
 ---
 
@@ -196,11 +199,42 @@ Each failed workflow run posts ~10-15 comments:
 
 ---
 
+### 6. False Validation Failures Causing Retries (Commit fe03946)
+
+**Problem:**
+- Plan phase completed successfully (files created, branch pushed, PR created)
+- Validation incorrectly reported "Plan phase incomplete after execution"
+- Workflow retried unnecessarily, causing push failures and loop detection
+
+**Root Cause:**
+- Validation looked for `adw_state.json` in worktree: `trees/{adw_id}/adw_state.json`
+- ADWState actually saves to agents directory: `agents/{adw_id}/adw_state.json`
+- Validation couldn't find state file → false negative → triggered retries
+
+**Fix:**
+```python
+# Check both locations for state file
+state_file_worktree = worktree / 'adw_state.json'
+
+# Primary location (where ADWState saves)
+project_root = worktree.parent.parent
+state_file_agents = project_root / 'agents' / adw_id / 'adw_state.json'
+
+if not state_file_worktree.exists() and not (state_file_agents and state_file_agents.exists()):
+    errors.append("adw_state.json not found")
+```
+
+**Files Changed:**
+- `adws/utils/state_validator.py` - Check both locations, use portable paths
+
+---
+
 ## Commits Pushed
 
 All fixes pushed to main:
 
 ```
+fe03946 fix: Check both agents/ and worktree locations for adw_state.json in validation
 8b11e2d fix: Correct setuptools package list in app/server/pyproject.toml
 52a545d fix: Handle None workflow in StateValidator phase validation methods
 02f7eac fix: Make StateValidator work for standalone ADW runs without database records
@@ -287,6 +321,16 @@ Even if `adws/pyproject.toml` has the dependency, inline scripts won't see it.
 ✅ **Root Cause:** Inline script dependencies were incomplete
 ✅ **Secondary Issue:** Wrong repository method called (5 locations)
 ✅ **Design Decision:** Standalone mode now supported via fallback validation
-✅ **Pre-existing Bug:** Fixed incorrect pyproject.toml package list
+✅ **Pre-existing Bugs:** Fixed pyproject.toml package list & state file location check
+✅ **Retry Prevention:** Validation now checks correct locations, no false failures
 
-**All critical validation bugs resolved and committed.**
+**All 6 critical validation bugs resolved and committed.**
+
+### Bugs Fixed Summary
+
+1. ✅ Missing psycopg2-binary in inline script dependencies
+2. ✅ Non-existent find_by_issue_number() method (5 locations)
+3. ✅ Database records required for standalone mode
+4. ✅ None workflow attribute access crashes
+5. ✅ Incorrect pyproject.toml package list
+6. ✅ State file location mismatch causing false validation failures
