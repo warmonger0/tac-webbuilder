@@ -108,19 +108,19 @@ export function RequestFormWebSocketProvider({ children }: RequestFormWebSocketP
     system: 0,
   });
 
-  // HTTP fallback queries (disabled by default, only enabled when WebSocket fails)
+  // HTTP fallback queries (enabled for fast initial load like Panel 5)
   const { data: queuePolledData } = useQuery({
     queryKey: ['queue'],
     queryFn: getQueueData,
     refetchInterval: false,
-    enabled: false,
+    enabled: true, // Enable initial HTTP fetch for fast page load
   });
 
   const { data: adwPolledData } = useQuery({
     queryKey: ['adw-monitor'],
     queryFn: getAdwMonitor,
     refetchInterval: false,
-    enabled: false,
+    enabled: true, // Enable initial HTTP fetch for fast page load
   });
 
   const { data: systemPolledData } = useQuery({
@@ -130,43 +130,52 @@ export function RequestFormWebSocketProvider({ children }: RequestFormWebSocketP
       return getSystemStatus();
     },
     refetchInterval: false,
-    enabled: false,
+    enabled: true, // Enable initial HTTP fetch for fast page load
   });
 
-  // Update state when polled data arrives
+  // Update state when polled data arrives (use HTTP data immediately for fast initial load)
   useEffect(() => {
-    if (!queueConnectionState.isConnected && queuePolledData) {
+    if (queuePolledData) {
       setQueueData(queuePolledData);
-      setQueueConnectionState(prev => ({
-        ...prev,
-        lastUpdated: new Date(),
-        connectionQuality: 'poor',
-      }));
+      // Only mark as 'poor' quality if WebSocket is explicitly disconnected
+      if (!queueConnectionState.isConnected) {
+        setQueueConnectionState(prev => ({
+          ...prev,
+          lastUpdated: new Date(),
+          connectionQuality: 'poor',
+        }));
+      }
     }
   }, [queuePolledData, queueConnectionState.isConnected]);
 
   useEffect(() => {
-    if (!adwConnectionState.isConnected && adwPolledData) {
+    if (adwPolledData) {
       setAdwMonitorData({
         ...adwPolledData,
         lastUpdated: adwPolledData.last_updated || new Date().toISOString(),
       });
-      setAdwConnectionState(prev => ({
-        ...prev,
-        lastUpdated: new Date(),
-        connectionQuality: 'poor',
-      }));
+      // Only mark as 'poor' quality if WebSocket is explicitly disconnected
+      if (!adwConnectionState.isConnected) {
+        setAdwConnectionState(prev => ({
+          ...prev,
+          lastUpdated: new Date(),
+          connectionQuality: 'poor',
+        }));
+      }
     }
   }, [adwPolledData, adwConnectionState.isConnected]);
 
   useEffect(() => {
-    if (!systemConnectionState.isConnected && systemPolledData) {
+    if (systemPolledData) {
       setSystemStatusData(systemPolledData);
-      setSystemConnectionState(prev => ({
-        ...prev,
-        lastUpdated: new Date(),
-        connectionQuality: 'poor',
-      }));
+      // Only mark as 'poor' quality if WebSocket is explicitly disconnected
+      if (!systemConnectionState.isConnected) {
+        setSystemConnectionState(prev => ({
+          ...prev,
+          lastUpdated: new Date(),
+          connectionQuality: 'poor',
+        }));
+      }
     }
   }, [systemPolledData, systemConnectionState.isConnected]);
 

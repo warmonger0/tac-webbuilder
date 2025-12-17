@@ -50,7 +50,7 @@ function sortByCompletedDate(a: PlannedFeature, b: PlannedFeature) {
 
 // Apply filters and group features by status
 function groupFeaturesByStatus(
-  features: PlannedFeature[] | undefined,
+  features: PlannedFeature[] | null | undefined,
   filterPriority: string | null,
   filterType: string | null
 ) {
@@ -589,6 +589,13 @@ export function PlansPanel() {
     setPreflightResults(null);
   };
 
+  // Group features by status with filters applied (memoized to prevent unnecessary re-sorting)
+  // MUST be called before any early returns to satisfy Rules of Hooks
+  const { inProgress, planned, completed } = useMemo(
+    () => groupFeaturesByStatus(features, filterPriority, filterType),
+    [features, filterPriority, filterType]
+  );
+
   if (isLoading) {
     return <LoadingState message="Loading plans..." />;
   }
@@ -596,12 +603,6 @@ export function PlansPanel() {
   if (error) {
     return <ErrorState message={`Error loading plans: ${(error as Error).message}`} />;
   }
-
-  // Group features by status with filters applied (memoized to prevent unnecessary re-sorting)
-  const { inProgress, planned, completed } = useMemo(
-    () => groupFeaturesByStatus(features, filterPriority, filterType),
-    [features, filterPriority, filterType]
-  );
 
   // Handle manual refresh (for WebSocket reconnection)
   const handleRefresh = () => {
