@@ -74,9 +74,10 @@ async def get_planned_features(
         None, description="Filter by priority: high, medium, low"
     ),
     limit: int = Query(100, description="Maximum number of results", ge=1, le=1000),
+    offset: int = Query(0, description="Number of results to skip (pagination)", ge=0),
 ):
     """
-    Get all planned features with optional filtering.
+    Get all planned features with optional filtering and pagination.
 
     Results are ordered by:
     1. Status (in_progress, planned, completed, cancelled)
@@ -88,6 +89,7 @@ async def get_planned_features(
     - item_type: Filter by type
     - priority: Filter by priority
     - limit: Maximum results (1-1000, default: 100)
+    - offset: Skip N results for pagination (default: 0)
 
     Returns:
         List of PlannedFeature objects
@@ -95,10 +97,10 @@ async def get_planned_features(
     try:
         service = PlannedFeaturesService()
         features = service.get_all(
-            status=status, item_type=item_type, priority=priority, limit=limit
+            status=status, item_type=item_type, priority=priority, limit=limit, offset=offset
         )
         logger.info(
-            f"[GET /api/planned-features] Retrieved {len(features)} features"
+            f"[GET /api/planned-features] Retrieved {len(features)} features (offset: {offset})"
         )
         return features
     except Exception as e:

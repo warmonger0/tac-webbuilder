@@ -4,7 +4,7 @@
  * Displays planned features, sessions, and work items fetched from the API.
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlannedFeature, plannedFeaturesClient, PlannedFeaturesStats } from '../api/plannedFeaturesClient';
 import { systemClient, PreflightChecksResponse } from '../api/systemClient';
@@ -596,11 +596,10 @@ export function PlansPanel() {
     return <ErrorState message={`Error loading plans: ${(error as Error).message}`} />;
   }
 
-  // Group features by status with filters applied
-  const { inProgress, planned, completed } = groupFeaturesByStatus(
-    features,
-    filterPriority,
-    filterType
+  // Group features by status with filters applied (memoized to prevent unnecessary re-sorting)
+  const { inProgress, planned, completed } = useMemo(
+    () => groupFeaturesByStatus(features, filterPriority, filterType),
+    [features, filterPriority, filterType]
   );
 
   // Handle manual refresh (for WebSocket reconnection)

@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
 import type { AdwWorkflowStatus } from '../api/client';
 import { phaseSvgIconMap, workflowPhases } from '../config/workflows';
-import { useADWMonitorWebSocket } from '../hooks/useWebSocket';
+import { useRequestFormWebSocket } from '../contexts/RequestFormWebSocketContext';
 
 export function CurrentWorkflowCard() {
-  // Use WebSocket for real-time updates instead of polling
-  const { workflows, isConnected } = useADWMonitorWebSocket();
+  // Use shared WebSocket context for real-time updates
+  const { adwMonitorData, adwConnectionState } = useRequestFormWebSocket();
+  const { workflows } = adwMonitorData;
+  const { isConnected } = adwConnectionState;
 
   // Select current workflow (prioritize running > paused) - ONLY show active workflows
   const workflow = useMemo(() => {

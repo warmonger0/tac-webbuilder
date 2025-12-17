@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { confirmAndPost, getCostEstimate, getPreflightChecks, getPreview, getSystemStatus, submitRequest } from '../api/client';
-import type { CostEstimate, GitHubIssue, ServiceHealth } from '../types';
+import { confirmAndPost, getCostEstimate, getPreflightChecks, getPreview, submitRequest } from '../api/client';
+import type { CostEstimate, GitHubIssue } from '../types';
 import { type DragHandlers, useDragAndDrop } from '../hooks/useDragAndDrop';
 import { useStaggeredLoad } from '../hooks/useStaggeredLoad';
 import { parsePhases, type PhaseParseResult } from '../utils/phaseParser';
@@ -81,12 +81,15 @@ export function useRequestForm(): UseRequestFormReturn {
   const [requestId, setRequestId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // System health state
-  const [systemHealthy, setSystemHealthy] = useState(true);
-  const [healthWarning, setHealthWarning] = useState<string | null>(null);
+  // System health state (maintained for interface compatibility)
+  const systemHealthy = true;
+  const healthWarning = null;
 
   // Ref for debounce timer
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Ref for tracking form changes (for smart auto-save)
+  const lastSavedStateRef = useRef<string>('');
 
   // Initialize drag-and-drop hook
   const { isDragging, error: dragError, isReading, dragHandlers, clearError } = useDragAndDrop({
@@ -142,14 +145,22 @@ export function useRequestForm(): UseRequestFormReturn {
     }
   }, []);
 
-  // Debounced auto-save effect
+  // Smart auto-save: only save when form data actually changes
   useEffect(() => {
+    // Create a hash of current state
+    const currentState = JSON.stringify({ nlInput, projectPath, autoPost });
+
+    // Skip save if state hasn't changed
+    if (currentState === lastSavedStateRef.current) {
+      return;
+    }
+
     // Clear existing timer
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
     }
 
-    // Set new timer for auto-save
+    // Set new timer for auto-save (increased from 300ms to 1000ms)
     saveTimerRef.current = setTimeout(() => {
       try {
         saveFormState({
@@ -157,11 +168,12 @@ export function useRequestForm(): UseRequestFormReturn {
           projectPath,
           autoPost,
         });
+        lastSavedStateRef.current = currentState;
         setStorageWarning(null);
       } catch {
         setStorageWarning('Unable to save form state. Your work may not persist if you navigate away.');
       }
-    }, 300); // AUTO_SAVE_DEBOUNCE_MS = 300
+    }, 1000); // Increased debounce time to reduce localStorage writes
 
     // Cleanup on unmount
     return () => {
@@ -200,7 +212,6 @@ export function useRequestForm(): UseRequestFormReturn {
 
     setIsLoading(true);
     setError(null);
-    setHealthWarning(null);
 
     // PRE-FLIGHT CHECKS: Run BEFORE creating issue
     try {
@@ -225,32 +236,8 @@ export function useRequestForm(): UseRequestFormReturn {
       return;
     }
 
-    // System health check (warnings only, not blocking)
-    try {
-      const healthStatus = await getSystemStatus();
-      if (healthStatus.overall_status === 'error') {
-        const unhealthyServices = Object.entries(healthStatus.services)
-          .filter(([, service]) => (service as ServiceHealth).status === 'error')
-          .map(([, service]) => (service as ServiceHealth).name);
-
-        setHealthWarning(
-          `Warning: Critical services are down: ${unhealthyServices.join(', ')}. ` +
-          `The workflow may fail. Do you want to proceed anyway?`
-        );
-        setSystemHealthy(false);
-      } else if (healthStatus.overall_status === 'degraded') {
-        setHealthWarning(
-          `Some services are degraded. The workflow may experience delays but should complete.`
-        );
-        setSystemHealthy(true);
-      } else {
-        setSystemHealthy(true);
-      }
-    } catch {
-      // If health check fails, warn but allow submission
-      setHealthWarning('Unable to check system health. Proceeding anyway.');
-    }
-
+    // System health is now monitored by SystemStatusPanel via WebSocket
+    // Pre-flight checks above already validate critical requirements
     // Continue with submission (already set isLoading=true and error=null above)
     setSuccessMessage(null);
 

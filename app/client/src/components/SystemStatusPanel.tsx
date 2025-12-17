@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { redeliverGitHubWebhook, restartCloudflare, startWebhookService } from '../api/client';
 import type { ServiceHealth, SystemStatusResponse } from '../types';
-import { useSystemStatusWebSocket } from '../hooks/useWebSocket';
+import { useRequestFormWebSocket } from '../contexts/RequestFormWebSocketContext';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 import { PreflightCheckPanel } from './PreflightCheckPanel';
 import { intervals } from '../config/intervals';
@@ -14,16 +14,17 @@ export function SystemStatusPanel() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  // Use WebSocket for real-time updates instead of polling
-  const { systemStatus, isConnected, connectionQuality, lastUpdated } = useSystemStatusWebSocket();
+  // Use shared WebSocket context for real-time updates
+  const { systemStatusData, systemConnectionState } = useRequestFormWebSocket();
+  const { isConnected, connectionQuality, lastUpdated } = systemConnectionState;
 
   // Update status when WebSocket data changes
   useEffect(() => {
-    if (systemStatus) {
-      setStatus(systemStatus);
+    if (systemStatusData) {
+      setStatus(systemStatusData as SystemStatusResponse);
       setError(null);
     }
-  }, [systemStatus]);
+  }, [systemStatusData]);
 
   // Manual refresh function (re-connects WebSocket)
   const fetchStatus = () => {

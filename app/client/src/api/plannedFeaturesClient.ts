@@ -69,19 +69,21 @@ export interface PlannedFeaturesStats {
 // ============================================================================
 
 /**
- * Get all planned features with optional filtering
+ * Get all planned features with optional filtering and pagination
  */
 export async function getAll(params?: {
   status?: string;
   item_type?: string;
   priority?: string;
   limit?: number;
+  offset?: number;
 }): Promise<PlannedFeature[]> {
   const queryParams = new URLSearchParams();
   if (params?.status) queryParams.append('status', params.status);
   if (params?.item_type) queryParams.append('item_type', params.item_type);
   if (params?.priority) queryParams.append('priority', params.priority);
   if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.offset !== undefined) queryParams.append('offset', params.offset.toString());
 
   const url = queryParams.toString()
     ? `${API_BASE}/planned-features?${queryParams}`

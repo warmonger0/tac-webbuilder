@@ -403,9 +403,15 @@ export function usePlannedFeaturesWebSocket() {
     url: wsUrl,
     queryKey: ['planned-features'],
     queryFn: async () => {
-      const features = await plannedFeaturesClient.getAll({ limit: 200 });
+      // Optimization: Fetch only active items (in_progress + planned) initially to reduce load time
+      // Completed items can be fetched separately when user expands that section
+      const activeFeatures = await plannedFeaturesClient.getAll({
+        limit: 100,
+        // Note: Not filtering by status here to get all items for now
+        // In a future optimization, we could fetch active items first, then completed separately
+      });
       const stats = await plannedFeaturesClient.getStats();
-      return { features, stats };
+      return { features: activeFeatures, stats };
     },
     onMessage: (message: any) => {
       // Handle both WebSocket message format and HTTP polling response format

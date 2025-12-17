@@ -38,15 +38,17 @@ class PlannedFeaturesService:
         item_type: str | None = None,
         priority: str | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[PlannedFeature]:
         """
-        Get all planned features with optional filtering.
+        Get all planned features with optional filtering and pagination.
 
         Args:
             status: Filter by status ('planned', 'in_progress', 'completed', 'cancelled')
             item_type: Filter by type ('session', 'feature', 'bug', 'enhancement')
             priority: Filter by priority ('high', 'medium', 'low')
             limit: Maximum number of results (default: 100)
+            offset: Number of results to skip for pagination (default: 0)
 
         Returns:
             List of PlannedFeature objects ordered by priority and status
@@ -84,15 +86,16 @@ class PlannedFeaturesService:
                     END,
                     created_at DESC
             """
-            query += f" LIMIT {self.adapter.placeholder()}"
+            query += f" LIMIT {self.adapter.placeholder()} OFFSET {self.adapter.placeholder()}"
             params.append(limit)
+            params.append(offset)
 
             cursor.execute(query, tuple(params))
             rows = cursor.fetchall()
 
             features = [self._row_to_model(row) for row in rows]
             logger.info(
-                f"[{self.__class__.__name__}] Retrieved {len(features)} planned features"
+                f"[{self.__class__.__name__}] Retrieved {len(features)} planned features (offset: {offset})"
             )
             return features
 
