@@ -141,10 +141,10 @@ os.makedirs("db", exist_ok=True)
 
 # Initialize services - use singleton to prevent multiple instances across reloads
 manager = get_connection_manager()
-# Increase cache to 60s to avoid expensive filesystem scans on every request
-# The sync scans 116+ agent directories which takes ~10s
-# Disable background sync - workflows write directly to DB and WebSocket broadcasts changes
-workflow_service = WorkflowService(sync_cache_seconds=60, enable_background_sync=False)
+# Re-enable background sync to prevent state drift between filesystem and database
+# Faster sync interval (10s) ensures database stays in sync with filesystem
+# This is critical for workflows that update filesystem directly
+workflow_service = WorkflowService(sync_cache_seconds=10, enable_background_sync=True)
 service_controller = ServiceController(
     webhook_port=8001,
     webhook_script_path="adw_triggers/trigger_webhook.py",

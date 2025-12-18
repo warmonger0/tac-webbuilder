@@ -255,6 +255,9 @@ export function GlobalWebSocketProvider({ children }: GlobalWebSocketProviderPro
     enabled: true,
   });
 
+  // Defer system-status query using a state flag
+  const [shouldFetchSystemStatus, setShouldFetchSystemStatus] = useState(false);
+
   const { data: systemPolledData } = useQuery({
     queryKey: ['system-status'],
     queryFn: async () => {
@@ -262,7 +265,7 @@ export function GlobalWebSocketProvider({ children }: GlobalWebSocketProviderPro
       return getSystemStatus();
     },
     refetchInterval: false,
-    enabled: true,
+    enabled: shouldFetchSystemStatus,  // Don't fetch on mount - defer to reduce initial load time
   });
 
   const { data: workflowsPolledData } = useQuery({
@@ -289,8 +292,11 @@ export function GlobalWebSocketProvider({ children }: GlobalWebSocketProviderPro
   const { data: plannedFeaturesPolledData } = useQuery({
     queryKey: ['planned-features'],
     queryFn: async () => {
-      const features = await plannedFeaturesClient.getAll({ limit: 100 });
-      const stats = await plannedFeaturesClient.getStats();
+      // Parallelize API calls instead of sequential
+      const [features, stats] = await Promise.all([
+        plannedFeaturesClient.getAll({ limit: 100 }),
+        plannedFeaturesClient.getStats()
+      ]);
       return { features, stats };
     },
     refetchInterval: false,
@@ -414,6 +420,17 @@ export function GlobalWebSocketProvider({ children }: GlobalWebSocketProviderPro
       }
     }
   }, [webhookStatusPolledData, webhookStatusConnectionState.isConnected]);
+
+  // ============================================================================
+  // Deferred loading for system-status (performance optimization)
+  // ============================================================================
+  // Load system-status after 2 seconds to avoid blocking initial page load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShouldFetchSystemStatus(true);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // ============================================================================
   // Exponential backoff calculation

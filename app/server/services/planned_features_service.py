@@ -69,23 +69,9 @@ class PlannedFeaturesService:
                 query += f" AND priority = {self.adapter.placeholder()}"
                 params.append(priority)
 
-            # Order by status (in_progress first, then planned, completed, cancelled)
-            # Then by priority (high, medium, low), then by creation date
-            query += """
-                ORDER BY
-                    CASE status
-                        WHEN 'in_progress' THEN 1
-                        WHEN 'planned' THEN 2
-                        WHEN 'completed' THEN 3
-                        WHEN 'cancelled' THEN 4
-                    END,
-                    CASE priority
-                        WHEN 'high' THEN 1
-                        WHEN 'medium' THEN 2
-                        WHEN 'low' THEN 3
-                    END,
-                    created_at DESC
-            """
+            # Sort by created_at in database for initial ordering
+            # Then apply custom sorting in Python (faster for small result sets)
+            query += " ORDER BY created_at DESC"
             query += f" LIMIT {self.adapter.placeholder()} OFFSET {self.adapter.placeholder()}"
             params.append(limit)
             params.append(offset)
@@ -94,6 +80,22 @@ class PlannedFeaturesService:
             rows = cursor.fetchall()
 
             features = [self._row_to_model(row) for row in rows]
+
+            # Sort in Python (faster for small result sets than complex CASE statements)
+            # Order by: status (in_progress → planned → completed → cancelled)
+            #          priority (high → medium → low)
+            #          created_at (newest first)
+            from datetime import datetime
+
+            status_order = {'in_progress': 1, 'planned': 2, 'completed': 3, 'cancelled': 4}
+            priority_order = {'high': 1, 'medium': 2, 'low': 3}
+
+            features.sort(key=lambda f: (
+                status_order.get(f.status, 5),
+                priority_order.get(f.priority, 4),
+                # Parse ISO string and negate timestamp for DESC order
+                -(datetime.fromisoformat(f.created_at).timestamp() if f.created_at else 0)
+            ))
             logger.info(
                 f"[{self.__class__.__name__}] Retrieved {len(features)} planned features (offset: {offset})"
             )
