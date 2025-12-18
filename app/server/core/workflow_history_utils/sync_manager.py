@@ -13,12 +13,12 @@ import logging
 from datetime import datetime
 
 from core.workflow_history_utils.database import (
-    _db_adapter,
     get_workflow_by_adw_id,
     get_workflow_history,
     insert_workflow_history,
     update_workflow_history,
 )
+from core.workflow_history_utils.database.schema import _get_adapter
 from core.workflow_history_utils.enrichment import enrich_cost_data_for_resync, enrich_workflow
 from core.workflow_history_utils.filesystem import scan_agents_directory
 
@@ -214,28 +214,33 @@ def sync_workflow_history() -> int:
 
         # Process each completed workflow for patterns
         patterns_detected_total = 0
-        for workflow in completed_workflows:
-            try:
-                # Check if this workflow has already been analyzed
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT COUNT(*) as count FROM pattern_occurrences WHERE adw_id = ?",
-                    (workflow.get('adw_id'),)
-                )
-                already_analyzed = cursor.fetchone()['count'] > 0
 
-                if not already_analyzed:
-                    result = process_and_persist_workflow(workflow, conn)
-                    patterns_detected = result.get('patterns_detected', 0)
-                    patterns_detected_total += patterns_detected
+        # Get database connection for pattern operations
+        adapter = _get_adapter()
+        with adapter.get_connection() as conn:
+            for workflow in completed_workflows:
+                try:
+                    # Check if this workflow has already been analyzed
+                    cursor = conn.cursor()
+                    ph = adapter.placeholder()
+                    cursor.execute(
+                        f"SELECT COUNT(*) as count FROM pattern_occurrences WHERE adw_id = {ph}",
+                        (workflow.get('adw_id'),)
+                    )
+                    already_analyzed = cursor.fetchone()['count'] > 0
 
-                    if patterns_detected > 0:
-                        logger.info(
-                            f"[PATTERN] Detected {patterns_detected} patterns "
-                            f"in {workflow.get('adw_id')}"
-                        )
-            except Exception as e:
-                logger.warning(f"[PATTERN] Learning failed for {workflow.get('adw_id')}: {e}")
+                    if not already_analyzed:
+                        result = process_and_persist_workflow(workflow, conn)
+                        patterns_detected = result.get('patterns_detected', 0)
+                        patterns_detected_total += patterns_detected
+
+                        if patterns_detected > 0:
+                            logger.info(
+                                f"[PATTERN] Detected {patterns_detected} patterns "
+                                f"in {workflow.get('adw_id')}"
+                            )
+                except Exception as e:
+                    logger.warning(f"[PATTERN] Learning failed for {workflow.get('adw_id')}: {e}")
 
         if patterns_detected_total > 0:
             logger.info(f"[PATTERN] Total patterns detected: {patterns_detected_total}")
