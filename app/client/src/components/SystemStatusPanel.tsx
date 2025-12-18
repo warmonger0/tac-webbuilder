@@ -4,6 +4,7 @@ import type { ServiceHealth, SystemStatusResponse } from '../types';
 import { useGlobalWebSocket } from '../contexts/GlobalWebSocketContext';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 import { PreflightCheckPanel } from './PreflightCheckPanel';
+import { GitCommitPanel } from './GitCommitPanel';
 import { intervals } from '../config/intervals';
 import { serviceDisplayOrder } from '../config/services';
 import { ErrorBanner } from './common/ErrorBanner';
@@ -328,6 +329,11 @@ export function SystemStatusPanel() {
                   />
                 ) : null;
               })}
+            </div>
+
+            {/* Git Commit Panel */}
+            <div className="mt-6">
+              <GitCommitPanel />
             </div>
 
             {/* Pre-Flight Health Checks */}

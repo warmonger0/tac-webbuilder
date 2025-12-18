@@ -19,6 +19,7 @@
 - **Database:** PostgreSQL only (production-grade, required for observability)
 - **Security:** Multi-layer SQL injection prevention
 - **Claude Code timeout:** 20-minute timeout for planning tasks (prevents premature termination)
+- **Rate limit handling:** Proactive GitHub API monitoring with graceful degradation (Session 20)
 
 ## Code Standards - Git Commits
 **CRITICAL:** Never include in commit messages:

@@ -1,6 +1,8 @@
 """
 Git operations endpoints for frontend UI.
 """
+from __future__ import annotations
+
 import logging
 import subprocess
 from datetime import datetime
