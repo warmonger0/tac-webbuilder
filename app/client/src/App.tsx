@@ -14,7 +14,19 @@ import { DataPanel } from './components/DataPanel';
 import { LogPanel } from './components/LogPanel';
 import { GlobalWebSocketProvider } from './contexts/GlobalWebSocketContext';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+  logger: {
+    log: () => {},
+    warn: () => {},
+    error: () => {},
+  },
+});
 const ACTIVE_TAB_STORAGE_KEY = 'tac-webbuilder-active-tab';
 
 function App() {

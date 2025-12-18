@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { intervals } from '../config/intervals';
 
-// Debug flag - only log in development mode
-const DEBUG_WS = import.meta.env.DEV;
+// Debug flag - disabled to reduce console noise
+const DEBUG_WS = false;
 
 interface ReliableWebSocketOptions<T, M = any> {
   url: string;

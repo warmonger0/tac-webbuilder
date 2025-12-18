@@ -5,8 +5,8 @@ import { getAdwMonitor, type AdwMonitorSummary, type AdwWorkflowStatus } from '.
 import { apiConfig } from '../config/api';
 import { intervals } from '../config/intervals';
 
-// Debug flag
-const DEBUG_WS = import.meta.env.DEV;
+// Debug flag - disabled to reduce console noise
+const DEBUG_WS = false;
 
 interface QueueData {
   phases: PhaseQueueItem[];

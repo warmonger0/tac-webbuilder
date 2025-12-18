@@ -7,8 +7,8 @@ import { useReliableWebSocket } from './useReliableWebSocket';
 import { apiConfig } from '../config/api';
 import { intervals } from '../config/intervals';
 
-// Debug flag - only log in development mode
-const DEBUG_WS = import.meta.env.DEV;
+// Debug flag - disabled to reduce console noise
+const DEBUG_WS = false;
 
 interface WorkflowsWebSocketMessage {
   type: 'workflows_update';
