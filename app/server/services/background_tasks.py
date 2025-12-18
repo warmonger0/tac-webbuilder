@@ -35,6 +35,7 @@ class BackgroundTaskManager:
         adw_monitor_watch_interval: float = 2.0,
         queue_watch_interval: float = 2.0,
         planned_features_watch_interval: float = 30.0,
+        pattern_sync_interval: float = 3600.0,  # 1 hour default
     ):
         """
         Initialize the BackgroundTaskManager
@@ -57,6 +58,7 @@ class BackgroundTaskManager:
         self.adw_monitor_watch_interval = adw_monitor_watch_interval
         self.queue_watch_interval = queue_watch_interval
         self.planned_features_watch_interval = planned_features_watch_interval
+        self.pattern_sync_interval = pattern_sync_interval
 
         # Task references for cleanup
         self._tasks: list[asyncio.Task] = []
@@ -93,6 +95,7 @@ class BackgroundTaskManager:
             # asyncio.create_task(self.watch_adw_monitor()),  # REMOVED - now event-driven
             asyncio.create_task(self.watch_queue()),
             asyncio.create_task(self.watch_planned_features()),
+            asyncio.create_task(self.watch_pattern_sync()),
         ]
 
         logger.info(
@@ -425,4 +428,68 @@ class BackgroundTaskManager:
 
         except asyncio.CancelledError:
             logger.info("[BACKGROUND_TASKS] Planned features watcher cancelled")
+            raise  # Re-raise to properly handle cancellation
+
+    async def watch_pattern_sync(self) -> None:
+        """
+        Background task to automatically sync patterns from operation_patterns to pattern_approvals.
+
+        This watcher:
+        - Runs every pattern_sync_interval seconds (default: 1 hour)
+        - Syncs only high-priority patterns (high confidence + high savings)
+        - Prevents overwhelming reviewers with low-value patterns
+        - Logs sync statistics for monitoring
+
+        Strategy:
+        - High confidence (70%+)
+        - High savings ($1000+/month)
+        - Proven patterns (5+ occurrences)
+        - Limit: Top 20 patterns per sync
+        """
+        try:
+            # Import here to avoid circular dependencies
+            from services.pattern_sync_service import PatternSyncService
+
+            pattern_sync_service = PatternSyncService()
+
+            logger.info(
+                f"[BACKGROUND_TASKS] Pattern sync watcher started "
+                f"(interval: {self.pattern_sync_interval}s)"
+            )
+
+            while True:
+                try:
+                    # Run high-priority pattern sync
+                    result = pattern_sync_service.sync_high_priority_patterns()
+
+                    logger.info(
+                        f"[BACKGROUND_TASKS] Pattern sync completed: "
+                        f"{result.synced_count} synced, {result.skipped_count} skipped, "
+                        f"{result.error_count} errors in {result.sync_duration_ms:.0f}ms"
+                    )
+
+                    # Log individual synced patterns if any
+                    if result.synced_count > 0:
+                        logger.info(
+                            f"[BACKGROUND_TASKS] Synced patterns: "
+                            f"{', '.join(result.synced_pattern_ids[:5])}"
+                            + (f" ... and {len(result.synced_pattern_ids) - 5} more"
+                               if len(result.synced_pattern_ids) > 5 else "")
+                        )
+
+                    # Log errors if any
+                    if result.error_count > 0:
+                        for error in result.errors:
+                            logger.error(f"[BACKGROUND_TASKS] Pattern sync error: {error}")
+
+                    await asyncio.sleep(self.pattern_sync_interval)
+
+                except Exception as e:
+                    logger.error(
+                        f"[BACKGROUND_TASKS] Error in pattern sync watcher: {e}"
+                    )
+                    await asyncio.sleep(300)  # Back off 5 minutes on error
+
+        except asyncio.CancelledError:
+            logger.info("[BACKGROUND_TASKS] Pattern sync watcher cancelled")
             raise  # Re-raise to properly handle cancellation

@@ -31,6 +31,7 @@ from routes import (
     latency_analytics_routes,
     observability_routes,
     pattern_review_routes,
+    pattern_sync_routes,
     planned_features_routes,
     queue_routes,
     roi_tracking_routes,
@@ -357,6 +358,9 @@ app.include_router(work_log_routes.router, prefix="/api/v1")
 
 # Initialize pattern review routes
 app.include_router(pattern_review_routes.router, prefix="/api/v1")
+
+# Initialize pattern sync routes
+app.include_router(pattern_sync_routes.router, prefix="/api/v1")
 
 # Initialize planned features routes (Panel 5)
 app.include_router(planned_features_routes.router)
