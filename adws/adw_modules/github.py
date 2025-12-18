@@ -19,6 +19,7 @@ import os
 import json
 from typing import Dict, List, Optional
 from .data_types import GitHubIssue, GitHubIssueListItem, GitHubComment
+from .rate_limit import check_graphql_rate_limit, RateLimitError, RateLimitInfo
 
 # Bot identifier to prevent webhook loops and filter bot comments
 ADW_BOT_IDENTIFIER = "[ADW-AGENTS]"
@@ -78,6 +79,21 @@ def extract_repo_path(github_url: str) -> str:
 
 def fetch_issue(issue_number: str, repo_path: str) -> GitHubIssue:
     """Fetch GitHub issue using gh CLI and return typed model."""
+    # Check rate limit before making API call
+    rate_limit = check_graphql_rate_limit()
+    if rate_limit and rate_limit.is_exhausted:
+        print(f"\n{'='*60}", file=sys.stderr)
+        print("⚠️  GitHub GraphQL API Rate Limit Exhausted", file=sys.stderr)
+        print(f"{'='*60}", file=sys.stderr)
+        print(f"Current Status: {rate_limit.remaining}/{rate_limit.limit} remaining", file=sys.stderr)
+        print(f"Resets in: {rate_limit.seconds_until_reset} seconds (~{rate_limit.seconds_until_reset // 60} minutes)", file=sys.stderr)
+        print(f"Reset time: {rate_limit.reset_at}", file=sys.stderr)
+        print(f"\n💡 Try again after the rate limit resets.", file=sys.stderr)
+        print(f"{'='*60}\n", file=sys.stderr)
+        raise RateLimitError(rate_limit)
+    elif rate_limit and rate_limit.remaining < 100:
+        print(f"\n⚠️  Warning: GitHub API rate limit low ({rate_limit.remaining}/{rate_limit.limit} remaining)", file=sys.stderr)
+
     # Use JSON output for structured data
     cmd = [
         "gh",
@@ -103,7 +119,21 @@ def fetch_issue(issue_number: str, repo_path: str) -> GitHubIssue:
 
             return issue
         else:
-            print(result.stderr, file=sys.stderr)
+            # Check if error is due to rate limit
+            if "API rate limit exceeded" in result.stderr or "rate limit" in result.stderr.lower():
+                print(f"\n{'='*60}", file=sys.stderr)
+                print("⚠️  GitHub API Rate Limit Error", file=sys.stderr)
+                print(f"{'='*60}", file=sys.stderr)
+                print(result.stderr, file=sys.stderr)
+
+                # Try to get current rate limit status
+                current_limit = check_graphql_rate_limit()
+                if current_limit:
+                    print(f"\nCurrent Status: {current_limit.remaining}/{current_limit.limit} remaining", file=sys.stderr)
+                    print(f"Resets in: {current_limit.seconds_until_reset}s (~{current_limit.seconds_until_reset // 60} min)", file=sys.stderr)
+                print(f"{'='*60}\n", file=sys.stderr)
+            else:
+                print(result.stderr, file=sys.stderr)
             sys.exit(result.returncode)
     except FileNotFoundError:
         print("Error: GitHub CLI (gh) is not installed.", file=sys.stderr)

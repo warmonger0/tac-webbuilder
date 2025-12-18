@@ -284,3 +284,76 @@ def init_system_routes(health_service, service_controller, app_start_time):
                 "checks_run": [],
                 "total_duration_ms": 0
             }
+
+    @router.get("/github-rate-limit")
+    async def get_github_rate_limit() -> dict:
+        """
+        Check GitHub API rate limit status for both REST and GraphQL APIs.
+
+        Returns:
+            Rate limit information including current usage, limits, and reset times.
+        """
+        import subprocess
+        import json
+        from datetime import datetime, timezone
+
+        try:
+            # Check REST API rate limit
+            rest_result = subprocess.run(
+                ["gh", "api", "rate_limit"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            rest_data = None
+            if rest_result.returncode == 0:
+                data = json.loads(rest_result.stdout)
+                core = data['resources']['core']
+                reset_dt = datetime.fromtimestamp(core['reset'], tz=timezone.utc)
+
+                rest_data = {
+                    "limit": core['limit'],
+                    "remaining": core['remaining'],
+                    "used": core['used'],
+                    "reset_at": reset_dt.isoformat(),
+                    "usage_percent": round((core['used'] / core['limit']) * 100, 1),
+                    "is_exhausted": core['remaining'] == 0
+                }
+
+            # Check GraphQL API rate limit
+            graphql_result = subprocess.run(
+                ["gh", "api", "graphql", "-f", "query=query { rateLimit { limit remaining resetAt } }"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            graphql_data = None
+            if graphql_result.returncode == 0:
+                data = json.loads(graphql_result.stdout)
+                rate_limit = data['data']['rateLimit']
+
+                graphql_data = {
+                    "limit": rate_limit['limit'],
+                    "remaining": rate_limit['remaining'],
+                    "used": rate_limit['limit'] - rate_limit['remaining'],
+                    "reset_at": rate_limit['resetAt'],
+                    "usage_percent": round(((rate_limit['limit'] - rate_limit['remaining']) / rate_limit['limit']) * 100, 1),
+                    "is_exhausted": rate_limit['remaining'] == 0
+                }
+
+            return {
+                "rest": rest_data,
+                "graphql": graphql_data,
+                "status": "healthy" if (rest_data and not rest_data['is_exhausted'] and graphql_data and not graphql_data['is_exhausted']) else "degraded"
+            }
+
+        except Exception as e:
+            logger.error(f"Rate limit check error: {str(e)}")
+            return {
+                "rest": None,
+                "graphql": None,
+                "status": "unknown",
+                "error": str(e)
+            }

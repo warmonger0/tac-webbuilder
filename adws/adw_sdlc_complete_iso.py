@@ -46,6 +46,7 @@ from adw_modules.utils import setup_logger
 from adw_modules.failure_cleanup import cleanup_failed_workflow
 from adw_modules.state import ADWState
 from adw_modules.preflight_checks import run_all_preflight_checks
+from adw_modules.rate_limit import RateLimitError
 
 # Circuit breaker: Detect repetitive patterns indicating a loop
 MAX_RECENT_COMMENTS_TO_CHECK = 15  # Look at last N comments
@@ -393,7 +394,21 @@ def main():
     logger = setup_logger(adw_id, "adw_sdlc_complete_iso")
 
     # Circuit breaker: Check for infinite loops before starting
-    check_for_loop(issue_number, logger, adw_id)
+    try:
+        check_for_loop(issue_number, logger, adw_id)
+    except RateLimitError as e:
+        logger.error(f"GitHub API rate limit exhausted: {e}")
+        logger.error(f"Cannot proceed with workflow until rate limit resets")
+
+        # Update workflow status back to paused if it exists in database
+        try:
+            from adw_modules.workflow_ops import update_workflow_status
+            update_workflow_status(adw_id, "paused", error_message=f"Rate limit exhausted: {str(e)}")
+            logger.info("Updated workflow status to 'paused' due to rate limit")
+        except Exception as status_error:
+            logger.warning(f"Could not update workflow status: {status_error}")
+
+        sys.exit(1)
 
     state = ADWState.load(adw_id, logger)
     state.update(
