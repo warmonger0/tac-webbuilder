@@ -38,7 +38,6 @@ export function useMultiPhaseSubmit({
       });
 
       // Handle multi-phase response
-      console.log('[DEBUG] Multi-phase response:', JSON.stringify(response, null, 2));
       if (response.is_multi_phase && response.child_issues && response.child_issues.length > 0) {
         // Filter issues that have been created (issue_number is not null)
         const createdIssues = response.child_issues.filter(c => c.issue_number !== null);

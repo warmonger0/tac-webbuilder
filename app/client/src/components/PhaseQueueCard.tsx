@@ -67,7 +67,6 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
 
     try {
       const result = await executePhase(queue_id);
-      console.log('Phase execution started:', result);
       toast.success(`${result.message}\n\nADW ID: ${result.adw_id}\nIssue: #${result.issue_number}`, { duration: 5000 });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to execute phase';
