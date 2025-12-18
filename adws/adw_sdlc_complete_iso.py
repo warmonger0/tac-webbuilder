@@ -47,6 +47,7 @@ from adw_modules.failure_cleanup import cleanup_failed_workflow
 from adw_modules.state import ADWState
 from adw_modules.preflight_checks import run_all_preflight_checks
 from adw_modules.rate_limit import RateLimitError
+from adw_modules.phase_tracker import PhaseTracker
 
 # Circuit breaker: Detect repetitive patterns indicating a loop
 MAX_RECENT_COMMENTS_TO_CHECK = 15  # Look at last N comments
@@ -269,9 +270,10 @@ def main():
     use_external = "--no-external" not in sys.argv
     use_optimized_plan = "--use-optimized-plan" in sys.argv
     clean_start = "--clean-start" in sys.argv
+    resume_mode = "--resume" in sys.argv
 
     # Remove flags from argv
-    for flag in ["--skip-e2e", "--skip-resolution", "--no-external", "--use-optimized-plan", "--clean-start"]:
+    for flag in ["--skip-e2e", "--skip-resolution", "--no-external", "--use-optimized-plan", "--clean-start", "--resume"]:
         if flag in sys.argv:
             sys.argv.remove(flag)
 
@@ -295,6 +297,7 @@ def main():
         print("  --no-external: Disable external tools (higher token usage)")
         print("  --use-optimized-plan: Use inverted context flow planner (77% cost reduction)")
         print("  --clean-start: Remove all previous state for this issue before starting")
+        print("  --resume: Resume from where workflow paused (skips completed phases)")
         print("\nNote: External tools are ENABLED by default for 70-95% token reduction")
         print("      Ships to production ONLY after all phases pass")
         print("\n⚠️  --clean-start will DELETE all previous agent dirs, worktrees, and database")
@@ -393,6 +396,37 @@ def main():
     from adw_modules.state import ADWState
     logger = setup_logger(adw_id, "adw_sdlc_complete_iso")
 
+    # Initialize phase tracker for resume capability
+    phase_tracker = PhaseTracker(adw_id)
+
+    # Define all phases in order
+    ALL_PHASES = ["Plan", "Validate", "Build", "Lint", "Test", "Review", "Document", "Ship", "Cleanup", "Verify"]
+
+    # Handle resume mode
+    if resume_mode:
+        completed_phases = phase_tracker.get_completed_phases()
+        next_phase = phase_tracker.get_next_phase_to_run(ALL_PHASES)
+
+        logger.info(f"🔄 RESUME MODE ENABLED")
+        logger.info(f"Completed phases: {completed_phases}")
+        logger.info(f"Next phase to run: {next_phase}")
+
+        print(f"\n{'='*60}")
+        print(f"🔄 RESUME MODE")
+        print(f"{'='*60}")
+        print(f"Completed phases: {', '.join(completed_phases) if completed_phases else 'None'}")
+        print(f"Resuming from: {next_phase if next_phase else 'All complete'}")
+        print(f"{'='*60}\n")
+
+        if not next_phase:
+            print("✅ All phases already completed, nothing to resume")
+            sys.exit(0)
+    else:
+        # Fresh start - reset phase tracker if clean_start
+        if clean_start:
+            phase_tracker.reset()
+            logger.info("🧹 Reset phase tracker for clean start")
+
     # Circuit breaker: Check for infinite loops before starting
     try:
         check_for_loop(issue_number, logger, adw_id)
@@ -421,15 +455,20 @@ def main():
     # Post initial message
     logger.info("Attempting to post initial GitHub comment...")
     try:
-        # Build cleanup status message
+        # Build status messages
         cleanup_msg = ""
         if clean_start:
-            # Note: cleanup already ran above, just showing status in comment
             cleanup_msg = f"\n\n🧹 **Clean Start Mode**: All previous state cleared before starting"
+
+        resume_msg = ""
+        if resume_mode:
+            completed = phase_tracker.get_completed_phases()
+            next_phase = phase_tracker.get_next_phase_to_run(ALL_PHASES)
+            resume_msg = f"\n\n🔄 **Resume Mode**: Continuing from {next_phase} (skipping {len(completed)} completed phases)"
 
         make_issue_comment(
             issue_number,
-            f"{adw_id}_ops: 🎯 **Starting Complete SDLC Workflow**{cleanup_msg}\n\n"
+            f"{adw_id}_ops: 🎯 **{'Resuming' if resume_mode else 'Starting'} Complete SDLC Workflow**{cleanup_msg}{resume_msg}\n\n"
             "This workflow will execute ALL 10 phases:\n"
             "1. ✍️ Plan the implementation\n"
             "2. 📊 Validate baseline (detect inherited errors)\n"
@@ -459,333 +498,443 @@ def main():
     # ========================================
     # PHASE 1: PLAN
     # ========================================
-    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
-    broadcast_phase_update(adw_id, "Plan", "running", logger=logger)
+    if phase_tracker.should_skip_phase("Plan", resume_mode):
+        print(f"\n{'='*60}")
+        print(f"PHASE 1/10: PLAN - ⏭️  SKIPPED (already completed)")
+        print(f"{'='*60}")
+        logger.info("Skipping Plan phase (already completed)")
+    else:
+        # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+        broadcast_phase_update(adw_id, "Plan", "running", logger=logger)
+        phase_tracker.set_current_phase("Plan")
 
-    plan_script = "adw_plan_iso_optimized.py" if use_optimized_plan else "adw_plan_iso.py"
-    plan_cmd = [
-        "uv",
-        "run",
-        os.path.join(script_dir, plan_script),
-        issue_number,
-        adw_id,
-    ]
-    print(f"\n{'='*60}")
-    print(f"PHASE 1/10: PLAN ({plan_script})")
-    print(f"{'='*60}")
-    logger.info(f"Starting PHASE 1: PLAN with command: {' '.join(plan_cmd)}")
+        plan_script = "adw_plan_iso_optimized.py" if use_optimized_plan else "adw_plan_iso.py"
+        plan_cmd = [
+            "uv",
+            "run",
+            os.path.join(script_dir, plan_script),
+            issue_number,
+            adw_id,
+        ]
+        print(f"\n{'='*60}")
+        print(f"PHASE 1/10: PLAN ({plan_script})")
+        print(f"{'='*60}")
+        logger.info(f"Starting PHASE 1: PLAN with command: {' '.join(plan_cmd)}")
 
-    exit_code = run_phase_with_retry(
-        cmd=plan_cmd,
-        phase_name="Plan",
-        issue_number=issue_number,
-        adw_id=adw_id,
-        logger=logger,
-        max_retries=2,  # Allow 2 retries (3 total attempts)
-        critical=True   # Fail workflow if all retries fail
-    )
+        exit_code = run_phase_with_retry(
+            cmd=plan_cmd,
+            phase_name="Plan",
+            issue_number=issue_number,
+            adw_id=adw_id,
+            logger=logger,
+            max_retries=2,  # Allow 2 retries (3 total attempts)
+            critical=True   # Fail workflow if all retries fail
+        )
+
+        # Mark phase as completed
+        phase_tracker.mark_phase_completed("Plan")
+        logger.info("✅ Plan phase marked as completed")
 
     # ========================================
     # PHASE 2: VALIDATE (NEW)
     # ========================================
-    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
-    broadcast_phase_update(adw_id, "Validate", "running", logger=logger)
+    if phase_tracker.should_skip_phase("Validate", resume_mode):
+        print(f"\n{'='*60}")
+        print(f"PHASE 2/10: VALIDATE - ⏭️  SKIPPED (already completed)")
+        print(f"{'='*60}")
+        logger.info("Skipping Validate phase (already completed)")
+    else:
+        # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+        broadcast_phase_update(adw_id, "Validate", "running", logger=logger)
+        phase_tracker.set_current_phase("Validate")
 
-    validate_cmd = [
-        "uv",
-        "run",
-        os.path.join(script_dir, "adw_validate_iso.py"),
-        issue_number,
-        adw_id,
-    ]
-    print(f"\n{'='*60}")
-    print(f"PHASE 2/10: VALIDATE (Baseline Error Detection)")
-    print(f"{'='*60}")
-    logger.info(f"Starting PHASE 2: VALIDATE with command: {' '.join(validate_cmd)}")
+        validate_cmd = [
+            "uv",
+            "run",
+            os.path.join(script_dir, "adw_validate_iso.py"),
+            issue_number,
+            adw_id,
+        ]
+        print(f"\n{'='*60}")
+        print(f"PHASE 2/10: VALIDATE (Baseline Error Detection)")
+        print(f"{'='*60}")
+        logger.info(f"Starting PHASE 2: VALIDATE with command: {' '.join(validate_cmd)}")
 
-    exit_code = run_phase_with_retry(
-        cmd=validate_cmd,
-        phase_name="Validate",
-        issue_number=issue_number,
-        adw_id=adw_id,
-        logger=logger,
-        max_retries=1,  # Allow 1 retry (2 total attempts)
-        critical=False  # Non-critical: can continue if fails
-    )
+        exit_code = run_phase_with_retry(
+            cmd=validate_cmd,
+            phase_name="Validate",
+            issue_number=issue_number,
+            adw_id=adw_id,
+            logger=logger,
+            max_retries=1,  # Allow 1 retry (2 total attempts)
+            critical=False  # Non-critical: can continue if fails
+        )
+
+        # Mark phase as completed
+        phase_tracker.mark_phase_completed("Validate")
+        logger.info("✅ Validate phase marked as completed")
 
     # ========================================
     # PHASE 3: BUILD (formerly PHASE 2)
     # ========================================
-    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
-    broadcast_phase_update(adw_id, "Build", "running", logger=logger)
+    if phase_tracker.should_skip_phase("Build", resume_mode):
+        print(f"\n{'='*60}")
+        print(f"PHASE 3/10: BUILD - ⏭️  SKIPPED (already completed)")
+        print(f"{'='*60}")
+        logger.info("Skipping Build phase (already completed)")
+    else:
+        # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+        broadcast_phase_update(adw_id, "Build", "running", logger=logger)
+        phase_tracker.set_current_phase("Build")
 
-    build_cmd = [
-        "uv",
-        "run",
-        os.path.join(script_dir, "adw_build_iso.py"),
-        issue_number,
-        adw_id,
-    ]
-    if not use_external:
-        build_cmd.append("--no-external")
+        build_cmd = [
+            "uv",
+            "run",
+            os.path.join(script_dir, "adw_build_iso.py"),
+            issue_number,
+            adw_id,
+        ]
+        if not use_external:
+            build_cmd.append("--no-external")
 
-    print(f"\n{'='*60}")
-    print(f"PHASE 3/10: BUILD")
-    print(f"{'='*60}")
-    logger.info(f"Starting PHASE 3: BUILD with command: {' '.join(build_cmd)}")
+        print(f"\n{'='*60}")
+        print(f"PHASE 3/10: BUILD")
+        print(f"{'='*60}")
+        logger.info(f"Starting PHASE 3: BUILD with command: {' '.join(build_cmd)}")
 
-    exit_code = run_phase_with_retry(
-        cmd=build_cmd,
-        phase_name="Build",
-        issue_number=issue_number,
-        adw_id=adw_id,
-        logger=logger,
-        max_retries=2,  # Allow 2 retries (3 total attempts)
-        critical=True   # Fail workflow if all retries fail
-    )
+        exit_code = run_phase_with_retry(
+            cmd=build_cmd,
+            phase_name="Build",
+            issue_number=issue_number,
+            adw_id=adw_id,
+            logger=logger,
+            max_retries=2,  # Allow 2 retries (3 total attempts)
+            critical=True   # Fail workflow if all retries fail
+        )
+
+        # Mark phase as completed
+        phase_tracker.mark_phase_completed("Build")
+        logger.info("✅ Build phase marked as completed")
 
     # ========================================
     # PHASE 4: LINT
     # ========================================
-    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
-    broadcast_phase_update(adw_id, "Lint", "running", logger=logger)
+    if phase_tracker.should_skip_phase("Lint", resume_mode):
+        print(f"\n{'='*60}")
+        print(f"PHASE 4/10: LINT - ⏭️  SKIPPED (already completed)")
+        print(f"{'='*60}")
+        logger.info("Skipping Lint phase (already completed)")
+    else:
+        # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+        broadcast_phase_update(adw_id, "Lint", "running", logger=logger)
+        phase_tracker.set_current_phase("Lint")
 
-    lint_cmd = [
-        "uv",
-        "run",
-        os.path.join(script_dir, "adw_lint_iso.py"),
-        issue_number,
-        adw_id,
-    ]
-    if not use_external:
-        lint_cmd.append("--no-external")
+        lint_cmd = [
+            "uv",
+            "run",
+            os.path.join(script_dir, "adw_lint_iso.py"),
+            issue_number,
+            adw_id,
+        ]
+        if not use_external:
+            lint_cmd.append("--no-external")
 
-    print(f"\n{'='*60}")
-    print(f"PHASE 4/10: LINT")
-    print(f"{'='*60}")
-    logger.info(f"Starting PHASE 4: LINT with command: {' '.join(lint_cmd)}")
+        print(f"\n{'='*60}")
+        print(f"PHASE 4/10: LINT")
+        print(f"{'='*60}")
+        logger.info(f"Starting PHASE 4: LINT with command: {' '.join(lint_cmd)}")
 
-    exit_code = run_phase_with_retry(
-        cmd=lint_cmd,
-        phase_name="Lint",
-        issue_number=issue_number,
-        adw_id=adw_id,
-        logger=logger,
-        max_retries=2,  # Allow 2 retries (3 total attempts)
-        critical=True   # Fail workflow if all retries fail
-    )
+        exit_code = run_phase_with_retry(
+            cmd=lint_cmd,
+            phase_name="Lint",
+            issue_number=issue_number,
+            adw_id=adw_id,
+            logger=logger,
+            max_retries=2,  # Allow 2 retries (3 total attempts)
+            critical=True   # Fail workflow if all retries fail
+        )
+
+        # Mark phase as completed
+        phase_tracker.mark_phase_completed("Lint")
+        logger.info("✅ Lint phase marked as completed")
 
     # ========================================
     # PHASE 5: TEST
     # ========================================
-    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
-    broadcast_phase_update(adw_id, "Test", "running", logger=logger)
+    if phase_tracker.should_skip_phase("Test", resume_mode):
+        print(f"\n{'='*60}")
+        print(f"PHASE 5/10: TEST - ⏭️  SKIPPED (already completed)")
+        print(f"{'='*60}")
+        logger.info("Skipping Test phase (already completed)")
+    else:
+        # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+        broadcast_phase_update(adw_id, "Test", "running", logger=logger)
+        phase_tracker.set_current_phase("Test")
 
-    test_cmd = [
-        "uv",
-        "run",
-        os.path.join(script_dir, "adw_test_iso.py"),
-        issue_number,
-        adw_id,
-        "--skip-e2e",  # Always skip E2E in SDLC workflows
-    ]
-    if not use_external:
-        test_cmd.append("--no-external")
+        test_cmd = [
+            "uv",
+            "run",
+            os.path.join(script_dir, "adw_test_iso.py"),
+            issue_number,
+            adw_id,
+            "--skip-e2e",  # Always skip E2E in SDLC workflows
+        ]
+        if not use_external:
+            test_cmd.append("--no-external")
 
-    print(f"\n{'='*60}")
-    print(f"PHASE 5/10: TEST")
-    print(f"{'='*60}")
-    logger.info(f"Starting PHASE 5: TEST with command: {' '.join(test_cmd)}")
+        print(f"\n{'='*60}")
+        print(f"PHASE 5/10: TEST")
+        print(f"{'='*60}")
+        logger.info(f"Starting PHASE 5: TEST with command: {' '.join(test_cmd)}")
 
-    exit_code = run_phase_with_retry(
-        cmd=test_cmd,
-        phase_name="Test",
-        issue_number=issue_number,
-        adw_id=adw_id,
-        logger=logger,
-        max_retries=2,  # Allow 2 retries (3 total attempts)
-        critical=True   # Fail workflow if all retries fail
-    )
+        exit_code = run_phase_with_retry(
+            cmd=test_cmd,
+            phase_name="Test",
+            issue_number=issue_number,
+            adw_id=adw_id,
+            logger=logger,
+            max_retries=2,  # Allow 2 retries (3 total attempts)
+            critical=True   # Fail workflow if all retries fail
+        )
+
+        # Mark phase as completed
+        phase_tracker.mark_phase_completed("Test")
+        logger.info("✅ Test phase marked as completed")
 
     # ========================================
     # PHASE 6: REVIEW
     # ========================================
-    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
-    broadcast_phase_update(adw_id, "Review", "running", logger=logger)
+    if phase_tracker.should_skip_phase("Review", resume_mode):
+        print(f"\n{'='*60}")
+        print(f"PHASE 6/10: REVIEW - ⏭️  SKIPPED (already completed)")
+        print(f"{'='*60}")
+        logger.info("Skipping Review phase (already completed)")
+    else:
+        # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+        broadcast_phase_update(adw_id, "Review", "running", logger=logger)
+        phase_tracker.set_current_phase("Review")
 
-    review_cmd = [
-        "uv",
-        "run",
-        os.path.join(script_dir, "adw_review_iso.py"),
-        issue_number,
-        adw_id,
-    ]
-    if skip_resolution:
-        review_cmd.append("--skip-resolution")
+        review_cmd = [
+            "uv",
+            "run",
+            os.path.join(script_dir, "adw_review_iso.py"),
+            issue_number,
+            adw_id,
+        ]
+        if skip_resolution:
+            review_cmd.append("--skip-resolution")
 
-    print(f"\n{'='*60}")
-    print(f"PHASE 6/10: REVIEW")
-    print(f"{'='*60}")
-    logger.info(f"Starting PHASE 6: REVIEW with command: {' '.join(review_cmd)}")
+        print(f"\n{'='*60}")
+        print(f"PHASE 6/10: REVIEW")
+        print(f"{'='*60}")
+        logger.info(f"Starting PHASE 6: REVIEW with command: {' '.join(review_cmd)}")
 
-    exit_code = run_phase_with_retry(
-        cmd=review_cmd,
-        phase_name="Review",
-        issue_number=issue_number,
-        adw_id=adw_id,
-        logger=logger,
-        max_retries=2,  # Allow 2 retries (3 total attempts)
-        critical=True   # Fail workflow if all retries fail
-    )
+        exit_code = run_phase_with_retry(
+            cmd=review_cmd,
+            phase_name="Review",
+            issue_number=issue_number,
+            adw_id=adw_id,
+            logger=logger,
+            max_retries=2,  # Allow 2 retries (3 total attempts)
+            critical=True   # Fail workflow if all retries fail
+        )
+
+        # Mark phase as completed
+        phase_tracker.mark_phase_completed("Review")
+        logger.info("✅ Review phase marked as completed")
 
     # ========================================
     # PHASE 7: DOCUMENT
     # ========================================
-    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
-    broadcast_phase_update(adw_id, "Document", "running", logger=logger)
+    if phase_tracker.should_skip_phase("Document", resume_mode):
+        print(f"\n{'='*60}")
+        print(f"PHASE 7/10: DOCUMENT - ⏭️  SKIPPED (already completed)")
+        print(f"{'='*60}")
+        logger.info("Skipping Document phase (already completed)")
+    else:
+        # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+        broadcast_phase_update(adw_id, "Document", "running", logger=logger)
+        phase_tracker.set_current_phase("Document")
 
-    document_cmd = [
-        "uv",
-        "run",
-        os.path.join(script_dir, "adw_document_iso.py"),
-        issue_number,
-        adw_id,
-    ]
-    print(f"\n{'='*60}")
-    print(f"PHASE 7/10: DOCUMENT")
-    print(f"{'='*60}")
-    logger.info(f"Starting PHASE 7: DOCUMENT with command: {' '.join(document_cmd)}")
+        document_cmd = [
+            "uv",
+            "run",
+            os.path.join(script_dir, "adw_document_iso.py"),
+            issue_number,
+            adw_id,
+        ]
+        print(f"\n{'='*60}")
+        print(f"PHASE 7/10: DOCUMENT")
+        print(f"{'='*60}")
+        logger.info(f"Starting PHASE 7: DOCUMENT with command: {' '.join(document_cmd)}")
 
-    exit_code = run_phase_with_retry(
-        cmd=document_cmd,
-        phase_name="Document",
-        issue_number=issue_number,
-        adw_id=adw_id,
-        logger=logger,
-        max_retries=1,  # Allow 1 retry (2 total attempts)
-        critical=False  # Non-critical: can continue if fails
-    )
+        exit_code = run_phase_with_retry(
+            cmd=document_cmd,
+            phase_name="Document",
+            issue_number=issue_number,
+            adw_id=adw_id,
+            logger=logger,
+            max_retries=1,  # Allow 1 retry (2 total attempts)
+            critical=False  # Non-critical: can continue if fails
+        )
+
+        # Mark phase as completed
+        phase_tracker.mark_phase_completed("Document")
+        logger.info("✅ Document phase marked as completed")
 
     # ========================================
     # PHASE 8: SHIP
     # ========================================
-    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
-    broadcast_phase_update(adw_id, "Ship", "running", logger=logger)
+    if phase_tracker.should_skip_phase("Ship", resume_mode):
+        print(f"\n{'='*60}")
+        print(f"PHASE 8/10: SHIP - ⏭️  SKIPPED (already completed)")
+        print(f"{'='*60}")
+        logger.info("Skipping Ship phase (already completed)")
+    else:
+        # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+        broadcast_phase_update(adw_id, "Ship", "running", logger=logger)
+        phase_tracker.set_current_phase("Ship")
 
-    ship_cmd = [
-        "uv",
-        "run",
-        os.path.join(script_dir, "adw_ship_iso.py"),
-        issue_number,
-        adw_id,
-    ]
-    print(f"\n{'='*60}")
-    print(f"PHASE 8/10: SHIP")
-    print(f"{'='*60}")
-    logger.info(f"Starting PHASE 8: SHIP with command: {' '.join(ship_cmd)}")
+        ship_cmd = [
+            "uv",
+            "run",
+            os.path.join(script_dir, "adw_ship_iso.py"),
+            issue_number,
+            adw_id,
+        ]
+        print(f"\n{'='*60}")
+        print(f"PHASE 8/10: SHIP")
+        print(f"{'='*60}")
+        logger.info(f"Starting PHASE 8: SHIP with command: {' '.join(ship_cmd)}")
 
-    exit_code = run_phase_with_retry(
-        cmd=ship_cmd,
-        phase_name="Ship",
-        issue_number=issue_number,
-        adw_id=adw_id,
-        logger=logger,
-        max_retries=2,  # Allow 2 retries (3 total attempts)
-        critical=True   # Fail workflow if all retries fail
-    )
+        exit_code = run_phase_with_retry(
+            cmd=ship_cmd,
+            phase_name="Ship",
+            issue_number=issue_number,
+            adw_id=adw_id,
+            logger=logger,
+            max_retries=2,  # Allow 2 retries (3 total attempts)
+            critical=True   # Fail workflow if all retries fail
+        )
+
+        # Mark phase as completed
+        phase_tracker.mark_phase_completed("Ship")
+        logger.info("✅ Ship phase marked as completed")
 
     # ========================================
     # PHASE 9: CLEANUP
     # ========================================
-    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
-    broadcast_phase_update(adw_id, "Cleanup", "running", logger=logger)
+    if phase_tracker.should_skip_phase("Cleanup", resume_mode):
+        print(f"\n{'='*60}")
+        print(f"PHASE 9/10: CLEANUP - ⏭️  SKIPPED (already completed)")
+        print(f"{'='*60}")
+        logger.info("Skipping Cleanup phase (already completed)")
+    else:
+        # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+        broadcast_phase_update(adw_id, "Cleanup", "running", logger=logger)
+        phase_tracker.set_current_phase("Cleanup")
 
-    print(f"\n{'='*60}")
-    print(f"PHASE 9/10: CLEANUP")
-    print(f"{'='*60}")
-    print(f"Running cleanup operations directly (pure Python, no LLM)...")
+        print(f"\n{'='*60}")
+        print(f"PHASE 9/10: CLEANUP")
+        print(f"{'='*60}")
+        print(f"Running cleanup operations directly (pure Python, no LLM)...")
 
-    try:
-        # Set up logger for cleanup
-        cleanup_logger = setup_logger(adw_id, "cleanup_operations")
+        try:
+            # Set up logger for cleanup
+            cleanup_logger = setup_logger(adw_id, "cleanup_operations")
 
-        # Post initial cleanup message
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", "🧹 Starting cleanup (pure Python, no LLM calls)...")
-        )
-
-        # Run cleanup directly
-        cleanup_result = cleanup_shipped_issue(
-            issue_number=issue_number,
-            adw_id=adw_id,
-            skip_worktree=False,
-            dry_run=False,
-            logger=cleanup_logger
-        )
-
-        if cleanup_result["success"]:
-            print(f"✅ Cleanup completed: {cleanup_result['summary']}")
-
-            # Post success message
-            summary_msg = f"✅ **Cleanup completed**\n\n"
-            if cleanup_result["docs_moved"] > 0:
-                summary_msg += f"📁 Organized {cleanup_result['docs_moved']} documentation files\n"
-            if cleanup_result["worktree_removed"]:
-                summary_msg += f"🗑️ Removed worktree and freed resources\n"
-            if cleanup_result["errors"]:
-                summary_msg += f"\n⚠️ {len(cleanup_result['errors'])} warnings (non-fatal)\n"
-
+            # Post initial cleanup message
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "cleanup", summary_msg)
+                format_issue_message(adw_id, "ops", "🧹 Starting cleanup (pure Python, no LLM calls)...")
             )
-        else:
-            print(f"⚠️ Cleanup had errors: {cleanup_result['errors']}")
-            # Cleanup failure shouldn't block SDLC completion
-            print("WARNING: Cleanup had errors but SDLC is still considered successful")
 
-            make_issue_comment(
-                issue_number,
-                format_issue_message(
-                    adw_id,
-                    "cleanup",
-                    f"⚠️ Cleanup completed with warnings\n\n"
-                    f"Errors: {', '.join(cleanup_result['errors'][:3])}"
+            # Run cleanup directly
+            cleanup_result = cleanup_shipped_issue(
+                issue_number=issue_number,
+                adw_id=adw_id,
+                skip_worktree=False,
+                dry_run=False,
+                logger=cleanup_logger
+            )
+
+            if cleanup_result["success"]:
+                print(f"✅ Cleanup completed: {cleanup_result['summary']}")
+
+                # Post success message
+                summary_msg = f"✅ **Cleanup completed**\n\n"
+                if cleanup_result["docs_moved"] > 0:
+                    summary_msg += f"📁 Organized {cleanup_result['docs_moved']} documentation files\n"
+                if cleanup_result["worktree_removed"]:
+                    summary_msg += f"🗑️ Removed worktree and freed resources\n"
+                if cleanup_result["errors"]:
+                    summary_msg += f"\n⚠️ {len(cleanup_result['errors'])} warnings (non-fatal)\n"
+
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "cleanup", summary_msg)
                 )
-            )
-    except Exception as e:
-        print(f"⚠️ Cleanup exception: {e}")
-        # Cleanup failure shouldn't block SDLC completion
-        print("WARNING: Cleanup failed but SDLC is still considered successful")
+            else:
+                print(f"⚠️ Cleanup had errors: {cleanup_result['errors']}")
+                # Cleanup failure shouldn't block SDLC completion
+                print("WARNING: Cleanup had errors but SDLC is still considered successful")
+
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id,
+                        "cleanup",
+                        f"⚠️ Cleanup completed with warnings\n\n"
+                        f"Errors: {', '.join(cleanup_result['errors'][:3])}"
+                    )
+                )
+        except Exception as e:
+            print(f"⚠️ Cleanup exception: {e}")
+            # Cleanup failure shouldn't block SDLC completion
+            print("WARNING: Cleanup failed but SDLC is still considered successful")
+
+        # Mark phase as completed
+        phase_tracker.mark_phase_completed("Cleanup")
+        logger.info("✅ Cleanup phase marked as completed")
 
     # ========================================
     # PHASE 10: VERIFY
     # ========================================
-    # Event-driven broadcast - immediate WebSocket notification (0ms latency)
-    broadcast_phase_update(adw_id, "Verify", "running", logger=logger)
+    if phase_tracker.should_skip_phase("Verify", resume_mode):
+        print(f"\n{'='*60}")
+        print(f"PHASE 10/10: VERIFY - ⏭️  SKIPPED (already completed)")
+        print(f"{'='*60}")
+        logger.info("Skipping Verify phase (already completed)")
+    else:
+        # Event-driven broadcast - immediate WebSocket notification (0ms latency)
+        broadcast_phase_update(adw_id, "Verify", "running", logger=logger)
+        phase_tracker.set_current_phase("Verify")
 
-    verify_cmd = [
-        "uv",
-        "run",
-        os.path.join(script_dir, "adw_verify_iso.py"),
-        issue_number,
-        adw_id,
-    ]
-    print(f"\n{'='*60}")
-    print(f"PHASE 10/10: VERIFY (Post-Deployment Verification)")
-    print(f"{'='*60}")
-    logger.info(f"Starting PHASE 10: VERIFY with command: {' '.join(verify_cmd)}")
+        verify_cmd = [
+            "uv",
+            "run",
+            os.path.join(script_dir, "adw_verify_iso.py"),
+            issue_number,
+            adw_id,
+        ]
+        print(f"\n{'='*60}")
+        print(f"PHASE 10/10: VERIFY (Post-Deployment Verification)")
+        print(f"{'='*60}")
+        logger.info(f"Starting PHASE 10: VERIFY with command: {' '.join(verify_cmd)}")
 
-    exit_code = run_phase_with_retry(
-        cmd=verify_cmd,
-        phase_name="Verify",
-        issue_number=issue_number,
-        adw_id=adw_id,
-        logger=logger,
-        max_retries=1,  # Allow 1 retry (2 total attempts)
-        critical=False  # Non-critical: can continue if fails
-    )
+        exit_code = run_phase_with_retry(
+            cmd=verify_cmd,
+            phase_name="Verify",
+            issue_number=issue_number,
+            adw_id=adw_id,
+            logger=logger,
+            max_retries=1,  # Allow 1 retry (2 total attempts)
+            critical=False  # Non-critical: can continue if fails
+        )
+
+        # Mark phase as completed
+        phase_tracker.mark_phase_completed("Verify")
+        logger.info("✅ Verify phase marked as completed")
 
     # ========================================
     # COMPLETION

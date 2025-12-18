@@ -353,9 +353,9 @@ async def _resume_adw_handler(adw_id: str) -> dict:
     if not os.path.exists(workflow_script):
         raise HTTPException(500, f"Workflow script not found: {workflow_script}")
 
-    cmd = ["uv", "run", workflow_script, str(issue_number), adw_id]
+    cmd = ["uv", "run", workflow_script, str(issue_number), adw_id, "--resume"]
 
-    logger.info(f"[RESUME] Resuming {workflow_template} for ADW {adw_id} (issue #{issue_number})")
+    logger.info(f"[RESUME] Resuming {workflow_template} for ADW {adw_id} (issue #{issue_number}) with --resume flag")
 
     # Launch workflow in background
     subprocess.Popen(
