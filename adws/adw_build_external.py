@@ -82,6 +82,9 @@ def run_external_build_check(
             "next_steps": ["Create worktree with adw_plan_iso.py"]
         }
 
+    # Get issue number from state for observability tracking
+    issue_number = state.get("issue_number", 0)
+
     # Get project root
     project_root = Path(__file__).parent.parent
 
@@ -94,7 +97,9 @@ def run_external_build_check(
         "--json-input", json.dumps({
             "check_type": check_type,
             "target": target,
-            "strict_mode": strict_mode
+            "strict_mode": strict_mode,
+            "adw_id": adw_id,  # Pass adw_id for tool tracking
+            "issue_number": issue_number  # Pass issue_number for tool tracking
         })
     ]
 

@@ -60,6 +60,7 @@ from typing import Dict, Any
 sys.path.insert(0, str(Path(__file__).parent))
 
 from adw_modules.build_checker import BuildChecker, result_to_dict
+from adw_modules.tool_call_tracker import ToolCallTracker
 
 
 def parse_args():
@@ -111,19 +112,29 @@ def run_workflow(params: Dict[str, Any]) -> Dict[str, Any]:
     check_type = params.get("check_type", "both")
     target = params.get("target", "both")
     strict_mode = params.get("strict_mode", True)
+    adw_id = params.get("adw_id", "unknown")
+    issue_number = params.get("issue_number", 0)
 
     # Get project root (2 levels up from this file)
     project_root = Path(__file__).parent.parent
 
-    # Initialize build checker
-    checker = BuildChecker(project_root)
+    # Use ToolCallTracker to track build tools automatically
+    with ToolCallTracker(
+        adw_id=adw_id,
+        issue_number=int(issue_number) if issue_number else 0,
+        phase_name="Build",
+        phase_number=3,
+        workflow_template="adw_build_workflow"
+    ) as tracker:
+        # Initialize build checker with tracker
+        checker = BuildChecker(project_root, tracker=tracker)
 
-    # Execute checks
-    results = checker.check_all(
-        check_type=check_type,
-        target=target,
-        strict_mode=strict_mode
-    )
+        # Execute checks - tools are automatically tracked
+        results = checker.check_all(
+            check_type=check_type,
+            target=target,
+            strict_mode=strict_mode
+        )
 
     # Combine results
     all_errors = []
