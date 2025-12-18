@@ -1,8 +1,14 @@
-# GitHub Webhook Setup Guide
+# GitHub Webhook Setup Guide - Planned Features Sync
+
+> **Note**: This project has TWO separate webhook systems. This guide covers **Planned Features Sync** (port 8002).
+> For **ADW Trigger Webhooks** (port 8001), see [`adws/README.md`](../adws/README.md).
+> For architecture overview, see [`docs/webhook-architecture.md`](webhook-architecture.md).
 
 ## Overview
 
-The tac-webbuilder system now supports real-time synchronization between GitHub issues and planned features via webhooks. When a GitHub issue is closed, reopened, or labeled, the corresponding planned feature is automatically updated and the UI is refreshed via WebSocket.
+This webhook system synchronizes GitHub issue state changes to the `planned_features` database. When a GitHub issue is closed, reopened, or labeled, the corresponding planned feature is automatically updated and the UI is refreshed via WebSocket.
+
+**This is NOT the ADW trigger webhook** - that runs on port 8001 and launches workflows.
 
 ## Features
 
