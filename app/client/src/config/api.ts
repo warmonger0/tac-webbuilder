@@ -56,6 +56,7 @@ export const apiConfig = {
     systemStatus: () => apiConfig.websocket.getUrl('/ws/system-status'),
     webhookStatus: () => apiConfig.websocket.getUrl('/ws/webhook-status'),
     plannedFeatures: () => apiConfig.websocket.getUrl('/ws/planned-features'),
+    qcMetrics: () => apiConfig.websocket.getUrl('/ws/qc-metrics'),
   },
 
   // REST API endpoints (relative to basePath)

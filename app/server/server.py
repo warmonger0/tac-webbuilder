@@ -174,6 +174,10 @@ github_issue_service = GitHubIssueService(
     github_repo=os.environ.get("GITHUB_REPO", "warmonger0/tac-webbuilder"),
     phase_queue_service=phase_queue_service
 )
+# Initialize QC metrics watcher (Panel 7 performance optimization)
+from services.qc_metrics_watcher import get_qc_watcher
+qc_watcher = get_qc_watcher(websocket_manager=manager)
+
 background_task_manager = BackgroundTaskManager(
     websocket_manager=manager,
     workflow_service=workflow_service,
@@ -182,6 +186,7 @@ background_task_manager = BackgroundTaskManager(
     history_watch_interval=10.0,
     adw_monitor_watch_interval=0.5,  # 500ms for near-instant workflow updates in Panel 1
     queue_watch_interval=2.0,  # Keep queue at 2s (less critical)
+    qc_metrics_watcher=qc_watcher,  # Add QC metrics watcher
 )
 # Set app reference for routes introspection (done after app is created above)
 background_task_manager.set_app(app)
@@ -318,6 +323,26 @@ def get_webhook_status_data() -> dict:
         logger.error(f"Error fetching webhook status: {e}")
         return {"status": "error", "message": str(e)}
 
+async def get_qc_metrics_data() -> dict:
+    """
+    Get QC metrics data for WebSocket broadcast.
+
+    Returns:
+        dict: QC metrics with coverage, naming, file structure, and linting data
+    """
+    from services.qc_metrics_service import QCMetricsService
+    from routes import qc_metrics_routes
+
+    # Return cached metrics if available (updated by watcher)
+    if qc_metrics_routes._qc_metrics_cache:
+        return qc_metrics_routes._qc_metrics_cache
+
+    # Otherwise compute fresh metrics (first load only)
+    service = QCMetricsService()
+    metrics = await service.get_all_metrics_async()
+    qc_metrics_routes._qc_metrics_cache = metrics
+    return metrics
+
 # API VERSION ENDPOINT
 # This endpoint is not versioned to allow clients to discover available API versions
 @app.get("/api/version")
@@ -397,7 +422,7 @@ github_poster = GitHubPoster()
 queue_routes.init_webhook_routes(phase_queue_service, github_poster, manager)
 app.include_router(queue_routes.webhook_router, prefix="/api/v1")
 
-websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state, get_adw_monitor_data, get_queue_data, get_system_status_data, get_webhook_status_data, get_planned_features_data)
+websocket_routes.init_websocket_routes(manager, get_workflows_data, get_routes_data, get_workflow_history_data, get_adw_state, get_adw_monitor_data, get_queue_data, get_system_status_data, get_webhook_status_data, get_planned_features_data, get_qc_metrics_data)
 app.include_router(websocket_routes.router, prefix="/api/v1")
 
 if __name__ == "__main__":

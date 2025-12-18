@@ -36,6 +36,7 @@ class BackgroundTaskManager:
         queue_watch_interval: float = 2.0,
         planned_features_watch_interval: float = 30.0,
         pattern_sync_interval: float = 3600.0,  # 1 hour default
+        qc_metrics_watcher = None,  # QC metrics watcher instance
     ):
         """
         Initialize the BackgroundTaskManager
@@ -49,6 +50,7 @@ class BackgroundTaskManager:
             adw_monitor_watch_interval: Seconds between ADW monitor checks (default: 2)
             queue_watch_interval: Seconds between queue checks (default: 2)
             planned_features_watch_interval: Seconds between planned features checks (default: 30)
+            qc_metrics_watcher: QC metrics watcher instance
         """
         self.websocket_manager = websocket_manager
         self.workflow_service = workflow_service
@@ -59,6 +61,7 @@ class BackgroundTaskManager:
         self.queue_watch_interval = queue_watch_interval
         self.planned_features_watch_interval = planned_features_watch_interval
         self.pattern_sync_interval = pattern_sync_interval
+        self.qc_metrics_watcher = qc_metrics_watcher
 
         # Task references for cleanup
         self._tasks: list[asyncio.Task] = []
@@ -98,14 +101,24 @@ class BackgroundTaskManager:
             asyncio.create_task(self.watch_pattern_sync()),
         ]
 
+        # Start QC metrics watcher if provided
+        if self.qc_metrics_watcher:
+            await self.qc_metrics_watcher.start()
+            logger.info("[BACKGROUND_TASKS] QC metrics watcher started")
+
         logger.info(
-            f"[BACKGROUND_TASKS] Started {len(self._tasks)} background watchers (ADW monitor now event-driven)"
+            f"[BACKGROUND_TASKS] Started {len(self._tasks)} background watchers (ADW monitor now event-driven, QC metrics active)"
         )
         return self._tasks
 
     async def stop_all(self) -> None:
         """Stop all background tasks"""
         logger.info("[BACKGROUND_TASKS] Stopping all background watchers...")
+
+        # Stop QC metrics watcher if provided
+        if self.qc_metrics_watcher:
+            await self.qc_metrics_watcher.stop()
+            logger.info("[BACKGROUND_TASKS] QC metrics watcher stopped")
 
         for task in self._tasks:
             task.cancel()

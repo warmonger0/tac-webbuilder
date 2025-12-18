@@ -9,6 +9,7 @@ Analyzes codebase quality metrics including:
 - File size and complexity metrics
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -92,21 +93,27 @@ class QCMetricsService:
 
         logger.info(f"QCMetricsService initialized with project root: {self.project_root}")
 
-    def get_coverage_metrics(self) -> CoverageMetrics:
-        """Get test coverage metrics for the entire project.
+    async def get_coverage_metrics(self) -> CoverageMetrics:
+        """Get test coverage metrics for the entire project (parallelized).
 
         Returns:
             Coverage metrics including overall and per-subsystem coverage.
         """
         try:
-            # Backend coverage (pytest with coverage)
-            backend_coverage = self._get_backend_coverage()
+            # Run all coverage checks in parallel using asyncio.gather()
+            backend_cov, frontend_cov, adws_cov, total_tests = await asyncio.gather(
+                self._get_backend_coverage_async(),
+                self._get_frontend_coverage_async(),
+                self._get_adws_coverage_async(),
+                self._count_total_tests_async(),
+                return_exceptions=True
+            )
 
-            # Frontend coverage (vitest)
-            frontend_coverage = self._get_frontend_coverage()
-
-            # ADWs coverage
-            adws_coverage = self._get_adws_coverage()
+            # Handle exceptions from gather
+            backend_coverage = backend_cov if not isinstance(backend_cov, Exception) else 0.0
+            frontend_coverage = frontend_cov if not isinstance(frontend_cov, Exception) else 0.0
+            adws_coverage = adws_cov if not isinstance(adws_cov, Exception) else 0.0
+            test_count = total_tests if not isinstance(total_tests, Exception) else 0
 
             # Calculate overall coverage (weighted by lines of code)
             backend_weight = 0.5  # Backend is larger
@@ -119,9 +126,6 @@ class QCMetricsService:
                 adws_coverage * adws_weight
             )
 
-            # Get total test count
-            total_tests = self._count_total_tests()
-
             return CoverageMetrics(
                 overall_coverage=round(overall, 2),
                 backend_coverage=round(backend_coverage, 2),
@@ -129,7 +133,7 @@ class QCMetricsService:
                 adws_coverage=round(adws_coverage, 2),
                 total_lines=0,  # Would need coverage.json to get exact numbers
                 covered_lines=0,
-                total_tests=total_tests
+                total_tests=test_count
             )
 
         except Exception as e:
@@ -144,8 +148,45 @@ class QCMetricsService:
                 total_tests=0
             )
 
+    async def _get_backend_coverage_async(self) -> float:
+        """Get backend test coverage from pytest (async).
+
+        Returns:
+            Coverage percentage (0-100)
+        """
+        try:
+            # Check if coverage data exists
+            coverage_file = self.project_root / "app" / "server" / ".coverage"
+            if not coverage_file.exists():
+                logger.warning("No backend coverage data found")
+                return 0.0
+
+            # Run coverage report to get percentage (non-blocking)
+            proc = await asyncio.create_subprocess_exec(
+                "uv", "run", "coverage", "report", "--precision=2",
+                cwd=self.project_root / "app" / "server",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+
+            if proc.returncode == 0:
+                # Parse TOTAL line: "TOTAL    10234    2345    77.12%"
+                for line in stdout.decode().split('\n'):
+                    if 'TOTAL' in line:
+                        match = re.search(r'(\d+\.?\d*)%', line)
+                        if match:
+                            return float(match.group(1))
+
+            return 0.0
+
+        except Exception as e:
+            logger.error(f"Error getting backend coverage: {e}")
+            return 0.0
+
     def _get_backend_coverage(self) -> float:
-        """Get backend test coverage from pytest.
+        """Get backend test coverage from pytest (sync wrapper for backwards compat).
 
         Returns:
             Coverage percentage (0-100)
@@ -180,8 +221,32 @@ class QCMetricsService:
             logger.error(f"Error getting backend coverage: {e}")
             return 0.0
 
+    async def _get_frontend_coverage_async(self) -> float:
+        """Get frontend test coverage from vitest (async).
+
+        Returns:
+            Coverage percentage (0-100)
+        """
+        try:
+            # Check if coverage summary exists
+            coverage_file = self.project_root / "app" / "client" / "coverage" / "coverage-summary.json"
+            if not coverage_file.exists():
+                logger.warning("No frontend coverage data found")
+                return 0.0
+
+            # Read file asynchronously (runs in executor)
+            loop = asyncio.get_event_loop()
+            data = await loop.run_in_executor(None, lambda: json.loads(coverage_file.read_text()))
+            total = data.get('total', {})
+            lines = total.get('lines', {})
+            return float(lines.get('pct', 0.0))
+
+        except Exception as e:
+            logger.error(f"Error getting frontend coverage: {e}")
+            return 0.0
+
     def _get_frontend_coverage(self) -> float:
-        """Get frontend test coverage from vitest.
+        """Get frontend test coverage from vitest (sync wrapper).
 
         Returns:
             Coverage percentage (0-100)
@@ -203,8 +268,43 @@ class QCMetricsService:
             logger.error(f"Error getting frontend coverage: {e}")
             return 0.0
 
+    async def _get_adws_coverage_async(self) -> float:
+        """Get ADWs test coverage (async).
+
+        Returns:
+            Coverage percentage (0-100)
+        """
+        try:
+            coverage_file = self.project_root / "adws" / "tests" / ".coverage"
+            if not coverage_file.exists():
+                logger.warning("No ADWs coverage data found")
+                return 0.0
+
+            # Run coverage report (non-blocking)
+            proc = await asyncio.create_subprocess_exec(
+                "uv", "run", "coverage", "report", "--precision=2",
+                cwd=self.project_root / "adws" / "tests",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+
+            if proc.returncode == 0:
+                for line in stdout.decode().split('\n'):
+                    if 'TOTAL' in line:
+                        match = re.search(r'(\d+\.?\d*)%', line)
+                        if match:
+                            return float(match.group(1))
+
+            return 0.0
+
+        except Exception as e:
+            logger.error(f"Error getting ADWs coverage: {e}")
+            return 0.0
+
     def _get_adws_coverage(self) -> float:
-        """Get ADWs test coverage.
+        """Get ADWs test coverage (sync wrapper).
 
         Returns:
             Coverage percentage (0-100)
@@ -237,8 +337,52 @@ class QCMetricsService:
             logger.error(f"Error getting ADWs coverage: {e}")
             return 0.0
 
+    async def _count_total_tests_async(self) -> int:
+        """Count total number of tests across all test suites (async).
+
+        Returns:
+            Total test count
+        """
+        total = 0
+
+        # Backend tests (run in parallel with frontend)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "uv", "run", "pytest", "--collect-only", "-q",
+                cwd=self.project_root / "app" / "server",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+            if proc.returncode == 0:
+                # Last line typically shows: "878 tests collected"
+                match = re.search(r'(\d+) tests? collected', stdout.decode())
+                if match:
+                    total += int(match.group(1))
+        except Exception as e:
+            logger.error(f"Error counting backend tests: {e}")
+
+        # Frontend tests
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "bun", "test", "--reporter=json",
+                cwd=self.project_root / "app" / "client",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+            if proc.returncode == 0:
+                # Parse JSON output for test count
+                match = re.search(r'"numTotalTests":\s*(\d+)', stdout.decode())
+                if match:
+                    total += int(match.group(1))
+        except Exception as e:
+            logger.error(f"Error counting frontend tests: {e}")
+
+        return total
+
     def _count_total_tests(self) -> int:
-        """Count total number of tests across all test suites.
+        """Count total number of tests across all test suites (sync wrapper).
 
         Returns:
             Total test count
@@ -304,9 +448,11 @@ class QCMetricsService:
             'folder': re.compile(r'^[a-z][a-z0-9_-]*$'),
         }
 
-        # Check Python files
+        # Check Python files (excluding venv/node_modules BEFORE enumeration)
         for py_file in self.project_root.rglob('*.py'):
-            if 'venv' in str(py_file) or '.venv' in str(py_file):
+            # Fast path filtering - check string representation for exclusions
+            file_str = str(py_file)
+            if any(exclude in file_str for exclude in ['venv', '.venv', 'node_modules', '__pycache__', '.git']):
                 continue
 
             total_files += 1
@@ -321,9 +467,11 @@ class QCMetricsService:
                     'severity': 'warning'
                 })
 
-        # Check TypeScript/React files
+        # Check TypeScript/React files (excluding node_modules BEFORE enumeration)
         for ts_file in self.project_root.rglob('*.ts*'):
-            if 'node_modules' in str(ts_file) or '.venv' in str(ts_file):
+            # Fast path filtering - check string representation for exclusions
+            file_str = str(ts_file)
+            if any(exclude in file_str for exclude in ['node_modules', 'venv', '.venv', 'dist', 'coverage', '.git']):
                 continue
 
             total_files += 1
@@ -374,10 +522,12 @@ class QCMetricsService:
         MAX_FILE_SIZE_KB = 500  # 500 KB
         MAX_FILE_LINES = 1000   # 1000 lines
 
-        # Check all code files
+        # Check all code files (excluding venv/node_modules BEFORE enumeration)
         for ext in ['*.py', '*.ts', '*.tsx', '*.js', '*.jsx']:
             for file in self.project_root.rglob(ext):
-                if 'venv' in str(file) or 'node_modules' in str(file):
+                # Fast path filtering - check string representation for exclusions
+                file_str = str(file)
+                if any(exclude in file_str for exclude in ['venv', '.venv', 'node_modules', 'dist', 'coverage', '__pycache__', '.git']):
                     continue
 
                 total_files += 1
@@ -536,8 +686,78 @@ class QCMetricsService:
 
         return round(overall, 2)
 
+    async def get_all_metrics_async(self) -> Dict:
+        """Get all QC metrics in one call (parallelized for performance).
+
+        Returns:
+            Complete QC metrics dictionary
+        """
+        from datetime import datetime
+
+        logger.info("Gathering all QC metrics (parallelized)...")
+
+        # Run coverage async, others are CPU-bound file operations
+        coverage, naming, file_structure, linting = await asyncio.gather(
+            self.get_coverage_metrics(),  # async - parallelizes subprocesses
+            asyncio.to_thread(self.get_naming_convention_metrics),  # CPU-bound - run in thread
+            asyncio.to_thread(self.get_file_structure_metrics),  # CPU-bound - run in thread
+            asyncio.to_thread(self.get_linting_metrics),  # CPU-bound with subprocess
+            return_exceptions=True
+        )
+
+        # Handle exceptions from gather
+        if isinstance(coverage, Exception):
+            logger.error(f"Coverage metrics failed: {coverage}")
+            coverage = CoverageMetrics(0.0, 0.0, 0.0, 0.0, 0, 0, 0)
+        if isinstance(naming, Exception):
+            logger.error(f"Naming metrics failed: {naming}")
+            naming = NamingConventionMetrics(0, 0, [], 0.0)
+        if isinstance(file_structure, Exception):
+            logger.error(f"File structure metrics failed: {file_structure}")
+            file_structure = FileStructureMetrics(0, [], [], [], 0.0)
+        if isinstance(linting, Exception):
+            logger.error(f"Linting metrics failed: {linting}")
+            linting = LintingMetrics(0, 0, 0, 0, 0, 0, 0)
+
+        overall_score = self.calculate_overall_score(
+            coverage, naming, file_structure, linting
+        )
+
+        return {
+            'coverage': {
+                'overall_coverage': coverage.overall_coverage,
+                'backend_coverage': coverage.backend_coverage,
+                'frontend_coverage': coverage.frontend_coverage,
+                'adws_coverage': coverage.adws_coverage,
+                'total_tests': coverage.total_tests
+            },
+            'naming': {
+                'total_files_checked': naming.total_files_checked,
+                'compliant_files': naming.compliant_files,
+                'violations': naming.violations,
+                'compliance_rate': naming.compliance_rate
+            },
+            'file_structure': {
+                'total_files': file_structure.total_files,
+                'oversized_files': file_structure.oversized_files,
+                'long_files': file_structure.long_files,
+                'avg_file_size_kb': file_structure.avg_file_size_kb
+            },
+            'linting': {
+                'backend_issues': linting.backend_issues,
+                'frontend_issues': linting.frontend_issues,
+                'backend_errors': linting.backend_errors,
+                'backend_warnings': linting.backend_warnings,
+                'frontend_errors': linting.frontend_errors,
+                'frontend_warnings': linting.frontend_warnings,
+                'total_issues': linting.total_issues
+            },
+            'overall_score': overall_score,
+            'last_updated': datetime.utcnow().isoformat()
+        }
+
     def get_all_metrics(self) -> Dict:
-        """Get all QC metrics in one call.
+        """Get all QC metrics in one call (sync wrapper for backwards compat).
 
         Returns:
             Complete QC metrics dictionary
@@ -546,7 +766,7 @@ class QCMetricsService:
 
         logger.info("Gathering all QC metrics...")
 
-        coverage = self.get_coverage_metrics()
+        coverage = asyncio.run(self.get_coverage_metrics()) if asyncio.get_event_loop().is_running() else self.get_coverage_metrics()
         naming = self.get_naming_convention_metrics()
         file_structure = self.get_file_structure_metrics()
         linting = self.get_linting_metrics()

@@ -7,14 +7,17 @@
  * - File structure metrics
  * - Linting issues
  * - Overall quality score
+ *
+ * Uses WebSocket for real-time updates (5-minute background refresh)
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { qcMetricsClient, QCMetrics } from '../api/qcMetricsClient';
 import { LoadingState } from './common/LoadingState';
 import { ErrorBanner } from './common/ErrorBanner';
 import { formatErrorMessage, logError } from '../utils/errorHandler';
+import { apiConfig } from '../config/api';
 
 // ============================================================================
 // Utility Functions
@@ -375,22 +378,96 @@ function LintingSection({ linting }: LintingSectionProps) {
 export function QualityPanel() {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [wsMetrics, setWsMetrics] = useState<QCMetrics | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectAttempts = useRef(0);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const maxReconnectAttempts = 5;
 
-  // Fetch QC metrics (cached)
-  const { data: metrics, isLoading, refetch } = useQuery<QCMetrics>({
+  // Fetch QC metrics (initial load only, then WebSocket takes over)
+  const { data: initialMetrics, isLoading } = useQuery<QCMetrics>({
     queryKey: ['qc-metrics'],
     queryFn: qcMetricsClient.getQCMetrics,
-    staleTime: 5 * 60 * 1000, // Consider fresh for 5 minutes
+    staleTime: Infinity, // WebSocket will keep it fresh
     retry: 2,
   });
+
+  // Use WebSocket data if available, otherwise use initial data
+  const metrics = wsMetrics || initialMetrics;
+
+  // WebSocket connection
+  useEffect(() => {
+    const connectWebSocket = () => {
+      if (reconnectAttempts.current >= maxReconnectAttempts) {
+        console.warn('[QC_WS] Max reconnection attempts reached');
+        return;
+      }
+
+      const url = apiConfig.websocket.qcMetrics();
+      console.log(`[QC_WS] Connecting to: ${url}`);
+
+      try {
+        const ws = new WebSocket(url);
+
+        ws.onopen = () => {
+          console.log('[QC_WS] Connected');
+          reconnectAttempts.current = 0;
+          setIsConnected(true);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            if (message.type === 'qc_metrics_update') {
+              console.log('[QC_WS] Metrics updated');
+              setWsMetrics(message.data);
+            }
+          } catch (err) {
+            console.error('[QC_WS] Message parse error:', err);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error('[QC_WS] Error:', error);
+        };
+
+        ws.onclose = () => {
+          console.log('[QC_WS] Disconnected');
+          setIsConnected(false);
+
+          // Attempt reconnect with exponential backoff
+          reconnectAttempts.current++;
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
+          reconnectTimeoutRef.current = setTimeout(connectWebSocket, delay);
+        };
+
+        wsRef.current = ws;
+      } catch (err) {
+        console.error('[QC_WS] Connection failed:', err);
+      }
+    };
+
+    connectWebSocket();
+
+    // Cleanup on unmount
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     setError(null);
 
     try {
-      await qcMetricsClient.refreshQCMetrics();
-      await refetch();
+      const freshMetrics = await qcMetricsClient.refreshQCMetrics();
+      setWsMetrics(freshMetrics);
     } catch (err: unknown) {
       logError('[QualityPanel]', 'Refresh metrics', err);
       setError(formatErrorMessage(err));
@@ -422,6 +499,11 @@ export function QualityPanel() {
           <h2 className="text-2xl font-bold text-gray-100 flex items-center gap-2">
             <span>🎯</span>
             Quality Control Panel
+            {isConnected && (
+              <span className="ml-2 text-xs text-emerald-400 bg-emerald-900/20 px-2 py-1 rounded-full">
+                Live
+              </span>
+            )}
           </h2>
           <p className="text-sm text-gray-400 mt-1">
             Last updated: {formatDate(metrics.last_updated)}

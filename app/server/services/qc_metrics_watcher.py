@@ -188,17 +188,17 @@ class QCMetricsWatcher:
             )
             return
 
-        logger.info("[QC_WATCHER] Triggering QC metrics refresh...")
+        logger.info("[QC_WATCHER] Triggering QC metrics refresh (parallelized)...")
 
         try:
             # Import here to avoid circular dependencies
             from services.qc_metrics_service import QCMetricsService
 
-            # Compute fresh metrics
+            # Compute fresh metrics using parallelized async method
             service = QCMetricsService(project_root=self.project_root)
-            metrics = service.get_all_metrics()
+            metrics = await service.get_all_metrics_async()
 
-            # Clear the cache in the route handler
+            # Update the cache in the route handler
             from routes import qc_metrics_routes
             qc_metrics_routes._qc_metrics_cache = metrics
 

@@ -108,7 +108,7 @@ async def _handle_websocket_connection(websocket: WebSocket, manager, initial_da
         logger.debug(f"[WS] {error_context}: Connection cleaned up")
 
 
-def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func, get_workflow_history_data_func, get_adw_state_func, get_adw_monitor_data_func, get_queue_data_func, get_system_status_data_func, get_webhook_status_data_func, get_planned_features_data_func):
+def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func, get_workflow_history_data_func, get_adw_state_func, get_adw_monitor_data_func, get_queue_data_func, get_system_status_data_func, get_webhook_status_data_func, get_planned_features_data_func, get_qc_metrics_data_func):
     """
     Initialize WebSocket routes with service dependencies.
 
@@ -210,3 +210,13 @@ def init_websocket_routes(manager, get_workflows_data_func, get_routes_data_func
             "data": planned_features_data
         }
         await _handle_websocket_connection(websocket, manager, initial_data, "planned features")
+
+    @router.websocket("/ws/qc-metrics")
+    async def websocket_qc_metrics(websocket: WebSocket) -> None:
+        """WebSocket endpoint for real-time QC metrics updates"""
+        qc_metrics_data = await get_qc_metrics_data_func()
+        initial_data = {
+            "type": "qc_metrics_update",
+            "data": qc_metrics_data
+        }
+        await _handle_websocket_connection(websocket, manager, initial_data, "qc metrics")

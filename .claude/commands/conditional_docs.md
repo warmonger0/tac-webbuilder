@@ -316,6 +316,16 @@
     - Understanding WebSocket broadcast architecture for real-time UI updates
     - Configuring bidirectional GitHub↔database sync
 
+### Git & Version Control Features
+- `app_docs/feature-git-commit-ui.md`
+  - Conditions:
+    - Working with git operations in the frontend UI
+    - Implementing git status or commit functionality
+    - Adding git-related API endpoints
+    - Modifying Panel 1 (System Status section)
+    - Troubleshooting git command execution from backend
+    - Understanding GitCommitPanel or git_routes.py
+
 ---
 
 ## Special Purpose Docs
