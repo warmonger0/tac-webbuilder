@@ -25,24 +25,20 @@ export async function getRoutes(): Promise<RoutesResponse> {
 /**
  * Get webhook service status.
  *
- * Attempts to fetch directly from webhook service first (port 8001),
- * then falls back to backend proxy if direct access fails.
+ * NOTE: This endpoint is only used as HTTP fallback for the WebSocket connection.
+ * The primary webhook status data comes from the WebSocket at /api/v1/ws/webhook-status.
+ * This HTTP endpoint is intentionally NOT IMPLEMENTED in the backend because:
+ * 1. Webhook service (port 8001) doesn't have CORS configured (security by design)
+ * 2. WebSocket provides real-time updates without polling
+ * 3. Backend fetches from port 8001 internally and broadcasts via WebSocket
  *
- * @returns Webhook service status
+ * @returns Empty object (WebSocket should be used instead)
  */
 export async function getWebhookStatus(): Promise<any> {
-  // Try to fetch from webhook service directly
-  try {
-    const response = await fetch(`${apiConfig.webhookServiceUrl}/webhook-status`);
-    if (response.ok) {
-      return response.json();
-    }
-  } catch {
-    // Fallback to backend proxy if direct access fails
-  }
-
-  // Fallback to backend API proxy
-  return fetchJSON<any>(`${API_BASE}/webhook-status`);
+  // Return empty object - webhook status comes from WebSocket only
+  // This function exists for API compatibility but should not be called
+  console.warn('[API] getWebhookStatus called - webhook status should come from WebSocket');
+  return { status: 'unknown', message: 'Use WebSocket for webhook status' };
 }
 
 /**

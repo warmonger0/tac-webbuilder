@@ -276,15 +276,10 @@ export function GlobalWebSocketProvider({ children }: GlobalWebSocketProviderPro
     enabled: true,
   });
 
-  const { data: webhookStatusPolledData } = useQuery({
-    queryKey: ['webhook-status'],
-    queryFn: async () => {
-      const { getWebhookStatus } = await import('../api/client');
-      return getWebhookStatus();
-    },
-    refetchInterval: false,
-    enabled: true,
-  });
+  // Webhook status has NO HTTP fallback - WebSocket only
+  // The webhook service (port 8001) doesn't have CORS configured
+  // Backend fetches from port 8001 internally and broadcasts via WebSocket
+  const webhookStatusPolledData = null;
 
   // ============================================================================
   // Update state when polled data arrives
