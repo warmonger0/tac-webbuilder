@@ -224,7 +224,6 @@ export function RequestFormCore() {
             )}
           </div>
         </div>
-      </div>
 
       {showConfirm && preview && (
         <ConfirmDialog
