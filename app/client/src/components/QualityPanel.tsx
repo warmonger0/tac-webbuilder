@@ -178,7 +178,7 @@ function NamingSection({ naming }: NamingSectionProps) {
               <div className="space-y-2">
                 {naming.violations.map((violation, idx) => (
                   <div
-                    key={idx}
+                    key={`${violation.file}-${violation.issue}-${idx}`}
                     className="bg-slate-900/50 rounded p-3 border-l-2 border-yellow-500/50"
                   >
                     <div className="text-xs font-mono text-gray-400 mb-1">{violation.file}</div>
@@ -254,9 +254,9 @@ function FileStructureSection({ fileStructure }: FileStructureSectionProps) {
           {showOversized && (
             <div className="px-4 pb-4 max-h-48 overflow-y-auto">
               <div className="space-y-2">
-                {fileStructure.oversized_files.map((file, idx) => (
+                {fileStructure.oversized_files.map((file) => (
                   <div
-                    key={idx}
+                    key={`${file.file}-${file.size_kb}`}
                     className="bg-slate-900/50 rounded p-2 flex items-center justify-between"
                   >
                     <span className="text-xs font-mono text-gray-400">{file.file}</span>
@@ -286,9 +286,9 @@ function FileStructureSection({ fileStructure }: FileStructureSectionProps) {
           {showLong && (
             <div className="px-4 pb-4 max-h-48 overflow-y-auto">
               <div className="space-y-2">
-                {fileStructure.long_files.map((file, idx) => (
+                {fileStructure.long_files.map((file) => (
                   <div
-                    key={idx}
+                    key={`${file.file}-${file.lines}`}
                     className="bg-slate-900/50 rounded p-2 flex items-center justify-between"
                   >
                     <span className="text-xs font-mono text-gray-400">{file.file}</span>

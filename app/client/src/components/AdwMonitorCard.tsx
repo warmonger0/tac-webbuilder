@@ -675,7 +675,7 @@ export function AdwMonitorCard() {
                           {/* Small sparks - more spread out horizontally */}
                           {[20, 35, 50, 65, 80].map((x, i) => (
                             <circle
-                              key={i}
+                              key={`spark-${i}`}
                               cx={x}
                               cy={i % 2 === 0 ? 44 : 56}
                               r="0.5"
@@ -787,7 +787,7 @@ export function AdwMonitorCard() {
                             <>
                               {[0, 0.33, 0.66].map((delay, i) => (
                                 <div
-                                  key={i}
+                                  key={`flow-${i}`}
                                   className="absolute w-2.5 h-2.5 bg-emerald-400 rounded-full shadow-[0_0_12px_rgba(16,185,129,1)]"
                                   style={{
                                     animation: `flowFromCenter 1.5s ease-in-out infinite`,

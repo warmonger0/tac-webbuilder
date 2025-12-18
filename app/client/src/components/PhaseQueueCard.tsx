@@ -181,7 +181,7 @@ export function PhaseQueueCard({ queueItem }: PhaseQueueCardProps) {
                 <span className="text-xs text-slate-400">Patterns:</span>
                 {phase_data.predicted_patterns.map((pattern, idx) => (
                   <span
-                    key={idx}
+                    key={`pattern-${idx}`}
                     className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-xs rounded-md border border-emerald-500/30"
                     title="Predicted pattern"
                   >

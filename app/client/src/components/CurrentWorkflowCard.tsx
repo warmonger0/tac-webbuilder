@@ -341,7 +341,7 @@ export function CurrentWorkflowCard() {
                 {/* Sparks */}
                 {[20, 35, 50, 65, 80].map((x, i) => (
                   <circle
-                    key={i}
+                    key={`spark-${i}`}
                     cx={x}
                     cy={i % 2 === 0 ? 44 : 56}
                     r="0.5"

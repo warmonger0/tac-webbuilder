@@ -164,7 +164,7 @@ export function ContextReviewPanel({ reviewId, onClose }: ContextReviewPanelProp
               <div className="space-y-1">
                 {analysis.result.suggested_files.map((file, idx) => (
                   <div
-                    key={idx}
+                    key={`suggested-${idx}`}
                     className="bg-emerald-500/10 border border-emerald-500/30 rounded px-3 py-2 text-sm text-emerald-300 font-mono"
                   >
                     {file}
@@ -184,7 +184,7 @@ export function ContextReviewPanel({ reviewId, onClose }: ContextReviewPanelProp
               <div className="space-y-1">
                 {analysis.result.missing_dependencies.map((dep, idx) => (
                   <div
-                    key={idx}
+                    key={`dep-${idx}`}
                     className="bg-yellow-500/10 border border-yellow-500/30 rounded px-3 py-2 text-sm text-yellow-300"
                   >
                     {dep}
@@ -204,7 +204,7 @@ export function ContextReviewPanel({ reviewId, onClose }: ContextReviewPanelProp
               <ul className="space-y-2">
                 {analysis.result.recommendations.map((rec, idx) => (
                   <li
-                    key={idx}
+                    key={`recommendation-${idx}`}
                     className="bg-blue-500/10 border border-blue-500/30 rounded px-3 py-2 text-sm text-blue-300 flex items-start gap-2"
                   >
                     <span className="text-blue-400 flex-shrink-0">•</span>

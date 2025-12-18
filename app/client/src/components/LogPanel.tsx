@@ -476,7 +476,7 @@ export function LogPanel() {
                       <div className="flex flex-wrap gap-1">
                         {entry.tags.map((tag, idx) => (
                           <span
-                            key={idx}
+                            key={`tag-${idx}`}
                             className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs"
                           >
                             {tag}

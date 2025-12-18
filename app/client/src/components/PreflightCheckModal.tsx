@@ -82,7 +82,7 @@ export function PreflightCheckModal({
               </h4>
               <div className="space-y-3">
                 {results.blocking_failures.map((failure, idx) => (
-                  <BlockingFailureCard key={idx} failure={failure} />
+                  <BlockingFailureCard key={`${failure.check}-${idx}`} failure={failure} />
                 ))}
               </div>
             </div>
@@ -97,7 +97,7 @@ export function PreflightCheckModal({
               </h4>
               <div className="space-y-3">
                 {results.warnings.map((warning, idx) => (
-                  <WarningCard key={idx} warning={warning} />
+                  <WarningCard key={`${warning.check}-${idx}`} warning={warning} />
                 ))}
               </div>
             </div>
@@ -115,7 +115,7 @@ export function PreflightCheckModal({
             </summary>
             <div className="p-3 space-y-2 border-t border-gray-200">
               {results.checks_run.map((check, idx) => (
-                <CheckResultRow key={idx} check={check} />
+                <CheckResultRow key={`${check.check}-${idx}`} check={check} />
               ))}
             </div>
           </details>
@@ -147,7 +147,7 @@ export function PreflightCheckModal({
                       </summary>
                       <ul className="list-disc pl-5 mt-1 text-sm text-gray-600 space-y-1">
                         {results.issue_validation.evidence.map((evidence, idx) => (
-                          <li key={idx}>{evidence}</li>
+                          <li key={`evidence-${idx}`}>{evidence}</li>
                         ))}
                       </ul>
                     </details>
@@ -209,7 +209,7 @@ function BlockingFailureCard({ failure }: { failure: PreflightBlockingFailure })
           </summary>
           <ul className="list-disc pl-5 mt-1 text-sm text-red-800 space-y-1">
             {failure.failing_tests.slice(0, 10).map((test, idx) => (
-              <li key={idx} className="font-mono text-xs">
+              <li key={`test-${idx}`} className="font-mono text-xs">
                 {test}
               </li>
             ))}
@@ -245,7 +245,7 @@ function WarningCard({ warning }: { warning: PreflightWarning }) {
           </summary>
           <ul className="list-disc pl-5 mt-1 text-sm text-gray-600 space-y-1">
             {warning.evidence.map((evidence, idx) => (
-              <li key={idx}>{evidence}</li>
+              <li key={`evidence-${idx}`}>{evidence}</li>
             ))}
           </ul>
         </details>
@@ -340,7 +340,7 @@ function PhaseCard({ phase }: { phase: DryRunPhase }) {
           </summary>
           <ul className="list-disc pl-5 mt-1 text-xs text-gray-600 space-y-0.5">
             {phase.files_to_modify.slice(0, 5).map((file, idx) => (
-              <li key={idx} className="font-mono">
+              <li key={`file-${idx}`} className="font-mono">
                 {file}
               </li>
             ))}

@@ -186,7 +186,7 @@ export function WebhookStatusPanel() {
             </div>
             <div className="space-y-2">
               {status.recent_failures.slice(0, thresholds.display.recentFailuresLimit).map((failure, idx) => (
-                <div key={idx} className="text-xs text-yellow-800">
+                <div key={`failure-${failure.issue}-${idx}`} className="text-xs text-yellow-800">
                   <span className="font-medium">Issue #{failure.issue}</span> •{' '}
                   {new Date(failure.timestamp).toLocaleString()}
                   <div className="text-yellow-700 mt-0.5 truncate">

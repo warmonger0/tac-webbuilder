@@ -278,7 +278,7 @@ export function ReviewPanel() {
                     </div>
                     <div className="text-xs space-y-1">
                       {selectedPattern.example_sessions.slice(0, 5).map((session, idx) => (
-                        <div key={idx} className="font-mono text-gray-600">
+                        <div key={`session-${idx}`} className="font-mono text-gray-600">
                           {session}
                         </div>
                       ))}

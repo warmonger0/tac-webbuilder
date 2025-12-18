@@ -37,7 +37,7 @@ export function ErrorSection({ workflow }: ErrorSectionProps) {
           <div className="text-sm font-medium text-gray-700 mb-2">Retry Triggers:</div>
           <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 bg-gray-50 border border-gray-200 rounded-lg p-3">
             {workflow.retry_reasons.map((reason, idx) => (
-              <li key={idx}>{reason.replace('_', ' ')}</li>
+              <li key={`reason-${idx}`}>{reason.replace('_', ' ')}</li>
             ))}
           </ul>
         </div>

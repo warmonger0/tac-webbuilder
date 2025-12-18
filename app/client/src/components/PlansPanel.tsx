@@ -406,7 +406,7 @@ function FeatureItemDescription({
           {completionNotes.includes('\n') ? (
             <ul className="list-disc pl-5 space-y-0.5">
               {completionNotes.split('\n').filter(line => line.trim()).map((line, i) => (
-                <li key={i}>{line.replace(/^[•\-*]\s*/, '')}</li>
+                <li key={`note-${i}`}>{line.replace(/^[•\-*]\s*/, '')}</li>
               ))}
             </ul>
           ) : (

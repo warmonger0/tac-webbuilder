@@ -22,7 +22,7 @@ export function InsightsSection({ workflow }: InsightsSectionProps) {
           <h4 className="text-sm font-semibold text-orange-700 mb-2">⚠️ Anomalies Detected</h4>
           <ul className="space-y-2">
             {workflow.anomaly_flags!.map((anomaly, idx) => (
-              <li key={idx} className="bg-orange-50 border border-orange-200 rounded p-3 text-sm">
+              <li key={`anomaly-${idx}`} className="bg-orange-50 border border-orange-200 rounded p-3 text-sm">
                 {anomaly}
               </li>
             ))}
@@ -36,7 +36,7 @@ export function InsightsSection({ workflow }: InsightsSectionProps) {
           <h4 className="text-sm font-semibold text-green-700 mb-2">✅ Optimization Tips</h4>
           <ul className="space-y-2">
             {workflow.optimization_recommendations!.map((rec, idx) => (
-              <li key={idx} className="bg-green-50 border border-green-200 rounded p-3 text-sm">
+              <li key={`rec-${idx}`} className="bg-green-50 border border-green-200 rounded p-3 text-sm">
                 {rec}
               </li>
             ))}

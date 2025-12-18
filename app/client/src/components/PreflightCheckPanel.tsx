@@ -155,7 +155,7 @@ export function PreflightCheckPanel() {
                         </summary>
                         <ul className="mt-2 ml-4 text-xs text-gray-600 space-y-1">
                           {failure.failing_tests.map((test, idx) => (
-                            <li key={idx} className="font-mono">
+                            <li key={`test-${idx}`} className="font-mono">
                               {test}
                             </li>
                           ))}

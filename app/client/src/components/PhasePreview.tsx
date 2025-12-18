@@ -56,7 +56,7 @@ export function PhasePreview({ parseResult, onConfirm, onCancel }: PhasePreviewP
                 </h3>
                 <ul className="space-y-1">
                   {warnings.map((warning, idx) => (
-                    <li key={idx} className={`text-sm ${hasErrors ? 'text-red-700' : 'text-yellow-700'}`}>
+                    <li key={`warning-${idx}`} className={`text-sm ${hasErrors ? 'text-red-700' : 'text-yellow-700'}`}>
                       • {warning}
                     </li>
                   ))}
@@ -84,7 +84,7 @@ export function PhasePreview({ parseResult, onConfirm, onCancel }: PhasePreviewP
           ) : (
             <div className="space-y-3">
               {phases.map((phase, idx) => (
-                <PhaseCard key={idx} phase={phase} position={idx + 1} />
+                <PhaseCard key={`phase-${phase.number}`} phase={phase} position={idx + 1} />
               ))}
             </div>
           )}
@@ -180,7 +180,7 @@ function PhaseCard({ phase, position }: { phase: ParsedPhase; position: number }
               </div>
               <div className="flex flex-wrap gap-1">
                 {phase.externalDocs.map((doc, idx) => (
-                  <code key={idx} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200">
+                  <code key={`doc-${idx}`} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200">
                     {doc}
                   </code>
                 ))}
