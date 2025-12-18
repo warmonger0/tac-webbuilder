@@ -7,8 +7,8 @@ import type { HistoryAnalytics, Route, WorkflowExecution, WorkflowHistoryItem } 
 import { apiConfig } from '../config/api';
 import { intervals } from '../config/intervals';
 
-// Debug flag
-const DEBUG_WS = import.meta.env.DEV;
+// Debug flag - only show errors, not connection status
+const DEBUG_WS = false;
 
 interface QueueData {
   phases: PhaseQueueItem[];
@@ -26,7 +26,28 @@ interface SystemStatusData {
 }
 
 interface WebhookStatusData {
-  [key: string]: any;
+  status: 'healthy' | 'degraded' | 'error' | 'unknown';
+  uptime?: {
+    hours: number;
+    human: string;
+  };
+  stats?: {
+    total_received: number;
+    successful: number;
+    failed: number;
+    success_rate: string;
+  };
+  recent_failures?: Array<{
+    issue: number;
+    timestamp: string;
+    error: string;
+  }>;
+  last_successful?: {
+    issue: number;
+    adw_id: string;
+    workflow: string;
+    timestamp: string;
+  } | null;
 }
 
 interface ConnectionState {

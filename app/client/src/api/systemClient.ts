@@ -11,7 +11,6 @@
 
 import type { RoutesResponse } from '../types';
 import { API_BASE, fetchJSON } from './baseClient';
-import { apiConfig } from '../config/api';
 
 /**
  * Get list of available API routes.

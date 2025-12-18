@@ -130,6 +130,9 @@ class PhaseCoordinator:
                 f"phase={phase_number}, status={status}"
             )
 
+            # Check if all phases for this feature are complete
+            await self._check_feature_completion(feature_id)
+
             # Find newly ready phases (dependency resolution)
             ready_phases = self._find_newly_ready_phases(feature_id)
 
@@ -177,6 +180,121 @@ class PhaseCoordinator:
             logger.error(f"[ERROR] handle_workflow_completion failed: {e}")
             import traceback
             logger.error(f"Traceback:\n{traceback.format_exc()}")
+
+    async def _check_feature_completion(self, feature_id: int):
+        """
+        Check if all phases for a feature are complete and update planned_features status.
+
+        If all phases are completed, update the planned_features table status to 'completed'
+        and broadcast WebSocket update to refresh the Plans Panel.
+
+        Args:
+            feature_id: Feature ID to check
+        """
+        try:
+            with self.phase_queue_service.repository.adapter.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Get total phases and completed phases count
+                cursor.execute(
+                    """
+                    SELECT
+                        COUNT(*) as total_phases,
+                        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_phases,
+                        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_phases
+                    FROM phase_queue
+                    WHERE feature_id = %s
+                    """,
+                    (feature_id,)
+                )
+                row = cursor.fetchone()
+
+                if not row:
+                    return
+
+                total_phases = row["total_phases"]
+                completed_phases = row["completed_phases"]
+                failed_phases = row["failed_phases"]
+
+                logger.info(
+                    f"[FEATURE #{feature_id}] Phase status: "
+                    f"{completed_phases}/{total_phases} completed, {failed_phases} failed"
+                )
+
+                # Check if all phases are completed
+                if total_phases > 0 and completed_phases == total_phases:
+                    logger.info(
+                        f"[FEATURE #{feature_id}] All phases complete! "
+                        f"Updating planned_features status to 'completed'"
+                    )
+
+                    # Update planned_features table
+                    from services.planned_features_service import PlannedFeaturesService
+                    from core.models import PlannedFeatureUpdate
+
+                    service = PlannedFeaturesService()
+                    feature = service.get_by_id(feature_id)
+
+                    if feature and feature.status != 'completed':
+                        # Calculate actual hours from phase data
+                        cursor.execute(
+                            """
+                            SELECT SUM((phase_data->>'estimated_hours')::float) as total_hours
+                            FROM phase_queue
+                            WHERE feature_id = %s AND status = 'completed'
+                            """,
+                            (feature_id,)
+                        )
+                        hours_row = cursor.fetchone()
+                        actual_hours = hours_row["total_hours"] if hours_row and hours_row["total_hours"] else None
+
+                        # Update status to completed
+                        update_data = PlannedFeatureUpdate(
+                            status='completed',
+                            actual_hours=actual_hours
+                        )
+                        service.update(feature_id, update_data)
+
+                        logger.info(
+                            f"[FEATURE #{feature_id}] Updated to completed "
+                            f"(actual_hours: {actual_hours})"
+                        )
+
+                        # Broadcast WebSocket update
+                        await self._broadcast_planned_features_update()
+
+                elif failed_phases > 0 and (completed_phases + failed_phases) == total_phases:
+                    # Some phases failed - mark feature as needing attention
+                    logger.warning(
+                        f"[FEATURE #{feature_id}] Some phases failed. "
+                        f"Feature remains 'in_progress' - manual intervention needed"
+                    )
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to check feature completion: {e}")
+            import traceback
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
+
+    async def _broadcast_planned_features_update(self):
+        """Broadcast planned features update to all WebSocket clients"""
+        try:
+            from services.planned_features_service import PlannedFeaturesService
+
+            service = PlannedFeaturesService()
+            features = service.get_all(limit=200)
+            stats = service.get_statistics()
+
+            if self.websocket_manager:
+                await self.websocket_manager.broadcast({
+                    "type": "planned_features_update",
+                    "data": {
+                        "features": [f.model_dump() for f in features],
+                        "stats": stats
+                    }
+                })
+                logger.debug("[WS] Broadcast planned features update")
+        except Exception as e:
+            logger.error(f"[WS] Error broadcasting planned features update: {e}")
 
     def _find_newly_ready_phases(self, feature_id: int) -> list[dict]:
         """
