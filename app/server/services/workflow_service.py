@@ -72,6 +72,10 @@ class WorkflowService:
         self._background_sync_thread = None
         self._stop_background_sync = threading.Event()
 
+        # Cache for get_workflows() to prevent slow filesystem scans
+        self._workflows_cache: list[Workflow] = []
+        self._workflows_cache_time = 0
+
         # Start background sync worker if enabled
         if self._background_sync_enabled:
             self._start_background_sync()
@@ -150,13 +154,26 @@ class WorkflowService:
 
     def get_workflows(self) -> list[Workflow]:
         """
-        Get all active workflows from agents directory
+        Get all active workflows from agents directory (with caching)
 
         Only returns workflows with valid integer issue numbers (filters out debug/test workflows).
+        Uses cache to prevent slow filesystem scans on every request.
 
         Returns:
             List of Workflow objects
         """
+        current_time = time.time()
+
+        # Return cached data if still fresh
+        if current_time - self._workflows_cache_time < self.sync_cache_seconds:
+            logger.debug(
+                f"[WORKFLOW_SERVICE] Using cached workflows data "
+                f"(cached {current_time - self._workflows_cache_time:.1f}s ago)"
+            )
+            return self._workflows_cache
+
+        # Cache expired or empty, scan filesystem
+        logger.debug("[WORKFLOW_SERVICE] Workflows cache expired, scanning filesystem")
         workflows = []
 
         # Check if agents directory exists
@@ -218,6 +235,11 @@ class WorkflowService:
                     f"[WORKFLOW_SERVICE] Failed to process workflow {adw_id}: {str(e)}"
                 )
                 continue
+
+        # Update cache
+        self._workflows_cache = workflows
+        self._workflows_cache_time = current_time
+        logger.debug(f"[WORKFLOW_SERVICE] Cached {len(workflows)} workflows")
 
         return workflows
 
