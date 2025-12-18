@@ -26,6 +26,7 @@ from routes import (
     cost_analytics_routes,
     data_routes,
     error_analytics_routes,
+    git_routes,
     github_routes,
     issue_completion_routes,
     latency_analytics_routes,
@@ -343,6 +344,9 @@ app.include_router(system_routes.router, prefix="/api/v1")
 
 github_routes.init_github_routes(github_issue_service)
 app.include_router(github_routes.router, prefix="/api/v1")
+
+# Initialize git routes (no dependencies needed)
+app.include_router(git_routes.router, prefix="/api/v1")
 
 queue_routes.init_queue_routes(phase_queue_service)
 app.include_router(queue_routes.router, prefix="/api/v1")
