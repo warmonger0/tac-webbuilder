@@ -104,3 +104,4 @@ Create-tac-webbuilder.md
 playwright-mcp-config.json.codebase_index.json
 app/client/coverage/.tmp/
 app/server/tests/
+.env.bak
