@@ -43,20 +43,15 @@ class PostgreSQLAdapter(DatabaseAdapter):
     @contextmanager
     def get_connection(self) -> Generator[Any, None, None]:
         """Get PostgreSQL connection from pool"""
-        conn = None
+        conn = self.pool.getconn()
         try:
-            conn = self.pool.getconn()
             yield conn
-        except Exception as e:
-            if conn:
-                conn.rollback()
-            raise e
-        else:
-            if conn:
-                conn.commit()
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
-            if conn:
-                self.pool.putconn(conn)
+            self.pool.putconn(conn)
 
     def execute_query(self, query: str, params: tuple | None = None) -> Any:
         """Execute query and return results"""
