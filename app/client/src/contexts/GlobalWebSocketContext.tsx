@@ -239,24 +239,28 @@ export function GlobalWebSocketProvider({ children }: GlobalWebSocketProviderPro
   });
 
   // ============================================================================
+  // Defer all queries using state flags to prevent blocking initial render
+  // ============================================================================
+  const [shouldFetchSystemStatus, setShouldFetchSystemStatus] = useState(false);
+  const [shouldFetchQueue, setShouldFetchQueue] = useState(false);
+  const [shouldFetchAdwMonitor, setShouldFetchAdwMonitor] = useState(false);
+
+  // ============================================================================
   // HTTP fallback queries (for fast initial load)
   // ============================================================================
   const { data: queuePolledData } = useQuery({
     queryKey: ['queue'],
     queryFn: getQueueData,
     refetchInterval: false,
-    enabled: true,
+    enabled: shouldFetchQueue,  // Deferred to reduce initial load time
   });
 
   const { data: adwPolledData } = useQuery({
     queryKey: ['adw-monitor'],
     queryFn: getAdwMonitor,
     refetchInterval: false,
-    enabled: true,
+    enabled: shouldFetchAdwMonitor,  // Deferred to reduce initial load time
   });
-
-  // Defer system-status query using a state flag
-  const [shouldFetchSystemStatus, setShouldFetchSystemStatus] = useState(false);
 
   const { data: systemPolledData } = useQuery({
     queryKey: ['system-status'],
@@ -272,21 +276,21 @@ export function GlobalWebSocketProvider({ children }: GlobalWebSocketProviderPro
     queryKey: ['workflows'],
     queryFn: listWorkflows,
     refetchInterval: false,
-    enabled: true,
+    enabled: false,  // Don't fetch on mount - defer to reduce initial load time (WebSocket provides real-time data)
   });
 
   const { data: routesPolledData } = useQuery({
     queryKey: ['routes'],
     queryFn: getRoutes,
     refetchInterval: false,
-    enabled: true,
+    enabled: false,  // Don't fetch on mount - defer to reduce initial load time (WebSocket provides real-time data)
   });
 
   const { data: historyPolledData } = useQuery({
     queryKey: ['workflow-history'],
     queryFn: () => getWorkflowHistory({ limit: 50, offset: 0 }),
     refetchInterval: false,
-    enabled: true,
+    enabled: false,  // Don't fetch on mount - defer to reduce initial load time (WebSocket provides real-time data)
   });
 
   const { data: plannedFeaturesPolledData } = useQuery({
@@ -300,7 +304,7 @@ export function GlobalWebSocketProvider({ children }: GlobalWebSocketProviderPro
       return { features, stats };
     },
     refetchInterval: false,
-    enabled: true,
+    enabled: false,  // Don't fetch on mount - defer to reduce initial load time (WebSocket provides real-time data)
   });
 
   // Webhook status has NO HTTP fallback - WebSocket only
@@ -422,14 +426,24 @@ export function GlobalWebSocketProvider({ children }: GlobalWebSocketProviderPro
   }, [webhookStatusPolledData, webhookStatusConnectionState.isConnected]);
 
   // ============================================================================
-  // Deferred loading for system-status (performance optimization)
+  // Deferred loading for all queries (performance optimization)
   // ============================================================================
-  // Load system-status after 2 seconds to avoid blocking initial page load
+  // Load data progressively to avoid blocking initial page load
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShouldFetchSystemStatus(true);
-    }, 2000);
-    return () => clearTimeout(timer);
+    // Enable queue first (fastest query, needed for Panel 1)
+    const queueTimer = setTimeout(() => setShouldFetchQueue(true), 500);
+
+    // Then ADW monitor (slower but needed for Panel 1)
+    const adwTimer = setTimeout(() => setShouldFetchAdwMonitor(true), 1000);
+
+    // Finally system status (slowest)
+    const systemTimer = setTimeout(() => setShouldFetchSystemStatus(true), 2000);
+
+    return () => {
+      clearTimeout(queueTimer);
+      clearTimeout(adwTimer);
+      clearTimeout(systemTimer);
+    };
   }, []);
 
   // ============================================================================

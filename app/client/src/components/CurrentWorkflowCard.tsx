@@ -1,13 +1,19 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { AdwWorkflowStatus } from '../api/client';
 import { phaseSvgIconMap, workflowPhases } from '../config/workflows';
 import { useGlobalWebSocket } from '../contexts/GlobalWebSocketContext';
+import { resumeAdw } from '../api/client';
 
 export function CurrentWorkflowCard() {
   // Use shared WebSocket context for real-time updates
   const { adwMonitorData, adwConnectionState } = useGlobalWebSocket();
   const { workflows } = adwMonitorData;
   const { isConnected } = adwConnectionState; // Used for connection indicator in UI
+
+  // State for resume button
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [resumeSuccess, setResumeSuccess] = useState<string | null>(null);
 
   // Select current workflow (prioritize running > paused) - ONLY show active workflows
   const workflow = useMemo(() => {
@@ -21,6 +27,29 @@ export function CurrentWorkflowCard() {
 
   // Don't block on WebSocket connection - show empty state immediately
   const loading = false; // WebSocket will update asynchronously
+
+  // Handle resume workflow
+  const handleResumeWorkflow = async () => {
+    if (!workflow?.adw_id) return;
+
+    setResumeLoading(true);
+    setResumeError(null);
+    setResumeSuccess(null);
+
+    try {
+      const result = await resumeAdw(workflow.adw_id);
+      setResumeSuccess(result.message);
+      // Clear success message after 5 seconds
+      setTimeout(() => setResumeSuccess(null), 5000);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to resume workflow';
+      setResumeError(errorMessage);
+      // Clear error message after 10 seconds
+      setTimeout(() => setResumeError(null), 10000);
+    } finally {
+      setResumeLoading(false);
+    }
+  };
 
   const renderIcon = (iconName: string, status: 'pending' | 'active' | 'completed' = 'pending') => {
     const iconClass = `w-6 h-6 transition-all duration-300 ${
@@ -188,6 +217,56 @@ export function CurrentWorkflowCard() {
             ${(workflow.current_cost || workflow.estimated_cost_total || 0).toFixed(2)}
           </div>
         </div>
+
+        {/* Resume Button Section (only for paused workflows) */}
+        {workflow.status === 'paused' && (
+          <div className="mt-3 pt-3 border-t border-slate-700/50">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleResumeWorkflow}
+                disabled={resumeLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg text-sm font-medium"
+              >
+                {resumeLoading ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Running Preflight Checks...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Resume Workflow
+                  </>
+                )}
+              </button>
+              {resumeSuccess && (
+                <div className="flex items-center gap-2 text-emerald-400 text-sm">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  {resumeSuccess}
+                </div>
+              )}
+              {resumeError && (
+                <div className="flex items-center gap-2 text-red-400 text-sm">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  {resumeError}
+                </div>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              Workflow is paused. Click Resume to run preflight checks and continue to the next phase.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Circular Visualization with W Logo */}

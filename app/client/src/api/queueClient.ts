@@ -238,6 +238,38 @@ export async function executePhase(
   );
 }
 
+/**
+ * Resume a paused ADW workflow after running preflight checks.
+ *
+ * @param adwId - The ADW ID to resume
+ * @returns Success response with workflow details
+ */
+export async function resumeAdw(
+  adwId: string
+): Promise<{
+  success: boolean;
+  message: string;
+  adw_id: string;
+  issue_number: string;
+  workflow: string;
+  preflight_checks: {
+    passed: boolean;
+    duration_ms: number;
+  };
+}> {
+  return apiPost<{
+    success: boolean;
+    message: string;
+    adw_id: string;
+    issue_number: string;
+    workflow: string;
+    preflight_checks: {
+      passed: boolean;
+      duration_ms: number;
+    };
+  }>(`${API_BASE}/queue/resume/${adwId}`);
+}
+
 // ============================================================================
 // ADW Monitor API Functions
 // ============================================================================
@@ -276,6 +308,7 @@ export const queueClient = {
   setQueuePaused,
   dequeuePhase,
   executePhase,
+  resumeAdw,
   // ADW Monitor operations
   getAdwMonitor,
   getAdwHealth,

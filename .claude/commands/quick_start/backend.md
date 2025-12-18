@@ -14,7 +14,7 @@ FastAPI + Python 3.10+ + PostgreSQL + OpenAI/Anthropic APIs + Pydantic
 ## API Routes (40+ Endpoints)
 - **data_routes.py** - File upload, NL→SQL queries, exports
 - **workflow_routes.py** - Workflow management, history, analytics
-- **queue_routes.py** - Multi-phase workflow queue coordination
+- **queue_routes.py** - Multi-phase workflow queue coordination, resume workflow endpoint
 - **github_routes.py** - Issue creation, preview, confirmation
 - **system_routes.py** - Health checks, service control, ADW monitoring
 - **work_log_routes.py** - Session logging (Panel 10)
@@ -163,6 +163,24 @@ Dynamic schema from uploaded files. Check: `core/file_processor.py`
 - **ROI Tracking:** CLI-based analytics (no service layer yet)
 - **Confidence Updates:** CLI-based system (no service layer yet)
 
+## Resume Workflow Feature (Issue #106)
+**Endpoint:** `POST /api/v1/queue/resume/{adw_id}`
+
+**Purpose:** Resume paused ADW workflows after running preflight checks
+
+**Features:**
+- Runs preflight checks with `skip_tests=True` for faster resume
+- Requires clean git state (no uncommitted changes)
+- Returns clear error messages if checks fail
+- Launches workflow in background using subprocess.Popen()
+- Frontend UI: Resume button in CurrentWorkflowCard (only for paused workflows)
+
+**Implementation:**
+- Handler: `queue_routes.py:289-381` (`_resume_adw_handler()`)
+- Endpoint: `queue_routes.py:538-547`
+- Frontend API: `app/client/src/api/queueClient.ts:247-271` (`resumeAdw()`)
+- UI: `app/client/src/components/CurrentWorkflowCard.tsx:221-269`
+
 ## Quick Commands
 ```bash
 cd app/server
@@ -170,6 +188,9 @@ uv sync --all-extras   # Install dependencies
 uv run python server.py # Start server (port 8000 or BACKEND_PORT)
 uv run pytest           # Run tests
 uv run pytest tests/test_sql_injection.py -v  # Security tests
+
+# Reliable startup (prevents PostgreSQL PoolError)
+../../scripts/start_full_clean.sh  # Kills processes, no --reload flag
 ```
 
 ## When to Load Full Docs

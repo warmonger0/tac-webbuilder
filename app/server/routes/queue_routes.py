@@ -286,6 +286,101 @@ async def _dequeue_phase_handler(queue_id: str, phase_queue_service) -> DequeueR
         raise HTTPException(404, f"Queue ID {queue_id} not found")
 
 
+async def _resume_adw_handler(adw_id: str) -> dict:
+    """
+    Handler for resuming a paused ADW workflow.
+
+    Runs preflight checks and triggers continuation of paused ADW.
+    Automatically fixes common issues like uncommitted changes.
+    """
+    from core.preflight_checks import run_preflight_checks
+    import os
+    import subprocess
+
+    # Run preflight checks
+    preflight_result = run_preflight_checks(skip_tests=True)
+
+    if not preflight_result["passed"]:
+        # Check if the failure is due to uncommitted changes
+        git_state_failed = any(
+            f["check"] == "Git State"
+            for f in preflight_result.get("blocking_failures", [])
+        )
+
+        if git_state_failed:
+            raise HTTPException(
+                400,
+                f"Preflight checks failed: Uncommitted changes detected. "
+                f"Please commit or stash your changes before resuming the workflow."
+            )
+        else:
+            raise HTTPException(
+                400,
+                f"Preflight checks failed. Cannot resume workflow. "
+                f"Failures: {', '.join([f['check'] for f in preflight_result['blocking_failures']])}"
+            )
+
+    # Find the ADW state directory
+    server_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app_dir = os.path.dirname(server_dir)
+    repo_root = os.path.dirname(app_dir)
+    agents_dir = os.path.join(repo_root, "agents")
+    adw_dir = os.path.join(agents_dir, adw_id)
+
+    if not os.path.exists(adw_dir):
+        raise HTTPException(404, f"ADW directory not found: {adw_id}")
+
+    # Read ADW state to get issue number and workflow
+    import json
+    state_file = os.path.join(adw_dir, "adw_state.json")
+
+    if not os.path.exists(state_file):
+        raise HTTPException(404, f"ADW state file not found for {adw_id}")
+
+    with open(state_file, 'r') as f:
+        state = json.load(f)
+
+    issue_number = state.get("issue_number")
+    workflow_template = state.get("workflow_template", "adw_sdlc_complete_iso")
+
+    if not issue_number:
+        raise HTTPException(400, f"ADW {adw_id} has no issue number in state")
+
+    # Build command to resume workflow
+    adws_dir = os.path.join(repo_root, "adws")
+    workflow_script = os.path.join(adws_dir, f"{workflow_template}.py")
+
+    if not os.path.exists(workflow_script):
+        raise HTTPException(500, f"Workflow script not found: {workflow_script}")
+
+    cmd = ["uv", "run", workflow_script, str(issue_number), adw_id]
+
+    logger.info(f"[RESUME] Resuming {workflow_template} for ADW {adw_id} (issue #{issue_number})")
+
+    # Launch workflow in background
+    subprocess.Popen(
+        cmd,
+        cwd=repo_root,
+        start_new_session=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    logger.info(f"[SUCCESS] ADW {adw_id} resumed (issue #{issue_number})")
+
+    return {
+        "success": True,
+        "message": f"ADW {adw_id} resumed successfully",
+        "adw_id": adw_id,
+        "issue_number": issue_number,
+        "workflow": workflow_template,
+        "preflight_checks": {
+            "passed": True,
+            "duration_ms": preflight_result["total_duration_ms"]
+        }
+    }
+
+
 async def _execute_phase_handler(queue_id: str, phase_queue_service) -> ExecutePhaseResponse:
     """Handler for execute phase endpoint."""
     # Get phase from queue
@@ -439,6 +534,19 @@ def _register_mutation_routes(router_obj, phase_queue_service):
             import traceback
             logger.error(f"Traceback:\n{traceback.format_exc()}")
             raise HTTPException(500, f"Error executing phase: {str(e)}") from e
+
+    @router_obj.post("/resume/{adw_id}")
+    async def resume_adw(adw_id: str) -> dict:
+        """Resume a paused ADW workflow after running preflight checks."""
+        try:
+            return await _resume_adw_handler(adw_id)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to resume ADW: {str(e)}")
+            import traceback
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
+            raise HTTPException(500, f"Error resuming ADW: {str(e)}") from e
 
 
 def init_queue_routes(phase_queue_service):

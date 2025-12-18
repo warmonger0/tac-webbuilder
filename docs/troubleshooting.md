@@ -413,6 +413,48 @@ bun run dev
 
 ---
 
+### Issue: PostgreSQL PoolError on hot-reload
+
+**Symptoms:**
+```
+PoolError: trying to put unkeyed connection
+Backend crashes after code changes
+Hot-reload triggers connection pool errors
+```
+
+**Root Cause:**
+When using Python's `--reload` flag with PostgreSQL connection pooling, hot-reload attempts to return connections to the pool after the pool has been destroyed, causing a PoolError.
+
+**Solution:**
+```bash
+# Option 1: Use start_full_clean.sh (recommended)
+./scripts/start_full_clean.sh
+
+# Option 2: Start backend WITHOUT --reload flag
+cd app/server
+BACKEND_PORT=8002 FRONTEND_PORT=5173 \
+POSTGRES_HOST=localhost POSTGRES_PORT=5432 \
+POSTGRES_DB=tac_webbuilder POSTGRES_USER=tac_user \
+POSTGRES_PASSWORD=changeme DB_TYPE=postgresql \
+uv run python server.py --host 0.0.0.0 --port 8002
+
+# Option 3: Manual restart when making changes
+# Stop backend: Ctrl+C or kill process
+# Start backend again (without --reload)
+```
+
+**Prevention:**
+- **DO NOT** use `--reload` flag with PostgreSQL
+- Use `./scripts/start_full_clean.sh` for reliable startup
+- Restart backend manually when making code changes
+- For SQLite, hot-reload works fine (but PostgreSQL is recommended for production)
+
+**Related:**
+- See Session notes from 2025-12-18 resume workflow implementation
+- `scripts/start_full_clean.sh` - Reliable startup script with proper cleanup
+
+---
+
 ### Issue: Database locked error
 
 **Symptoms:**
