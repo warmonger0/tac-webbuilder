@@ -195,15 +195,13 @@ export function RequestFormWebSocketProvider({ children }: RequestFormWebSocketP
     }
 
     const url = apiConfig.websocket.queue();
-    const startTime = performance.now();
     if (DEBUG_WS) console.log(`[WS] Connecting to Queue: ${url}`);
 
     try {
       const ws = new WebSocket(url);
 
       ws.onopen = () => {
-        const connectTime = performance.now() - startTime;
-        if (DEBUG_WS) console.log(`[WS] Queue connected in ${connectTime.toFixed(2)}ms`);
+        if (DEBUG_WS) console.log(`[WS] Queue connected`);
         reconnectAttemptsRefs.current.queue = 0;
         setQueueConnectionState({
           isConnected: true,
@@ -262,15 +260,13 @@ export function RequestFormWebSocketProvider({ children }: RequestFormWebSocketP
     }
 
     const url = apiConfig.websocket.adwMonitor();
-    const startTime = performance.now();
     if (DEBUG_WS) console.log(`[WS] Connecting to ADW Monitor: ${url}`);
 
     try {
       const ws = new WebSocket(url);
 
       ws.onopen = () => {
-        const connectTime = performance.now() - startTime;
-        if (DEBUG_WS) console.log(`[WS] ADW Monitor connected in ${connectTime.toFixed(2)}ms`);
+        if (DEBUG_WS) console.log(`[WS] ADW Monitor connected`);
         reconnectAttemptsRefs.current.adw = 0;
         setAdwConnectionState({
           isConnected: true,
@@ -329,15 +325,13 @@ export function RequestFormWebSocketProvider({ children }: RequestFormWebSocketP
     }
 
     const url = apiConfig.websocket.systemStatus();
-    const startTime = performance.now();
     if (DEBUG_WS) console.log(`[WS] Connecting to System Status: ${url}`);
 
     try {
       const ws = new WebSocket(url);
 
       ws.onopen = () => {
-        const connectTime = performance.now() - startTime;
-        if (DEBUG_WS) console.log(`[WS] System Status connected in ${connectTime.toFixed(2)}ms`);
+        if (DEBUG_WS) console.log(`[WS] System Status connected`);
         reconnectAttemptsRefs.current.system = 0;
         setSystemConnectionState({
           isConnected: true,

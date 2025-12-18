@@ -168,7 +168,9 @@ class ConnectionManager:
             logger.debug(f"[WS] Broadcasting message to {len(self.active_connections)} clients")
             disconnected = set()
 
-            for connection in self.active_connections:
+            # Create a snapshot to avoid "Set changed size during iteration" error
+            # if connections are added/removed concurrently
+            for connection in list(self.active_connections):
                 try:
                     await connection.send_json(message)
                 except Exception as e:

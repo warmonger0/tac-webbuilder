@@ -126,8 +126,9 @@ class BackgroundTaskManager:
         try:
             while True:
                 try:
-                    # Only do work if there are active connections
-                    if len(self.websocket_manager.active_connections) > 0:
+                    # Only do work if there are active connections (snapshot to avoid race conditions)
+                    active_count = len(list(self.websocket_manager.active_connections))
+                    if active_count > 0:
                         workflows = self.workflow_service.get_workflows()
 
                         # Convert to JSON for comparison
@@ -146,7 +147,7 @@ class BackgroundTaskManager:
                             )
                             logger.info(
                                 f"[BACKGROUND_TASKS] Broadcasted workflow update to "
-                                f"{len(self.websocket_manager.active_connections)} clients"
+                                f"{active_count} clients"
                             )
 
                     await asyncio.sleep(self.workflow_watch_interval)
@@ -172,8 +173,9 @@ class BackgroundTaskManager:
         try:
             while True:
                 try:
-                    # Only do work if there are active connections
-                    if len(self.websocket_manager.active_connections) > 0:
+                    # Only do work if there are active connections (snapshot to avoid race conditions)
+                    active_count = len(list(self.websocket_manager.active_connections))
+                    if active_count > 0:
                         if self._app is None:
                             logger.warning(
                                 "[BACKGROUND_TASKS] App not set for routes watcher, skipping..."
@@ -199,7 +201,7 @@ class BackgroundTaskManager:
                             )
                             logger.info(
                                 f"[BACKGROUND_TASKS] Broadcasted routes update to "
-                                f"{len(self.websocket_manager.active_connections)} clients"
+                                f"{active_count} clients"
                             )
 
                     await asyncio.sleep(self.routes_watch_interval)
@@ -225,8 +227,9 @@ class BackgroundTaskManager:
         try:
             while True:
                 try:
-                    # Only do work if there are active connections
-                    if len(self.websocket_manager.active_connections) > 0:
+                    # Only do work if there are active connections (snapshot to avoid race conditions)
+                    active_count = len(list(self.websocket_manager.active_connections))
+                    if active_count > 0:
                         # Get latest workflow history - did_sync tells us if anything changed
                         history_data, did_sync = (
                             self.workflow_service.get_workflow_history_with_cache(
@@ -244,7 +247,7 @@ class BackgroundTaskManager:
                             )
                             logger.info(
                                 f"[BACKGROUND_TASKS] Broadcasted workflow history update to "
-                                f"{len(self.websocket_manager.active_connections)} clients"
+                                f"{active_count} clients"
                             )
 
                     await asyncio.sleep(self.history_watch_interval)
@@ -272,8 +275,9 @@ class BackgroundTaskManager:
         try:
             while True:
                 try:
-                    # Only do work if there are active connections
-                    if len(self.websocket_manager.active_connections) > 0:
+                    # Only do work if there are active connections (snapshot to avoid race conditions)
+                    active_count = len(list(self.websocket_manager.active_connections))
+                    if active_count > 0:
                         from core.adw_monitor import aggregate_adw_monitor_data
 
                         # Get latest ADW monitor data
@@ -293,7 +297,7 @@ class BackgroundTaskManager:
                             )
                             logger.debug(
                                 f"[BACKGROUND_TASKS] Broadcasted ADW monitor update to "
-                                f"{len(self.websocket_manager.active_connections)} clients"
+                                f"{active_count} clients"
                             )
 
                     await asyncio.sleep(self.adw_monitor_watch_interval)
@@ -321,8 +325,9 @@ class BackgroundTaskManager:
         try:
             while True:
                 try:
-                    # Only do work if there are active connections
-                    if len(self.websocket_manager.active_connections) > 0:
+                    # Only do work if there are active connections (snapshot to avoid race conditions)
+                    active_count = len(list(self.websocket_manager.active_connections))
+                    if active_count > 0:
                         # Import here to avoid circular dependencies
                         from server import get_queue_data
 
@@ -343,7 +348,7 @@ class BackgroundTaskManager:
                             )
                             logger.debug(
                                 f"[BACKGROUND_TASKS] Broadcasted queue update to "
-                                f"{len(self.websocket_manager.active_connections)} clients"
+                                f"{active_count} clients"
                             )
 
                     await asyncio.sleep(self.queue_watch_interval)
@@ -376,8 +381,9 @@ class BackgroundTaskManager:
         try:
             while True:
                 try:
-                    # Only do work if there are active connections
-                    if len(self.websocket_manager.active_connections) > 0:
+                    # Only do work if there are active connections (snapshot to avoid race conditions)
+                    active_count = len(list(self.websocket_manager.active_connections))
+                    if active_count > 0:
                         from services.planned_features_service import PlannedFeaturesService
 
                         service = PlannedFeaturesService()
@@ -406,7 +412,7 @@ class BackgroundTaskManager:
                             )
                             logger.debug(
                                 f"[BACKGROUND_TASKS] Broadcasted planned features update to "
-                                f"{len(self.websocket_manager.active_connections)} clients"
+                                f"{active_count} clients"
                             )
 
                     await asyncio.sleep(self.planned_features_watch_interval)
