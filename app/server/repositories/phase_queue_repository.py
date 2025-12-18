@@ -549,11 +549,15 @@ class PhaseQueueRepository:
             # Get all workflows for this feature
             existing_workflows = self.get_all_by_feature_id(feature_id)
 
-            # Check for active workflows (not completed, failed, or cancelled)
-            active_statuses = [
-                "running", "planned", "building", "linting", "testing",
-                "reviewing", "documenting", "shipping", "cleaning_up", "verifying"
-            ]
+            # =============================================================================
+            # SCHEMA CONSTRAINT: phase_queue.status
+            # =============================================================================
+            # ALLOWED: 'queued', 'ready', 'running', 'completed', 'blocked', 'failed'
+            # FORBIDDEN: 'pending', 'planned', 'building', 'linting', 'testing', etc.
+            # NOTE: Phase names (building/linting/etc) are stored in phase_data, NOT status!
+            # =============================================================================
+            # Check for active workflows (not completed, failed, or blocked)
+            active_statuses = ["queued", "ready", "running"]
 
             active_workflows = [
                 w for w in existing_workflows

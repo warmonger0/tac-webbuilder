@@ -237,8 +237,14 @@ def check_active_workflows(
         repo = PhaseQueueRepository()
         workflows = repo.get_all_by_feature_id(issue_number)
 
+        # =============================================================================
+        # SCHEMA CONSTRAINT: phase_queue.status
+        # =============================================================================
+        # ALLOWED: 'queued', 'ready', 'running', 'completed', 'blocked', 'failed'
+        # FORBIDDEN: 'pending', 'planned', 'building', 'linting', 'testing', etc.
+        # =============================================================================
         # Filter for active statuses
-        active_statuses = ["running", "planned", "building", "testing", "reviewing", "documenting"]
+        active_statuses = ["queued", "ready", "running"]
         active_workflows = [w for w in workflows if w.status in active_statuses]
 
         if active_workflows:
