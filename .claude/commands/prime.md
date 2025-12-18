@@ -95,6 +95,17 @@ Commits should be professional and focused on technical changes only.
 - **Retry limits:** Max 3 attempts (test and E2E)
 - **Exit conditions:** No progress detected OR max attempts OR circuit breaker triggered
 
+### GitHub Rate Limit Handling (Session 20)
+**Proactive API quota management with graceful degradation**
+**Problem:** Workflows fail silently when hitting GitHub API rate limits during bulk operations
+**Solution:**
+- **Proactive checking:** Verifies quota before making API calls (prevents wasted attempts)
+- **Clear error messages:** Shows remaining quota, usage %, and reset time
+- **Graceful degradation:** Workflows pause with status 'paused' instead of failing
+- **Real-time monitoring:** `/api/v1/github-rate-limit` endpoint tracks REST + GraphQL quotas
+- **Files:** `adws/adw_modules/rate_limit.py` (new), `adws/adw_modules/github.py`, `adws/adw_sdlc_complete_iso.py`, `app/server/routes/system_routes.py`
+- **Typical quotas:** 5000 requests/hour (REST), 5000 points/hour (GraphQL)
+
 ### Documentation
 **Adding or updating docs**
 
