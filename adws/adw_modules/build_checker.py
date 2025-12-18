@@ -19,6 +19,8 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
+from adw_modules.tool_call_tracker import ToolCallTracker
+
 
 @dataclass
 class BuildError:
@@ -54,14 +56,20 @@ class BuildResult:
 class BuildChecker:
     """Execute build checks and return compact results."""
 
-    def __init__(self, project_root: Path):
+    def __init__(
+        self,
+        project_root: Path,
+        tracker: Optional[ToolCallTracker] = None
+    ):
         """
         Initialize build checker.
 
         Args:
             project_root: Path to project root directory
+            tracker: Optional ToolCallTracker for observability
         """
         self.project_root = Path(project_root)
+        self.tracker = tracker
 
     def check_frontend_types(self, strict_mode: bool = True) -> BuildResult:
         """
@@ -84,13 +92,21 @@ class BuildChecker:
         start_time = time.time()
 
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=frontend_path,
-                capture_output=True,
-                text=True,
-                timeout=120  # 2 minute timeout
-            )
+            # Track tool call if tracker available
+            if self.tracker:
+                result = self.tracker.track_bash(
+                    tool_name="tsc_typecheck",
+                    command=cmd,
+                    cwd=str(frontend_path)
+                )
+            else:
+                result = subprocess.run(
+                    cmd,
+                    cwd=frontend_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=120  # 2 minute timeout
+                )
             duration = time.time() - start_time
 
             # Parse TypeScript errors
@@ -189,13 +205,21 @@ class BuildChecker:
         start_time = time.time()
 
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=frontend_path,
-                capture_output=True,
-                text=True,
-                timeout=180  # 3 minute timeout
-            )
+            # Track tool call if tracker available
+            if self.tracker:
+                result = self.tracker.track_bash(
+                    tool_name="bun_build",
+                    command=cmd,
+                    cwd=str(frontend_path)
+                )
+            else:
+                result = subprocess.run(
+                    cmd,
+                    cwd=frontend_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=180  # 3 minute timeout
+                )
             duration = time.time() - start_time
 
             # Parse build errors
@@ -312,13 +336,21 @@ class BuildChecker:
         start_time = time.time()
 
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=backend_path,
-                capture_output=True,
-                text=True,
-                timeout=60  # 1 minute timeout
-            )
+            # Track tool call if tracker available
+            if self.tracker:
+                result = self.tracker.track_bash(
+                    tool_name="mypy_typecheck",
+                    command=cmd,
+                    cwd=str(backend_path)
+                )
+            else:
+                result = subprocess.run(
+                    cmd,
+                    cwd=backend_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=60  # 1 minute timeout
+                )
             duration = time.time() - start_time
 
             errors = self._parse_mypy_output(result.stdout + result.stderr)
