@@ -1,0 +1,179 @@
+================================================================================
+WEBSOCKET CONNECTION SEQUENCE - BEFORE FIX (BROKEN)
+================================================================================
+
+Time →   CLIENT                          SERVER                        RESULT
+────────────────────────────────────────────────────────────────────────────
+00:00    new WebSocket(url)              
+         |                               
+00:01    ├──[SYN]─────────────────────→  
+         |                               accept()                      ✓
+00:02    ←──[SYN-ACK]────────────────┤  
+         |                               ws.accept()                   ✓
+00:03    ws.onopen()                     add to active_connections     ✓
+         isConnected = true              
+         |                               
+00:04    ←──[Initial Data]───────────┤  send_json(initial_data)       ✓
+         |  {"type": "queue_update"}     
+         |                               
+00:05    ws.onmessage()                  
+         ├─ Parse JSON                   
+         ├─ setQueueData()               
+         └─ UI updated ✓                 
+         |                               
+00:06    (waiting for updates...)        while True:                   
+         |                                   receive_text()            ⚠️
+         |                               
+00:07    (no messages sent)              (blocked on receive...)       
+         |                               (waiting for client message)  
+         |                               
+00:08    (no messages sent)              (still blocked...)            
+         |                               
+00:09    (no messages sent)              (still blocked...)            
+         |                               
+...      ...                             ...                           
+         |                               
+02:00    (no messages sent)              (still blocked...)            
+         |                               (connection idle)             
+         |                               
+02:30    [Browser/OS timeout]            
+         ws.onclose()                    
+         connectionQuality =             
+           'disconnected'                
+         |                               
+02:31    ├──[FIN]─────────────────────→  WebSocketDisconnect          
+         |                               break                         
+         |                               manager.disconnect(ws)        
+         |                               remove from active_conns      
+         |                               
+02:32    X DISCONNECTED                  X CONNECTION LOST              ✗
+         Code 1006                       
+         (abnormal closure)              
+         |                               
+02:33    [Retry with backoff]            
+         new WebSocket(url)              
+         |                               
+         └──[CYCLE REPEATS]──────────────────────────────────────────→  ∞
+
+
+================================================================================
+WEBSOCKET CONNECTION SEQUENCE - AFTER FIX (WORKING)
+================================================================================
+
+Time →   CLIENT                          SERVER                        RESULT
+────────────────────────────────────────────────────────────────────────────
+00:00    new WebSocket(url)              
+         |                               
+00:01    ├──[SYN]─────────────────────→  
+         |                               accept()                      ✓
+00:02    ←──[SYN-ACK]────────────────┤  
+         |                               ws.accept()                   ✓
+00:03    ws.onopen()                     add to active_connections     ✓
+         isConnected = true              
+         |                               
+00:04    ←──[Initial Data]───────────┤  send_json(initial_data)       ✓
+         |  {"type": "queue_update"}     
+         |                               
+00:05    ws.onmessage()                  
+         ├─ Parse JSON                   
+         ├─ setQueueData()               
+         └─ UI updated ✓                 
+         |                               
+00:06    (waiting for updates...)        while True:                   
+         |                                   await asyncio.sleep(1)    ✓
+         |                                   # Yields control           
+         |                                   # Non-blocking             
+         |                               
+00:07    (no messages sent)              sleep(1) # Yields              
+         |                               check if connected             
+         |                               # Still connected ✓            
+         |                               
+00:08    (no messages sent)              sleep(1) # Yields              
+         |                               check if connected             
+         |                               # Still connected ✓            
+         |                               
+00:09    (no messages sent)              sleep(1) # Yields              
+         |                               check if connected             
+         |                               # Still connected ✓            
+         |                               
+00:10    [Background Watcher Detects]    
+         |                               [Queue changed!]              
+         |                               manager.broadcast()           
+         |                                 ├─ for ws in active_conns   
+         |                                 └─ ws.send_json(update)     
+         |                               
+00:11    ←──[Update Data]────────────┤  send_json(message)            ✓
+         |  {"type": "queue_update"}     
+         |                               
+00:12    ws.onmessage()                  
+         ├─ Parse JSON                   
+         ├─ setQueueData()               
+         └─ UI updated ✓                 
+         |                               
+00:13    (waiting for updates...)        sleep(1) # Yields              
+         |                               check if connected             
+         |                               # Still connected ✓            
+         |                               
+...      ...                             ...                           
+         |                               
+10:00    (still connected!)              sleep(1) # Yields              
+         |                               check if connected             
+         |                               # Still connected ✓            
+         |                               
+10:05    [Background Watcher Detects]    
+         |                               [Queue changed again!]        
+         |                               manager.broadcast()           
+         |                               
+10:06    ←──[Update Data]────────────┤  send_json(message)            ✓
+         ws.onmessage()                  
+         UI updated ✓                    
+         |                               
+...      [Hours pass...]                 [Connection stays alive]      
+         |                               
+24:00    [User closes tab]               
+         ws.close()                      
+         |                               
+24:01    ├──[FIN]─────────────────────→  WebSocketDisconnect          
+         |                               break                         
+         |                               manager.disconnect(ws)        
+         |                               
+24:02    X CLOSED NORMALLY               X CLEAN DISCONNECT             ✓
+         Code 1000                       
+         (normal closure)                
+         |                               
+         [No retry needed]               
+
+
+================================================================================
+KEY DIFFERENCES
+================================================================================
+
+BEFORE (BROKEN)                         AFTER (FIXED)
+────────────────────────────────────────────────────────────────────────────
+await receive_text()                    await asyncio.sleep(1)
+├─ Blocks indefinitely                  ├─ Yields control
+├─ Waits for client message             ├─ Allows broadcasts
+├─ Client never sends                   ├─ Non-blocking
+├─ Eventually times out                 ├─ Stays responsive
+└─ Code 1006 (abnormal)                 └─ Code 1000 (normal)
+
+Connection lifetime: ~2 minutes         Connection lifetime: Hours/Days
+Real-time updates: NO                   Real-time updates: YES
+Error code: 1006                        Error code: 1000
+User experience: BAD                    User experience: EXCELLENT
+
+
+================================================================================
+ROOT CAUSE SUMMARY
+================================================================================
+
+The server was designed for BIDIRECTIONAL communication:
+   Client ←→ Server (both send messages)
+
+But the client was designed as PASSIVE LISTENER:
+   Client ← Server (only server sends)
+
+Result: Server blocked waiting for messages that would never arrive.
+
+Fix: Server now yields control instead of blocking, allowing broadcasts
+     to flow freely while keeping connection alive.
