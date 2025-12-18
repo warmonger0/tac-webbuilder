@@ -1,4 +1,4 @@
-import { useWorkflowHistoryWebSocket } from '../hooks/useWebSocket';
+import { useGlobalWebSocket } from '../contexts/GlobalWebSocketContext';
 import { StatusBadge } from './StatusBadge';
 
 function formatDate(timestamp: string): string {
@@ -8,11 +8,9 @@ function formatDate(timestamp: string): string {
 
 export function HistoryView() {
   const {
-    workflows: history,
-    isConnected,
-    connectionQuality,
-    lastUpdated,
-  } = useWorkflowHistoryWebSocket();
+    historyWorkflows: history,
+    historyConnectionState: { isConnected, connectionQuality, lastUpdated },
+  } = useGlobalWebSocket();
 
   if (!isConnected) {
     return (

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useRoutesWebSocket } from '../hooks/useWebSocket';
+import { useGlobalWebSocket } from '../contexts/GlobalWebSocketContext';
 import type { Route } from '../types';
 import { httpMethodColors } from '../config/theme';
 
@@ -30,7 +30,7 @@ function MethodBadge({ method }: { method: string }) {
 export function RoutesView() {
   const [searchText, setSearchText] = useState('');
   const [methodFilter, setMethodFilter] = useState<string>('ALL');
-  const { routes, isConnected, lastUpdated } = useRoutesWebSocket();
+  const { routes, routesConnectionState: { isConnected, lastUpdated } } = useGlobalWebSocket();
 
   const filteredRoutes = useMemo(() => {
     if (!routes || routes.length === 0) return [];

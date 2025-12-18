@@ -10,7 +10,7 @@ import { PlannedFeature, plannedFeaturesClient, PlannedFeaturesStats } from '../
 import { systemClient, PreflightChecksResponse } from '../api/systemClient';
 import { PreflightCheckModal } from './PreflightCheckModal';
 import { apiConfig } from '../config/api';
-import { usePlannedFeaturesWebSocket } from '../hooks/useWebSocket';
+import { useGlobalWebSocket } from '../contexts/GlobalWebSocketContext';
 
 // ============================================================================
 // Utility Functions
@@ -501,12 +501,10 @@ export function PlansPanel() {
 
   // WebSocket connection for real-time updates
   const {
-    features,
-    stats,
-    isConnected,
-    connectionQuality,
-    lastUpdated: wsLastUpdated,
-  } = usePlannedFeaturesWebSocket();
+    plannedFeatures: features,
+    plannedFeaturesStats: stats,
+    plannedFeaturesConnectionState: { isConnected, connectionQuality, lastUpdated: wsLastUpdated },
+  } = useGlobalWebSocket();
 
   // Loading state: show loading only if features array is null/undefined (not yet fetched)
   // An empty array [] is a valid state (no features in database)

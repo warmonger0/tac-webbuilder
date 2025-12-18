@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useWorkflowHistoryWebSocket } from '../hooks/useWebSocket';
+import { useGlobalWebSocket } from '../contexts/GlobalWebSocketContext';
 import { WorkflowHistoryCard } from './WorkflowHistoryCard';
 import { HistoryAnalytics } from './HistoryAnalytics';
 
 export function WorkflowHistoryView() {
-  const { workflows, totalCount, analytics, isConnected, lastUpdated } = useWorkflowHistoryWebSocket();
+  const { historyWorkflows: workflows, historyTotalCount: totalCount, historyAnalytics: analytics, historyConnectionState: { isConnected, lastUpdated } } = useGlobalWebSocket();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterModel, setFilterModel] = useState<string>('');

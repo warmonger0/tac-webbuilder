@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import type { AdwWorkflowStatus } from '../api/client';
 import { phaseSvgIconMap, workflowPhases } from '../config/workflows';
-import { useRequestFormWebSocket } from '../contexts/RequestFormWebSocketContext';
+import { useGlobalWebSocket } from '../contexts/GlobalWebSocketContext';
 
 export function CurrentWorkflowCard() {
   // Use shared WebSocket context for real-time updates
-  const { adwMonitorData, adwConnectionState } = useRequestFormWebSocket();
+  const { adwMonitorData, adwConnectionState } = useGlobalWebSocket();
   const { workflows } = adwMonitorData;
   const { isConnected } = adwConnectionState; // Used for connection indicator in UI
 

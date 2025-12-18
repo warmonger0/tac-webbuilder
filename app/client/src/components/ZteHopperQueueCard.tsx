@@ -2,7 +2,7 @@ import { useState } from "react";
 import { setQueuePaused } from "../api/client";
 import { PhaseQueueList } from "./PhaseQueueCard";
 import { QueuePauseToggle } from "./QueuePauseToggle";
-import { useRequestFormWebSocket } from "../contexts/RequestFormWebSocketContext";
+import { useGlobalWebSocket } from "../contexts/GlobalWebSocketContext";
 import { LoadingState } from "./common/LoadingState";
 import { ErrorBanner } from "./common/ErrorBanner";
 
@@ -13,7 +13,7 @@ export function ZteHopperQueueCard() {
   const [error, setError] = useState<string | null>(null);
 
   // Use shared WebSocket context for real-time updates
-  const { queueData } = useRequestFormWebSocket();
+  const { queueData } = useGlobalWebSocket();
   const { phases, paused: isPaused } = queueData;
 
   // Local state for tracking pause status updates

@@ -9,7 +9,6 @@ import { FileUploadSection } from './request-form/FileUploadSection';
 import { ContextAnalysisButton } from './context-review/ContextAnalysisButton';
 import { ContextReviewPanel } from './context-review/ContextReviewPanel';
 import { ErrorBanner } from './common/ErrorBanner';
-import { RequestFormWebSocketProvider } from '../contexts/RequestFormWebSocketContext';
 
 export function RequestFormCore() {
   const [contextReviewId, setContextReviewId] = useState<number | null>(null);
@@ -59,8 +58,7 @@ export function RequestFormCore() {
   } = useRequestForm();
 
   return (
-    <RequestFormWebSocketProvider>
-      <div className="max-w-7xl mx-auto px-4">
+    <div className="max-w-7xl mx-auto px-4">
         {/* First Row: Create New Request & Hopper Queue */}
         <div className="flex flex-col lg:flex-row gap-4 mb-4 items-stretch">
           {/* Left Column - Create New Request */}
@@ -238,6 +236,6 @@ export function RequestFormCore() {
       )}
 
       {phaseHandler.modal}
-    </RequestFormWebSocketProvider>
+    </div>
   );
 }

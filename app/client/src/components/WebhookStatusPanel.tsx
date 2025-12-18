@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useWebhookStatusWebSocket } from '../hooks/useWebSocket';
+import { useGlobalWebSocket } from '../contexts/GlobalWebSocketContext';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 import { thresholds } from '../config/thresholds';
 import { ErrorBanner } from './common/ErrorBanner';
@@ -34,7 +34,7 @@ export function WebhookStatusPanel() {
   const [error, setError] = useState<string | null>(null);
 
   // Use WebSocket for real-time updates instead of polling
-  const { webhookStatus, isConnected, connectionQuality, lastUpdated } = useWebhookStatusWebSocket();
+  const { webhookStatusData: webhookStatus, webhookStatusConnectionState: { isConnected, connectionQuality, lastUpdated } } = useGlobalWebSocket();
 
   // Update status when WebSocket data changes
   useEffect(() => {

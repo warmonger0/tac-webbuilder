@@ -12,6 +12,7 @@ import { QualityPanel } from './components/QualityPanel';
 import { ReviewPanel } from './components/ReviewPanel';
 import { DataPanel } from './components/DataPanel';
 import { LogPanel } from './components/LogPanel';
+import { GlobalWebSocketProvider } from './contexts/GlobalWebSocketContext';
 
 const queryClient = new QueryClient();
 const ACTIVE_TAB_STORAGE_KEY = 'tac-webbuilder-active-tab';
@@ -35,7 +36,8 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-gray-50">
+      <GlobalWebSocketProvider>
+        <div className="min-h-screen bg-gray-50">
         <header className="bg-white border-b border-gray-200">
           <div className="container mx-auto px-4 py-2 text-center">
             <h1 className="text-xl font-bold text-gray-900">
@@ -92,6 +94,7 @@ function App() {
           },
         }}
       />
+      </GlobalWebSocketProvider>
     </QueryClientProvider>
   );
 }
