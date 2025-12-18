@@ -33,6 +33,7 @@ from routes import (
     pattern_review_routes,
     pattern_sync_routes,
     planned_features_routes,
+    qc_metrics_routes,
     queue_routes,
     roi_tracking_routes,
     system_routes,
@@ -379,6 +380,9 @@ app.include_router(roi_tracking_routes.router)
 
 # Initialize confidence update routes (Session 13)
 app.include_router(confidence_update_routes.router)
+
+# Initialize QC metrics routes (Panel 7)
+app.include_router(qc_metrics_routes.router, prefix="/api/v1")
 
 # Initialize observability routes (task logs + user prompts)
 observability_router = observability_routes.init_observability_routes()
