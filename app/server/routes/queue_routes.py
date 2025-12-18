@@ -92,7 +92,7 @@ router = APIRouter(prefix="/queue", tags=["Phase Queue"])
 class PhaseQueueItemResponse(BaseModel):
     """Response model for phase queue item"""
     queue_id: str = Field(..., description="Unique queue identifier")
-    feature_id: int = Field(..., description="Feature ID from planned_features table")
+    feature_id: int | None = Field(None, description="Feature ID from planned_features table (if from planned features)")
     phase_number: int = Field(..., description="Phase number")
     issue_number: int | None = Field(None, description="Child GitHub issue number")
     status: str = Field(..., description="Phase status")

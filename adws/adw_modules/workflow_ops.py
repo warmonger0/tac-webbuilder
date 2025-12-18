@@ -884,6 +884,42 @@ def ensure_plan_exists(state: ADWState, issue_number: str) -> str:
     )
 
 
+def lookup_feature_id(issue_number: int, logger: Optional[logging.Logger] = None) -> Optional[int]:
+    """
+    Look up the planned feature ID from GitHub issue number.
+
+    Args:
+        issue_number: GitHub issue number
+        logger: Optional logger instance
+
+    Returns:
+        Feature ID if found, None otherwise
+    """
+    try:
+        import sys
+        import os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "app", "server"))
+        from services.planned_features_service import PlannedFeaturesService
+
+        service = PlannedFeaturesService()
+        features = service.get_all()
+
+        for feature in features:
+            if feature.github_issue_number == issue_number:
+                if logger:
+                    logger.info(f"Found planned feature #{feature.id} for issue #{issue_number}")
+                return feature.id
+
+        if logger:
+            logger.debug(f"No planned feature found for issue #{issue_number}")
+        return None
+
+    except Exception as e:
+        if logger:
+            logger.warning(f"Failed to lookup feature_id for issue #{issue_number}: {e}")
+        return None
+
+
 def ensure_adw_id(
     issue_number: str,
     adw_id: Optional[str] = None,
@@ -937,12 +973,14 @@ def ensure_adw_id(
 
                 if not existing_record:
                     # Create missing database record
+                    # Look up feature_id from planned_features
+                    feature_id = lookup_feature_id(int(issue_number_str), logger)
                     queue_item = PhaseQueueItem(
                         queue_id=adw_id,
-                        feature_id=None,
+                        feature_id=feature_id,
                         issue_number=int(issue_number_str),
                         phase_number=1,
-                        status='pending',
+                        status='queued',
                         current_phase='init',
                         depends_on_phases=[],
                         phase_data={},
@@ -982,12 +1020,14 @@ def ensure_adw_id(
             from models.phase_queue_item import PhaseQueueItem
 
             repo = PhaseQueueRepository()
+            # Look up feature_id from planned_features
+            feature_id = lookup_feature_id(int(issue_number_str), logger)
             queue_item = PhaseQueueItem(
                 queue_id=adw_id,
-                feature_id=None,
+                feature_id=feature_id,
                 issue_number=int(issue_number_str),
                 phase_number=1,
-                status='pending',
+                status='queued',
                 current_phase='init',
                 depends_on_phases=[],
                 phase_data={},
@@ -1032,12 +1072,14 @@ def ensure_adw_id(
         from models.phase_queue_item import PhaseQueueItem
 
         repo = PhaseQueueRepository()
+        # Look up feature_id from planned_features
+        feature_id = lookup_feature_id(int(issue_number_str), logger)
         queue_item = PhaseQueueItem(
             queue_id=new_adw_id,
-            feature_id=None,  # Not from planned_features
+            feature_id=feature_id,
             issue_number=int(issue_number_str),
             phase_number=1,
-            status='pending',
+            status='queued',
             current_phase='init',
             depends_on_phases=[],
             phase_data={},

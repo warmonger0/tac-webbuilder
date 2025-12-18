@@ -38,7 +38,7 @@ def init_phase_queue_db():
             cursor.execute(f"""
                 CREATE TABLE IF NOT EXISTS phase_queue (
                     queue_id TEXT PRIMARY KEY,
-                    feature_id INTEGER NOT NULL,
+                    feature_id INTEGER,
                     phase_number INTEGER NOT NULL,
                     issue_number INTEGER,
                     status TEXT CHECK(status IN ('queued', 'ready', 'running', 'completed', 'blocked', 'failed')) DEFAULT 'queued',
@@ -59,7 +59,7 @@ def init_phase_queue_db():
             cursor.execute(f"""
                 CREATE TABLE IF NOT EXISTS phase_queue (
                     queue_id TEXT PRIMARY KEY,
-                    feature_id INTEGER NOT NULL,
+                    feature_id INTEGER,
                     phase_number INTEGER NOT NULL,
                     issue_number INTEGER,
                     status TEXT CHECK(status IN ('queued', 'ready', 'running', 'completed', 'blocked', 'failed')) DEFAULT 'queued',
