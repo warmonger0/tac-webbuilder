@@ -285,6 +285,17 @@ class PatternSyncService:
             ),
         )
 
+        # Mark pattern as 'in_review' in operation_patterns to prevent re-sync
+        cursor.execute(
+            f"""
+            UPDATE operation_patterns
+            SET automation_status = 'in_review',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE pattern_signature = {placeholder}
+        """,
+            (candidate["pattern_signature"],),
+        )
+
         logger.debug(
             f"[{self.__class__.__name__}] Synced pattern: {candidate['pattern_signature']}"
         )

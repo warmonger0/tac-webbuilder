@@ -134,7 +134,7 @@ class PatternReviewService:
         with self.adapter.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Update pattern status
+            # Update pattern status in pattern_approvals
             placeholder = self.adapter.placeholder()
             cursor.execute(
                 f"""
@@ -153,6 +153,24 @@ class PatternReviewService:
                     f"[{self.__class__.__name__}] Pattern not found: {pattern_id}"
                 )
                 return None
+
+            # Update automation_status in operation_patterns to prevent re-sync
+            cursor.execute(
+                f"""
+                UPDATE operation_patterns
+                SET automation_status = 'approved',
+                    reviewed_by = {placeholder},
+                    reviewed_at = CURRENT_TIMESTAMP,
+                    review_notes = {placeholder},
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE pattern_signature = {placeholder}
+            """,
+                (reviewer, notes, pattern_id),
+            )
+
+            logger.debug(
+                f"[{self.__class__.__name__}] Updated operation_patterns for {pattern_id}"
+            )
 
             # Add to review history
             cursor.execute(
@@ -187,7 +205,7 @@ class PatternReviewService:
         with self.adapter.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Update pattern status
+            # Update pattern status in pattern_approvals
             placeholder = self.adapter.placeholder()
             cursor.execute(
                 f"""
@@ -206,6 +224,24 @@ class PatternReviewService:
                     f"[{self.__class__.__name__}] Pattern not found: {pattern_id}"
                 )
                 return None
+
+            # Update automation_status in operation_patterns to prevent re-sync
+            cursor.execute(
+                f"""
+                UPDATE operation_patterns
+                SET automation_status = 'rejected',
+                    reviewed_by = {placeholder},
+                    reviewed_at = CURRENT_TIMESTAMP,
+                    review_notes = {placeholder},
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE pattern_signature = {placeholder}
+            """,
+                (reviewer, f"REJECTED: {reason}", pattern_id),
+            )
+
+            logger.debug(
+                f"[{self.__class__.__name__}] Updated operation_patterns for {pattern_id}"
+            )
 
             # Add to review history
             cursor.execute(
