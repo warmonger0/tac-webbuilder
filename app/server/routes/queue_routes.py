@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field, field_validator
 from repositories.task_log_repository import TaskLogRepository
 from repositories.webhook_event_repository import WebhookEventRepository
 from services.structured_logger import StructuredLogger
+from services.planned_features_service import PlannedFeaturesService
+from core.models import PlannedFeatureUpdate
 from utils.webhook_security import validate_webhook_request
 
 logger = logging.getLogger(__name__)
@@ -362,8 +364,14 @@ def _register_query_routes(router_obj, phase_queue_service):
     @router_obj.get("", response_model=QueueListResponse)
     async def get_all_queued() -> QueueListResponse:
         """Get all phases in the queue."""
+        import time
+        start = time.time()
+        logger.info(f"[PERF] GET /queue started")
         try:
-            return await _get_all_queued_handler(phase_queue_service)
+            result = await _get_all_queued_handler(phase_queue_service)
+            elapsed = time.time() - start
+            logger.info(f"[PERF] GET /queue completed in {elapsed:.3f}s")
+            return result
         except Exception as e:
             logger.error(f"[ERROR] Failed to get queued phases: {str(e)}")
             raise HTTPException(500, f"Error retrieving queue: {str(e)}") from e
@@ -463,6 +471,75 @@ def _update_phase_status(
     else:
         logger.warning(f"[WEBHOOK] Queue ID {request.queue_id} not found")
         response.message = "Queue ID not found, but notification received"
+
+
+def _sync_planned_feature_status(request: WorkflowCompleteRequest) -> None:
+    """
+    Auto-sync planned_features table based on workflow completion.
+
+    Updates the planned feature status when an ADW workflow completes:
+    - Completed workflow → Mark feature as 'completed'
+    - Failed workflow → Keep as 'in_progress', add failure notes with phase info
+
+    Args:
+        request: WorkflowCompleteRequest with issue_number, status, metadata
+    """
+    if not request.issue_number:
+        return
+
+    try:
+        planned_features_service = PlannedFeaturesService()
+
+        # Find all features with this github_issue_number
+        all_features = planned_features_service.get_all()
+        matching_features = [
+            f for f in all_features
+            if f.github_issue_number == request.issue_number
+        ]
+
+        if not matching_features:
+            logger.debug(
+                f"[WEBHOOK] No planned feature found for issue #{request.issue_number}"
+            )
+            return
+
+        for feature in matching_features:
+            if request.status == "completed":
+                # Workflow succeeded - mark feature as completed
+                update_data = PlannedFeatureUpdate(
+                    status="completed",
+                    completion_notes=(
+                        f"Completed by ADW workflow {request.adw_id}. "
+                        f"Metadata: {request.metadata}"
+                    )
+                )
+                planned_features_service.update(feature.id, update_data)
+                logger.info(
+                    f"[WEBHOOK] Marked planned feature #{feature.id} "
+                    f"(issue #{request.issue_number}) as completed"
+                )
+            else:
+                # Workflow failed - keep in_progress, add failure notes
+                phase_info = f"Phase {request.phase_number}" if request.phase_number else "Unknown phase"
+                update_data = PlannedFeatureUpdate(
+                    completion_notes=(
+                        f"⚠️ Workflow failed at {phase_info} (ADW: {request.adw_id}). "
+                        f"Metadata: {request.metadata}. "
+                        f"Status kept as '{feature.status}' for retry."
+                    )
+                )
+                planned_features_service.update(feature.id, update_data)
+                logger.warning(
+                    f"[WEBHOOK] Recorded failure for planned feature #{feature.id} "
+                    f"(issue #{request.issue_number}) at {phase_info}"
+                )
+
+    except Exception as e:
+        # Don't fail the webhook if planned_features sync fails
+        logger.error(
+            f"[WEBHOOK] Error syncing planned feature for issue #{request.issue_number}: {e}",
+            exc_info=True
+        )
 
 
 def _find_next_phase(phase_queue_service, request: WorkflowCompleteRequest):
@@ -725,6 +802,9 @@ def init_webhook_routes(phase_queue_service, github_poster, websocket_manager=No
 
             # Update phase status
             _update_phase_status(phase_queue_service, request, response)
+
+            # Auto-sync planned_features status based on workflow completion
+            _sync_planned_feature_status(request)
 
             # Check if we should trigger next phase
             if not request.trigger_next or request.status != "completed":

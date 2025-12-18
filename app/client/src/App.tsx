@@ -20,17 +20,17 @@ function App() {
   const [activeTab, setActiveTab] = useState<
     'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data' | 'logs'
   >(() => {
-    // Load active tab from localStorage on mount
-    const savedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+    // Load active tab from sessionStorage (per-tab, not shared across tabs)
+    const savedTab = sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
     if (savedTab && ['request', 'workflows', 'history', 'routes', 'plans', 'patterns', 'quality', 'review', 'data', 'logs'].includes(savedTab)) {
       return savedTab as 'request' | 'workflows' | 'history' | 'routes' | 'plans' | 'patterns' | 'quality' | 'review' | 'data' | 'logs';
     }
     return 'request';
   });
 
-  // Save active tab to localStorage whenever it changes
+  // Save active tab to sessionStorage whenever it changes (isolated per-tab)
   useEffect(() => {
-    localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
+    sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
   }, [activeTab]);
 
   return (

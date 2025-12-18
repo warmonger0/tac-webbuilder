@@ -36,7 +36,7 @@ async def _handle_websocket_connection(websocket: WebSocket, manager, initial_da
             except WebSocketDisconnect:
                 break
     except Exception as e:
-        logger.error(f"[WS] Error in {error_context} WebSocket connection: {e}")
+        logger.error(f"[WS] Error in {error_context} WebSocket connection: {e}", exc_info=True)
     finally:
         manager.disconnect(websocket)
 
