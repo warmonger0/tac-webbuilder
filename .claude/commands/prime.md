@@ -122,6 +122,20 @@ Commits should be professional and focused on technical changes only.
 → Full doc: `app_docs/feature-workflow-resume.md` [~250 tokens]
 → Full doc: `app_docs/feature-panel7-performance-optimization.md` [~190 tokens]
 
+### Tool Call Tracking & Pattern Detection (Session 22)
+**Infrastructure for ADW pattern learning and automation**
+**Discovery:** Pattern learning system already active with 29K hook events and 11 patterns (5 approved)
+**Implementation:**
+- **Database:** Added `tool_calls JSONB` column to `task_logs` with GIN index for efficient queries
+- **Models:** New `ToolCallRecord` type (tool_name, duration_ms, success, parameters, result_summary)
+- **Backward compatible:** Optional parameter in `log_task_completion()` - existing workflows unaffected
+- **Two-layer tracking:** hook_events (Claude Code tools) + task_logs.tool_calls (ADW workflow tools)
+- **Pattern analysis:** 195 sessions analyzed, discovered $183K potential savings in approved patterns
+- **Files:** `app/server/migrations/add_tool_calls_tracking.py`, `app/server/core/models/observability.py`, `adws/adw_modules/observability.py`
+- **Next:** ToolCallTracker helper class for easy integration in ADW phases
+
+→ Full docs: `docs/architecture/adw-tracking-architecture.md`, `docs/design/tool-call-tracking-design.md`
+
 ### Documentation
 **Adding or updating docs**
 

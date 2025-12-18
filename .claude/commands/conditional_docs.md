@@ -224,6 +224,26 @@
     - Adding entries to Panel 10 (Work Log) via API or UI
     - Designing new automation workflows based on detected patterns
     - Setting up observability for new workflow types
+- `docs/architecture/adw-tracking-architecture.md` [~800 tokens] - ADW tool call tracking system architecture
+  - Conditions:
+    - Understanding two-layer tracking (hook_events vs task_logs.tool_calls)
+    - Working with pattern detection infrastructure
+    - Implementing ToolCallTracker helper class
+    - Understanding pattern approval workflow
+    - Database schema for tool tracking (task_logs.tool_calls JSONB column)
+- `docs/design/tool-call-tracking-design.md` [~1,200 tokens] - Tool call tracking implementation specification
+  - Conditions:
+    - Implementing tool call tracking in ADW phases
+    - Understanding ToolCallRecord model structure
+    - Working with observability.py log_task_completion() tool_calls parameter
+    - Database migration for tool_calls column
+    - JSON serialization/deserialization of tool calls
+- `docs/analysis/tool-tracking-comprehensive-review.md` [~2,000 tokens] - Multi-agent analysis of tool tracking system
+  - Conditions:
+    - Understanding complete pattern→script automation pipeline
+    - Evaluating ROI and cost savings from pattern automation
+    - Six critical components: tracking, semantic detection, script generation, validation, registration, ROI feedback
+    - 35-day implementation roadmap for complete automation system
 
 ### Error Handling & Recovery Features
 - `app_docs/design-error-handling-protocol.md` [~750 lines, ~5,000 tokens] - Comprehensive error handling sub-agent protocol design

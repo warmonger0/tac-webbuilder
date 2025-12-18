@@ -7,7 +7,7 @@ Handles database operations for ADW task/phase logs.
 import json
 import logging
 
-from core.models.observability import IssueProgress, TaskLog, TaskLogCreate, TaskLogFilters
+from core.models.observability import IssueProgress, TaskLog, TaskLogCreate, TaskLogFilters, ToolCallRecord
 from database.factory import get_database_adapter
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,24 @@ class TaskLogRepository:
 
     def __init__(self):
         self.adapter = get_database_adapter()
+
+    @staticmethod
+    def _deserialize_tool_calls(tool_calls_json: str | None) -> list[ToolCallRecord]:
+        """Deserialize tool_calls JSONB to list of ToolCallRecord objects."""
+        if not tool_calls_json:
+            return []
+
+        try:
+            # PostgreSQL returns JSONB as a JSON string or dict
+            if isinstance(tool_calls_json, str):
+                tool_calls_data = json.loads(tool_calls_json)
+            else:
+                tool_calls_data = tool_calls_json
+
+            return [ToolCallRecord(**tc) for tc in tool_calls_data]
+        except (json.JSONDecodeError, TypeError, ValueError):
+            logger.warning("Failed to deserialize tool_calls, returning empty list")
+            return []
 
     def create(self, task_log: TaskLogCreate) -> TaskLog:
         """
@@ -32,15 +50,18 @@ class TaskLogRepository:
         Raises:
             Exception: If database operation fails
         """
+        # Serialize tool_calls to JSON
+        tool_calls_json = json.dumps([tc.model_dump() for tc in task_log.tool_calls])
+
         query = """
             INSERT INTO task_logs (
                 adw_id, issue_number, workflow_template,
                 phase_name, phase_number, phase_status,
                 log_message, error_message,
                 started_at, completed_at, duration_seconds,
-                tokens_used, cost_usd
+                tokens_used, cost_usd, tool_calls
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
             RETURNING id, captured_at, created_at
         """
 
@@ -63,6 +84,7 @@ class TaskLogRepository:
                         task_log.duration_seconds,
                         task_log.tokens_used,
                         task_log.cost_usd,
+                        tool_calls_json,
                     ),
                 )
                 result = cursor.fetchone()
@@ -74,7 +96,8 @@ class TaskLogRepository:
 
                 logger.info(
                     f"Created task log {task_id} for issue #{task_log.issue_number} "
-                    f"phase {task_log.phase_name} ({task_log.phase_status})"
+                    f"phase {task_log.phase_name} ({task_log.phase_status}) "
+                    f"with {len(task_log.tool_calls)} tool call(s)"
                 )
 
                 return TaskLog(
@@ -92,6 +115,7 @@ class TaskLogRepository:
                     duration_seconds=task_log.duration_seconds,
                     tokens_used=task_log.tokens_used,
                     cost_usd=task_log.cost_usd,
+                    tool_calls=task_log.tool_calls,
                     captured_at=captured_at,
                     created_at=created_at,
                 )
@@ -117,7 +141,7 @@ class TaskLogRepository:
                    phase_name, phase_number, phase_status,
                    log_message, error_message,
                    started_at, completed_at, duration_seconds,
-                   tokens_used, cost_usd, captured_at, created_at
+                   tokens_used, cost_usd, tool_calls, captured_at, created_at
             FROM task_logs
             WHERE 1=1
         """
@@ -166,6 +190,7 @@ class TaskLogRepository:
                             duration_seconds=row['duration_seconds'],
                             tokens_used=row['tokens_used'],
                             cost_usd=row['cost_usd'],
+                            tool_calls=self._deserialize_tool_calls(row.get('tool_calls')),
                             captured_at=row['captured_at'],
                             created_at=row['created_at'],
                         )
@@ -192,7 +217,7 @@ class TaskLogRepository:
                    phase_name, phase_number, phase_status,
                    log_message, error_message,
                    started_at, completed_at, duration_seconds,
-                   tokens_used, cost_usd, captured_at, created_at
+                   tokens_used, cost_usd, tool_calls, captured_at, created_at
             FROM task_logs
             WHERE issue_number = %s
             ORDER BY phase_number ASC, created_at ASC
@@ -222,6 +247,7 @@ class TaskLogRepository:
                             duration_seconds=row['duration_seconds'],
                             tokens_used=row['tokens_used'],
                             cost_usd=row['cost_usd'],
+                            tool_calls=self._deserialize_tool_calls(row.get('tool_calls')),
                             captured_at=row['captured_at'],
                             created_at=row['created_at'],
                         )
@@ -248,7 +274,7 @@ class TaskLogRepository:
                    phase_name, phase_number, phase_status,
                    log_message, error_message,
                    started_at, completed_at, duration_seconds,
-                   tokens_used, cost_usd, captured_at, created_at
+                   tokens_used, cost_usd, tool_calls, captured_at, created_at
             FROM task_logs
             WHERE adw_id = %s
             ORDER BY phase_number ASC, created_at ASC
@@ -278,6 +304,7 @@ class TaskLogRepository:
                             duration_seconds=row['duration_seconds'],
                             tokens_used=row['tokens_used'],
                             cost_usd=row['cost_usd'],
+                            tool_calls=self._deserialize_tool_calls(row.get('tool_calls')),
                             captured_at=row['captured_at'],
                             created_at=row['created_at'],
                         )
@@ -345,7 +372,7 @@ class TaskLogRepository:
                    phase_name, phase_number, phase_status,
                    log_message, error_message,
                    started_at, completed_at, duration_seconds,
-                   tokens_used, cost_usd, captured_at, created_at
+                   tokens_used, cost_usd, tool_calls, captured_at, created_at
             FROM task_logs
             WHERE issue_number = %s
             ORDER BY phase_number DESC, created_at DESC
@@ -376,6 +403,7 @@ class TaskLogRepository:
                     duration_seconds=row['duration_seconds'],
                     tokens_used=row['tokens_used'],
                     cost_usd=row['cost_usd'],
+                    tool_calls=self._deserialize_tool_calls(row.get('tool_calls')),
                     captured_at=row['captured_at'],
                     created_at=row['created_at'],
                 )

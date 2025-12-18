@@ -44,6 +44,7 @@ def log_task_completion(
     duration_seconds: Optional[float] = None,
     tokens_used: Optional[int] = None,
     cost_usd: Optional[float] = None,
+    tool_calls: Optional[list[dict]] = None,
 ) -> bool:
     """
     Log task/phase completion to the observability system.
@@ -65,6 +66,7 @@ def log_task_completion(
         duration_seconds: Duration of the phase
         tokens_used: Tokens consumed during the phase
         cost_usd: Cost in USD
+        tool_calls: Optional list of tool call records (dicts with tool_name, duration_ms, etc.)
 
     Returns:
         True if logging succeeded, False otherwise (never raises exceptions)
@@ -77,7 +79,8 @@ def log_task_completion(
         ...     phase_number=1,
         ...     phase_status="completed",
         ...     log_message="✅ Isolated planning phase completed",
-        ...     workflow_template="adw_sdlc_complete_iso"
+        ...     workflow_template="adw_sdlc_complete_iso",
+        ...     tool_calls=[{"tool_name": "git_clone", "duration_ms": 150, "success": True}]
         ... )
         True
     """
@@ -108,6 +111,8 @@ def log_task_completion(
         payload["tokens_used"] = tokens_used
     if cost_usd is not None:
         payload["cost_usd"] = cost_usd
+    if tool_calls is not None:
+        payload["tool_calls"] = tool_calls
 
     # Write to structured JSONL logs (zero-overhead, non-blocking)
     try:
