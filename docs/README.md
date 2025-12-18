@@ -51,7 +51,8 @@ Documentation is organized into the following categories:
 - [ADW Documentation](features/adw/) - Complete ADW system documentation
 - [Observability & Logging](features/observability-and-logging.md) - Hook events, pattern learning, cost tracking, and work logs (Panel 10)
 - [Cost Optimization](features/cost-optimization/) - API cost optimization and estimation
-- [Webhooks](features/webhooks/) - Webhook integration and setup guides
+- [Webhook Architecture](webhook-architecture.md) - Complete webhook system architecture (ADW Trigger + Planned Features Sync)
+- [GitHub Webhook Setup](github-webhook-setup.md) - Planned Features sync webhook configuration
 
 ## Quick Links
 
