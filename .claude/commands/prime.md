@@ -34,6 +34,7 @@ Commits should be professional and focused on technical changes only.
 ### Frontend (app/client/)
 **Tech:** React + Vite + TypeScript + Tailwind + TanStack Query
 **Note:** Zustand listed in package.json but unused - all state via React hooks
+**Dev mode:** Silent logging (TanStack Query + WebSocket debug disabled for cleaner console)
 
 **10-Panel System:**
 - Panel 1: Request Form | Panel 6: Patterns (stub)
@@ -46,7 +47,8 @@ Commits should be professional and focused on technical changes only.
 
 ### Backend (app/server/)
 **Tech:** FastAPI + Python + PostgreSQL + OpenAI/Anthropic
-**36 endpoints:** GitHub, workflows, queue, work-log, system, websocket, observability
+**37 endpoints:** GitHub, workflows, queue, work-log, system, websocket, observability
+**New:** `/api/v1/github-rate-limit` - Real-time GitHub API quota monitoring (REST + GraphQL)
 
 → Read `.claude/commands/quick_start/backend.md` [~300 tokens]
 
