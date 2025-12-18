@@ -921,6 +921,46 @@ def ensure_adw_id(
                 logger.info(f"Found existing ADW state for ID: {adw_id}")
             else:
                 print(f"Found existing ADW state for ID: {adw_id}")
+
+            # Ensure database record exists even for existing state
+            try:
+                import sys
+                import os
+                from datetime import datetime
+
+                sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "app", "server"))
+                from repositories.phase_queue_repository import PhaseQueueRepository
+                from models.phase_queue_item import PhaseQueueItem
+
+                repo = PhaseQueueRepository()
+                existing_record = repo.find_by_adw_id(adw_id)
+
+                if not existing_record:
+                    # Create missing database record
+                    queue_item = PhaseQueueItem(
+                        queue_id=adw_id,
+                        feature_id=None,
+                        issue_number=int(issue_number_str),
+                        phase_number=1,
+                        status='pending',
+                        current_phase='init',
+                        depends_on_phases=[],
+                        phase_data={},
+                        created_at=datetime.now().isoformat(),
+                        updated_at=datetime.now().isoformat(),
+                        adw_id=adw_id
+                    )
+                    repo.create(queue_item)
+                    if logger:
+                        logger.info(f"✅ Created missing database record for existing workflow {adw_id}")
+                    else:
+                        print(f"✅ Created missing database record for existing workflow {adw_id}")
+            except Exception as e:
+                if logger:
+                    logger.warning(f"Could not verify/create database record: {e}")
+                else:
+                    print(f"Warning: Could not verify/create database record: {e}")
+
             return adw_id
         # ADW ID provided but no state exists, create state
         state = ADWState(adw_id)
@@ -930,6 +970,42 @@ def ensure_adw_id(
             logger.info(f"Created new ADW state for provided ID: {adw_id}")
         else:
             print(f"Created new ADW state for provided ID: {adw_id}")
+
+        # Create database record for new state with provided ID
+        try:
+            import sys
+            import os
+            from datetime import datetime
+
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "app", "server"))
+            from repositories.phase_queue_repository import PhaseQueueRepository
+            from models.phase_queue_item import PhaseQueueItem
+
+            repo = PhaseQueueRepository()
+            queue_item = PhaseQueueItem(
+                queue_id=adw_id,
+                feature_id=None,
+                issue_number=int(issue_number_str),
+                phase_number=1,
+                status='pending',
+                current_phase='init',
+                depends_on_phases=[],
+                phase_data={},
+                created_at=datetime.now().isoformat(),
+                updated_at=datetime.now().isoformat(),
+                adw_id=adw_id
+            )
+            repo.create(queue_item)
+            if logger:
+                logger.info(f"✅ Created phase_queue database record for {adw_id}")
+            else:
+                print(f"✅ Created phase_queue database record for {adw_id}")
+        except Exception as e:
+            if logger:
+                logger.warning(f"Failed to create database record (background sync will retry): {e}")
+            else:
+                print(f"Warning: Failed to create database record (background sync will retry): {e}")
+
         return adw_id
 
     # No ADW ID provided, create new one with state
@@ -943,6 +1019,44 @@ def ensure_adw_id(
         logger.info(f"Created new ADW ID and state: {new_adw_id}")
     else:
         print(f"Created new ADW ID and state: {new_adw_id}")
+
+    # Create database record to ensure workflow is tracked from the start
+    try:
+        import sys
+        import os
+        from datetime import datetime
+
+        # Add server path for imports
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "app", "server"))
+        from repositories.phase_queue_repository import PhaseQueueRepository
+        from models.phase_queue_item import PhaseQueueItem
+
+        repo = PhaseQueueRepository()
+        queue_item = PhaseQueueItem(
+            queue_id=new_adw_id,
+            feature_id=None,  # Not from planned_features
+            issue_number=int(issue_number_str),
+            phase_number=1,
+            status='pending',
+            current_phase='init',
+            depends_on_phases=[],
+            phase_data={},
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+            adw_id=new_adw_id
+        )
+        repo.create(queue_item)
+        if logger:
+            logger.info(f"✅ Created phase_queue database record for {new_adw_id}")
+        else:
+            print(f"✅ Created phase_queue database record for {new_adw_id}")
+    except Exception as e:
+        # Don't fail workflow if database creation fails - background sync will create it
+        if logger:
+            logger.warning(f"Failed to create database record (background sync will retry): {e}")
+        else:
+            print(f"Warning: Failed to create database record (background sync will retry): {e}")
+
     return new_adw_id
 
 
