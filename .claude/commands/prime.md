@@ -20,6 +20,8 @@
 - **Security:** Multi-layer SQL injection prevention
 - **Claude Code timeout:** 20-minute timeout for planning tasks (prevents premature termination)
 - **Rate limit handling:** Proactive GitHub API monitoring with graceful degradation (Session 20)
+- **Workflow resume:** Phase completion tracking with intelligent skip logic (Session 21)
+- **Panel 7 performance:** Background computation + WebSocket = 20x faster (< 1s vs 15-20s)
 
 ## Code Standards - Git Commits
 **CRITICAL:** Never include in commit messages:
@@ -38,8 +40,8 @@ Commits should be professional and focused on technical changes only.
 
 **10-Panel System:**
 - Panel 1: Request Form | Panel 6: Patterns (stub)
-- Panel 2: ADW Dashboard | Panel 7: Quality (stub)
-- Panel 3: History | Panel 8: Review (active, needs fixes)
+- Panel 2: ADW Dashboard | Panel 7: Quality (complete, < 1s load)
+- Panel 3: History | Panel 8: Review (active, needs data flow fixes)
 - Panel 4: Routes | Panel 9: Data (stub)
 - Panel 5: Plans (complete, database-driven) | Panel 10: Work Log (complete)
 
@@ -75,9 +77,10 @@ Commits should be professional and focused on technical changes only.
 
 ### WebSocket Real-Time Updates
 **Migration from HTTP polling to WebSocket for real-time dashboard updates**
-**Status:** 5/6 components migrated (Sessions 15-16)
+**Status:** 6/6 components migrated (Sessions 15-16, 21)
 - ✅ CurrentWorkflowCard - Real-time workflow status
 - ✅ AdwMonitorCard - Real-time ADW monitoring
+- ✅ QualityPanel - Real-time quality metrics (Session 21)
 - ✅ ZteHopperQueueCard - Real-time queue updates
 - ✅ RoutesView - Real-time route updates
 - ✅ WorkflowHistoryView - Real-time history updates
@@ -105,6 +108,19 @@ Commits should be professional and focused on technical changes only.
 - **Real-time monitoring:** `/api/v1/github-rate-limit` endpoint tracks REST + GraphQL quotas
 - **Files:** `adws/adw_modules/rate_limit.py` (new), `adws/adw_modules/github.py`, `adws/adw_sdlc_complete_iso.py`, `app/server/routes/system_routes.py`
 - **Typical quotas:** 5000 requests/hour (REST), 5000 points/hour (GraphQL)
+
+### Workflow Resume & Performance Optimization (Session 21)
+**Intelligent phase skipping + Panel 7 optimization**
+**Problem:** Workflows restart from Phase 1 when resumed; Panel 7 took 15-20s to load
+**Solution:**
+- **PhaseTracker:** Tracks completed phases in `agents/{adw_id}/completed_phases.json`
+- **Resume logic:** Workflows skip completed phases, continue from first incomplete
+- **50% time savings:** Pause after Phase 5 = only run 5 phases (not 10)
+- **Panel 7 optimization:** File filtering (36x reduction) + parallelization + WebSocket = 20x faster
+- **Files:** `adws/adw_modules/phase_tracker.py` (new), `adws/adw_sdlc_complete_iso.py`, `app/server/services/qc_metrics_service.py`
+
+→ Full doc: `app_docs/feature-workflow-resume.md` [~250 tokens]
+→ Full doc: `app_docs/feature-panel7-performance-optimization.md` [~190 tokens]
 
 ### Documentation
 **Adding or updating docs**

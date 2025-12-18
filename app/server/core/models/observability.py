@@ -85,6 +85,18 @@ class UserPromptWithProgress(UserPrompt):
 # Task Log Models
 # =====================================================================
 
+class ToolCallRecord(BaseModel):
+    """Record of a single tool call within a phase."""
+    tool_name: str
+    started_at: datetime
+    completed_at: datetime | None = None
+    duration_ms: int | None = None
+    success: bool = True
+    error_message: str | None = None
+    parameters: dict | None = Field(default_factory=dict)
+    result_summary: str | None = None
+
+
 class TaskLog(BaseModel):
     """Task log for ADW phase execution."""
     id: int | None = None
@@ -112,6 +124,9 @@ class TaskLog(BaseModel):
     tokens_used: int | None = None
     cost_usd: float | None = None
 
+    # Tool Call Tracking
+    tool_calls: list[ToolCallRecord] = Field(default_factory=list)
+
     # Metadata
     captured_at: datetime
     created_at: datetime
@@ -132,6 +147,7 @@ class TaskLogCreate(BaseModel):
     duration_seconds: float | None = None
     tokens_used: int | None = None
     cost_usd: float | None = None
+    tool_calls: list[ToolCallRecord] = Field(default_factory=list)
 
 
 class IssueProgress(BaseModel):

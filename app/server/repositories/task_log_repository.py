@@ -4,6 +4,7 @@ Task Log Repository
 Handles database operations for ADW task/phase logs.
 """
 
+import json
 import logging
 
 from core.models.observability import IssueProgress, TaskLog, TaskLogCreate, TaskLogFilters
