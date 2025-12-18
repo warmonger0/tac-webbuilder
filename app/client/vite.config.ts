@@ -15,6 +15,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: frontendPort,
+    hmr: {
+      overlay: true, // Keep error overlay
+    },
     proxy: {
       '/api': {
         target: backendUrl,
@@ -26,4 +29,5 @@ export default defineConfig({
       },
     },
   },
+  logLevel: 'error', // Only show errors, suppress info/warn logs
 })
