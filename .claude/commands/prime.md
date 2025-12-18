@@ -31,6 +31,28 @@
 
 Commits should be professional and focused on technical changes only.
 
+## Code Standards - Behavioral Requirements (Session 22)
+**DELEGATION IS MANDATORY:**
+- ✅ Use sub-agents for research, exploration, and specialized tasks
+- ✅ "Trust but verify" - Review sub-agent findings before acting
+- ✅ Let sub-agents "occupy a lane and advise you on it"
+- ❌ DO NOT try to do everything yourself - context is finite
+- ❌ DO NOT skip documentation research when unsure
+
+**Example:** When uncertain about dual backend port architecture (8001 webhook + 8002 API):
+- ✅ Spawn Explore agent to research port configuration
+- ❌ DON'T guess or attempt fixes without understanding the system
+
+**COMPREHENSIVE FIXES ONLY:**
+- ✅ See errors, fix them comprehensively at the root cause
+- ✅ Document why the error occurred and what was fixed
+- ❌ DO NOT create temporary workarounds or "just make it work" fixes
+- ❌ DO NOT say "don't worry, I'll just do this to make it work"
+
+**Example:** When startup scripts fail:
+- ✅ Audit all startup scripts, identify root cause, fix system-wide
+- ❌ DON'T manually start servers as a workaround
+
 ## What Are You Working On?
 
 ### Frontend (app/client/)
@@ -131,8 +153,12 @@ Commits should be professional and focused on technical changes only.
 - **Backward compatible:** Optional parameter in `log_task_completion()` - existing workflows unaffected
 - **Two-layer tracking:** hook_events (Claude Code tools) + task_logs.tool_calls (ADW workflow tools)
 - **Pattern analysis:** 195 sessions analyzed, discovered $183K potential savings in approved patterns
-- **Files:** `app/server/migrations/add_tool_calls_tracking.py`, `app/server/core/models/observability.py`, `adws/adw_modules/observability.py`
-- **Next:** ToolCallTracker helper class for easy integration in ADW phases
+- **ToolCallTracker:** Context manager for automatic tool tracking (20/20 tests passing)
+  - Enabled by default in all ADW build workflows
+  - Zero-overhead guarantee (failures don't block workflow execution)
+  - Automatic Bash subprocess tracking
+  - Auto-logs to observability system on context exit
+- **Files:** `adws/adw_modules/tool_call_tracker.py`, `adws/adw_build_workflow.py`, `adws/adw_modules/build_checker.py`
 
 → Full docs: `docs/architecture/adw-tracking-architecture.md`, `docs/design/tool-call-tracking-design.md`
 
