@@ -44,9 +44,9 @@ class PostgreSQLAdapter(DatabaseAdapter):
     @contextmanager
     def get_connection(self) -> Generator[Any, None, None]:
         """Get PostgreSQL connection from pool"""
-        # Use thread ID as key for connection pool
+        # ThreadedConnectionPool requires same key for get/put
         key = threading.get_ident()
-        conn = self.pool.getconn(key=key)
+        conn = self.pool.getconn(key)
         try:
             yield conn
             conn.commit()
@@ -54,7 +54,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
             conn.rollback()
             raise
         finally:
-            self.pool.putconn(conn, key=key)
+            self.pool.putconn(conn, key)
 
     def execute_query(self, query: str, params: tuple | None = None) -> Any:
         """Execute query and return results"""
