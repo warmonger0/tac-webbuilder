@@ -47,7 +47,16 @@
 
 ### Recent Work & Features
 
-**Session 22 (Current) - Tool Call Tracking:**
+**Session 23 (Current) - Progressive Loading System:**
+- Implemented lazy loading with deterministic logic gates
+- 75% reduction in always-loaded context (3,190 → 801 tokens)
+- Created CODE_STANDARDS.md (single source of truth for all standards)
+- Enhanced CLAUDE.md with logic gates for critical checkpoints
+- Progressive escalation: prime → QUICK_REF → quick_start → references → full docs
+
+→ Full docs: `docs/sessions/SESSION_23_PROGRESSIVE_LOADING_REFACTOR.md`
+
+**Session 22 - Tool Call Tracking:**
 - ToolCallTracker for ADW pattern learning (20/20 tests passing)
 - Enabled by default in all build workflows
 - Two-layer tracking: hook_events (Claude Code) + task_logs.tool_calls (ADW)
