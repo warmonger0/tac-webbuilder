@@ -37,7 +37,9 @@ class PostgreSQLAdapter(DatabaseAdapter):
     def pool(self):
         """Lazy-initialize connection pool on first access"""
         if self._pool is None:
-            self._pool = psycopg2.pool.ThreadedConnectionPool(**self._pool_config)
+            # Use SimpleConnectionPool instead of ThreadedConnectionPool to avoid
+            # threading issues with uvicorn's recursive lifespan contexts
+            self._pool = psycopg2.pool.SimpleConnectionPool(**self._pool_config)
         return self._pool
 
     @contextmanager

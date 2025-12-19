@@ -360,7 +360,7 @@ class GitHubPoster:
 
     def issue_exists(self, issue_number: int) -> bool:
         """
-        Check if a GitHub issue exists.
+        Check if a GitHub issue exists, with REST API fallback for rate limits.
 
         Args:
             issue_number: Issue number to check
@@ -368,28 +368,98 @@ class GitHubPoster:
         Returns:
             True if issue exists, False otherwise
         """
+        logger = logging.getLogger(__name__)
+
         try:
+            # Try GraphQL first (gh CLI)
             cmd = ["gh", "issue", "view", str(issue_number), "--json", "number"]
             if self.repo_url:
                 cmd.extend(["--repo", self.repo_url])
 
             result = self._execute_gh_command(cmd)
             return bool(result.strip())
-        except Exception:
-            # If command fails (issue not found, rate limit, etc.), assume doesn't exist
+
+        except Exception as e:
+            error_str = str(e).lower()
+
+            # If rate limit, try REST API fallback
+            if "rate limit" in error_str or "api rate limit exceeded" in error_str:
+                logger.warning(f"GraphQL rate limit checking issue #{issue_number}, trying REST API")
+
+                try:
+                    return self._issue_exists_via_rest(issue_number)
+                except Exception as rest_error:
+                    logger.warning(f"REST API also failed checking issue #{issue_number}: {rest_error}")
+                    # If both fail, conservatively assume issue exists to prevent duplicates
+                    return True
+
+            # For other errors (issue not found, auth issues), assume doesn't exist
+            logger.debug(f"Issue #{issue_number} check failed: {e}")
             return False
+
+    def _issue_exists_via_rest(self, issue_number: int) -> bool:
+        """
+        Check if a GitHub issue exists using REST API.
+
+        Args:
+            issue_number: Issue number to check
+
+        Returns:
+            True if issue exists, False otherwise
+
+        Raises:
+            RuntimeError: If REST API call fails
+        """
+        import httpx
+
+        try:
+            # Get authentication token
+            token = self._get_github_token()
+
+            # Get repository information (uses fallback if needed)
+            repo_info = self.get_repo_info()
+            owner = repo_info['owner']['login']
+            repo_name = repo_info['name']
+
+            # Check issue via REST API
+            url = f"https://api.github.com/repos/{owner}/{repo_name}/issues/{issue_number}"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28"
+            }
+
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(url, headers=headers)
+
+                # 200 = exists, 404 = doesn't exist, other = error
+                if response.status_code == 200:
+                    return True
+                elif response.status_code == 404:
+                    return False
+                else:
+                    response.raise_for_status()
+                    return False  # Shouldn't reach here
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return False
+            raise RuntimeError(f"GitHub REST API returned {e.response.status_code}") from e
+        except Exception as e:
+            raise RuntimeError(f"Failed to check issue via REST API: {str(e)}") from e
 
     def get_repo_info(self) -> dict:
         """
         Get information about the current/specified repository.
 
         Returns:
-            Dictionary with repository information
+            Dictionary with repository information (keys: name, owner, url)
 
         Raises:
             RuntimeError: If unable to get repo info
         """
         try:
+            # Try gh CLI (GraphQL) first
             cmd = ["gh", "repo", "view", "--json", "name,owner,url"]
             if self.repo_url:
                 cmd.append(self.repo_url)
@@ -400,4 +470,57 @@ class GitHubPoster:
             return json.loads(result)
 
         except Exception as e:
-            raise RuntimeError(f"Failed to get repository info: {str(e)}") from e
+            # Fallback: Parse from repo_url or git remote
+            logger = logging.getLogger(__name__)
+            logger.warning(f"gh CLI failed to get repo info (likely rate limit), using fallback: {e}")
+
+            try:
+                # If repo_url is provided, parse it
+                if self.repo_url:
+                    return self._parse_repo_url(self.repo_url)
+
+                # Otherwise, get from git remote
+                result = ProcessRunner.run_command(["git", "remote", "get-url", "origin"])
+                if result.success and result.stdout.strip():
+                    return self._parse_repo_url(result.stdout.strip())
+
+                raise RuntimeError("No repo_url provided and git remote not found")
+
+            except Exception as fallback_error:
+                raise RuntimeError(
+                    f"Failed to get repository info via gh CLI and fallback. "
+                    f"gh CLI: {str(e)} | Fallback: {str(fallback_error)}"
+                ) from fallback_error
+
+    def _parse_repo_url(self, url: str) -> dict:
+        """
+        Parse repository information from a GitHub URL.
+
+        Args:
+            url: GitHub URL (e.g., https://github.com/owner/repo.git or git@github.com:owner/repo.git)
+
+        Returns:
+            Dictionary with name, owner, url keys
+
+        Raises:
+            ValueError: If URL format is invalid
+        """
+        import re
+
+        # Match HTTPS or SSH format
+        # HTTPS: https://github.com/owner/repo.git or https://github.com/owner/repo
+        # SSH: git@github.com:owner/repo.git or git@github.com:owner/repo
+        https_pattern = r'https://github\.com/([^/]+)/([^/\.]+?)(?:\.git)?$'
+        ssh_pattern = r'git@github\.com:([^/]+)/([^/\.]+?)(?:\.git)?$'
+
+        match = re.match(https_pattern, url) or re.match(ssh_pattern, url)
+        if not match:
+            raise ValueError(f"Invalid GitHub URL format: {url}")
+
+        owner, repo = match.groups()
+
+        return {
+            "name": repo,
+            "owner": {"login": owner},
+            "url": f"https://github.com/{owner}/{repo}"
+        }

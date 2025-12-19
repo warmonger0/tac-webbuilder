@@ -26,10 +26,15 @@ import sys
 import os
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.insert(0, parent_dir)
 
 from adws.utils.state_validator import StateValidator
 from adws.adw_modules.state import ADWState
+from adws.adw_modules.utils import setup_database_imports
+
+# Setup database imports for app.server access
+setup_database_imports()
 
 
 def is_phase_complete(phase: str, issue_number: int, logger: logging.Logger) -> bool:
