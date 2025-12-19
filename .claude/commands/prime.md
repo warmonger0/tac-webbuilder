@@ -47,62 +47,18 @@
 
 ### Recent Work & Features
 
-**Session 25 (Current) - Panel 5 GitHub Issue Creation & Retry:**
-- Fixed Panel 5 automation to create GitHub issues using GitHubPoster (same as Panel 1)
-- Unified issue creation flow across panels - no duplicate subprocess code
-- Added retry button for in-progress features in Panel 5
-- Added `issue_exists()` validation - verifies recorded issues actually exist on GitHub
-- Auto-creates new issue if recorded issue was deleted/doesn't exist
-- Both "Start Automation" (planned) and "Retry Automation" (in-progress) buttons functional
-- Files: `app/server/routes/planned_features_routes.py`, `app/server/core/github_poster.py`, `app/client/src/components/PlansPanel.tsx`
+**Need session history or feature context?**
+→ Read `.claude/commands/references/recent_work.md` [~1,000 tokens]
 
-**Session 24 - Single Source of Truth Fixes:**
-- Fixed phase detection: ADW Monitor now queries `task_logs` database (not filesystem heuristics)
-- Fixed cost display: Now queries `task_logs` for cumulative costs (not null state file)
-- Identified Issue #224 hung during Plan phase (PR creator agent, no timeout)
-- Added planned_feature for comprehensive data duplication audit
-- **Key lesson**: Database is source of truth; filesystem/state files are caches
+**Major architectural milestones:**
+- **Session 23**: Progressive loading system (75% context reduction, logic gates)
+- **Session 22**: Tool call tracking infrastructure (pattern learning)
+- **Session 19**: ADW loop prevention (Issue #168 - verification control)
+- **Sessions 15-16**: WebSocket migration (6/6 components, <2s latency)
+- **Sessions 7-14**: Observability foundation (pattern analysis, cost tracking)
 
-→ Full docs: `docs/sessions/SESSION_24_SINGLE_SOURCE_OF_TRUTH.md`
-
-**Session 23 - Progressive Loading System:**
-- Implemented lazy loading with deterministic logic gates
-- 75% reduction in always-loaded context (3,190 → 801 tokens)
-- Created CODE_STANDARDS.md (single source of truth for all standards)
-- Enhanced CLAUDE.md with logic gates for critical checkpoints
-- Progressive escalation: prime → QUICK_REF → quick_start → references → full docs
-
-→ Full docs: `docs/sessions/SESSION_23_PROGRESSIVE_LOADING_REFACTOR.md`
-
-**Session 22 - Tool Call Tracking:**
-- ToolCallTracker for ADW pattern learning (20/20 tests passing)
-- Enabled by default in all build workflows
-- Two-layer tracking: hook_events (Claude Code) + task_logs.tool_calls (ADW)
-- 29K events captured, 11 patterns discovered, $183K potential savings
-
-→ Full docs: `docs/architecture/adw-tracking-architecture.md`, `docs/design/tool-call-tracking-design.md`
-
-**Session 21 - Workflow Resume & Panel 7 Performance:**
-- PhaseTracker: Resume workflows from last incomplete phase (50% time savings)
-- Panel 7: 20x faster (< 1s vs 15-20s) via file filtering + parallelization
-
-→ Full docs: `app_docs/feature-workflow-resume.md`, `app_docs/feature-panel7-performance-optimization.md`
-
-**Session 20 - GitHub Rate Limit Handling:**
-- Proactive API quota management with graceful degradation
-- Real-time monitoring: `/api/v1/github-rate-limit` endpoint
-
-**Session 19 - ADW Loop Prevention (Issue #168):**
-- Dual-layer protection against infinite retry loops
-- Verification-based loop control + pattern-based circuit breaker
-
-**Session 15-16, 21 - WebSocket Real-Time Updates:**
-- 6/6 components migrated from HTTP polling to WebSocket
-- Performance: <2s latency (vs 3-10s polling)
-
-**Observability & Analytics (Sessions 7-14):**
-- Daily pattern analysis, cost attribution, error/latency analytics
-- Closed-loop ROI tracking with confidence updating
+→ For session details: Read `recent_work.md` or `docs/sessions/SESSION_*.md`
+→ For git history: Run `git log --oneline --grep="Session"`
 
 ### Planned Features & Roadmap
 → Read `.claude/commands/references/planned_features.md` [~600 tokens]
