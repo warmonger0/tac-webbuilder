@@ -1,7 +1,7 @@
 # Prime - Progressive Context Loader
 
 ## Project Essence
-**tac-webbuilder** - AI-powered GitHub automation platform with autonomous SDLC workflows
+**tac-webbuilder** - Web-based, AI-powered, phased autonomous workflow system with self-improving capabilities via pattern learning
 
 ## Four Core Features
 1. **ADW Automation** - 10-phase SDLC workflows in isolated git worktrees (Claude Code CLI)
@@ -9,221 +9,110 @@
 3. **Observability & Analytics** - Pattern analysis, cost attribution, error/latency tracking, ROI metrics
 4. **10-Panel Dashboard** - Real-time workflow monitoring, roadmap tracking, and control
 
-## Quick Architecture
-- **Worktree isolation:** Up to 15 concurrent ADWs in `trees/{adw_id}/`
-- **Port allocation:** Backend 9100-9114, Frontend 9200-9214 (calculated from adw_id)
-- **Main ports:** Backend 8002, Frontend 5173 (from .ports.env)
-- **10-phase SDLC:** Plan → Validate → Build → Lint → Test → Review → Document → Ship → Cleanup → Verify
-- **Cost optimization:** 60-80% savings via external test tools
-- **Loop prevention:** Verification-based loop control + pattern-based circuit breaker (Issue #168)
-- **Database:** PostgreSQL only (production-grade, required for observability)
-- **Security:** Multi-layer SQL injection prevention
-- **Claude Code timeout:** 20-minute timeout for planning tasks (prevents premature termination)
-- **Rate limit handling:** Proactive GitHub API monitoring with graceful degradation (Session 20)
-- **Workflow resume:** Phase completion tracking with intelligent skip logic (Session 21)
-- **Panel 7 performance:** Background computation + WebSocket = 20x faster (< 1s vs 15-20s)
-
-## Code Standards - Git Commits
-**CRITICAL:** Never include in commit messages:
-- ❌ "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
-- ❌ "Co-Authored-By: Claude <noreply@anthropic.com>"
-- ❌ Any AI generation references
-
-Commits should be professional and focused on technical changes only.
-
-## Code Standards - Behavioral Requirements (Session 22)
-**DELEGATION IS MANDATORY:**
-- ✅ Use sub-agents for research, exploration, and specialized tasks
-- ✅ "Trust but verify" - Review sub-agent findings before acting
-- ✅ Let sub-agents "occupy a lane and advise you on it"
-- ❌ DO NOT try to do everything yourself - context is finite
-- ❌ DO NOT skip documentation research when unsure
-
-**Example:** When uncertain about dual backend port architecture (8001 webhook + 8002 API):
-- ✅ Spawn Explore agent to research port configuration
-- ❌ DON'T guess or attempt fixes without understanding the system
-
-**COMPREHENSIVE FIXES ONLY:**
-- ✅ See errors, fix them comprehensively at the root cause
-- ✅ Document why the error occurred and what was fixed
-- ❌ DO NOT create temporary workarounds or "just make it work" fixes
-- ❌ DO NOT say "don't worry, I'll just do this to make it work"
-
-**Example:** When startup scripts fail:
-- ✅ Audit all startup scripts, identify root cause, fix system-wide
-- ❌ DON'T manually start servers as a workaround
-
 ## What Are You Working On?
+
+### Need Architecture/Commands/Ports?
+→ Read `.claude/QUICK_REF.md` [~600 tokens]
+- Port configuration (8001 webhook, 8002 API, 5173 frontend)
+- Startup commands
+- Database setup
+- Quick command reference
+- Tech stack details
+
+### Need Code Standards/Commit Rules?
+→ Read `.claude/CODE_STANDARDS.md` [~400 tokens]
+- Git commit standards (CRITICAL: no AI attribution)
+- Loop prevention & retry limits
+- Behavioral requirements (delegation, comprehensive fixes)
+- Quality gates (before shipping)
+- PR & documentation standards
 
 ### Frontend (app/client/)
 **Tech:** React + Vite + TypeScript + Tailwind + TanStack Query
-**Note:** Zustand listed in package.json but unused - all state via React hooks
-**Dev mode:** Silent logging (TanStack Query + WebSocket debug disabled for cleaner console)
-
-**10-Panel System:**
-- Panel 1: Request Form | Panel 6: Patterns (stub)
-- Panel 2: ADW Dashboard | Panel 7: Quality (complete, < 1s load)
-- Panel 3: History | Panel 8: Review (active, needs data flow fixes)
-- Panel 4: Routes | Panel 9: Data (stub)
-- Panel 5: Plans (complete, database-driven) | Panel 10: Work Log (complete)
+**10-Panel System:** Request Form, ADW Dashboard, History, Routes, Plans, Patterns, Quality, Review, Data, Work Log
 
 → Read `.claude/commands/quick_start/frontend.md` [~300 tokens]
 
 ### Backend (app/server/)
 **Tech:** FastAPI + Python + PostgreSQL + OpenAI/Anthropic
 **37 endpoints:** GitHub, workflows, queue, work-log, system, websocket, observability
-**New:** `/api/v1/github-rate-limit` - Real-time GitHub API quota monitoring (REST + GraphQL)
 
 → Read `.claude/commands/quick_start/backend.md` [~300 tokens]
 
 ### ADW Workflows (adws/)
 **10-phase orchestration via isolated worktrees**
-**Key workflows:** adw_sdlc_complete_iso, adw_sdlc_complete_zte (zero-touch)
+**Key workflows:** adw_sdlc_complete_iso (full SDLC), adw_sdlc_complete_zte (zero-touch with auto-merge)
 
 → Read `.claude/commands/quick_start/adw.md` [~400 tokens]
 
-### Plans Panel (Session 8A/8B)
-**Database-driven roadmap tracking with session management**
-**Panel 5:** View/edit planned features, track session progress, manage roadmap
+### Recent Work & Features
 
-→ Read `.claude/commands/references/planned_features.md` [~600 tokens]
-→ Full doc: `docs/features/planned-features-system.md` [~1,500 tokens]
-
-### Observability & Analytics
-**Pattern analysis, cost attribution, error/latency analytics, ROI tracking**
-**New in Sessions 7-14:** Daily pattern analysis, cost attribution, error analytics, latency analytics, closed-loop ROI tracking, confidence updating, auto-archiving
-
-→ Read `.claude/commands/references/observability.md` [~900 tokens]
-→ Read `.claude/commands/references/analytics.md` [~800 tokens] (Sessions 9-11)
-→ Full doc: `docs/features/observability-and-logging.md` [~2,500 tokens]
-
-### WebSocket Real-Time Updates
-**Migration from HTTP polling to WebSocket for real-time dashboard updates**
-**Status:** 6/6 components migrated (Sessions 15-16, 21)
-- ✅ CurrentWorkflowCard - Real-time workflow status
-- ✅ AdwMonitorCard - Real-time ADW monitoring
-- ✅ QualityPanel - Real-time quality metrics (Session 21)
-- ✅ ZteHopperQueueCard - Real-time queue updates
-- ✅ RoutesView - Real-time route updates
-- ✅ WorkflowHistoryView - Real-time history updates
-- 🟢 SystemStatusPanel - Polling OK (status rarely changes)
-
-**Performance:** <2s latency (vs 3-10s polling), reduced network traffic, broadcast only on state change
-
-### ADW Loop Prevention (Session 19 - Issue #168)
-**Dual-layer protection against infinite retry loops**
-**Problem:** Test resolver agents claimed "✅ Resolved" but tests still failed → infinite loop (62 comments)
-**Solution:**
-- **Layer 1:** Verification-based loop control - Re-runs tests after each resolution to verify actual progress
-- **Layer 2:** Pattern-based circuit breaker - Detects same agent posting 8+ times in 15 comments
-- **Files:** `adws/adw_test_iso.py` (lines 806-909, 1097-1200), `adws/adw_sdlc_complete_iso.py` (lines 53-149)
-- **Retry limits:** Max 3 attempts (test and E2E)
-- **Exit conditions:** No progress detected OR max attempts OR circuit breaker triggered
-
-### GitHub Rate Limit Handling (Session 20)
-**Proactive API quota management with graceful degradation**
-**Problem:** Workflows fail silently when hitting GitHub API rate limits during bulk operations
-**Solution:**
-- **Proactive checking:** Verifies quota before making API calls (prevents wasted attempts)
-- **Clear error messages:** Shows remaining quota, usage %, and reset time
-- **Graceful degradation:** Workflows pause with status 'paused' instead of failing
-- **Real-time monitoring:** `/api/v1/github-rate-limit` endpoint tracks REST + GraphQL quotas
-- **Files:** `adws/adw_modules/rate_limit.py` (new), `adws/adw_modules/github.py`, `adws/adw_sdlc_complete_iso.py`, `app/server/routes/system_routes.py`
-- **Typical quotas:** 5000 requests/hour (REST), 5000 points/hour (GraphQL)
-
-### Workflow Resume & Performance Optimization (Session 21)
-**Intelligent phase skipping + Panel 7 optimization**
-**Problem:** Workflows restart from Phase 1 when resumed; Panel 7 took 15-20s to load
-**Solution:**
-- **PhaseTracker:** Tracks completed phases in `agents/{adw_id}/completed_phases.json`
-- **Resume logic:** Workflows skip completed phases, continue from first incomplete
-- **50% time savings:** Pause after Phase 5 = only run 5 phases (not 10)
-- **Panel 7 optimization:** File filtering (36x reduction) + parallelization + WebSocket = 20x faster
-- **Files:** `adws/adw_modules/phase_tracker.py` (new), `adws/adw_sdlc_complete_iso.py`, `app/server/services/qc_metrics_service.py`
-
-→ Full doc: `app_docs/feature-workflow-resume.md` [~250 tokens]
-→ Full doc: `app_docs/feature-panel7-performance-optimization.md` [~190 tokens]
-
-### Tool Call Tracking & Pattern Detection (Session 22)
-**Infrastructure for ADW pattern learning and automation**
-**Discovery:** Pattern learning system already active with 29K hook events and 11 patterns (5 approved)
-**Implementation:**
-- **Database:** Added `tool_calls JSONB` column to `task_logs` with GIN index for efficient queries
-- **Models:** New `ToolCallRecord` type (tool_name, duration_ms, success, parameters, result_summary)
-- **Backward compatible:** Optional parameter in `log_task_completion()` - existing workflows unaffected
-- **Two-layer tracking:** hook_events (Claude Code tools) + task_logs.tool_calls (ADW workflow tools)
-- **Pattern analysis:** 195 sessions analyzed, discovered $183K potential savings in approved patterns
-- **ToolCallTracker:** Context manager for automatic tool tracking (20/20 tests passing)
-  - Enabled by default in all ADW build workflows
-  - Zero-overhead guarantee (failures don't block workflow execution)
-  - Automatic Bash subprocess tracking
-  - Auto-logs to observability system on context exit
-- **Files:** `adws/adw_modules/tool_call_tracker.py`, `adws/adw_build_workflow.py`, `adws/adw_modules/build_checker.py`
+**Session 22 (Current) - Tool Call Tracking:**
+- ToolCallTracker for ADW pattern learning (20/20 tests passing)
+- Enabled by default in all build workflows
+- Two-layer tracking: hook_events (Claude Code) + task_logs.tool_calls (ADW)
+- 29K events captured, 11 patterns discovered, $183K potential savings
 
 → Full docs: `docs/architecture/adw-tracking-architecture.md`, `docs/design/tool-call-tracking-design.md`
 
+**Session 21 - Workflow Resume & Panel 7 Performance:**
+- PhaseTracker: Resume workflows from last incomplete phase (50% time savings)
+- Panel 7: 20x faster (< 1s vs 15-20s) via file filtering + parallelization
+
+→ Full docs: `app_docs/feature-workflow-resume.md`, `app_docs/feature-panel7-performance-optimization.md`
+
+**Session 20 - GitHub Rate Limit Handling:**
+- Proactive API quota management with graceful degradation
+- Real-time monitoring: `/api/v1/github-rate-limit` endpoint
+
+**Session 19 - ADW Loop Prevention (Issue #168):**
+- Dual-layer protection against infinite retry loops
+- Verification-based loop control + pattern-based circuit breaker
+
+**Session 15-16, 21 - WebSocket Real-Time Updates:**
+- 6/6 components migrated from HTTP polling to WebSocket
+- Performance: <2s latency (vs 3-10s polling)
+
+**Observability & Analytics (Sessions 7-14):**
+- Daily pattern analysis, cost attribution, error/latency analytics
+- Closed-loop ROI tracking with confidence updating
+
+### Planned Features & Roadmap
+→ Read `.claude/commands/references/planned_features.md` [~600 tokens]
+→ Full doc: `docs/features/planned-features-system.md` [~1,500 tokens]
+
+### Observability Deep-Dive
+→ Read `.claude/commands/references/observability.md` [~900 tokens]
+→ Read `.claude/commands/references/analytics.md` [~800 tokens]
+→ Full doc: `docs/features/observability-and-logging.md` [~2,500 tokens]
+
 ### Documentation
 **Adding or updating docs**
-
 → Read `.claude/commands/quick_start/docs.md` [~200 tokens]
 
 ### Not Sure / Need Routing Help
 → Read `.claude/commands/references/decision_tree.md` [~400 tokens]
 
-## Quick Commands
-```bash
-# Full stack
-./scripts/start_full.sh                # Backend + frontend
+---
 
-# Backend
-cd app/server && uv run python server.py   # Port from .ports.env (BACKEND_PORT=8002)
+## Progressive Loading Strategy
 
-# Frontend
-cd app/client && bun run dev           # Port from .ports.env (FRONTEND_PORT=5173)
+Load only what you need, when you need it:
 
-# ADW
-cd adws/ && uv run adw_sdlc_complete_iso.py 123  # Full SDLC
+- **Tier 0:** QUICK_REF.md (~600 tokens) - Architecture, commands, tech stack
+- **Tier 1:** prime.md (~300 tokens) - YOU ARE HERE - Project orientation, routing
+- **Tier 2:** quick_start/ (~300-400 tokens) - Subsystem primers
+- **Tier 3:** references/ (~900-1,700 tokens) - Feature deep-dives
+- **Tier 4:** full docs/ (~2,000-4,000 tokens) - Complete context
 
-# Tests
-cd app/server && uv run pytest         # 878 tests
-cd app/client && bun test              # 149 tests
-
-# CLI Tools (Sessions 7-14)
-./scripts/run_analytics.sh analyze_daily_patterns.py --report  # Pattern analysis (auto-credentials)
-./scripts/run_analytics.sh analyze_errors.py --report          # Error analysis
-./scripts/run_analytics.sh analyze_costs.py --report           # Cost analytics
-./scripts/health_check.sh                                      # Full system health check
-
-# Developer Tools
-./scripts/gen_prompt.sh --list         # List all planned features (Feature #104)
-./scripts/gen_prompt.sh 49             # Generate implementation prompt for issue 49
-```
-
-## Health Checks & Observability (Session 18)
-```bash
-# Multi-layer health check system
-./scripts/health_check.sh              # Terminal: 7 sections including observability
-curl localhost:8002/api/v1/preflight-checks  # API: 9 checks (port from .ports.env)
-# Panel 1 UI: Automatic display of all preflight checks
-
-# 3 New Observability Checks:
-# - observability_database: PostgreSQL connection + tables
-# - hook_events_recording: Verify events being captured
-# - pattern_analysis_system: Analytics scripts functional
-```
-
-## After Loading Quick Start
-Confirm you understand:
-1. Which subsystem you're working in
-2. Where to find detailed docs (references/ or full docs/)
-3. The progressive loading approach (quick_start → references → full docs)
+**Logic Gates:** See `CLAUDE.md` for deterministic checkpoints (before commit, before API calls, before shipping, etc.)
 
 ---
 
-**Progressive Loading Strategy:**
-- **Tier 1** (prime): ~150 tokens
-- **Tier 2** (quick_start): 300-400 tokens
-- **Tier 3** (references): 900-1,700 tokens
-- **Tier 4** (full docs): 2,000-4,000 tokens
+## After Loading
 
-Load only what you need. Use `conditional_docs.md` for feature-specific documentation.
+Confirm you understand:
+1. Which subsystem you're working in (frontend/backend/ADW)
+2. Where to find detailed docs (references/ or full docs/)
+3. The progressive loading approach (QUICK_REF → quick_start → references → full docs)
+4. Logic gates enforce standards at critical moments (CLAUDE.md)
