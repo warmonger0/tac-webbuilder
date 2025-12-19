@@ -5,6 +5,7 @@ Implements DatabaseAdapter interface using psycopg2 with connection pooling.
 """
 
 import os
+import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
@@ -43,7 +44,9 @@ class PostgreSQLAdapter(DatabaseAdapter):
     @contextmanager
     def get_connection(self) -> Generator[Any, None, None]:
         """Get PostgreSQL connection from pool"""
-        conn = self.pool.getconn()
+        # Use thread ID as key for connection pool
+        key = threading.get_ident()
+        conn = self.pool.getconn(key=key)
         try:
             yield conn
             conn.commit()
@@ -51,7 +54,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
             conn.rollback()
             raise
         finally:
-            self.pool.putconn(conn)
+            self.pool.putconn(conn, key=key)
 
     def execute_query(self, query: str, params: tuple | None = None) -> Any:
         """Execute query and return results"""
