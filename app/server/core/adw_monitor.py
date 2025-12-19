@@ -331,8 +331,8 @@ def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | 
     """
     Calculate the current phase and overall progress percentage.
 
-    Progress is based on completed phase directories in the agents/{adw_id}/ folder.
-    Standard SDLC phases: plan, build, lint, test, review, doc, ship, cleanup
+    Progress is based on task_logs database records (single source of truth).
+    Standard SDLC phases: plan, validate, build, lint, test, review, doc, ship, cleanup
 
     Args:
         adw_id: The ADW workflow identifier
@@ -341,92 +341,102 @@ def calculate_phase_progress(adw_id: str, state: dict[str, Any]) -> tuple[str | 
     Returns:
         tuple: (current_phase, progress_percentage, completed_phases_list, total_phases)
     """
+    from repositories.task_log_repository import TaskLogRepository
+
     # Standard SDLC phases (9 total)
     phases = ["plan", "validate", "build", "lint", "test", "review", "doc", "ship", "cleanup"]
     total_phases = len(phases)
 
-    agents_dir = get_agents_directory()
-    adw_dir = agents_dir / adw_id
-
-    if not adw_dir.exists():
-        return None, 0.0, [], total_phases
-
-    # Get list of subdirectories in the agent directory
+    # Query task_logs table for authoritative phase completion data
     try:
-        subdirs = [d.name.lower() for d in adw_dir.iterdir() if d.is_dir()]
+        task_log_repo = TaskLogRepository()
+        task_logs = task_log_repo.get_by_adw_id(adw_id)
+
+        # Extract completed phases from database
+        completed_phases = []
+        current_phase = None
+
+        for log in task_logs:
+            if log.phase_status == "completed" and log.phase_name.lower() not in completed_phases:
+                completed_phases.append(log.phase_name.lower())
+            elif log.phase_status == "started" and not current_phase:
+                # Most recent "started" phase is the current one
+                current_phase = log.phase_name.lower()
+
+        # Calculate base progress
+        base_progress = (len(completed_phases) / total_phases) * 100
+
+        # If no current phase from database, check state (fallback)
+        if not current_phase:
+            current_phase = state.get("current_phase")
+            if current_phase:
+                current_phase = current_phase.lower()
+
+        # If still no current phase but workflow is running/paused, infer next phase
+        if not current_phase and state.get("status", "").lower() in ["running", "paused"]:
+            # Next incomplete phase is current
+            for phase in phases:
+                if phase not in completed_phases:
+                    current_phase = phase
+                    break
+
+        # If we have a current phase that's not in completed phases,
+        # add partial progress (50% of one phase)
+        if current_phase and current_phase not in completed_phases:
+            base_progress += (100 / total_phases) * 0.5
+
+        # Cap at 100%
+        progress = min(base_progress, 100.0)
+
+        return current_phase, round(progress, 1), completed_phases, total_phases
+
     except Exception as e:
-        logger.error(f"Error reading agent directory for {adw_id}: {e}")
+        logger.error(f"Error querying task_logs for {adw_id}: {e}")
+        # Fallback: return minimal progress if database query fails
         return None, 0.0, [], total_phases
 
-    # Count completed phases (directories that match phase names)
-    completed_phases = []
-    phase_dirs = {}  # Track which directories correspond to which phases
 
-    for phase in phases:
-        # Check if any subdirectory contains this phase name
-        matching_dirs = [subdir for subdir in subdirs if phase in subdir and subdir.startswith('adw_')]
-        if matching_dirs:
-            completed_phases.append(phase)
-            phase_dirs[phase] = matching_dirs
-
-    # Calculate base progress
-    base_progress = (len(completed_phases) / total_phases) * 100
-
-    # Determine current phase - check state first, then infer from directories
-    current_phase = state.get("current_phase")
-
-    # If no current_phase in state, infer from most recently modified phase directory
-    if not current_phase and phase_dirs:
-        try:
-            # Find the most recently modified phase directory
-            most_recent_phase = None
-            most_recent_time = 0
-
-            for phase, dirs in phase_dirs.items():
-                for dir_name in dirs:
-                    dir_path = adw_dir / dir_name
-                    if dir_path.exists():
-                        mtime = dir_path.stat().st_mtime
-                        if mtime > most_recent_time:
-                            most_recent_time = mtime
-                            most_recent_phase = phase
-
-            # If workflow is not completed, the most recent phase is current
-            workflow_status = state.get("status", "").lower()
-            if workflow_status in ["running", "paused"] and most_recent_phase:
-                # Check if there's a next phase (not completed yet)
-                next_phase_index = phases.index(most_recent_phase) + 1
-                if next_phase_index < len(phases):
-                    current_phase = phases[next_phase_index]
-                else:
-                    # Last phase is current
-                    current_phase = most_recent_phase
-        except Exception as e:
-            logger.debug(f"Could not infer current phase for {adw_id}: {e}")
-
-    # If we have a current phase that's not in completed phases,
-    # add partial progress (50% of one phase)
-    if current_phase and current_phase not in completed_phases:
-        base_progress += (100 / total_phases) * 0.5
-
-    # Cap at 100%
-    progress = min(base_progress, 100.0)
-
-    return current_phase, round(progress, 1), completed_phases, total_phases
-
-
-def extract_cost_data(state: dict[str, Any]) -> tuple[float | None, float | None]:
+def extract_cost_data(state: dict[str, Any], adw_id: str | None = None) -> tuple[float | None, float | None]:
     """
-    Extract current and estimated total cost from state data.
+    Extract current and estimated total cost.
+
+    Queries task_logs database for actual accumulated costs (single source of truth).
+    Falls back to state file for estimated costs.
 
     Args:
         state: The workflow state dictionary
+        adw_id: The ADW workflow identifier (optional, for database query)
 
     Returns:
         tuple: (current_cost, estimated_total_cost)
     """
-    current_cost = state.get("current_cost")
+    from repositories.task_log_repository import TaskLogRepository
+
+    current_cost = None
     estimated_cost = state.get("estimated_cost_total") or state.get("estimated_cost")
+
+    # Query database for actual accumulated costs
+    if adw_id:
+        try:
+            task_log_repo = TaskLogRepository()
+            task_logs = task_log_repo.get_by_adw_id(adw_id)
+
+            # Sum all costs from completed phases
+            total_cost = 0.0
+            for log in task_logs:
+                if log.cost_usd and log.phase_status in ["completed", "failed"]:
+                    total_cost += log.cost_usd
+
+            current_cost = total_cost if total_cost > 0 else None
+
+        except Exception as e:
+            logger.error(f"Error querying task_logs for cost data (adw_id={adw_id}): {e}")
+            # Fallback to state file
+            current_cost = state.get("current_cost")
+
+    else:
+        # No adw_id provided, fallback to state file
+        current_cost = state.get("current_cost")
 
     # Convert to float if string
     try:
@@ -561,8 +571,8 @@ def build_workflow_status(state: dict[str, Any], running_processes: dict[str, bo
         # Calculate phase progress (now returns total_phases dynamically)
         current_phase, progress, completed_phases, total_phases = calculate_phase_progress(adw_id, state)
 
-        # Extract costs
-        current_cost, estimated_cost = extract_cost_data(state)
+        # Extract costs (queries database for actual accumulated costs)
+        current_cost, estimated_cost = extract_cost_data(state, adw_id=adw_id)
 
         # Extract error info
         error_count, last_error = extract_error_info(adw_id, state)

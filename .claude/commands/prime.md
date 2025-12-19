@@ -47,7 +47,16 @@
 
 ### Recent Work & Features
 
-**Session 23 (Current) - Progressive Loading System:**
+**Session 24 (Current) - Single Source of Truth Fixes:**
+- Fixed phase detection: ADW Monitor now queries `task_logs` database (not filesystem heuristics)
+- Fixed cost display: Now queries `task_logs` for cumulative costs (not null state file)
+- Identified Issue #224 hung during Plan phase (PR creator agent, no timeout)
+- Added planned_feature for comprehensive data duplication audit
+- **Key lesson**: Database is source of truth; filesystem/state files are caches
+
+→ Full docs: `docs/sessions/SESSION_24_SINGLE_SOURCE_OF_TRUTH.md`
+
+**Session 23 - Progressive Loading System:**
 - Implemented lazy loading with deterministic logic gates
 - 75% reduction in always-loaded context (3,190 → 801 tokens)
 - Created CODE_STANDARDS.md (single source of truth for all standards)

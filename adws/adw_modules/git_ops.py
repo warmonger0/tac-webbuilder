@@ -288,6 +288,8 @@ def finalize_git_operations(
             make_issue_comment(issue_number, f"{adw_id}_ops: ✅ Pull request: {pr_url}")
     else:
         # Create new PR - fetch issue data first
+        # PR creation is non-critical: if it fails, workflow continues
+        # Later phases will retry PR creation
         if issue_number:
             try:
                 repo_url = get_repo_url()
@@ -299,18 +301,38 @@ def finalize_git_operations(
                 from adw_modules.workflow_ops import create_pull_request
 
                 pr_url, error = create_pull_request(branch_name, issue, state, logger, cwd)
-            except Exception as e:
-                logger.error(f"Failed to fetch issue for PR creation: {e}")
-                pr_url, error = None, str(e)
-        else:
-            pr_url, error = None, "No issue number in state"
 
-        if pr_url:
-            logger.info(f"Created PR: {pr_url}")
-            # Post new PR link
-            if issue_number and adw_id:
-                make_issue_comment(
-                    issue_number, f"{adw_id}_ops: ✅ Pull request created: {pr_url}"
-                )
+                if pr_url:
+                    logger.info(f"Created PR: {pr_url}")
+                    # Post new PR link
+                    if adw_id:
+                        make_issue_comment(
+                            issue_number, f"{adw_id}_ops: ✅ Pull request created: {pr_url}"
+                        )
+                else:
+                    logger.warning(f"Failed to create PR (non-critical): {error}")
+                    logger.info("Branch pushed successfully - PR can be created manually or will be retried in next phase")
+                    if adw_id:
+                        make_issue_comment(
+                            issue_number,
+                            f"{adw_id}_ops: ⚠️ Branch pushed but PR creation failed (will retry in next phase): {error}"
+                        )
+
+            except subprocess.TimeoutExpired:
+                logger.warning("PR creation timed out after 5 minutes (non-critical)")
+                logger.info("Branch pushed successfully - PR can be created manually or will be retried in next phase")
+                if adw_id:
+                    make_issue_comment(
+                        issue_number,
+                        f"{adw_id}_ops: ⚠️ Branch pushed but PR creation timed out (will retry in next phase)"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to create PR (non-critical): {e}")
+                logger.info("Branch pushed successfully - PR can be created manually or will be retried in next phase")
+                if adw_id:
+                    make_issue_comment(
+                        issue_number,
+                        f"{adw_id}_ops: ⚠️ Branch pushed but PR creation failed (will retry in next phase): {e}"
+                    )
         else:
-            logger.error(f"Failed to create PR: {error}")
+            logger.warning("No issue number in state - skipping PR creation")

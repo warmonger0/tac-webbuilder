@@ -10,7 +10,9 @@ trap cleanup INT TERM
 
 # Start backend
 cd "$PROJECT_DIR"
-./scripts/start_webbuilder.sh &
+export BACKEND_PORT=8002
+export FRONTEND_PORT=5173
+cd "$PROJECT_DIR/app/server" && POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_DB=tac_webbuilder POSTGRES_USER=tac_user POSTGRES_PASSWORD=changeme DB_TYPE=postgresql uv run python server.py &
 BACKEND_PID=$!
 echo "⏳ Waiting for backend to initialize..."
 sleep 3
