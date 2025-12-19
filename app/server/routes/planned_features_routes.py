@@ -77,14 +77,31 @@ def _create_github_issue_from_feature(feature: PlannedFeature) -> int:
     if feature.priority:
         labels.append(f"priority-{feature.priority}")
 
+    # Map item_type to classification (feature/bug/chore)
+    classification_map = {
+        "feature": "feature",
+        "enhancement": "feature",
+        "bug": "bug",
+        "session": "chore",
+    }
+    classification = classification_map.get(feature.item_type, "feature")
+
+    # Map priority to model_set (lightweight/base/heavy)
+    model_set_map = {
+        "low": "lightweight",
+        "medium": "base",
+        "high": "heavy",
+    }
+    model_set = model_set_map.get(feature.priority or "medium", "base")
+
     # Create GitHubIssue object
     github_issue = GitHubIssue(
         title=feature.title,
         body=body,
-        classification=f"/{feature.item_type}",
+        classification=classification,
         labels=labels,
-        workflow="planned_feature",
-        model_set="standard"
+        workflow="adw_sdlc_complete_iso",
+        model_set=model_set
     )
 
     # Use GitHubPoster (same as Panel 1)
@@ -436,8 +453,20 @@ async def start_automation(feature_id: int):
             )
             raise HTTPException(status_code=404, detail="Feature not found")
 
-        # Create GitHub issue if not already exists
+        # Create GitHub issue if not already exists or if recorded issue doesn't exist on GitHub
+        needs_issue_creation = False
         if not feature.github_issue_number:
+            needs_issue_creation = True
+            logger.info(f"[POST /api/planned-features/{feature_id}/start-automation] No GitHub issue number recorded")
+        else:
+            # Verify the issue actually exists on GitHub
+            if not github_poster.issue_exists(feature.github_issue_number):
+                needs_issue_creation = True
+                logger.warning(f"[POST /api/planned-features/{feature_id}/start-automation] GitHub issue #{feature.github_issue_number} recorded but doesn't exist on GitHub - will create new issue")
+            else:
+                logger.info(f"[POST /api/planned-features/{feature_id}/start-automation] Feature already has GitHub issue #{feature.github_issue_number}")
+
+        if needs_issue_creation:
             logger.info(f"[POST /api/planned-features/{feature_id}/start-automation] Creating GitHub issue...")
             try:
                 issue_number = _create_github_issue_from_feature(feature)
@@ -454,8 +483,6 @@ async def start_automation(feature_id: int):
                     status_code=500,
                     detail=f"Failed to create GitHub issue: {str(e)}"
                 )
-        else:
-            logger.info(f"[POST /api/planned-features/{feature_id}/start-automation] Feature already has GitHub issue #{feature.github_issue_number}")
 
         # Analyze feature and generate phase breakdown
         logger.info(

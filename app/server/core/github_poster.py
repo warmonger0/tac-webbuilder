@@ -226,6 +226,27 @@ class GitHubPoster:
         auth_result = ProcessRunner.run_gh_command(["auth", "status"])
         return auth_result.success
 
+    def issue_exists(self, issue_number: int) -> bool:
+        """
+        Check if a GitHub issue exists.
+
+        Args:
+            issue_number: Issue number to check
+
+        Returns:
+            True if issue exists, False otherwise
+        """
+        try:
+            cmd = ["gh", "issue", "view", str(issue_number), "--json", "number"]
+            if self.repo_url:
+                cmd.extend(["--repo", self.repo_url])
+
+            result = self._execute_gh_command(cmd)
+            return bool(result.strip())
+        except Exception:
+            # If command fails (issue not found, rate limit, etc.), assume doesn't exist
+            return False
+
     def get_repo_info(self) -> dict:
         """
         Get information about the current/specified repository.
