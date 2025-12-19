@@ -47,7 +47,14 @@
 
 ### Recent Work & Features
 
-**Session 24 (Current) - Single Source of Truth Fixes:**
+**Session 25 (Current) - Panel 5 GitHub Issue Creation & Retry:**
+- Fixed Panel 5 automation to create GitHub issues using GitHubPoster (same as Panel 1)
+- Unified issue creation flow across panels - no duplicate subprocess code
+- Added retry button for in-progress features in Panel 5
+- Both "Start Automation" (planned) and "Retry Automation" (in-progress) buttons functional
+- Files: `app/server/routes/planned_features_routes.py`, `app/client/src/components/PlansPanel.tsx`
+
+**Session 24 - Single Source of Truth Fixes:**
 - Fixed phase detection: ADW Monitor now queries `task_logs` database (not filesystem heuristics)
 - Fixed cost display: Now queries `task_logs` for cumulative costs (not null state file)
 - Identified Issue #224 hung during Plan phase (PR creator agent, no timeout)

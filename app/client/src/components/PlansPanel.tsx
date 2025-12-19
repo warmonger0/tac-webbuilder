@@ -475,6 +475,16 @@ function FeatureItem({
             {isStartingAutomation ? '⏳ Running checks...' : '🚀 Start Automation'}
           </button>
         )}
+        {/* Retry button for in-progress features */}
+        {isInProgress && onStartAutomation && (
+          <button
+            onClick={() => onStartAutomation(feature.id)}
+            disabled={isStartingAutomation}
+            className="mt-2 px-3 py-1 bg-orange-600 text-white text-sm rounded hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {isStartingAutomation ? '⏳ Running checks...' : '🔄 Retry Automation'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -682,6 +692,14 @@ export function PlansPanel() {
         colorClass="text-blue-700"
         features={inProgress}
         emptyMessage="No items in progress"
+        onStartAutomation={handleStartAutomation}
+        startingAutomationId={
+          isRunningPreflight && pendingFeature
+            ? pendingFeature.id
+            : startAutomationMutation.isPending
+            ? startAutomationMutation.variables
+            : null
+        }
       />
 
       <FeatureListSection

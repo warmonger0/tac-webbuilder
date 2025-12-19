@@ -19,6 +19,8 @@ import sys
 import uuid
 from pathlib import Path
 
+from core.data_models import GitHubIssue
+from core.github_poster import GitHubPoster
 from core.models import PlannedFeature, PlannedFeatureCreate, PlannedFeatureUpdate
 from fastapi import APIRouter, HTTPException, Query
 from models.phase_queue_item import PhaseQueueItem
@@ -37,6 +39,60 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/planned-features", tags=["planned-features"])
+
+# Initialize GitHub poster for issue creation
+github_poster = GitHubPoster()
+
+
+def _create_github_issue_from_feature(feature: PlannedFeature) -> int:
+    """
+    Create a GitHub issue from a planned feature using GitHubPoster.
+
+    Uses the same service as Panel 1 for consistency and observability.
+
+    Args:
+        feature: Planned feature to create issue for
+
+    Returns:
+        Issue number of created issue
+
+    Raises:
+        RuntimeError: If issue creation fails
+    """
+    # Build issue body
+    body_parts = []
+    if feature.description:
+        body_parts.append(feature.description)
+
+    if feature.estimated_hours:
+        body_parts.append(f"\n**Estimated Hours:** {feature.estimated_hours}")
+
+    if feature.tags:
+        body_parts.append(f"\n**Tags:** {', '.join(feature.tags)}")
+
+    body = "\n\n".join(body_parts) if body_parts else "Automated feature from Plans Panel"
+
+    # Build labels
+    labels = [feature.item_type]
+    if feature.priority:
+        labels.append(f"priority-{feature.priority}")
+
+    # Create GitHubIssue object
+    github_issue = GitHubIssue(
+        title=feature.title,
+        body=body,
+        classification=f"/{feature.item_type}",
+        labels=labels,
+        workflow="planned_feature",
+        model_set="standard"
+    )
+
+    # Use GitHubPoster (same as Panel 1)
+    logger.info(f"Creating GitHub issue for feature #{feature.id} via GitHubPoster: {feature.title}")
+    issue_number = github_poster.post_issue(github_issue, confirm=False)
+    logger.info(f"Created GitHub issue #{issue_number} for feature #{feature.id}")
+
+    return issue_number
 
 
 async def _broadcast_planned_features_update():
@@ -379,6 +435,27 @@ async def start_automation(feature_id: int):
                 f"[POST /api/planned-features/{feature_id}/start-automation] Feature not found"
             )
             raise HTTPException(status_code=404, detail="Feature not found")
+
+        # Create GitHub issue if not already exists
+        if not feature.github_issue_number:
+            logger.info(f"[POST /api/planned-features/{feature_id}/start-automation] Creating GitHub issue...")
+            try:
+                issue_number = _create_github_issue_from_feature(feature)
+
+                # Update feature with GitHub issue number
+                service.update(feature_id, PlannedFeatureUpdate(github_issue_number=issue_number))
+                logger.info(f"[POST /api/planned-features/{feature_id}/start-automation] Created GitHub issue #{issue_number}")
+
+                # Reload feature to get updated data
+                feature = service.get_by_id(feature_id)
+            except RuntimeError as e:
+                logger.error(f"[POST /api/planned-features/{feature_id}/start-automation] Failed to create GitHub issue: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to create GitHub issue: {str(e)}"
+                )
+        else:
+            logger.info(f"[POST /api/planned-features/{feature_id}/start-automation] Feature already has GitHub issue #{feature.github_issue_number}")
 
         # Analyze feature and generate phase breakdown
         logger.info(
