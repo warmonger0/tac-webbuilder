@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# start_full_clean.sh - Reliable startup script that prevents PostgreSQL PoolError
-# This script DOES NOT use --reload flag to avoid connection pool issues
+# start_full_clean.sh - Reliable full-stack startup script
+# Starts all three services: ADW webhook (8001), Backend API (8002), Frontend (5173)
+# DOES NOT use --reload flag to avoid PostgreSQL PoolError
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -23,6 +24,7 @@ echo -e "${YELLOW}Waiting for ports to clear...${NC}"
 sleep 3
 
 # Clear specific ports if still in use
+lsof -ti:8001 2>/dev/null | xargs kill -9 2>/dev/null || true
 lsof -ti:8002 2>/dev/null | xargs kill -9 2>/dev/null || true
 lsof -ti:5173 2>/dev/null | xargs kill -9 2>/dev/null || true
 sleep 1
@@ -39,6 +41,7 @@ if [ -f "$PROJECT_ROOT/.ports.env" ]; then
 fi
 
 # Port configuration with fallbacks
+WEBHOOK_PORT=${WEBHOOK_PORT:-8001}
 BACKEND_PORT=${BACKEND_PORT:-8002}
 FRONTEND_PORT=${FRONTEND_PORT:-5173}
 
@@ -52,14 +55,40 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
 # Function to cleanup on exit
 cleanup() {
     echo -e "\n${BLUE}🛑 Shutting down services...${NC}"
-    kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
-    wait $BACKEND_PID $FRONTEND_PID 2>/dev/null
+    kill $WEBHOOK_PID $BACKEND_PID $FRONTEND_PID 2>/dev/null
+    wait $WEBHOOK_PID $BACKEND_PID $FRONTEND_PID 2>/dev/null
     echo -e "${GREEN}✓ Services stopped${NC}"
     exit 0
 }
 trap cleanup INT TERM
 
-# Step 3: Start backend WITHOUT --reload flag
+# Step 3: Start ADW webhook service
+echo -e "${GREEN}📡 Starting ADW webhook service on port $WEBHOOK_PORT...${NC}"
+cd "$PROJECT_ROOT/adws/adw_triggers"
+PORT=$WEBHOOK_PORT \
+POSTGRES_HOST=$POSTGRES_HOST \
+POSTGRES_PORT=$POSTGRES_PORT \
+POSTGRES_DB=$POSTGRES_DB \
+POSTGRES_USER=$POSTGRES_USER \
+POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
+DB_TYPE=postgresql \
+uv run trigger_webhook.py > /tmp/tac_webhook.log 2>&1 &
+WEBHOOK_PID=$!
+
+# Step 3.5: Wait for webhook service to be ready
+echo -e "${YELLOW}⏳ Waiting for webhook service to initialize...${NC}"
+for i in {1..20}; do
+    if curl -s http://localhost:$WEBHOOK_PORT/webhook-status >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ Webhook service is ready at http://localhost:$WEBHOOK_PORT${NC}"
+        break
+    fi
+    if [ $i -eq 20 ]; then
+        echo -e "${YELLOW}⚠️  Webhook service may still be starting...${NC}"
+    fi
+    sleep 1
+done
+
+# Step 4: Start backend WITHOUT --reload flag
 echo -e "${GREEN}🚀 Starting backend on port $BACKEND_PORT...${NC}"
 cd "$PROJECT_ROOT/app/server"
 
@@ -75,7 +104,7 @@ DB_TYPE=postgresql \
 uv run python server.py --host 0.0.0.0 --port $BACKEND_PORT > /tmp/tac_backend.log 2>&1 &
 BACKEND_PID=$!
 
-# Step 4: Wait for backend to be ready
+# Step 5: Wait for backend to be ready
 echo -e "${YELLOW}⏳ Waiting for backend to initialize...${NC}"
 for i in {1..30}; do
     if curl -s http://localhost:$BACKEND_PORT/api/v1/health >/dev/null 2>&1; then
@@ -91,13 +120,13 @@ for i in {1..30}; do
     sleep 1
 done
 
-# Step 5: Start frontend
+# Step 6: Start frontend
 echo -e "${GREEN}🎨 Starting frontend on port $FRONTEND_PORT...${NC}"
 cd "$PROJECT_ROOT/app/client"
 VITE_BACKEND_URL=http://localhost:$BACKEND_PORT bun run dev > /tmp/tac_frontend.log 2>&1 &
 FRONTEND_PID=$!
 
-# Step 6: Wait for frontend to be ready
+# Step 7: Wait for frontend to be ready
 echo -e "${YELLOW}⏳ Waiting for frontend to initialize...${NC}"
 sleep 5
 for i in {1..20}; do
@@ -116,12 +145,14 @@ echo ""
 echo -e "${GREEN}════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}✅ Full stack is running successfully!${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════${NC}"
-echo -e "${BLUE}Frontend:  http://localhost:$FRONTEND_PORT${NC}"
+echo -e "${BLUE}Webhook:   http://localhost:$WEBHOOK_PORT${NC}"
 echo -e "${BLUE}Backend:   http://localhost:$BACKEND_PORT${NC}"
+echo -e "${BLUE}Frontend:  http://localhost:$FRONTEND_PORT${NC}"
 echo -e "${BLUE}API Docs:  http://localhost:$BACKEND_PORT/docs${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "${YELLOW}📋 Logs:${NC}"
+echo -e "  Webhook:  tail -f /tmp/tac_webhook.log"
 echo -e "  Backend:  tail -f /tmp/tac_backend.log"
 echo -e "  Frontend: tail -f /tmp/tac_frontend.log"
 echo ""
