@@ -53,16 +53,22 @@ Quick reference for recent development work and major architectural milestones.
 
 ## Recent Sessions (Last 5)
 
-**Session 25 (Dec 2025) - GitHub REST API Fallback & Critical Fixes:**
-- **REST API Fallback**: Automatic fallback when GraphQL rate limit exhausted
+**Session 25 (Dec 2025) - Panel 5 Automation & ADW Database Import Fixes:**
+- **Panel 5 Automation Fix**: GitHub issue creation now works when GraphQL rate-limited
+  - Added REST API fallback for `get_repo_info()` (parses git remote URLs)
+  - Added REST API fallback for `issue_exists()` (prevents duplicate issues)
   - Doubles GitHub API capacity: 5000 GraphQL + 5000 REST = 10,000 operations/hour
   - Token management: GITHUB_PAT → GH_TOKEN → gh CLI extraction
-  - Comprehensive error handling with graceful degradation
-- **PostgreSQL Pool Fix**: Resolved `PoolError` in connection pool (thread ID key)
-- **Panel 5 Automation**: GitHub issue creation with `issue_exists()` validation
-- Files: `github_poster.py`, `postgres_adapter.py`, `planned_features_routes.py`
+- **ADW Database Import Fix**: Resolved "No module named 'psycopg2'" during phase validation
+  - Root cause: ADW workflows import from `app.server` but `app/server` wasn't in sys.path
+  - Solution: Call `setup_database_imports()` in `adws/utils/idempotency.py`
+  - Workflow validation can now access database from parent environment
+- **PostgreSQL Pool Fix**: Switched to SimpleConnectionPool (avoids threading issues)
+  - Prevents "PoolError: trying to put unkeyed connection" on startup
+  - Resolves conflicts with uvicorn's recursive lifespan contexts
+- Files: `github_poster.py` (+117 lines), `idempotency.py` (+6 lines), `postgres_adapter.py` (3 changed)
 
-→ Full docs: TBD (see git commits 09752ec, 60c8407, 698fb4a)
+→ Full docs: Git commits 8c8c99e, d66920c (see commit messages for detailed explanations)
 
 **Session 24 (Dec 2025) - Single Source of Truth Fixes:**
 - Fixed phase detection: ADW Monitor now queries `task_logs` database (not filesystem)
