@@ -18,7 +18,7 @@ FastAPI + Python 3.10+ + PostgreSQL + OpenAI/Anthropic APIs + Pydantic
 - **github_routes.py** - Issue creation, preview, confirmation
 - **system_routes.py** - Health checks, service control, ADW monitoring
 - **work_log_routes.py** - Session logging (Panel 10)
-- **planned_features_routes.py** - Roadmap tracking (Panel 5) - NEW (Session 8A)
+- **planned_features_routes.py** - Roadmap tracking (Panel 5), AI plan generation (Session 21)
 - **websocket_routes.py** - Real-time updates (workflows, routes, history, ADW monitor, queue)
 - **context_review_routes.py** - Context analysis
 

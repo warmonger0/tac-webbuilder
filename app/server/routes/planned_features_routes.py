@@ -33,8 +33,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "scripts"))
 
 try:
     from plan_phases import PhaseAnalyzer
+    from generate_prompt import PromptGenerator
 except ImportError:
     PhaseAnalyzer = None  # Handle gracefully if script not available
+    PromptGenerator = None
 
 logger = logging.getLogger(__name__)
 
@@ -589,3 +591,233 @@ async def start_automation(feature_id: int):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{feature_id}/generate-plan")
+async def generate_plan(feature_id: int):
+    """
+    Generate full markdown implementation prompts for a planned feature.
+
+    This endpoint:
+    1. Analyzes the feature to determine phase breakdown
+    2. Generates complete markdown prompts for each phase (using template)
+    3. Returns full prompt content ready to copy into Panel 1
+
+    Does NOT:
+    - Create GitHub issues
+    - Create phase queue items
+    - Trigger automation
+
+    Path parameters:
+    - feature_id: Feature ID from planned_features table
+
+    Returns:
+        Full markdown prompts for each phase
+
+    Raises:
+        404: Feature not found
+        400: PhaseAnalyzer or PromptGenerator not available
+    """
+    try:
+        # Check if required modules are available
+        if PhaseAnalyzer is None or PromptGenerator is None:
+            logger.error(
+                f"[POST /api/planned-features/{feature_id}/generate-plan] Required modules not available"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="PhaseAnalyzer or PromptGenerator not available. Check scripts are accessible."
+            )
+
+        # Verify feature exists
+        service = PlannedFeaturesService()
+        feature = service.get_by_id(feature_id)
+        if not feature:
+            logger.warning(
+                f"[POST /api/planned-features/{feature_id}/generate-plan] Feature not found"
+            )
+            raise HTTPException(status_code=404, detail="Feature not found")
+
+        # Analyze feature and generate phase breakdown
+        logger.info(
+            f"[POST /api/planned-features/{feature_id}/generate-plan] Analyzing feature..."
+        )
+        analyzer = PhaseAnalyzer()
+        phases = analyzer.analyze_feature(feature_id)
+
+        if not phases:
+            logger.warning(
+                f"[POST /api/planned-features/{feature_id}/generate-plan] No phases generated"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="Feature analysis did not produce any phases"
+            )
+
+        # Generate full markdown prompts for each phase
+        logger.info(
+            f"[POST /api/planned-features/{feature_id}/generate-plan] Generating markdown prompts..."
+        )
+
+        prompt_generator = PromptGenerator()
+        formatted_phases = []
+
+        for phase in phases:
+            # Generate markdown prompt for this phase
+            # For multi-phase features, we need to create phase-specific prompts
+            markdown_prompt = _generate_phase_prompt(
+                feature=feature,
+                phase=phase,
+                prompt_generator=prompt_generator
+            )
+
+            formatted_phases.append({
+                "phase_number": phase.phase_number,
+                "total_phases": phase.total_phases,
+                "title": phase.title,
+                "description": phase.description,
+                "estimated_hours": phase.estimated_hours,
+                "files_to_modify": phase.files_to_modify,
+                "depends_on": phase.depends_on,
+                "prompt_filename": phase.filename,
+                "markdown_prompt": markdown_prompt,  # Full markdown content
+            })
+
+        # Return plan summary
+        plan_summary = {
+            "feature_id": feature_id,
+            "feature_title": feature.title,
+            "total_phases": len(phases),
+            "total_estimated_hours": sum(p.estimated_hours for p in phases),
+            "phases": formatted_phases,
+        }
+
+        # Persist the generated plan to the database
+        logger.info(
+            f"[POST /api/planned-features/{feature_id}/generate-plan] Persisting plan to database..."
+        )
+        service.update(feature_id, PlannedFeatureUpdate(generated_plan=plan_summary))
+
+        logger.info(
+            f"[POST /api/planned-features/{feature_id}/generate-plan] Generated {len(phases)} markdown prompts"
+        )
+
+        return plan_summary
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"[POST /api/planned-features/{feature_id}/generate-plan] Error: {e}"
+        )
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _generate_phase_prompt(feature, phase, prompt_generator) -> str:
+    """
+    Generate full markdown prompt for a specific phase.
+
+    Args:
+        feature: PlannedFeature object
+        phase: Phase object from PhaseAnalyzer
+        prompt_generator: PromptGenerator instance
+
+    Returns:
+        Complete markdown prompt content
+    """
+    from utils.codebase_analyzer import CodebaseAnalyzer
+
+    # Get codebase context for this phase's files
+    analyzer = CodebaseAnalyzer()
+
+    # Create a filtered context based on phase files
+    context = {
+        "backend_files": [],
+        "frontend_files": [],
+        "related_functions": [],
+        "test_files": [],
+        "suggested_locations": []
+    }
+
+    # Analyze the specific files for this phase
+    for file_path in phase.files_to_modify:
+        if "app/server" in file_path or "adws" in file_path:
+            context["backend_files"].append((file_path, 10.0))
+        elif "app/client" in file_path:
+            context["frontend_files"].append((file_path, 10.0))
+
+    # Build phase-specific prompt
+    # Path from app/server/routes/ -> project root is 3 levels up
+    template_path = Path(__file__).parent.parent.parent.parent / ".claude" / "templates" / "IMPLEMENTATION_PROMPT_TEMPLATE.md"
+    template = template_path.read_text()
+
+    # Basic replacements
+    replacements = {
+        "[Type]": "Feature",
+        "[ID]": str(feature.id),
+        "[Title]": phase.title,
+        "[One-line description]": phase.description,
+        "[High/Medium/Low]": (feature.priority or "Medium").capitalize(),
+        "[Bug/Feature/Enhancement/Session]": "Feature",
+        "[X hours]": f"{phase.estimated_hours}",
+    }
+
+    # Apply replacements
+    content = template
+    for placeholder, value in replacements.items():
+        content = content.replace(placeholder, value)
+
+    # Generate codebase section
+    codebase_section = _generate_codebase_section_for_phase(context)
+
+    # Insert context before "## Problem Statement"
+    problem_statement_pos = content.find("## Problem Statement")
+    if problem_statement_pos != -1:
+        content = (
+            content[:problem_statement_pos] +
+            codebase_section + "\n\n" +
+            content[problem_statement_pos:]
+        )
+
+    # Add phase-specific notes at the top
+    phase_header = f"\n**Phase {phase.phase_number}/{phase.total_phases}**\n"
+    if phase.depends_on:
+        deps = ", ".join(f"Phase {pn}" for _, pn in phase.depends_on)
+        phase_header += f"**Depends on:** {deps}\n"
+    phase_header += "\n"
+
+    # Insert phase header after the first line (title)
+    lines = content.split("\n")
+    lines.insert(2, phase_header)
+    content = "\n".join(lines)
+
+    return content
+
+
+def _generate_codebase_section_for_phase(context: dict) -> str:
+    """Generate codebase context section for a phase."""
+    sections = ["## Codebase Context (Auto-Generated)", ""]
+
+    # Backend files
+    if context["backend_files"]:
+        sections.append("### Files to Modify (Backend)")
+        sections.append("")
+        for file_path, _ in context["backend_files"]:
+            sections.append(f"- `{file_path}`")
+        sections.append("")
+
+    # Frontend files
+    if context["frontend_files"]:
+        sections.append("### Files to Modify (Frontend)")
+        sections.append("")
+        for file_path, _ in context["frontend_files"]:
+            sections.append(f"- `{file_path}`")
+        sections.append("")
+
+    if not context["backend_files"] and not context["frontend_files"]:
+        sections.append("*Files will be determined during implementation.*")
+        sections.append("")
+
+    return "\n".join(sections)

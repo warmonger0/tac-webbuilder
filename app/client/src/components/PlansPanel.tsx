@@ -4,9 +4,9 @@
  * Displays planned features, sessions, and work items fetched from the API.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlannedFeature, plannedFeaturesClient, PlannedFeaturesStats } from '../api/plannedFeaturesClient';
+import { PlannedFeature, plannedFeaturesClient, PlannedFeaturesStats, PlanSummary } from '../api/plannedFeaturesClient';
 import { PreflightChecksResponse, systemClient } from '../api/systemClient';
 import { PreflightCheckModal } from './PreflightCheckModal';
 import { apiConfig } from '../config/api';
@@ -226,6 +226,9 @@ interface FeatureListSectionProps {
   onToggleShowAll?: () => void;
   onStartAutomation?: (id: number) => void;
   startingAutomationId?: number | null;
+  onGeneratePlan?: (id: number) => void;
+  generatingPlanId?: number | null;
+  generatedPlans?: Map<number, PlanSummary>;
 }
 
 function FeatureListSection({
@@ -237,7 +240,10 @@ function FeatureListSection({
   showAllCompleted,
   onToggleShowAll,
   onStartAutomation,
-  startingAutomationId
+  startingAutomationId,
+  onGeneratePlan,
+  generatingPlanId,
+  generatedPlans
 }: FeatureListSectionProps) {
   const displayedFeatures = showAllCompleted !== undefined && !showAllCompleted
     ? features.slice(0, 15)
@@ -259,6 +265,9 @@ function FeatureListSection({
                 feature={feature}
                 onStartAutomation={onStartAutomation}
                 isStartingAutomation={startingAutomationId === feature.id}
+                onGeneratePlan={onGeneratePlan}
+                isGeneratingPlan={generatingPlanId === feature.id}
+                generatedPlan={generatedPlans?.get(feature.id)}
               />
             ))}
             {showAllCompleted !== undefined && onToggleShowAll && features.length > 15 && (
@@ -424,12 +433,19 @@ function FeatureItemDescription({
 function FeatureItem({
   feature,
   onStartAutomation,
-  isStartingAutomation
+  isStartingAutomation,
+  onGeneratePlan,
+  isGeneratingPlan,
+  generatedPlan
 }: {
   feature: PlannedFeature;
   onStartAutomation?: (id: number) => void;
   isStartingAutomation?: boolean;
+  onGeneratePlan?: (id: number) => void;
+  isGeneratingPlan?: boolean;
+  generatedPlan?: PlanSummary;
 }) {
+  const [showPlan, setShowPlan] = useState(false);
   const isCompleted = feature.status === 'completed';
   const isInProgress = feature.status === 'in_progress';
   const isPlanned = feature.status === 'planned';
@@ -465,25 +481,126 @@ function FeatureItem({
           description={feature.description}
           completionNotes={feature.completion_notes}
         />
-        {/* Start Automation button for planned features */}
-        {isPlanned && onStartAutomation && (
-          <button
-            onClick={() => onStartAutomation(feature.id)}
-            disabled={isStartingAutomation}
-            className="mt-2 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {isStartingAutomation ? '⏳ Running checks...' : '🚀 Start Automation'}
-          </button>
+        {/* Action buttons for planned/in-progress features */}
+        {(isPlanned || isInProgress) && (
+          <div className="mt-2 flex gap-2 flex-wrap">
+            {/* Generate Plan button */}
+            {onGeneratePlan && (
+              <button
+                onClick={() => onGeneratePlan(feature.id)}
+                disabled={isGeneratingPlan}
+                className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {isGeneratingPlan ? '⏳ Generating...' : '📋 Generate Plan'}
+              </button>
+            )}
+
+            {/* Start/Retry Automation button */}
+            {onStartAutomation && (
+              <button
+                onClick={() => onStartAutomation(feature.id)}
+                disabled={isStartingAutomation}
+                className={`px-3 py-1 text-white text-sm rounded disabled:bg-gray-400 disabled:cursor-not-allowed ${
+                  isPlanned
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-orange-600 hover:bg-orange-700'
+                }`}
+              >
+                {isStartingAutomation
+                  ? '⏳ Running checks...'
+                  : isPlanned
+                    ? '🚀 Start Automation'
+                    : '🔄 Retry Automation'
+                }
+              </button>
+            )}
+          </div>
         )}
-        {/* Retry button for in-progress features */}
-        {isInProgress && onStartAutomation && (
-          <button
-            onClick={() => onStartAutomation(feature.id)}
-            disabled={isStartingAutomation}
-            className="mt-2 px-3 py-1 bg-orange-600 text-white text-sm rounded hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {isStartingAutomation ? '⏳ Running checks...' : '🔄 Retry Automation'}
-          </button>
+
+        {/* Generated plan display (collapsible) */}
+        {generatedPlan && (
+          <div className="mt-3 border border-purple-300 rounded-lg overflow-hidden bg-purple-50">
+            <button
+              onClick={() => setShowPlan(!showPlan)}
+              className="w-full px-4 py-3 bg-purple-100 hover:bg-purple-200 text-left font-medium text-sm flex items-center justify-between"
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-lg">📝</span>
+                <span>
+                  Implementation Prompts ({generatedPlan.total_phases} {generatedPlan.total_phases === 1 ? 'phase' : 'phases'},
+                  ~{generatedPlan.total_estimated_hours}h total)
+                </span>
+              </span>
+              <span className="text-purple-600 font-bold">{showPlan ? '▼' : '▶'}</span>
+            </button>
+
+            {showPlan && (
+              <div className="p-4 space-y-4">
+                {generatedPlan.phases.map((phase) => (
+                  <div key={phase.phase_number} className="border border-purple-200 rounded-lg bg-white overflow-hidden">
+                    {/* Phase Header */}
+                    <div className="px-4 py-3 bg-purple-50 border-b border-purple-200">
+                      <div className="font-bold text-gray-900 mb-1">
+                        Phase {phase.phase_number}/{phase.total_phases}: {phase.title}
+                      </div>
+                      <div className="text-sm text-gray-600">{phase.description}</div>
+                      <div className="text-xs text-gray-500 mt-2">
+                        ⏱️ {phase.estimated_hours}h | 📁 {phase.files_to_modify.length} files | 📄 {phase.prompt_filename}
+                      </div>
+                    </div>
+
+                    {/* Full Markdown Prompt */}
+                    <div className="p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Full Implementation Prompt:</span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(phase.markdown_prompt);
+                            // Show success feedback
+                            const btn = document.activeElement as HTMLButtonElement;
+                            const originalText = btn.textContent;
+                            btn.textContent = '✅ Copied!';
+                            setTimeout(() => { btn.textContent = originalText; }, 2000);
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded font-medium"
+                        >
+                          📋 Copy Full Prompt
+                        </button>
+                      </div>
+
+                      {/* Markdown Preview (scrollable) */}
+                      <div className="relative">
+                        <pre className="text-xs bg-gray-900 text-gray-100 p-4 rounded overflow-x-auto max-h-96 overflow-y-auto border border-gray-700">
+                          <code>{phase.markdown_prompt}</code>
+                        </pre>
+                      </div>
+
+                      {/* Quick file list */}
+                      {phase.files_to_modify.length > 0 && (
+                        <details className="mt-3">
+                          <summary className="cursor-pointer text-sm text-blue-600 hover:underline">
+                            Files to modify ({phase.files_to_modify.length})
+                          </summary>
+                          <ul className="mt-2 pl-4 list-disc text-xs text-gray-600 max-h-32 overflow-y-auto">
+                            {phase.files_to_modify.map((file, idx) => (
+                              <li key={idx} className="font-mono">{file}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Instructions */}
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-900">
+                    <strong>How to use:</strong> Click "Copy Full Prompt" for each phase, then paste into Panel 1 (New Request) to execute the workflow.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -507,6 +624,9 @@ export function PlansPanel() {
   const [pendingFeature, setPendingFeature] = useState<PlannedFeature | null>(null);
   const [isRunningPreflight, setIsRunningPreflight] = useState(false);
 
+  // Generated plans state
+  const [generatedPlans, setGeneratedPlans] = useState<Map<number, PlanSummary>>(new Map());
+
   const queryClient = useQueryClient();
 
   // WebSocket connection for real-time updates
@@ -520,6 +640,47 @@ export function PlansPanel() {
   // An empty array [] is a valid state (no features in database)
   const isLoading = features === undefined || features === null;
   const error = null; // WebSocket handles errors internally
+
+  // Load persisted plans from features when they arrive
+  // This runs when features are first loaded or when they change
+  useEffect(() => {
+    if (features && features.length > 0) {
+      const persistedPlans = new Map<number, PlanSummary>();
+      features.forEach(feature => {
+        if (feature.generated_plan) {
+          persistedPlans.set(feature.id, feature.generated_plan);
+        }
+      });
+      setGeneratedPlans(persistedPlans);
+    }
+  }, [features]);
+
+  // Generate plan mutation
+  const generatePlanMutation = useMutation({
+    mutationFn: (featureId: number) => plannedFeaturesClient.generatePlan(featureId),
+    onSuccess: (data, featureId) => {
+      // Store the generated plan
+      setGeneratedPlans(prev => new Map(prev).set(featureId, data));
+
+      // Show success message
+      setAutomationMessage({
+        type: 'success',
+        text: `✅ Plan generated: ${data.total_phases} ${data.total_phases === 1 ? 'phase' : 'phases'}, ~${data.total_estimated_hours}h total`
+      });
+
+      // Clear message after 10 seconds
+      setTimeout(() => setAutomationMessage(null), 10000);
+    },
+    onError: (error: Error) => {
+      setAutomationMessage({
+        type: 'error',
+        text: `❌ Failed to generate plan: ${error.message}`
+      });
+
+      // Clear message after 10 seconds
+      setTimeout(() => setAutomationMessage(null), 10000);
+    }
+  });
 
   // Start automation mutation
   const startAutomationMutation = useMutation({
@@ -548,6 +709,11 @@ export function PlansPanel() {
       setTimeout(() => setAutomationMessage(null), 10000);
     }
   });
+
+  // Handle generate plan button click
+  const handleGeneratePlan = (featureId: number) => {
+    generatePlanMutation.mutate(featureId);
+  };
 
   // Run pre-flight checks before starting automation
   const handleStartAutomation = async (featureId: number) => {
@@ -700,6 +866,9 @@ export function PlansPanel() {
             ? startAutomationMutation.variables
             : null
         }
+        onGeneratePlan={handleGeneratePlan}
+        generatingPlanId={generatePlanMutation.isPending ? generatePlanMutation.variables : null}
+        generatedPlans={generatedPlans}
       />
 
       <FeatureListSection
@@ -716,6 +885,9 @@ export function PlansPanel() {
             ? startAutomationMutation.variables
             : null
         }
+        onGeneratePlan={handleGeneratePlan}
+        generatingPlanId={generatePlanMutation.isPending ? generatePlanMutation.variables : null}
+        generatedPlans={generatedPlans}
       />
 
       <FeatureListSection

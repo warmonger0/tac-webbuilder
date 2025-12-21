@@ -42,6 +42,8 @@ CREATE TABLE planned_features (
 - `GET /session/{session_number}` - Get by session number
 - `PUT /{id}` - Update feature (status, hours, etc.)
 - `DELETE /{id}` - Delete feature
+- `POST /{id}/generate-plan` - Generate AI implementation plan (NEW - Session 21)
+- `POST /{id}/start-automation` - Start automated workflow execution
 
 **Service Layer:** `services/planned_features_service.py`
 - `create(feature_data)` - Create new planned feature
@@ -259,6 +261,83 @@ const { data: features } = useQuery({
 4. Removed hardcoded data (Session 8B)
 5. Added edit/delete functionality (Session 8B)
 
+## AI-Generated Implementation Plans (Session 21)
+
+**Feature:** Generate full markdown implementation prompts for planned features
+
+### Generate Plan Endpoint
+
+**Request:**
+```
+POST /api/v1/planned-features/{id}/generate-plan
+```
+
+**Response:**
+```json
+{
+  "feature_id": 123,
+  "feature_title": "Add real-time notifications",
+  "total_phases": 3,
+  "total_estimated_hours": 8.5,
+  "phases": [
+    {
+      "phase_number": 1,
+      "total_phases": 3,
+      "title": "Backend notification infrastructure",
+      "description": "Create notification service and database schema",
+      "estimated_hours": 3.0,
+      "files_to_modify": ["app/server/services/notification_service.py", "..."],
+      "depends_on": [],
+      "prompt_filename": "phase_1_backend_infrastructure.md",
+      "markdown_prompt": "# Phase 1/3: Backend Infrastructure\n\n..."
+    }
+  ]
+}
+```
+
+### Plan Persistence
+
+**Database Column:** `generated_plan` (JSONB)
+- Plans are **automatically saved** to database when generated
+- **No re-generation** needed on page refresh
+- Loaded via WebSocket with planned features
+
+**Frontend Integration:**
+```tsx
+// Plans are automatically loaded from feature.generated_plan
+useEffect(() => {
+  features.forEach(feature => {
+    if (feature.generated_plan) {
+      setGeneratedPlans(prev => new Map(prev).set(feature.id, feature.generated_plan));
+    }
+  });
+}, [features]);
+```
+
+### UI Features
+
+**Generate Plan Button:**
+- Click "📋 Generate Plan" on any planned/in-progress feature
+- AI analyzes feature and generates phase breakdown
+- Full markdown prompts ready to copy into Panel 1
+- Plan is **persisted to database** automatically
+
+**Plan Display:**
+- Collapsible section showing all phases
+- Each phase includes:
+  - Phase number and title
+  - Description and estimated hours
+  - Files to modify
+  - Full markdown prompt (copy-ready)
+  - "Copy Full Prompt" button for easy workflow execution
+
+**Workflow:**
+1. User clicks "Generate Plan" → AI creates phase breakdown
+2. Plan saved to `planned_features.generated_plan` (JSONB)
+3. User copies markdown prompt for each phase
+4. Paste into Panel 1 to execute workflow
+5. Plan persists across page refreshes (no re-generation needed)
+
 ## When to Load Full Documentation
 
 **Load full docs when:**
@@ -267,6 +346,7 @@ const { data: features } = useQuery({
 - Customizing Panel 5 UI
 - Understanding session dependency logic
 - Troubleshooting roadmap tracking
+- Working with AI-generated implementation plans
 
 **Full Documentation:**
 - Session 8A prompt: `archives/prompts/2025/SESSION_8A_PROMPT.md` (backend)

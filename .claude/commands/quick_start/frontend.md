@@ -15,7 +15,7 @@ React 18.3 + Vite + TypeScript + Tailwind CSS + TanStack Query
 - **Panel 2: WorkflowDashboard** - Real-time ADW monitoring (Catalog view)
 - **Panel 3: HistoryView** - Workflow execution history
 - **Panel 4: RoutesView** - API route visualization
-- **Panel 5: PlansPanel** - Roadmap tracking (database-driven) - COMPLETE (Session 8B)
+- **Panel 5: PlansPanel** - Roadmap tracking (database-driven), AI plan generation (Session 21) - COMPLETE
 - **Panel 6-9:** Placeholder panels (future features)
 - **Panel 10: LogPanel** - Work log and session summaries - COMPLETE
 

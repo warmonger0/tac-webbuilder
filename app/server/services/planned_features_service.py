@@ -278,6 +278,9 @@ class PlannedFeaturesService:
         if update_data.completion_notes is not None:
             set_clauses.append(f"completion_notes = {self.adapter.placeholder()}")
             params.append(update_data.completion_notes)
+        if update_data.generated_plan is not None:
+            set_clauses.append(f"generated_plan = {self.adapter.placeholder()}")
+            params.append(json.dumps(update_data.generated_plan))
 
         if not set_clauses:
             logger.info(
@@ -505,6 +508,22 @@ class PlannedFeaturesService:
                 data["tags"] = []
         else:
             data["tags"] = []
+
+        # Parse JSON generated_plan (handle both JSONB from PostgreSQL and JSON string)
+        if data.get("generated_plan"):
+            if isinstance(data["generated_plan"], str):
+                # JSON string from SQLite
+                try:
+                    data["generated_plan"] = json.loads(data["generated_plan"])
+                except (json.JSONDecodeError, TypeError):
+                    data["generated_plan"] = None
+            elif isinstance(data["generated_plan"], dict):
+                # Already a dict (JSONB from PostgreSQL)
+                pass
+            else:
+                data["generated_plan"] = None
+        else:
+            data["generated_plan"] = None
 
         # Convert datetime objects to ISO format strings
         for field in ["created_at", "updated_at", "started_at", "completed_at"]:

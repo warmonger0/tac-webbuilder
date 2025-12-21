@@ -10,6 +10,32 @@ import { API_BASE, fetchJSON } from './baseClient';
 // Types
 // ============================================================================
 
+/**
+ * Phase plan for implementation prompts
+ */
+export interface PhasePlan {
+  phase_number: number;
+  total_phases: number;
+  title: string;
+  description: string;
+  estimated_hours: number;
+  files_to_modify: string[];
+  depends_on: Array<[number, number]>;  // [(issue_id, phase_number)]
+  prompt_filename: string;
+  markdown_prompt: string;  // Full markdown implementation prompt
+}
+
+/**
+ * Summary of generated implementation plan
+ */
+export interface PlanSummary {
+  feature_id: number;
+  feature_title: string;
+  total_phases: number;
+  total_estimated_hours: number;
+  phases: PhasePlan[];
+}
+
 export interface PlannedFeature {
   id: number;
   item_type: 'session' | 'feature' | 'bug' | 'enhancement';
@@ -24,6 +50,7 @@ export interface PlannedFeature {
   parent_id?: number;
   tags: string[];
   completion_notes?: string;
+  generated_plan?: PlanSummary;
   created_at?: string;
   updated_at?: string;
   started_at?: string;
@@ -187,6 +214,19 @@ export async function startAutomation(id: number): Promise<AutomationSummary> {
   );
 }
 
+/**
+ * Generate phase implementation plan (preview only)
+ *
+ * Analyzes the feature and returns the phase breakdown WITHOUT creating
+ * GitHub issues or queue items. Use this for previewing the plan.
+ */
+export async function generatePlan(id: number): Promise<PlanSummary> {
+  return fetchJSON<PlanSummary>(
+    `${API_BASE}/planned-features/${id}/generate-plan`,
+    { method: 'POST' }
+  );
+}
+
 // ============================================================================
 // Client namespace export
 // ============================================================================
@@ -200,4 +240,5 @@ export const plannedFeaturesClient = {
   update,
   delete: deletePlannedFeature,
   startAutomation,
+  generatePlan,
 };

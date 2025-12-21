@@ -320,6 +320,7 @@ class PlannedFeature(BaseModel):
     parent_id: int | None = Field(None, description="Parent feature ID for hierarchical features")
     tags: list[str] = Field(default_factory=list, description="Tags for categorization")
     completion_notes: str | None = Field(None, description="Notes added when completed")
+    generated_plan: dict[str, Any] | None = Field(None, description="AI-generated implementation plan (PlanSummary JSON)")
     created_at: str | None = Field(None, description="Creation timestamp (ISO format)")
     updated_at: str | None = Field(None, description="Last update timestamp (ISO format)")
     started_at: str | None = Field(None, description="Start timestamp (ISO format)")
@@ -354,6 +355,7 @@ class PlannedFeatureUpdate(BaseModel):
     github_issue_number: int | None = Field(None, description="Related GitHub issue number")
     tags: list[str] | None = Field(None, description="Tags for categorization")
     completion_notes: str | None = Field(None, description="Notes added when completed")
+    generated_plan: dict[str, Any] | None = Field(None, description="AI-generated implementation plan (PlanSummary JSON)")
 
 
 # Cost Analytics Models
