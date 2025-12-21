@@ -152,7 +152,7 @@ def fetch_issue(issue_number: str, repo_path: str) -> GitHubIssue:
                         comments_data = json.loads(comments_result.stdout)
                         transformed["comments"] = [
                             {
-                                "id": c["id"],
+                                "id": str(c["id"]),
                                 "author": {"login": c["user"]["login"]},
                                 "body": c["body"],
                                 "createdAt": c["created_at"]
