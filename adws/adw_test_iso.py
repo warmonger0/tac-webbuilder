@@ -1368,20 +1368,36 @@ def main():
             adw_id, issue_number, logger, state, worktree_path
         )
 
-        # Check if we fell back to inline mode (infrastructure failure after max retries)
-        if not success and "error" in external_results:
-            # External tools failed completely - fallback to inline mode
-            logger.warning("External test tools failed after retries, using inline execution as fallback")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(
-                    adw_id,
-                    "ops",
-                    "⚠️ External test tools failed after max retries. Using inline execution mode for comprehensive analysis..."
+        # Check if we need to fall back to inline mode for LLM-based fixes
+        if not success:
+            if "error" in external_results:
+                # Infrastructure failure - fallback to inline mode
+                logger.warning("External test tools failed after retries, using inline execution as fallback")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id,
+                        "ops",
+                        "⚠️ External test tools failed after max retries. Using inline execution mode for comprehensive analysis..."
+                    )
                 )
-            )
+            else:
+                # Test failures after external resolution - need LLM-based fixes
+                summary = external_results.get("summary", {})
+                failed_count_ext = summary.get("failed", 0)
 
-            # Use inline mode with full resolution
+                logger.warning(f"External resolution could not fix {failed_count_ext} test failures, falling back to LLM-based fixes")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id,
+                        "ops",
+                        f"⚠️ External test resolution could not fix {failed_count_ext} test failures.\n"
+                        f"Falling back to LLM-based test fixing for comprehensive resolution..."
+                    )
+                )
+
+            # Use inline mode with full LLM-based resolution
             test_results, passed_count, failed_count, test_response = run_tests_with_resolution(
                 adw_id, issue_number, logger, worktree_path
             )
@@ -1392,33 +1408,16 @@ def main():
                     issue_number,
                     format_issue_message(adw_id, AGENT_TESTER, comment)
                 )
-                logger.info(f"Inline test results: {passed_count} passed, {failed_count} failed")
+                logger.info(f"LLM-based resolution results: {passed_count} passed, {failed_count} failed")
         else:
-            # Process external results
+            # Process external results - all tests passed
             summary = external_results.get("summary", {})
-            failures = external_results.get("failures", [])
-
             passed_count = summary.get("passed", 0)
             failed_count = summary.get("failed", 0)
             total = summary.get("total", passed_count + failed_count)
 
-            # Format results comment
-            if success:
-                comment = f"✅ All {total} tests passed!\n"
-                comment += f"⚡ Context savings: ~90% (using external tools with resolution)"
-            else:
-                comment = f"❌ {failed_count} test(s) failed out of {total} after resolution attempts\n\n"
-                comment += "**Remaining Failures:**\n"
-                for failure in failures[:10]:  # Limit to first 10
-                    file_path = failure.get("file", "unknown")
-                    line = failure.get("line", "?")
-                    error_msg = failure.get("error_message", "unknown error")
-                    comment += f"- `{file_path}:{line}` - {error_msg}\n"
-
-                if len(failures) > 10:
-                    comment += f"\n... and {len(failures) - 10} more failures\n"
-
-                comment += f"\n⚡ Context savings: ~84% (compact failure reporting with resolution)"
+            comment = f"✅ All {total} tests passed!\n"
+            comment += f"⚡ Context savings: ~90% (using external tools with resolution)"
 
             make_issue_comment(
                 issue_number,

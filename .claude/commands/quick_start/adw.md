@@ -157,7 +157,34 @@ NEW: Plan → Validate → Build → Lint → Test → Review → Doc → Ship �
 
 **Best Practices**: See `docs/ADW_WORKFLOW_BEST_PRACTICES.md` for complete guide
 
-## Loop Prevention (Session 19 - Issue #168)
+## Test Resolution & Loop Prevention
+
+### Cascading Resolution Strategies (Session 26)
+
+Test phase uses **three-layer resolution** to maximize success while minimizing cost:
+
+**Layer 1 - External Tool Resolution** (fast, 90% context savings):
+- Runs tests via subprocess (`adw_test_external.py`)
+- Attempts resolution in same external process (3 retries)
+- Best for: Infrastructure issues, simple test fixes
+- Location: `adws/adw_test_iso.py:632` (`run_external_tests_with_resolution()`)
+
+**Layer 2 - LLM-Based Resolution** (comprehensive, higher context):
+- Automatic fallback when external resolution fails
+- Uses `/resolve_failed_test` command to fix underlying code
+- Verification-based loop control (re-runs tests after each fix)
+- Best for: Complex test failures requiring code changes
+- Location: `adws/adw_test_iso.py:754` (`run_tests_with_resolution()`)
+- **NEW (Session 26)**: Now triggers on ANY test failure, not just infrastructure errors
+
+**Layer 3 - Orchestrator Retry** (last resort):
+- Only triggers if phase crashes (not for test failures)
+- Leverages idempotency for safe retries
+- Location: `adws/adw_sdlc_complete_iso.py:154` (`run_phase_with_retry()`)
+
+**Flow**: External → LLM → Orchestrator (escalating resolution depth)
+
+### Loop Prevention (Session 19 - Issue #168)
 
 **Problem Solved**: Test resolver agents claimed "✅ Resolved" but tests continued failing → infinite loops
 

@@ -53,6 +53,16 @@ Quick reference for recent development work and major architectural milestones.
 
 ## Recent Sessions (Last 5)
 
+**Session 26 (Dec 2025) - Test Phase LLM Fallback Fix:**
+- **Issue**: Test phase retries would loop without progress (Issues #254/255)
+- **Root Cause**: LLM-based test fixing only triggered on infrastructure errors, not test failures
+- **Solution**: Automatic fallback to LLM resolution when external resolution fails
+- **Impact**: Cascading resolution strategies - external tools → LLM fixes → orchestrator retry
+- **Result**: Higher test fix success rate, fewer loop detector false positives
+- Files: `adws/adw_test_iso.py` (lines 1371-1426)
+
+→ Full docs: `docs/sessions/SESSION_26_TEST_RETRY_LLM_FALLBACK.md`
+
 **Session 25 (Dec 2025) - Panel 5 Automation & ADW Database Import Fixes:**
 - **Panel 5 Automation Fix**: GitHub issue creation now works when GraphQL rate-limited
   - Added REST API fallback for `get_repo_info()` (parses git remote URLs)

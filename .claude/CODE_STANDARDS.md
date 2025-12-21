@@ -38,6 +38,27 @@
 - `MAX_SAME_AGENT_REPEATS = 8` - Maximum times same agent can post in comment window
 - Circuit breaker: Detects when agent claims "✅ Resolved" but tests still fail
 
+### Cascading Resolution Strategies (Session 26 - Issues #254/255)
+
+**Test failures use three-layer escalation** (not just retry):
+
+**Layer 1 - External Tool Resolution** (fast, 90% context savings):
+- Subprocess execution with built-in retry (3 attempts)
+- Best for: Infrastructure issues, simple test fixes
+- Auto-escalates to Layer 2 if failures remain
+
+**Layer 2 - LLM-Based Resolution** (comprehensive, higher context):
+- **Automatically invoked** when external resolution fails
+- Uses `/resolve_failed_test` to fix underlying code issues
+- Verification-based loop control (pattern below)
+- Best for: Complex test failures requiring code changes
+
+**Layer 3 - Orchestrator Retry** (last resort):
+- Only for phase crashes (not test failures)
+- Leverages idempotency for safe retries
+
+**CRITICAL (Session 26 Fix):** Layer 2 MUST trigger on ANY test failure, not just infrastructure errors
+
 ### Verification-Based Loop Control
 
 **Pattern (DO THIS):**
@@ -52,10 +73,18 @@
 2. Trust claim without verification
 3. Loop infinitely posting same fix
 
+**Anti-Pattern #2 (Session 26 - Issues #254/255):**
+1. External tests fail
+2. External resolution fails
+3. Report failures and retry same external resolution
+4. Loop detected → Abort
+❌ **Missing:** LLM-based resolution fallback
+
 ### Implementation Locations
 
-- `adws/adw_test_iso.py` (lines 806-909, 1097-1200) - Test retry logic
-- `adws/adw_sdlc_complete_iso.py` (lines 53-149) - Circuit breaker implementation
+- `adws/adw_test_iso.py` (lines 1371-1426) - Cascading resolution + LLM fallback (Session 26)
+- `adws/adw_test_iso.py` (lines 806-909, 1097-1200) - Verification-based loop control (Session 19)
+- `adws/adw_sdlc_complete_iso.py` (lines 53-149) - Circuit breaker implementation (Session 19)
 
 ---
 
