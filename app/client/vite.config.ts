@@ -15,6 +15,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: frontendPort,
+    strictPort: true, // Fail if port is busy instead of auto-incrementing
     hmr: {
       overlay: true, // Keep error overlay
     },
