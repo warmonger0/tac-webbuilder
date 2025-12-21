@@ -5,6 +5,7 @@ Implements DatabaseAdapter interface using psycopg2 with connection pooling.
 """
 
 import os
+import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
@@ -22,6 +23,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
     def __init__(self):
         """Initialize PostgreSQL adapter (lazy connection pool)"""
         self._pool = None
+        self._lock = threading.Lock()  # Protect SimpleConnectionPool from concurrent access
         self._pool_config = {
             "minconn": int(os.getenv("POSTGRES_POOL_MIN", "1")),
             "maxconn": int(os.getenv("POSTGRES_POOL_MAX", "10")),
@@ -44,8 +46,9 @@ class PostgreSQLAdapter(DatabaseAdapter):
 
     @contextmanager
     def get_connection(self) -> Generator[Any, None, None]:
-        """Get PostgreSQL connection from pool"""
-        conn = self.pool.getconn()
+        """Get PostgreSQL connection from pool (thread-safe)"""
+        with self._lock:
+            conn = self.pool.getconn()
         try:
             yield conn
             conn.commit()
@@ -53,7 +56,8 @@ class PostgreSQLAdapter(DatabaseAdapter):
             conn.rollback()
             raise
         finally:
-            self.pool.putconn(conn)
+            with self._lock:
+                self.pool.putconn(conn)
 
     def execute_query(self, query: str, params: tuple | None = None) -> Any:
         """Execute query and return results"""
