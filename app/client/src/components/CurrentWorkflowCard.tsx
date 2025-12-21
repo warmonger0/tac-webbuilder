@@ -15,15 +15,35 @@ export function CurrentWorkflowCard() {
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeSuccess, setResumeSuccess] = useState<string | null>(null);
 
-  // Select current workflow (prioritize running > paused) - ONLY show active workflows
-  const workflow = useMemo(() => {
-    if (!workflows.length) return null;
+  // State for workflow navigation
+  const [currentWorkflowIndex, setCurrentWorkflowIndex] = useState(0);
+
+  // Get all active workflows (running or paused) - ONLY show active workflows
+  const activeWorkflows = useMemo(() => {
+    if (!workflows.length) return [];
     // Only return workflows that are actively in progress (running or paused)
     // Never show failed or completed workflows
-    return workflows.find(w => w.status === 'running')
-      || workflows.find(w => w.status === 'paused')
-      || null; // Show "No Active Workflow" if only failed/completed workflows exist
+    return workflows.filter(w => w.status === 'running' || w.status === 'paused');
   }, [workflows]);
+
+  // Reset index if it's out of bounds
+  const safeIndex = useMemo(() => {
+    if (activeWorkflows.length === 0) return 0;
+    if (currentWorkflowIndex >= activeWorkflows.length) return 0;
+    return currentWorkflowIndex;
+  }, [activeWorkflows.length, currentWorkflowIndex]);
+
+  // Get current workflow to display
+  const workflow = activeWorkflows[safeIndex] || null;
+
+  // Navigation handlers
+  const handlePrevWorkflow = () => {
+    setCurrentWorkflowIndex((prev) => (prev - 1 + activeWorkflows.length) % activeWorkflows.length);
+  };
+
+  const handleNextWorkflow = () => {
+    setCurrentWorkflowIndex((prev) => (prev + 1) % activeWorkflows.length);
+  };
 
   // Don't block on WebSocket connection - show empty state immediately
   const loading = false; // WebSocket will update asynchronously
@@ -179,17 +199,45 @@ export function CurrentWorkflowCard() {
               <p className="text-slate-400 text-xs">Real-time progress</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative w-2 h-2">
-              <div className={`absolute w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'}`}></div>
-              {isConnected && <div className="absolute w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>}
+          <div className="flex items-center gap-3">
+            {/* Navigation controls (only show when multiple active workflows) */}
+            {activeWorkflows.length > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePrevWorkflow}
+                  className="p-1 rounded hover:bg-slate-700/50 transition-colors text-slate-400 hover:text-white"
+                  title="Previous workflow"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <div className="px-2 py-1 bg-slate-700/50 rounded text-xs font-medium text-slate-300">
+                  {safeIndex + 1} of {activeWorkflows.length}
+                </div>
+                <button
+                  onClick={handleNextWorkflow}
+                  className="p-1 rounded hover:bg-slate-700/50 transition-colors text-slate-400 hover:text-white"
+                  title="Next workflow"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <div className="relative w-2 h-2">
+                <div className={`absolute w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-yellow-500'}`}></div>
+                {isConnected && <div className="absolute w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>}
+              </div>
+              <span className={`text-xs font-medium ${isConnected ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                {isConnected ? 'Live' : 'Reconnecting...'}
+              </span>
+              <span className="text-slate-500 text-xs">
+                {isConnected ? 'Real-time' : 'Waiting'}
+              </span>
             </div>
-            <span className={`text-xs font-medium ${isConnected ? 'text-emerald-400' : 'text-yellow-400'}`}>
-              {isConnected ? 'Live' : 'Reconnecting...'}
-            </span>
-            <span className="text-slate-500 text-xs">
-              {isConnected ? 'Real-time' : 'Waiting'}
-            </span>
           </div>
         </div>
 

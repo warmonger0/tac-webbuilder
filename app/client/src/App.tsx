@@ -21,11 +21,6 @@ const queryClient = new QueryClient({
       retry: 1,
     },
   },
-  logger: {
-    log: () => {},
-    warn: () => {},
-    error: () => {},
-  },
 });
 const ACTIVE_TAB_STORAGE_KEY = 'tac-webbuilder-active-tab';
 
