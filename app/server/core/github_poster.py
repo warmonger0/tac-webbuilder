@@ -480,7 +480,7 @@ class GitHubPoster:
                     return self._parse_repo_url(self.repo_url)
 
                 # Otherwise, get from git remote
-                result = ProcessRunner.run_command(["git", "remote", "get-url", "origin"])
+                result = ProcessRunner.run_git_command(["remote", "get-url", "origin"])
                 if result.success and result.stdout.strip():
                     return self._parse_repo_url(result.stdout.strip())
 
