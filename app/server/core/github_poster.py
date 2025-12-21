@@ -117,13 +117,21 @@ class GitHubPoster:
         except Exception as e:
             error_str = str(e).lower()
 
-            # Detect rate limit errors from GraphQL API
-            if "rate limit" in error_str or "api rate limit exceeded" in error_str:
+            # Detect rate limit errors or timeouts from GraphQL API
+            # Timeouts often indicate rate limiting (gh CLI hangs waiting for response)
+            should_fallback_to_rest = (
+                "rate limit" in error_str
+                or "api rate limit exceeded" in error_str
+                or "timed out" in error_str
+                or "timeout" in error_str
+            )
+
+            if should_fallback_to_rest:
                 logger.warning(
-                    f"GraphQL API rate limit hit, falling back to REST API: {e}"
+                    f"GraphQL API issue (rate limit or timeout), falling back to REST API: {e}"
                 )
                 self.console.print(
-                    "[yellow]⚠️  GraphQL rate limit exhausted, using REST API fallback...[/yellow]"
+                    "[yellow]⚠️  GraphQL unavailable (rate limit/timeout), using REST API fallback...[/yellow]"
                 )
 
                 try:
@@ -406,9 +414,17 @@ class GitHubPoster:
         except Exception as e:
             error_str = str(e).lower()
 
-            # If rate limit, try REST API fallback
-            if "rate limit" in error_str or "api rate limit exceeded" in error_str:
-                logger.warning(f"GraphQL rate limit checking issue #{issue_number}, trying REST API")
+            # If rate limit or timeout, try REST API fallback
+            # Timeouts often indicate rate limiting (gh CLI hangs waiting for response)
+            should_fallback_to_rest = (
+                "rate limit" in error_str
+                or "api rate limit exceeded" in error_str
+                or "timed out" in error_str
+                or "timeout" in error_str
+            )
+
+            if should_fallback_to_rest:
+                logger.warning(f"GraphQL issue (rate limit/timeout) checking issue #{issue_number}, trying REST API")
 
                 try:
                     return self._issue_exists_via_rest(issue_number)
