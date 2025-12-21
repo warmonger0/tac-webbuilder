@@ -16,7 +16,8 @@ Responsibilities:
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Dict, Tuple
 
 from services.phase_queue_service import PhaseQueueService
 
@@ -33,6 +34,10 @@ class PhaseCoordinator:
     Handles workflow completion events, resolves dependencies,
     and launches up to 3 ADWs concurrently.
     """
+
+    # Loop prevention constants (per CODE_STANDARDS.md Section 2)
+    MAX_PHASE_LAUNCH_ATTEMPTS = 3
+    PHASE_COOLDOWN_MINUTES = 30
 
     def __init__(
         self,
@@ -60,13 +65,18 @@ class PhaseCoordinator:
         self._is_running = False
         self._task: asyncio.Task | None = None
 
+        # Loop prevention tracking: {queue_id: (attempt_count, last_failure_time)}
+        self.phase_attempt_history: Dict[str, Tuple[int, datetime]] = {}
+
         # Initialize helper components (use database factory)
         self.detector = WorkflowCompletionDetector()
         self.notifier = PhaseGitHubNotifier(phase_queue_service)
 
         logger.info(
             f"[INIT] PhaseCoordinator initialized "
-            f"(max_concurrent_adws={max_concurrent_adws}, event-driven mode)"
+            f"(max_concurrent_adws={max_concurrent_adws}, event-driven mode, "
+            f"loop_prevention: max_attempts={self.MAX_PHASE_LAUNCH_ATTEMPTS}, "
+            f"cooldown={self.PHASE_COOLDOWN_MINUTES}min)"
         )
 
     async def start(self):
@@ -107,6 +117,10 @@ class PhaseCoordinator:
 
         Called by WebSocket manager when workflow_completed event is broadcast.
 
+        Implements failure detection for loop prevention:
+        - Tracks workflow failures in phase_attempt_history
+        - Prevents infinite retry loops after repeated failures
+
         Args:
             event_data: {
                 "queue_id": "1",
@@ -129,6 +143,31 @@ class PhaseCoordinator:
                 f"queue_id={queue_id}, feature_id={feature_id}, "
                 f"phase={phase_number}, status={status}"
             )
+
+            # Loop prevention: Track failures for retry control
+            if status == "failed":
+                if queue_id in self.phase_attempt_history:
+                    attempt_count, _ = self.phase_attempt_history[queue_id]
+                    self.phase_attempt_history[queue_id] = (attempt_count, datetime.now())
+                    logger.warning(
+                        f"[LOOP PREVENTION] Phase {phase_number} (queue_id={queue_id}) failed. "
+                        f"Failure recorded (attempt {attempt_count}/{self.MAX_PHASE_LAUNCH_ATTEMPTS})"
+                    )
+                else:
+                    # Failed on first attempt
+                    self.phase_attempt_history[queue_id] = (1, datetime.now())
+                    logger.warning(
+                        f"[LOOP PREVENTION] Phase {phase_number} (queue_id={queue_id}) failed "
+                        f"on first attempt (1/{self.MAX_PHASE_LAUNCH_ATTEMPTS})"
+                    )
+            elif status == "completed":
+                # Success - clear attempt history for this phase
+                if queue_id in self.phase_attempt_history:
+                    del self.phase_attempt_history[queue_id]
+                    logger.info(
+                        f"[LOOP PREVENTION] Phase {phase_number} (queue_id={queue_id}) "
+                        f"completed successfully. Attempt history cleared."
+                    )
 
             # Check if all phases for this feature are complete
             await self._check_feature_completion(feature_id)
@@ -408,6 +447,12 @@ class PhaseCoordinator:
         """
         Launch a single phase: create isolated issue + start ADW.
 
+        Implements loop prevention per CODE_STANDARDS.md Section 2:
+        - Tracks launch attempts per queue_id
+        - Enforces MAX_PHASE_LAUNCH_ATTEMPTS limit
+        - Enforces PHASE_COOLDOWN_MINUTES cooldown period
+        - Marks phases as failed after max attempts
+
         Args:
             phase_row: Database row with queue_id, phase_number, depends_on_phases, phase_data
         """
@@ -423,6 +468,45 @@ class PhaseCoordinator:
         else:
             logger.error(f"[ERROR] Invalid phase_data type: {type(phase_data_json)}")
             return
+
+        # Loop prevention: Check attempt history
+        if queue_id in self.phase_attempt_history:
+            attempt_count, last_failure_time = self.phase_attempt_history[queue_id]
+
+            # Check if max attempts exceeded
+            if attempt_count >= self.MAX_PHASE_LAUNCH_ATTEMPTS:
+                logger.error(
+                    f"[LOOP PREVENTION] Phase {phase_number} (queue_id={queue_id}) "
+                    f"exceeded max attempts ({self.MAX_PHASE_LAUNCH_ATTEMPTS}). "
+                    f"Marking as permanently failed."
+                )
+                self.phase_queue_service.update_status(queue_id, "failed")
+                return
+
+            # Check cooldown period
+            cooldown_until = last_failure_time + timedelta(minutes=self.PHASE_COOLDOWN_MINUTES)
+            if datetime.now() < cooldown_until:
+                remaining_minutes = (cooldown_until - datetime.now()).total_seconds() / 60
+                logger.warning(
+                    f"[LOOP PREVENTION] Phase {phase_number} (queue_id={queue_id}) "
+                    f"in cooldown period. Retry in {remaining_minutes:.1f} minutes. "
+                    f"Attempt {attempt_count}/{self.MAX_PHASE_LAUNCH_ATTEMPTS}"
+                )
+                return
+
+            # Cooldown passed, increment attempt count
+            self.phase_attempt_history[queue_id] = (attempt_count + 1, datetime.now())
+            logger.info(
+                f"[LOOP PREVENTION] Phase {phase_number} (queue_id={queue_id}) "
+                f"attempting launch (attempt {attempt_count + 1}/{self.MAX_PHASE_LAUNCH_ATTEMPTS})"
+            )
+        else:
+            # First attempt for this phase
+            self.phase_attempt_history[queue_id] = (1, datetime.now())
+            logger.info(
+                f"[LOOP PREVENTION] Phase {phase_number} (queue_id={queue_id}) "
+                f"first launch attempt (1/{self.MAX_PHASE_LAUNCH_ATTEMPTS})"
+            )
 
         logger.info(f"[LAUNCH] Launching Phase {phase_number} (queue_id={queue_id})")
 
