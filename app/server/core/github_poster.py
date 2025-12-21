@@ -306,6 +306,22 @@ class GitHubPoster:
             # Get authentication token
             token = self._get_github_token()
 
+            # Validate token format
+            if not token or len(token) < 20:
+                raise RuntimeError(
+                    f"Invalid GitHub token: empty or too short (length: {len(token) if token else 0}). "
+                    "Token should be 20+ characters. Run 'gh auth status' to verify authentication."
+                )
+
+            if token.startswith("Bearer ") or token.startswith("token "):
+                raise RuntimeError(
+                    f"Token should not include prefix. Got: {token[:30]}... "
+                    "Only pass the token value, not 'token' or 'Bearer' prefix."
+                )
+
+            # Debug logging (safe - shows first/last chars only)
+            logger.debug(f"Token obtained: {token[:8]}...{token[-4:]} (length: {len(token)})")
+
             # Get repository information
             repo_info = self.get_repo_info()
             owner = repo_info['owner']['login']
@@ -330,6 +346,14 @@ class GitHubPoster:
             # Make REST API request (synchronous, following existing patterns)
             with httpx.Client(timeout=30.0) as client:
                 response = client.post(url, json=payload, headers=headers)
+
+                # Debug logging (before raise_for_status to capture errors)
+                auth_header_preview = headers.get('Authorization', 'MISSING')[:15]
+                logger.debug(
+                    f"REST API Response: {response.status_code}, "
+                    f"URL: {url}, Auth header: {auth_header_preview}..."
+                )
+
                 response.raise_for_status()
 
             # Parse response

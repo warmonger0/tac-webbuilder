@@ -13,6 +13,7 @@ service_controller.py, health_service.py, github_poster.py, and workflow_history
 """
 
 import logging
+import os
 import subprocess
 from dataclasses import dataclass
 
@@ -85,7 +86,8 @@ class ProcessRunner:
                 text=text,
                 timeout=timeout,
                 check=check,
-                cwd=cwd
+                cwd=cwd,
+                env=os.environ.copy()
             )
             return ProcessResult(
                 success=result.returncode == 0,
