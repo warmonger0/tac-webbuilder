@@ -17,7 +17,7 @@ Follow these steps to quickly checkout and review work done by agents:
 - Run `git checkout {branch}` to switch to the target branch
 
 ### Step 2: Prepare Application
-- Read and execute: `.claude/commands/prepare_app.md` to setup the application for review
+- Read and execute: `.claude/commands/prepare_test.md` to setup the application for review
 
 ### Step 3: Start Application
 - Read and execute: `.claude/commands/start.md` to start the application for testing

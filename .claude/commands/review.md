@@ -58,7 +58,7 @@ adw_id: $1
 ## Application Setup
 
 > **ADW Workflows:** The application is prepared automatically by `adw_modules/app_lifecycle.py` before review starts.
-> **Manual Use:** Execute `/prepare_app` or read `.claude/commands/prepare_app.md` to prepare the application.
+> **Manual Use:** Execute `/prepare_test` or read `.claude/commands/prepare_test.md` to prepare the application.
 
 The application will be running at:
 - Frontend URL: Auto-detected from `.ports.env` or default to http://localhost:5173

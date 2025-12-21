@@ -35,7 +35,7 @@ application_url: $ARGUMENT if provided, otherwise determine from port configurat
 ## Application Setup
 
 > **ADW Workflows:** The application is prepared automatically by `adw_modules/app_lifecycle.py` before testing starts.
-> **Manual Use:** Execute `/prepare_app` or read `.claude/commands/prepare_app.md` to prepare the application.
+> **Manual Use:** Execute `/prepare_test` or read `.claude/commands/prepare_test.md` to prepare the application.
 
 Application URL will be auto-detected from `.ports.env` or defaulted to http://localhost:5173.
 

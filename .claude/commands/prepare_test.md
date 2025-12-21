@@ -1,9 +1,11 @@
-# Prepare Application
+# Prepare Test Environment
 
 > **Note:** ADW workflows now use `adw_modules/app_lifecycle.py` for deterministic app preparation without AI calls.
-> This command is available for manual app setup or debugging purposes.
+> This command is available for manual testing/review or debugging purposes.
 
-Setup the application for the review or test.
+Setup the application for testing or review with a clean database state.
+
+⚠️ **WARNING:** This command resets the database to seed state (data loss). A backup is created automatically.
 
 ## Variables
 
@@ -15,8 +17,10 @@ PORT: If `.ports.env` exists, read FRONTEND_PORT from it, otherwise default to 5
    - If it exists, source it and use `FRONTEND_PORT` for the PORT variable
    - If not, use default PORT: 5173
 
-2. Reset the database:
-   - Run `scripts/reset_db.sh`
+2. Backup and reset the database:
+   - Create timestamped backup: `cp app/server/db/database.db app/server/db/database.db.backup-$(date +%Y%m%d-%H%M%S)`
+   - Reset to seed state: `./scripts/reset_db.sh`
+   - Report backup location to user
 
 3. Start the application:
    - IMPORTANT: Make sure the server and client are running on a background process using `nohup sh ./scripts/start.sh > /dev/null 2>&1 &`

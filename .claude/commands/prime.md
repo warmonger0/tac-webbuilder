@@ -74,7 +74,7 @@
 → Read `.claude/commands/quick_start/docs.md` [~200 tokens]
 
 ### Not Sure / Need Routing Help
-→ Read `.claude/commands/references/decision_tree.md` [~400 tokens]
+→ Read `.claude/commands/conditional_docs.md` (see "Quick Routing" section) [~400 tokens]
 
 ---
 

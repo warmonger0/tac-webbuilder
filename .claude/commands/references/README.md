@@ -8,7 +8,6 @@ Lightweight reference docs for quick lookups.
 - `architecture_overview.md` - Architecture, integrations, cost optimization (900 tokens)
 - `adw_workflows.md` - All ADW workflows and usage (1,500 tokens)
 - `api_endpoints.md` - API reference (1,700 tokens)
-- `decision_tree.md` - Help choosing which docs to load (400 tokens)
 
 ## Quick Start Docs (in `../quick_start/`)
 
