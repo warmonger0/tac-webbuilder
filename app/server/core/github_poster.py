@@ -314,7 +314,7 @@ class GitHubPoster:
             # Prepare REST API request
             url = f"https://api.github.com/repos/{owner}/{repo_name}/issues"
             headers = {
-                "Authorization": f"Bearer {token}",
+                "Authorization": f"token {token}",
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28"
             }
