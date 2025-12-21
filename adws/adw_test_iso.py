@@ -86,6 +86,7 @@ from adw_modules.workflow_ops import (
 )
 from adw_modules.worktree_ops import validate_worktree
 from adw_modules.observability import log_phase_completion, get_phase_number
+from adw_modules.tool_call_tracker import ToolCallTracker
 
 # Agent name constants
 AGENT_TESTER = "test_runner"
@@ -227,7 +228,8 @@ def run_external_tests(
     issue_number: str,
     adw_id: str,
     logger: logging.Logger,
-    state: ADWState
+    state: ADWState,
+    tracker: Optional[ToolCallTracker] = None
 ) -> Tuple[bool, Dict[str, Any]]:
     """
     Run tests using external test ADW workflow.
@@ -262,7 +264,15 @@ def run_external_tests(
     logger.info(f"Executing: {' '.join(cmd)}")
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        # Track external test execution if tracker available
+        if tracker:
+            result = tracker.track_bash(
+                tool_name="adw_test_external",
+                command=cmd,
+                cwd=None
+            )
+        else:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
 
         # Check if subprocess exited with non-zero code
         if result.returncode != 0:
@@ -636,6 +646,7 @@ def run_external_tests_with_resolution(
     state: ADWState,
     worktree_path: str,
     max_attempts: int = MAX_TEST_RETRY_ATTEMPTS,
+    tracker: Optional[ToolCallTracker] = None
 ) -> Tuple[bool, Dict[str, Any]]:
     """
     Run external tests with automatic resolution and retry logic for infrastructure failures.
@@ -653,7 +664,7 @@ def run_external_tests_with_resolution(
         logger.info(f"\n=== External Test Run Attempt {attempt}/{max_attempts} ===")
 
         # Run external tests
-        success, external_results = run_external_tests(issue_number, adw_id, logger, state)
+        success, external_results = run_external_tests(issue_number, adw_id, logger, state, tracker)
         last_results = external_results
 
         # Check for infrastructure failure (has "error" key)
@@ -1363,10 +1374,12 @@ def main():
             format_issue_message(adw_id, AGENT_TESTER, "🔧 Running tests via external tools with resolution loop (70-95% token reduction)...")
         )
 
-        # Run external tests with resolution and retry logic
-        success, external_results = run_external_tests_with_resolution(
-            adw_id, issue_number, logger, state, worktree_path
-        )
+        # Create tool call tracker for Test phase
+        with ToolCallTracker(adw_id=adw_id, issue_number=int(issue_number), phase_name="Test") as tracker:
+            # Run external tests with resolution and retry logic
+            success, external_results = run_external_tests_with_resolution(
+                adw_id, issue_number, logger, state, worktree_path, tracker=tracker
+            )
 
         # Check if we need to fall back to inline mode for LLM-based fixes
         if not success:

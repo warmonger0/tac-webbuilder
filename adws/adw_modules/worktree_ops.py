@@ -8,12 +8,15 @@ import os
 import subprocess
 import logging
 import socket
-from typing import Tuple, Optional
+from typing import Tuple, Optional, TYPE_CHECKING
 from adw_modules.state import ADWState
 from adw_modules.port_pool import get_port_pool
 
+if TYPE_CHECKING:
+    from adw_modules.tool_call_tracker import ToolCallTracker
 
-def create_worktree(adw_id: str, branch_name: str, logger: logging.Logger) -> Tuple[str, Optional[str]]:
+
+def create_worktree(adw_id: str, branch_name: str, logger: logging.Logger, tracker: Optional["ToolCallTracker"] = None) -> Tuple[str, Optional[str]]:
     """Create a git worktree for isolated ADW execution.
     
     Args:
@@ -44,25 +47,46 @@ def create_worktree(adw_id: str, branch_name: str, logger: logging.Logger) -> Tu
     
     # First, fetch latest changes from origin
     logger.info("Fetching latest changes from origin")
-    fetch_result = subprocess.run(
-        ["git", "fetch", "origin"], 
-        capture_output=True, 
-        text=True, 
-        cwd=project_root
-    )
+    if tracker:
+        fetch_result = tracker.track_bash(
+            tool_name="git_fetch",
+            command=["git", "fetch", "origin"],
+            cwd=project_root
+        )
+    else:
+        fetch_result = subprocess.run(
+            ["git", "fetch", "origin"],
+            capture_output=True,
+            text=True,
+            cwd=project_root
+        )
     if fetch_result.returncode != 0:
         logger.warning(f"Failed to fetch from origin: {fetch_result.stderr}")
     
     # Create the worktree using git, branching from origin/main
     # Use -b to create the branch as part of worktree creation
     cmd = ["git", "worktree", "add", "-b", branch_name, worktree_path, "origin/main"]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root)
-    
+    if tracker:
+        result = tracker.track_bash(
+            tool_name="git_worktree_add",
+            command=cmd,
+            cwd=project_root
+        )
+    else:
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root)
+
     if result.returncode != 0:
         # If branch already exists, try without -b
         if "already exists" in result.stderr:
             cmd = ["git", "worktree", "add", worktree_path, branch_name]
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root)
+            if tracker:
+                result = tracker.track_bash(
+                    tool_name="git_worktree_add_retry",
+                    command=cmd,
+                    cwd=project_root
+                )
+            else:
+                result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root)
             
         if result.returncode != 0:
             error_msg = f"Failed to create worktree: {result.stderr}"
