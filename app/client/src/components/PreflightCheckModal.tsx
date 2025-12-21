@@ -6,12 +6,12 @@
  */
 
 import type {
-  PreflightChecksResponse,
-  PreflightCheckResult,
-  PreflightBlockingFailure,
-  PreflightWarning,
-  DryRunResult,
   DryRunPhase,
+  DryRunResult,
+  PreflightBlockingFailure,
+  PreflightCheckResult,
+  PreflightChecksResponse,
+  PreflightWarning,
 } from '../api/systemClient';
 
 interface PreflightCheckModalProps {

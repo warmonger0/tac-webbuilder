@@ -176,6 +176,7 @@ github_issue_service = GitHubIssueService(
 )
 # Initialize QC metrics watcher (Panel 7 performance optimization)
 from services.qc_metrics_watcher import get_qc_watcher
+
 qc_watcher = get_qc_watcher(websocket_manager=manager)
 
 background_task_manager = BackgroundTaskManager(
@@ -330,8 +331,8 @@ async def get_qc_metrics_data() -> dict:
     Returns:
         dict: QC metrics with coverage, naming, file structure, and linting data
     """
-    from services.qc_metrics_service import QCMetricsService
     from routes import qc_metrics_routes
+    from services.qc_metrics_service import QCMetricsService
 
     # Return cached metrics if available (updated by watcher)
     if qc_metrics_routes._qc_metrics_cache:

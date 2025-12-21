@@ -11,9 +11,9 @@
  * Uses WebSocket for real-time updates (5-minute background refresh)
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { qcMetricsClient, QCMetrics } from '../api/qcMetricsClient';
+import { QCMetrics, qcMetricsClient } from '../api/qcMetricsClient';
 import { LoadingState } from './common/LoadingState';
 import { ErrorBanner } from './common/ErrorBanner';
 import { formatErrorMessage, logError } from '../utils/errorHandler';

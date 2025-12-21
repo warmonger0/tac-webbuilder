@@ -8,7 +8,6 @@ allowing only changed metrics to be recomputed.
 import logging
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +16,16 @@ logger = logging.getLogger(__name__)
 class QCMetricsCache:
     """Cached QC metrics with timestamps for selective updates."""
 
-    coverage: Optional[Dict] = None
+    coverage: dict | None = None
     coverage_updated: float = 0
 
-    naming: Optional[Dict] = None
+    naming: dict | None = None
     naming_updated: float = 0
 
-    file_structure: Optional[Dict] = None
+    file_structure: dict | None = None
     file_structure_updated: float = 0
 
-    linting: Optional[Dict] = None
+    linting: dict | None = None
     linting_updated: float = 0
 
     overall_score: float = 0.0
@@ -55,7 +54,7 @@ class QCMetricsCache:
 
         return True
 
-    def update_category(self, category: str, data: Dict):
+    def update_category(self, category: str, data: dict):
         """Update a specific metric category.
 
         Args:
@@ -77,7 +76,7 @@ class QCMetricsCache:
             self.linting = data
             self.linting_updated = current_time
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert cache to dictionary format matching QCMetrics.
 
         Returns:
@@ -105,7 +104,7 @@ class SelectiveQCMetricsService:
         self.qc_service = qc_service
         self.cache = QCMetricsCache()
 
-    def get_metrics_selective(self, changed_categories: Optional[Set[str]] = None) -> Dict:
+    def get_metrics_selective(self, changed_categories: set[str] | None = None) -> dict:
         """Get QC metrics with selective updates.
 
         Args:
@@ -136,7 +135,7 @@ class SelectiveQCMetricsService:
 
         return self.cache.to_dict()
 
-    def _full_refresh(self) -> Dict:
+    def _full_refresh(self) -> dict:
         """Perform full metric refresh."""
         logger.info("[QC_SELECTIVE] Full refresh of all metrics")
 
@@ -242,7 +241,7 @@ class SelectiveQCMetricsService:
 
 
 # Singleton instance
-_selective_service: Optional[SelectiveQCMetricsService] = None
+_selective_service: SelectiveQCMetricsService | None = None
 
 
 def get_selective_metrics_service() -> SelectiveQCMetricsService:

@@ -40,7 +40,7 @@ async def _handle_websocket_connection(websocket: WebSocket, manager, initial_da
 
             if client_msg.get('type') != 'client_ready':
                 logger.debug(f"[WS] {error_context}: Received {client_msg.get('type')} instead of client_ready, continuing anyway")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Client didn't send ready signal - that's OK, proceed anyway for backwards compatibility
             logger.debug(f"[WS] {error_context}: No client_ready signal within 2s, proceeding with initial data send")
         except json.JSONDecodeError:
@@ -89,7 +89,7 @@ async def _handle_websocket_connection(websocket: WebSocket, manager, initial_da
                 except json.JSONDecodeError as e:
                     logger.warning(f"[WS] {error_context}: Failed to parse JSON message: {e}")
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # No message received in 1s - that's expected and normal
                 # Connection is still alive, just waiting for broadcasts from background tasks
                 pass

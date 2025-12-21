@@ -2,7 +2,7 @@
 System health and service control endpoints.
 """
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from core.data_models import (
     AdwHealthCheckResponse,
@@ -293,9 +293,9 @@ def init_system_routes(health_service, service_controller, app_start_time):
         Returns:
             Rate limit information including current usage, limits, and reset times.
         """
-        import subprocess
         import json
-        from datetime import datetime, timezone
+        import subprocess
+        from datetime import datetime
 
         try:
             # Check REST API rate limit
@@ -310,7 +310,7 @@ def init_system_routes(health_service, service_controller, app_start_time):
             if rest_result.returncode == 0:
                 data = json.loads(rest_result.stdout)
                 core = data['resources']['core']
-                reset_dt = datetime.fromtimestamp(core['reset'], tz=timezone.utc)
+                reset_dt = datetime.fromtimestamp(core['reset'], tz=UTC)
 
                 rest_data = {
                     "limit": core['limit'],

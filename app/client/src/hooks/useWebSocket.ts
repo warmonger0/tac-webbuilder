@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { type AdwMonitorSummary, type AdwWorkflowStatus, getAdwMonitor, getRoutes, getWorkflowHistory, listWorkflows } from '../api/client';
 import { getQueueData, type PhaseQueueItem } from '../api/queueClient';
-import { type PlannedFeature, type PlannedFeaturesStats, plannedFeaturesClient } from '../api/plannedFeaturesClient';
+import { type PlannedFeature, plannedFeaturesClient, type PlannedFeaturesStats } from '../api/plannedFeaturesClient';
 import type { HistoryAnalytics, Route, WorkflowExecution, WorkflowHistoryItem } from '../types';
 import { useReliableWebSocket } from './useReliableWebSocket';
 import { apiConfig } from '../config/api';

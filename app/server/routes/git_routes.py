@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from datetime import datetime
-from typing import List
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -27,16 +25,16 @@ class GitStatusResponse(BaseModel):
     branch: str
     ahead: int
     behind: int
-    staged: List[GitStatusFile]
-    unstaged: List[GitStatusFile]
-    untracked: List[GitStatusFile]
+    staged: list[GitStatusFile]
+    unstaged: list[GitStatusFile]
+    untracked: list[GitStatusFile]
     clean: bool
 
 
 class GitCommitRequest(BaseModel):
     """Git commit request."""
     message: str
-    files: List[str] = []  # Empty list means commit all changes
+    files: list[str] = []  # Empty list means commit all changes
 
 
 class GitCommitResponse(BaseModel):
@@ -91,9 +89,9 @@ async def get_git_status() -> GitStatusResponse:
             check=True
         )
 
-        staged: List[GitStatusFile] = []
-        unstaged: List[GitStatusFile] = []
-        untracked: List[GitStatusFile] = []
+        staged: list[GitStatusFile] = []
+        unstaged: list[GitStatusFile] = []
+        untracked: list[GitStatusFile] = []
 
         for line in status_result.stdout.splitlines():
             if len(line) < 4:

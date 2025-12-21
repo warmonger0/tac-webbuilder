@@ -12,12 +12,10 @@ Analyzes codebase quality metrics including:
 import asyncio
 import json
 import logging
-import os
 import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +37,7 @@ class NamingConventionMetrics:
     """Naming convention compliance metrics."""
     total_files_checked: int
     compliant_files: int
-    violations: List[Dict[str, str]]
+    violations: list[dict[str, str]]
     compliance_rate: float
 
 
@@ -47,9 +45,9 @@ class NamingConventionMetrics:
 class FileStructureMetrics:
     """File and folder structure metrics."""
     total_files: int
-    oversized_files: List[Dict[str, any]]
-    long_files: List[Dict[str, any]]
-    misplaced_files: List[Dict[str, str]]
+    oversized_files: list[dict[str, any]]
+    long_files: list[dict[str, any]]
+    misplaced_files: list[dict[str, str]]
     avg_file_size_kb: float
 
 
@@ -79,7 +77,7 @@ class QCMetrics:
 class QCMetricsService:
     """Service for analyzing codebase quality metrics."""
 
-    def __init__(self, project_root: Optional[Path] = None):
+    def __init__(self, project_root: Path | None = None):
         """Initialize QC metrics service.
 
         Args:
@@ -258,7 +256,7 @@ class QCMetricsService:
                 logger.warning("No frontend coverage data found")
                 return 0.0
 
-            with open(coverage_file, 'r') as f:
+            with open(coverage_file) as f:
                 data = json.load(f)
                 total = data.get('total', {})
                 lines = total.get('lines', {})
@@ -544,7 +542,7 @@ class QCMetricsService:
 
                 # Check line count
                 try:
-                    with open(file, 'r', encoding='utf-8') as f:
+                    with open(file, encoding='utf-8') as f:
                         line_count = sum(1 for _ in f)
 
                     if line_count > MAX_FILE_LINES:
@@ -686,7 +684,7 @@ class QCMetricsService:
 
         return round(overall, 2)
 
-    async def get_all_metrics_async(self) -> Dict:
+    async def get_all_metrics_async(self) -> dict:
         """Get all QC metrics in one call (parallelized for performance).
 
         Returns:
@@ -756,7 +754,7 @@ class QCMetricsService:
             'last_updated': datetime.utcnow().isoformat()
         }
 
-    def get_all_metrics(self) -> Dict:
+    def get_all_metrics(self) -> dict:
         """Get all QC metrics in one call (sync wrapper for backwards compat).
 
         Returns:

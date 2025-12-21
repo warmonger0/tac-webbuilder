@@ -5,8 +5,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-
-from services.pattern_sync_service import PatternSyncService, SyncFilter, SyncResult
+from services.pattern_sync_service import PatternSyncService, SyncFilter
 
 logger = logging.getLogger(__name__)
 

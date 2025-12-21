@@ -7,15 +7,15 @@ import os
 import subprocess
 import time
 
+from core.models import PlannedFeatureUpdate
 from core.models.observability import TaskLogCreate
 from core.nl_processor import suggest_adw_workflow
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from repositories.task_log_repository import TaskLogRepository
 from repositories.webhook_event_repository import WebhookEventRepository
-from services.structured_logger import StructuredLogger
 from services.planned_features_service import PlannedFeaturesService
-from core.models import PlannedFeatureUpdate
+from services.structured_logger import StructuredLogger
 from utils.webhook_security import validate_webhook_request
 
 logger = logging.getLogger(__name__)
@@ -293,9 +293,10 @@ async def _resume_adw_handler(adw_id: str) -> dict:
     Runs preflight checks and triggers continuation of paused ADW.
     Automatically fixes common issues like uncommitted changes.
     """
-    from core.preflight_checks import run_preflight_checks
     import os
     import subprocess
+
+    from core.preflight_checks import run_preflight_checks
 
     # Run preflight checks
     preflight_result = run_preflight_checks(skip_tests=True)
@@ -310,8 +311,8 @@ async def _resume_adw_handler(adw_id: str) -> dict:
         if git_state_failed:
             raise HTTPException(
                 400,
-                f"Preflight checks failed: Uncommitted changes detected. "
-                f"Please commit or stash your changes before resuming the workflow."
+                "Preflight checks failed: Uncommitted changes detected. "
+                "Please commit or stash your changes before resuming the workflow."
             )
         else:
             raise HTTPException(
@@ -337,7 +338,7 @@ async def _resume_adw_handler(adw_id: str) -> dict:
     if not os.path.exists(state_file):
         raise HTTPException(404, f"ADW state file not found for {adw_id}")
 
-    with open(state_file, 'r') as f:
+    with open(state_file) as f:
         state = json.load(f)
 
     issue_number = state.get("issue_number")
@@ -461,7 +462,7 @@ def _register_query_routes(router_obj, phase_queue_service):
         """Get all phases in the queue."""
         import time
         start = time.time()
-        logger.info(f"[PERF] GET /queue started")
+        logger.info("[PERF] GET /queue started")
         try:
             result = await _get_all_queued_handler(phase_queue_service)
             elapsed = time.time() - start

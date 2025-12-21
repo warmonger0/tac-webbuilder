@@ -7,6 +7,7 @@ Initializes the planned_features table and related indexes for SQLite.
 
 import logging
 import os
+
 from database import get_database_adapter
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ def init_planned_features_db():
 
         logger.info(f"[INIT] Initializing planned_features schema from {schema_file}")
 
-        with open(schema_path, "r") as f:
+        with open(schema_path) as f:
             schema = f.read()
 
         with adapter.get_connection() as conn:

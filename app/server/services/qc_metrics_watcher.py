@@ -14,10 +14,8 @@ Watches for:
 import asyncio
 import json
 import logging
-import os
 import time
 from pathlib import Path
-from typing import Dict, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +31,7 @@ class QCMetricsWatcher:
     - Linting completes
     """
 
-    def __init__(self, project_root: Optional[Path] = None, websocket_manager=None):
+    def __init__(self, project_root: Path | None = None, websocket_manager=None):
         """Initialize QC metrics watcher.
 
         Args:
@@ -48,10 +46,10 @@ class QCMetricsWatcher:
 
         self.websocket_manager = websocket_manager
         self.is_running = False
-        self.watcher_task: Optional[asyncio.Task] = None
+        self.watcher_task: asyncio.Task | None = None
 
         # Track last modification times
-        self.coverage_files_mtime: Dict[str, float] = {}
+        self.coverage_files_mtime: dict[str, float] = {}
         self.last_broadcast_time: float = 0
         self.min_broadcast_interval: float = 30.0  # Min 30s between broadcasts
 
@@ -61,7 +59,7 @@ class QCMetricsWatcher:
         self.last_background_refresh: float = 0
 
         # Change accumulation for smart updates
-        self.pending_changes: Set[str] = set()
+        self.pending_changes: set[str] = set()
         self.change_accumulation_time: float = 5.0  # Wait 5s for changes to settle
 
         # Files to watch
@@ -216,7 +214,7 @@ class QCMetricsWatcher:
         except Exception as e:
             logger.error(f"[QC_WATCHER] Error refreshing metrics: {e}", exc_info=True)
 
-    async def _broadcast_metrics(self, metrics: Dict):
+    async def _broadcast_metrics(self, metrics: dict):
         """Broadcast QC metrics to all WebSocket clients.
 
         Args:
@@ -256,7 +254,7 @@ class QCMetricsWatcher:
 
 
 # Singleton instance
-_qc_watcher_instance: Optional[QCMetricsWatcher] = None
+_qc_watcher_instance: QCMetricsWatcher | None = None
 
 
 def get_qc_watcher(websocket_manager=None) -> QCMetricsWatcher:

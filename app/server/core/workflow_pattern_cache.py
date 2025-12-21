@@ -8,8 +8,8 @@ Matches new features against learned patterns to skip full analysis.
 import json
 import logging
 import re
-from typing import Any
 from difflib import SequenceMatcher
+from typing import Any
 
 from database import get_database_adapter
 

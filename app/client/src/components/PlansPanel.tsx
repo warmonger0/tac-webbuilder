@@ -4,10 +4,10 @@
  * Displays planned features, sessions, and work items fetched from the API.
  */
 
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlannedFeature, plannedFeaturesClient, PlannedFeaturesStats } from '../api/plannedFeaturesClient';
-import { systemClient, PreflightChecksResponse } from '../api/systemClient';
+import { PreflightChecksResponse, systemClient } from '../api/systemClient';
 import { PreflightCheckModal } from './PreflightCheckModal';
 import { apiConfig } from '../config/api';
 import { useGlobalWebSocket } from '../contexts/GlobalWebSocketContext';

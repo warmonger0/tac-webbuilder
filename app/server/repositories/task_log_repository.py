@@ -7,7 +7,13 @@ Handles database operations for ADW task/phase logs.
 import json
 import logging
 
-from core.models.observability import IssueProgress, TaskLog, TaskLogCreate, TaskLogFilters, ToolCallRecord
+from core.models.observability import (
+    IssueProgress,
+    TaskLog,
+    TaskLogCreate,
+    TaskLogFilters,
+    ToolCallRecord,
+)
 from database.factory import get_database_adapter
 
 logger = logging.getLogger(__name__)

@@ -7,7 +7,6 @@ Provides endpoints for:
 """
 
 import logging
-from typing import Dict
 
 from fastapi import APIRouter, HTTPException
 from services.qc_metrics_service import QCMetricsService
@@ -20,11 +19,11 @@ router = APIRouter(prefix="/qc-metrics", tags=["QC Metrics"])
 qc_service = QCMetricsService()
 
 # Cache for QC metrics (expensive to compute)
-_qc_metrics_cache: Dict | None = None
+_qc_metrics_cache: dict | None = None
 
 
-@router.get("", response_model=Dict)
-async def get_qc_metrics() -> Dict:
+@router.get("", response_model=dict)
+async def get_qc_metrics() -> dict:
     """
     Get complete QC metrics for the codebase.
 
@@ -98,8 +97,8 @@ async def get_qc_metrics() -> Dict:
         )
 
 
-@router.post("/refresh", response_model=Dict)
-async def refresh_qc_metrics() -> Dict:
+@router.post("/refresh", response_model=dict)
+async def refresh_qc_metrics() -> dict:
     """
     Force refresh QC metrics (clears cache and recomputes).
 
@@ -135,8 +134,8 @@ async def refresh_qc_metrics() -> Dict:
         )
 
 
-@router.get("/coverage", response_model=Dict)
-async def get_coverage_only() -> Dict:
+@router.get("/coverage", response_model=dict)
+async def get_coverage_only() -> dict:
     """
     Get test coverage metrics only (faster than full metrics).
 
@@ -168,8 +167,8 @@ async def get_coverage_only() -> Dict:
         )
 
 
-@router.get("/linting", response_model=Dict)
-async def get_linting_only() -> Dict:
+@router.get("/linting", response_model=dict)
+async def get_linting_only() -> dict:
     """
     Get linting metrics only (faster than full metrics).
 

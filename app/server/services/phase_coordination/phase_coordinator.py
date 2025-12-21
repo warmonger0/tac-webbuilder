@@ -229,8 +229,9 @@ class PhaseCoordinator:
                     )
 
                     # Update planned_features table
-                    from services.planned_features_service import PlannedFeaturesService
                     from core.models import PlannedFeatureUpdate
+
+                    from services.planned_features_service import PlannedFeaturesService
 
                     service = PlannedFeaturesService()
                     feature = service.get_by_id(feature_id)

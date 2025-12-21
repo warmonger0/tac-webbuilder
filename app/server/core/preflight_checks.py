@@ -247,7 +247,7 @@ def run_preflight_checks(
         else:
             check_start = time.time()
             try:
-                from core.workflow_dry_run import run_workflow_dry_run, format_dry_run_for_display
+                from core.workflow_dry_run import format_dry_run_for_display, run_workflow_dry_run
 
                 # Get feature description for better pattern matching
                 feature_description = None
