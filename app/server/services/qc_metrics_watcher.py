@@ -231,7 +231,7 @@ class QCMetricsWatcher:
 
         try:
             # Use the connection manager's broadcast method
-            await self.websocket_manager.broadcast(json.dumps(message))
+            await self.websocket_manager.broadcast(message)
             logger.info("[QC_WATCHER] Broadcasted QC metrics update to WebSocket clients")
         except Exception as e:
             logger.error(f"[QC_WATCHER] Error broadcasting metrics: {e}", exc_info=True)

@@ -72,6 +72,9 @@ def _create_github_issue_from_feature(feature: PlannedFeature) -> int:
 
     body = "\n\n".join(body_parts) if body_parts else "Automated feature from Plans Panel"
 
+    # Add workflow specification for ADW (CRITICAL: ADW needs this to know which workflow to run)
+    body += "\n\n---\n\nInclude workflow: adw_sdlc_complete_iso"
+
     # Build labels
     labels = [feature.item_type]
     if feature.priority:
