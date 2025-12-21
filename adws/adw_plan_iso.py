@@ -24,53 +24,51 @@ This workflow creates an isolated git worktree under trees/<adw_id>/ for
 parallel execution without interference.
 """
 
-import sys
-import os
-import logging
 import json
-from typing import Optional
-from dotenv import load_dotenv
+import logging
+import os
+import sys
 from datetime import datetime
 
-from adw_modules.state import ADWState
-from utils.idempotency import (
-    check_and_skip_if_complete,
-    validate_phase_completion,
-    ensure_database_state,
-)
+from adw_modules.data_types import GitHubIssue
 from adw_modules.git_ops import commit_changes, finalize_git_operations
 from adw_modules.github import (
-    fetch_issue,
-    make_issue_comment,
-    get_repo_url,
     extract_repo_path,
+    fetch_issue,
+    get_repo_url,
+    make_issue_comment,
 )
+from adw_modules.integration_checklist import (
+    format_checklist_markdown,
+    generate_integration_checklist,
+)
+from adw_modules.observability import get_phase_number, log_phase_completion
+from adw_modules.state import ADWState
+from adw_modules.tool_call_tracker import ToolCallTracker
+from adw_modules.utils import check_env_vars, setup_logger
 from adw_modules.workflow_ops import (
-    classify_issue,
-    build_plan,
-    generate_branch_name,
-    create_commit,
-    format_issue_message,
-    ensure_adw_id,
     AGENT_PLANNER,
+    build_plan,
+    classify_issue,
+    create_commit,
+    ensure_adw_id,
+    format_issue_message,
+    generate_branch_name,
 )
-from adw_modules.utils import setup_logger, check_env_vars
-from adw_modules.data_types import GitHubIssue, IssueClassSlashCommand, AgentTemplateRequest
-from adw_modules.agent import execute_template
 from adw_modules.worktree_ops import (
     create_worktree,
-    validate_worktree,
+    find_next_available_ports,
     get_ports_for_adw,
     is_port_available,
-    find_next_available_ports,
+    validate_worktree,
 )
 from adw_modules.worktree_setup import setup_worktree_complete
-from adw_modules.observability import log_phase_completion, get_phase_number
-from adw_modules.integration_checklist import (
-    generate_integration_checklist,
-    format_checklist_markdown
+from dotenv import load_dotenv
+from utils.idempotency import (
+    check_and_skip_if_complete,
+    ensure_database_state,
+    validate_phase_completion,
 )
-from adw_modules.tool_call_tracker import ToolCallTracker
 
 
 def safe_comment(issue_number: str, message: str, logger: logging.Logger, critical: bool = False) -> None:
@@ -114,7 +112,7 @@ def main():
     # Ensure state has the adw_id field
     if not state.get("adw_id"):
         state.update(adw_id=adw_id)
-    
+
     # Track that this ADW workflow has run
     state.append_adw_id("adw_plan_iso")
 
@@ -153,12 +151,12 @@ def main():
     else:
         # Allocate ports for this instance
         backend_port, frontend_port = get_ports_for_adw(adw_id)
-        
+
         # Check port availability
         if not (is_port_available(backend_port) and is_port_available(frontend_port)):
             logger.warning(f"Deterministic ports {backend_port}/{frontend_port} are in use, finding alternatives")
             backend_port, frontend_port = find_next_available_ports(adw_id)
-        
+
         logger.info(f"Allocated ports - Backend: {backend_port}, Frontend: {frontend_port}")
         state.update(backend_port=backend_port, frontend_port=frontend_port)
         state.save("adw_plan_iso")
@@ -216,222 +214,224 @@ def main():
     state.save("adw_plan_iso")
     logger.info(f"Will create branch in worktree: {branch_name}")
 
-    # Create worktree if it doesn't exist
-    if not valid:
-        logger.info(f"Creating worktree for {adw_id}")
-        worktree_path, error = create_worktree(adw_id, branch_name, logger)
-        
-        if error:
-            logger.error(f"Error creating worktree: {error}")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", f"❌ Error creating worktree: {error}"),
-            )
-            sys.exit(1)
-        
-        state.update(worktree_path=worktree_path)
-        state.save("adw_plan_iso")
-        logger.info(f"Created worktree at {worktree_path}")
+    # Create ToolCallTracker context for Plan phase
+    with ToolCallTracker(adw_id=adw_id, issue_number=int(issue_number), phase_name="Plan") as tracker:
+        # Create worktree if it doesn't exist
+        if not valid:
+            logger.info(f"Creating worktree for {adw_id}")
+            worktree_path, error = create_worktree(adw_id, branch_name, logger, tracker)
 
-        # Setup worktree environment using deterministic Python function
-        logger.info("Setting up isolated environment with custom ports (using Python, no AI)")
-        success, error = setup_worktree_complete(worktree_path, backend_port, frontend_port, logger)
-        if not success:
-            logger.error(f"Error setting up worktree: {error}")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", f"❌ Error setting up worktree: {error}"),
-            )
-            sys.exit(1)
+            if error:
+                logger.error(f"Error creating worktree: {error}")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "ops", f"❌ Error creating worktree: {error}"),
+                )
+                sys.exit(1)
 
-        logger.info("✅ Worktree environment setup complete (deterministic Python)")
+            state.update(worktree_path=worktree_path)
+            state.save("adw_plan_iso")
+            logger.info(f"Created worktree at {worktree_path}")
 
-    # Post worktree info comment (non-critical)
-    safe_comment(
-        issue_number,
-        format_issue_message(adw_id, "ops", f"✅ Working in isolated worktree: {worktree_path}\n"
-                           f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}"),
-        logger
-    )
+            # Setup worktree environment using deterministic Python function
+            logger.info("Setting up isolated environment with custom ports (using Python, no AI)")
+            success, error = setup_worktree_complete(worktree_path, backend_port, frontend_port, logger)
+            if not success:
+                logger.error(f"Error setting up worktree: {error}")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "ops", f"❌ Error setting up worktree: {error}"),
+                )
+                sys.exit(1)
 
-    # PRE-COMPUTE the plan file path deterministically
-    # Generate a descriptive name from issue title
-    import re
-    import shutil
-    title_slug = re.sub(r'[^a-z0-9]+', '-', issue.title.lower()).strip('-')[:50]
+            logger.info("✅ Worktree environment setup complete (deterministic Python)")
 
-    # Different naming conventions for different issue types
-    if issue_command == "/patch":
-        # Patch issues go into specs/patch/ subdirectory with patch- prefix
-        expected_plan_file = f"specs/patch/patch-adw-{adw_id}-{title_slug}.md"
-    else:
-        # Feature/bug/chore issues use the standard naming
-        expected_plan_file = f"specs/issue-{issue_number}-adw-{adw_id}-sdlc_planner-{title_slug}.md"
-
-    logger.info(f"Plan file path (deterministic): {expected_plan_file}")
-
-    # Build the implementation plan (now executing in worktree)
-    logger.info("Building implementation plan in worktree")
-    safe_comment(
-        issue_number,
-        format_issue_message(adw_id, AGENT_PLANNER, "✅ Building implementation plan in isolated environment"),
-        logger
-    )
-
-    # Pass the pre-computed plan file path to the agent
-    plan_response = build_plan(
-        issue, issue_command, adw_id, logger,
-        working_dir=worktree_path,
-        plan_file_path=expected_plan_file
-    )
-
-    if not plan_response.success:
-        logger.error(f"Error building plan: {plan_response.output}")
-        make_issue_comment(
+        # Post worktree info comment (non-critical)
+        safe_comment(
             issue_number,
-            format_issue_message(
-                adw_id, AGENT_PLANNER, f"❌ Error building plan: {plan_response.output}"
-            ),
+            format_issue_message(adw_id, "ops", f"✅ Working in isolated worktree: {worktree_path}\n"
+                               f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}"),
+            logger
         )
-        sys.exit(1)
 
-    logger.debug(f"Plan response: {plan_response.output}")
-    safe_comment(
-        issue_number,
-        format_issue_message(adw_id, AGENT_PLANNER, "✅ Implementation plan created"),
-        logger
-    )
+        # PRE-COMPUTE the plan file path deterministically
+        # Generate a descriptive name from issue title
+        import re
+        import shutil
+        title_slug = re.sub(r'[^a-z0-9]+', '-', issue.title.lower()).strip('-')[:50]
 
-    # Verify the deterministic plan file was created at the expected path
-    worktree_plan_path = os.path.join(worktree_path, expected_plan_file)
+        # Different naming conventions for different issue types
+        if issue_command == "/patch":
+            # Patch issues go into specs/patch/ subdirectory with patch- prefix
+            expected_plan_file = f"specs/patch/patch-adw-{adw_id}-{title_slug}.md"
+        else:
+            # Feature/bug/chore issues use the standard naming
+            expected_plan_file = f"specs/issue-{issue_number}-adw-{adw_id}-sdlc_planner-{title_slug}.md"
 
-    if os.path.exists(worktree_plan_path):
-        # Save ABSOLUTE path to state so downstream phases can find it
-        plan_file_path = worktree_plan_path
-        logger.info(f"✅ Plan file created at expected path: {plan_file_path}")
-    else:
-        # Check if file was mistakenly created in parent repo
-        parent_repo_root = os.path.dirname(os.path.dirname(worktree_path))
-        parent_plan_path = os.path.join(parent_repo_root, expected_plan_file)
+        logger.info(f"Plan file path (deterministic): {expected_plan_file}")
 
-        if os.path.exists(parent_plan_path):
-            logger.warning(f"Plan file created in parent repo, moving to worktree")
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(worktree_plan_path), exist_ok=True)
-            # Move file to worktree
-            shutil.move(parent_plan_path, worktree_plan_path)
+        # Build the implementation plan (now executing in worktree)
+        logger.info("Building implementation plan in worktree")
+        safe_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_PLANNER, "✅ Building implementation plan in isolated environment"),
+            logger
+        )
+
+        # Pass the pre-computed plan file path to the agent
+        plan_response = build_plan(
+            issue, issue_command, adw_id, logger,
+            working_dir=worktree_path,
+            plan_file_path=expected_plan_file
+        )
+
+        if not plan_response.success:
+            logger.error(f"Error building plan: {plan_response.output}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id, AGENT_PLANNER, f"❌ Error building plan: {plan_response.output}"
+                ),
+            )
+            sys.exit(1)
+
+        logger.debug(f"Plan response: {plan_response.output}")
+        safe_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_PLANNER, "✅ Implementation plan created"),
+            logger
+        )
+
+        # Verify the deterministic plan file was created at the expected path
+        worktree_plan_path = os.path.join(worktree_path, expected_plan_file)
+
+        if os.path.exists(worktree_plan_path):
             # Save ABSOLUTE path to state so downstream phases can find it
             plan_file_path = worktree_plan_path
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", f"⚠️ Plan file was in parent repo, moved to worktree: {plan_file_path}"),
-            )
+            logger.info(f"✅ Plan file created at expected path: {plan_file_path}")
         else:
-            # File doesn't exist at expected location - fail with diagnostic info
-            error = f"Plan file not found at expected path: {expected_plan_file}"
-            logger.error(error)
+            # Check if file was mistakenly created in parent repo
+            parent_repo_root = os.path.dirname(os.path.dirname(worktree_path))
+            parent_plan_path = os.path.join(parent_repo_root, expected_plan_file)
 
-            # Provide diagnostic info
-            specs_dir = os.path.join(worktree_path, "specs")
-            if os.path.exists(specs_dir):
-                import glob
-                pattern = f"*{adw_id}*.md"
-                found_files = glob.glob(os.path.join(specs_dir, "**", pattern), recursive=True)
-                if found_files:
-                    relative_files = [os.path.relpath(f, worktree_path) for f in found_files]
-                    logger.error(f"Files found with ADW ID in specs/: {relative_files}")
-                else:
-                    logger.error(f"No files with ADW ID found in specs/")
+            if os.path.exists(parent_plan_path):
+                logger.warning("Plan file created in parent repo, moving to worktree")
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(worktree_plan_path), exist_ok=True)
+                # Move file to worktree
+                shutil.move(parent_plan_path, worktree_plan_path)
+                # Save ABSOLUTE path to state so downstream phases can find it
+                plan_file_path = worktree_plan_path
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "ops", f"⚠️ Plan file was in parent repo, moved to worktree: {plan_file_path}"),
+                )
+            else:
+                # File doesn't exist at expected location - fail with diagnostic info
+                error = f"Plan file not found at expected path: {expected_plan_file}"
+                logger.error(error)
 
+                # Provide diagnostic info
+                specs_dir = os.path.join(worktree_path, "specs")
+                if os.path.exists(specs_dir):
+                    import glob
+                    pattern = f"*{adw_id}*.md"
+                    found_files = glob.glob(os.path.join(specs_dir, "**", pattern), recursive=True)
+                    if found_files:
+                        relative_files = [os.path.relpath(f, worktree_path) for f in found_files]
+                        logger.error(f"Files found with ADW ID in specs/: {relative_files}")
+                    else:
+                        logger.error("No files with ADW ID found in specs/")
+
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "ops", f"❌ {error}"),
+                )
+                sys.exit(1)
+
+        state.update(plan_file=plan_file_path)
+        state.save("adw_plan_iso")
+        logger.info(f"Plan file validated: {plan_file_path}")
+        safe_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"✅ Plan file validated in worktree: {plan_file_path}"),
+            logger
+        )
+
+        # Generate integration checklist
+        logger.info("[Plan] Generating integration checklist...")
+        integration_checklist = generate_integration_checklist(
+            nl_input=issue.title,
+            issue_body=issue.body,
+            issue_labels=[label.name for label in issue.labels]
+        )
+
+        # Format as markdown for PR comment
+        checklist_markdown = format_checklist_markdown(integration_checklist)
+
+        # Save to state file for Ship phase validation
+        state.update(
+            integration_checklist=integration_checklist.to_dict(),
+            integration_checklist_markdown=checklist_markdown
+        )
+        state.save("adw_plan_iso")
+
+        # Log summary
+        required_items = integration_checklist.get_required_items()
+        logger.info(
+            f"[Plan] Integration checklist generated: "
+            f"{len(required_items)} required items, "
+            f"{len(integration_checklist.get_all_items())} total items"
+        )
+        safe_comment(
+            issue_number,
+            format_issue_message(
+                adw_id, "ops",
+                f"✅ Integration checklist generated: {len(required_items)} required items, "
+                f"{len(integration_checklist.get_all_items())} total items"
+            ),
+            logger
+        )
+
+        # Create commit message
+        logger.info("Creating plan commit")
+        commit_msg, error = create_commit(
+            AGENT_PLANNER, issue, issue_command, adw_id, logger, worktree_path
+        )
+
+        if error:
+            logger.error(f"Error creating commit message: {error}")
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "ops", f"❌ {error}"),
+                format_issue_message(
+                    adw_id, AGENT_PLANNER, f"❌ Error creating commit message: {error}"
+                ),
             )
             sys.exit(1)
 
-    state.update(plan_file=plan_file_path)
-    state.save("adw_plan_iso")
-    logger.info(f"Plan file validated: {plan_file_path}")
-    safe_comment(
-        issue_number,
-        format_issue_message(adw_id, "ops", f"✅ Plan file validated in worktree: {plan_file_path}"),
-        logger
-    )
+        # Commit the plan (in worktree)
+        success, error = commit_changes(commit_msg, cwd=worktree_path)
 
-    # Generate integration checklist
-    logger.info("[Plan] Generating integration checklist...")
-    integration_checklist = generate_integration_checklist(
-        nl_input=issue.title,
-        issue_body=issue.body,
-        issue_labels=[label.name for label in issue.labels]
-    )
+        if not success:
+            logger.error(f"Error committing plan: {error}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id, AGENT_PLANNER, f"❌ Error committing plan: {error}"
+                ),
+            )
+            sys.exit(1)
 
-    # Format as markdown for PR comment
-    checklist_markdown = format_checklist_markdown(integration_checklist)
-
-    # Save to state file for Ship phase validation
-    state.update(
-        integration_checklist=integration_checklist.to_dict(),
-        integration_checklist_markdown=checklist_markdown
-    )
-    state.save("adw_plan_iso")
-
-    # Log summary
-    required_items = integration_checklist.get_required_items()
-    logger.info(
-        f"[Plan] Integration checklist generated: "
-        f"{len(required_items)} required items, "
-        f"{len(integration_checklist.get_all_items())} total items"
-    )
-    safe_comment(
-        issue_number,
-        format_issue_message(
-            adw_id, "ops",
-            f"✅ Integration checklist generated: {len(required_items)} required items, "
-            f"{len(integration_checklist.get_all_items())} total items"
-        ),
-        logger
-    )
-
-    # Create commit message
-    logger.info("Creating plan commit")
-    commit_msg, error = create_commit(
-        AGENT_PLANNER, issue, issue_command, adw_id, logger, worktree_path
-    )
-
-    if error:
-        logger.error(f"Error creating commit message: {error}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(
-                adw_id, AGENT_PLANNER, f"❌ Error creating commit message: {error}"
-            ),
+        logger.info(f"Committed plan: {commit_msg}")
+        safe_comment(
+            issue_number, format_issue_message(adw_id, AGENT_PLANNER, "✅ Plan committed"), logger
         )
-        sys.exit(1)
 
-    # Commit the plan (in worktree)
-    success, error = commit_changes(commit_msg, cwd=worktree_path)
+        # Finalize git operations (push and PR)
+        # Note: This will work from the worktree context
+        finalize_git_operations(state, logger, cwd=worktree_path)
 
-    if not success:
-        logger.error(f"Error committing plan: {error}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(
-                adw_id, AGENT_PLANNER, f"❌ Error committing plan: {error}"
-            ),
-        )
-        sys.exit(1)
-
-    logger.info(f"Committed plan: {commit_msg}")
-    safe_comment(
-        issue_number, format_issue_message(adw_id, AGENT_PLANNER, "✅ Plan committed"), logger
-    )
-
-    # Finalize git operations (push and PR)
-    # Note: This will work from the worktree context
-    finalize_git_operations(state, logger, cwd=worktree_path)
-
-    logger.info("Isolated planning phase completed successfully")
+        logger.info("Isolated planning phase completed successfully")
 
     # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
     try:
