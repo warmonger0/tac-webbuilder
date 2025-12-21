@@ -119,8 +119,13 @@ class StateValidator:
 
             from repositories.phase_queue_repository import PhaseQueueRepository
             repo = PhaseQueueRepository()
-            # Get all phases for this issue (feature_id == issue_number in ADW context)
-            workflows = repo.get_all_by_feature_id(issue_number)
+
+            # Get all phases for this issue
+            # For Panel 5 multi-phase: feature_id may differ from issue_number
+            # (e.g., feature #106 → issues #258, #259 for phases)
+            # So we filter by issue_number instead
+            all_phases = repo.get_all()
+            workflows = [p for p in all_phases if p.issue_number == issue_number]
 
             if not workflows:
                 errors.append(f"Workflow not found for issue {issue_number}")

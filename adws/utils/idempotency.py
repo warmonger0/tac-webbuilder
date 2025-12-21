@@ -315,7 +315,11 @@ def ensure_database_state(
         from app.server.repositories.phase_queue_repository import PhaseQueueRepository
 
         repo = PhaseQueueRepository()
-        workflows = repo.get_all_by_feature_id(issue_number)  # feature_id == issue_number
+        # For Panel 5 multi-phase: feature_id may differ from issue_number
+        # (e.g., feature #106 → issues #258, #259 for phases)
+        # So we filter by issue_number instead
+        all_phases = repo.get_all()
+        workflows = [p for p in all_phases if p.issue_number == issue_number]
         workflow = workflows[0] if workflows else None
 
         if not workflow:
