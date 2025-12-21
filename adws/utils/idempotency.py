@@ -348,7 +348,25 @@ def ensure_database_state(
                 needs_update = True
 
         if needs_update:
-            repo.update_phase(issue_number=issue_number, **update_fields)
+            # Update phase coordination state (current_phase + status)
+            if 'current_phase' in update_fields and 'status' in update_fields:
+                repo.update_phase(
+                    queue_id=workflow.queue_id,
+                    current_phase=update_fields['current_phase'],
+                    status=update_fields['status']
+                )
+            elif 'status' in update_fields:
+                # Status-only update
+                repo.update_status(
+                    queue_id=workflow.queue_id,
+                    status=update_fields['status'],
+                    adw_id=update_fields.get('adw_id')
+                )
+
+            # Handle other field updates
+            if 'error_message' in update_fields:
+                repo.update_error_message(workflow.queue_id, update_fields['error_message'])
+
             logger.info(f"✓ Database state updated for issue {issue_number}")
         else:
             logger.debug(f"✓ Database state already correct for issue {issue_number}")
