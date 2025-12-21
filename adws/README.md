@@ -1485,6 +1485,36 @@ export ADW_DEBUG=true
 uv run adw_plan_build_iso.py 123  # Verbose output
 ```
 
+### GitHub API Rate Limiting
+
+ADW workflows automatically handle GitHub API rate limiting with dual-API fallback:
+
+**Rate Limits:**
+- GraphQL API: 5,000 requests/hour
+- REST API: 5,000 requests/hour (separate quota)
+
+**How It Works:**
+1. Both APIs checked before each request
+2. If GraphQL exhausted → Automatically falls back to REST API
+3. If REST API exhausted → Workflow pauses with clear error message
+4. Both APIs reset on hourly schedule
+
+**Where Fallback Applies:**
+- `fetch_issue()` in Plan phase (gets issue details and comments)
+- `make_issue_comment()` posting after Plan/Build/Test phases
+
+**Example Output:**
+```
+⚠️  GraphQL Rate Limit Exhausted - Falling back to REST API
+GraphQL: 0/5000 (resets in 1823s)
+REST API: 4832/5000 remaining
+```
+
+**Troubleshooting:**
+- If both APIs exhausted: Wait for hourly reset
+- For high-volume workflows (10+ concurrent): Stagger issue processing
+- Monitor rate limit warnings in stderr during intensive runs
+
 ## Configuration
 
 ### ADW Tracking
@@ -1607,8 +1637,9 @@ app_docs/                         # Generated documentation
 #### Modules
 - `adw_modules/agent.py` - Claude Code CLI integration with worktree support
 - `adw_modules/data_types.py` - Pydantic models including worktree fields
-- `adw_modules/github.py` - GitHub API operations
+- `adw_modules/github.py` - GitHub API operations with REST API fallback when GraphQL exhausted
 - `adw_modules/git_ops.py` - Git operations with `cwd` parameter support
+- `adw_modules/rate_limit.py` - GitHub API rate limit checking (GraphQL & REST separate quotas)
 - `adw_modules/state.py` - State management tracking worktrees and ports
 - `adw_modules/workflow_ops.py` - Core workflow operations with isolation
 - `adw_modules/worktree_ops.py` - Worktree and port management

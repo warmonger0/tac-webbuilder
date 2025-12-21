@@ -86,6 +86,39 @@ tac-webbuilder/
 
 ---
 
+## GitHub API Rate Limiting
+
+ADW workflows automatically handle GitHub API rate limiting with intelligent fallback:
+
+**Rate Limits (separate quotas):**
+- GraphQL API: 5,000 requests/hour
+- REST API: 5,000 requests/hour
+
+**Automatic Fallback:**
+- When GraphQL quota exhausted → Automatically uses REST API
+- When REST API quota exhausted → Workflow pauses gracefully
+- Status messages shown in stderr with current limit info
+- Both APIs checked before making requests
+
+**Where This Matters:**
+- `fetch_issue()` - Issue fetching in Plan phase
+- `make_issue_comment()` - Comment posting after phases complete
+- Both functions in `adws/adw_modules/github.py`
+
+**What You'll See:**
+```
+⚠️  GraphQL Rate Limit Exhausted - Falling back to REST API
+GraphQL: 0/5000 (resets in 1823s)
+REST API: 4832/5000 remaining
+```
+
+**Prevention:**
+- Monitor rate limit usage during high-volume ADW runs
+- Stagger issue processing if running 10+ concurrent workflows
+- Rate limits reset hourly
+
+---
+
 ## Quick Commands
 
 ### Full Stack

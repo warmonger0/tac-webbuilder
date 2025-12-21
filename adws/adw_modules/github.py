@@ -78,83 +78,156 @@ def extract_repo_path(github_url: str) -> str:
 
 
 def fetch_issue(issue_number: str, repo_path: str) -> GitHubIssue:
-    """Fetch GitHub issue using gh CLI and return typed model."""
-    # Check rate limit before making API call
-    rate_limit = check_graphql_rate_limit()
-    if rate_limit and rate_limit.is_exhausted:
-        print(f"\n{'='*60}", file=sys.stderr)
-        print("⚠️  GitHub GraphQL API Rate Limit Exhausted", file=sys.stderr)
-        print(f"{'='*60}", file=sys.stderr)
-        print(f"Current Status: {rate_limit.remaining}/{rate_limit.limit} remaining", file=sys.stderr)
-        print(f"Resets in: {rate_limit.seconds_until_reset} seconds (~{rate_limit.seconds_until_reset // 60} minutes)", file=sys.stderr)
-        print(f"Reset time: {rate_limit.reset_at}", file=sys.stderr)
-        print(f"\n💡 Try again after the rate limit resets.", file=sys.stderr)
-        print(f"{'='*60}\n", file=sys.stderr)
-        raise RateLimitError(rate_limit)
-    elif rate_limit and rate_limit.remaining < 100:
-        print(f"\n⚠️  Warning: GitHub API rate limit low ({rate_limit.remaining}/{rate_limit.limit} remaining)", file=sys.stderr)
+    """Fetch GitHub issue using gh CLI with REST API fallback when GraphQL is exhausted.
 
-    # Use JSON output for structured data
-    cmd = [
-        "gh",
-        "issue",
-        "view",
-        issue_number,
-        "-R",
-        repo_path,
-        "--json",
-        "number,title,body,state,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url",
-    ]
+    Automatically falls back to REST API if GraphQL rate limit is exhausted.
+    REST API has a separate 5000 req/hour quota.
+    """
+    from .rate_limit import check_graphql_rate_limit, check_rest_rate_limit
+
+    # Check rate limits
+    graphql_limit = check_graphql_rate_limit()
+    rest_limit = check_rest_rate_limit()
+
+    use_rest_api = False
+
+    # Decide whether to use REST API fallback
+    if graphql_limit and graphql_limit.is_exhausted:
+        if rest_limit and not rest_limit.is_exhausted:
+            print(f"\n{'='*60}", file=sys.stderr)
+            print("⚠️  GraphQL Rate Limit Exhausted - Falling back to REST API", file=sys.stderr)
+            print(f"{'='*60}", file=sys.stderr)
+            print(f"GraphQL: {graphql_limit.remaining}/{graphql_limit.limit} (resets in {graphql_limit.seconds_until_reset}s)", file=sys.stderr)
+            print(f"REST API: {rest_limit.remaining}/{rest_limit.limit} remaining", file=sys.stderr)
+            print(f"{'='*60}\n", file=sys.stderr)
+            use_rest_api = True
+        else:
+            # Both APIs exhausted
+            print(f"\n{'='*60}", file=sys.stderr)
+            print("⚠️  All GitHub API Rate Limits Exhausted", file=sys.stderr)
+            print(f"{'='*60}", file=sys.stderr)
+            print(f"GraphQL: {graphql_limit.remaining}/{graphql_limit.limit} (resets in {graphql_limit.seconds_until_reset}s)", file=sys.stderr)
+            if rest_limit:
+                print(f"REST: {rest_limit.remaining}/{rest_limit.limit} (resets in {rest_limit.seconds_until_reset}s)", file=sys.stderr)
+            print(f"\n💡 Try again after rate limits reset.", file=sys.stderr)
+            print(f"{'='*60}\n", file=sys.stderr)
+            raise RateLimitError(graphql_limit)
+    elif graphql_limit and graphql_limit.remaining < 100:
+        print(f"\n⚠️  Warning: GraphQL API rate limit low ({graphql_limit.remaining}/{graphql_limit.limit} remaining)", file=sys.stderr)
 
     # Set up environment with GitHub token if available
     env = get_github_env()
 
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    if use_rest_api:
+        # Use REST API endpoint directly
+        try:
+            cmd = ["gh", "api", f"repos/{repo_path}/issues/{issue_number}"]
+            result = subprocess.run(cmd, capture_output=True, text=True, env=env)
 
-        if result.returncode == 0:
-            # Parse JSON response into Pydantic model
-            issue_data = json.loads(result.stdout)
-            issue = GitHubIssue(**issue_data)
+            if result.returncode == 0:
+                issue_data = json.loads(result.stdout)
 
-            return issue
-        else:
-            # Check if error is due to rate limit
-            if "API rate limit exceeded" in result.stderr or "rate limit" in result.stderr.lower():
-                print(f"\n{'='*60}", file=sys.stderr)
-                print("⚠️  GitHub API Rate Limit Error", file=sys.stderr)
-                print(f"{'='*60}", file=sys.stderr)
-                print(result.stderr, file=sys.stderr)
+                # Transform REST API response to match GraphQL structure
+                transformed = {
+                    "number": issue_data["number"],
+                    "title": issue_data["title"],
+                    "body": issue_data.get("body", ""),
+                    "state": issue_data["state"],
+                    "author": {"login": issue_data["user"]["login"]},
+                    "assignees": [{"login": a["login"]} for a in issue_data.get("assignees", [])],
+                    "labels": [{"name": l["name"]} for l in issue_data.get("labels", [])],
+                    "milestone": issue_data.get("milestone"),
+                    "comments": [],  # REST API doesn't include comments in issue endpoint
+                    "createdAt": issue_data["created_at"],
+                    "updatedAt": issue_data["updated_at"],
+                    "closedAt": issue_data.get("closed_at"),
+                    "url": issue_data["html_url"]
+                }
 
-                # Try to get current rate limit status
-                current_limit = check_graphql_rate_limit()
-                if current_limit:
-                    print(f"\nCurrent Status: {current_limit.remaining}/{current_limit.limit} remaining", file=sys.stderr)
-                    print(f"Resets in: {current_limit.seconds_until_reset}s (~{current_limit.seconds_until_reset // 60} min)", file=sys.stderr)
-                print(f"{'='*60}\n", file=sys.stderr)
+                # Fetch comments separately if needed
+                if issue_data.get("comments", 0) > 0:
+                    comments_cmd = ["gh", "api", f"repos/{repo_path}/issues/{issue_number}/comments"]
+                    comments_result = subprocess.run(comments_cmd, capture_output=True, text=True, env=env)
+                    if comments_result.returncode == 0:
+                        comments_data = json.loads(comments_result.stdout)
+                        transformed["comments"] = [
+                            {
+                                "id": c["id"],
+                                "author": {"login": c["user"]["login"]},
+                                "body": c["body"],
+                                "createdAt": c["created_at"]
+                            }
+                            for c in comments_data
+                        ]
+
+                return GitHubIssue(**transformed)
             else:
-                print(result.stderr, file=sys.stderr)
-            sys.exit(result.returncode)
-    except FileNotFoundError:
-        print("Error: GitHub CLI (gh) is not installed.", file=sys.stderr)
-        print("\nTo install gh:", file=sys.stderr)
-        print("  - macOS: brew install gh", file=sys.stderr)
-        print(
-            "  - Linux: See https://github.com/cli/cli#installation",
-            file=sys.stderr,
-        )
-        print(
-            "  - Windows: See https://github.com/cli/cli#installation", file=sys.stderr
-        )
-        print("\nAfter installation, authenticate with: gh auth login", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error parsing issue data: {e}", file=sys.stderr)
-        sys.exit(1)
+                print(f"REST API error: {result.stderr}", file=sys.stderr)
+                sys.exit(result.returncode)
+        except Exception as e:
+            print(f"Error fetching issue via REST API: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        # Use GraphQL (default gh issue view command)
+        cmd = [
+            "gh",
+            "issue",
+            "view",
+            issue_number,
+            "-R",
+            repo_path,
+            "--json",
+            "number,title,body,state,author,assignees,labels,milestone,comments,createdAt,updatedAt,closedAt,url",
+        ]
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+
+            if result.returncode == 0:
+                # Parse JSON response into Pydantic model
+                issue_data = json.loads(result.stdout)
+                issue = GitHubIssue(**issue_data)
+
+                return issue
+            else:
+                # Check if error is due to rate limit
+                if "API rate limit exceeded" in result.stderr or "rate limit" in result.stderr.lower():
+                    print(f"\n{'='*60}", file=sys.stderr)
+                    print("⚠️  GitHub API Rate Limit Error", file=sys.stderr)
+                    print(f"{'='*60}", file=sys.stderr)
+                    print(result.stderr, file=sys.stderr)
+
+                    # Try to get current rate limit status
+                    current_limit = check_graphql_rate_limit()
+                    if current_limit:
+                        print(f"\nCurrent Status: {current_limit.remaining}/{current_limit.limit} remaining", file=sys.stderr)
+                        print(f"Resets in: {current_limit.seconds_until_reset}s (~{current_limit.seconds_until_reset // 60} min)", file=sys.stderr)
+                    print(f"{'='*60}\n", file=sys.stderr)
+                else:
+                    print(result.stderr, file=sys.stderr)
+                sys.exit(result.returncode)
+        except FileNotFoundError:
+            print("Error: GitHub CLI (gh) is not installed.", file=sys.stderr)
+            print("\nTo install gh:", file=sys.stderr)
+            print("  - macOS: brew install gh", file=sys.stderr)
+            print(
+                "  - Linux: See https://github.com/cli/cli#installation",
+                file=sys.stderr,
+            )
+            print(
+                "  - Windows: See https://github.com/cli/cli#installation", file=sys.stderr
+            )
+            print("\nAfter installation, authenticate with: gh auth login", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"Error parsing issue data: {e}", file=sys.stderr)
+            sys.exit(1)
 
 
 def make_issue_comment(issue_id: str, comment: str) -> None:
-    """Post a comment to a GitHub issue using gh CLI."""
+    """Post a comment to a GitHub issue using gh CLI with REST API fallback."""
+    from .rate_limit import check_graphql_rate_limit, check_rest_rate_limit
+
     # Get repo information from git remote
     github_repo_url = get_repo_url()
     repo_path = extract_repo_path(github_repo_url)
@@ -163,22 +236,41 @@ def make_issue_comment(issue_id: str, comment: str) -> None:
     if not comment.startswith(ADW_BOT_IDENTIFIER):
         comment = f"{ADW_BOT_IDENTIFIER} {comment}"
 
-    # Build command
-    cmd = [
-        "gh",
-        "issue",
-        "comment",
-        issue_id,
-        "-R",
-        repo_path,
-        "--body",
-        comment,
-    ]
+    # Check rate limits
+    graphql_limit = check_graphql_rate_limit()
+    rest_limit = check_rest_rate_limit()
+    use_rest_api = False
+
+    if graphql_limit and graphql_limit.is_exhausted:
+        if rest_limit and not rest_limit.is_exhausted:
+            use_rest_api = True
+        # If both exhausted, still try - gh CLI will handle the error
 
     # Set up environment with GitHub token if available
     env = get_github_env()
 
     try:
+        if use_rest_api:
+            # Use REST API directly
+            import json
+            cmd = [
+                "gh", "api",
+                f"repos/{repo_path}/issues/{issue_id}/comments",
+                "-f", f"body={comment}"
+            ]
+        else:
+            # Use GraphQL (default gh issue comment command)
+            cmd = [
+                "gh",
+                "issue",
+                "comment",
+                issue_id,
+                "-R",
+                repo_path,
+                "--body",
+                comment,
+            ]
+
         result = subprocess.run(cmd, capture_output=True, text=True, env=env)
 
         if result.returncode == 0:
