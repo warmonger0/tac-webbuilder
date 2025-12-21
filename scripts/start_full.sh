@@ -26,9 +26,23 @@ echo "🧹 Cleaning up existing processes..."
 pkill -9 -f "python.*server.py" 2>/dev/null || true
 pkill -9 -f "bun.*dev" 2>/dev/null || true
 pkill -9 -f "node.*vite" 2>/dev/null || true
-lsof -ti:${BACKEND_PORT} | xargs kill -9 2>/dev/null || true
-lsof -ti:${FRONTEND_PORT} | xargs kill -9 2>/dev/null || true
+
+# Aggressively kill anything on target ports (including 5174 to prevent auto-increment)
+for port in ${BACKEND_PORT} ${FRONTEND_PORT} 5174; do
+    lsof -ti:${port} | xargs kill -9 2>/dev/null || true
+done
 sleep 1
+
+# Verify ports are clear (retry up to 3 times)
+for i in {1..3}; do
+    BUSY_PORTS=$(lsof -ti:${BACKEND_PORT},${FRONTEND_PORT},5174 2>/dev/null || true)
+    if [ -z "$BUSY_PORTS" ]; then
+        break
+    fi
+    echo "Ports still busy, retrying cleanup ($i/3)..."
+    echo "$BUSY_PORTS" | xargs kill -9 2>/dev/null || true
+    sleep 1
+done
 
 # Start backend
 cd "$PROJECT_DIR"
