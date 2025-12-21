@@ -52,6 +52,9 @@ POSTGRES_DB=${POSTGRES_DB:-tac_webbuilder}
 POSTGRES_USER=${POSTGRES_USER:-tac_user}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
 
+# Webhook secret (from .env file)
+GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
+
 # Function to cleanup on exit
 cleanup() {
     echo -e "\n${BLUE}🛑 Shutting down services...${NC}"
@@ -72,6 +75,7 @@ POSTGRES_DB=$POSTGRES_DB \
 POSTGRES_USER=$POSTGRES_USER \
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
 DB_TYPE=postgresql \
+GITHUB_WEBHOOK_SECRET=$GITHUB_WEBHOOK_SECRET \
 uv run trigger_webhook.py > /tmp/tac_webhook.log 2>&1 &
 WEBHOOK_PID=$!
 
