@@ -36,16 +36,24 @@ class Phase:
     estimated_hours: float
     files_to_modify: List[str]
     depends_on: List[Tuple[int, int]]  # List of (issue_id, phase_number) dependencies
+    estimated_tokens: int = 0  # Estimated token count for context
+    file_count: int = 0  # Number of files to modify
 
     @property
     def filename(self) -> str:
         """Generate filename for this phase prompt."""
         slug = self._slugify(self.title)
+        warning = ""
+
+        # Add warning emoji if phase might exceed context limits
+        if self.file_count > 20 or self.estimated_tokens > 150000:
+            warning = "⚠️_"
+
         if self.total_phases == 1:
             if self.estimated_hours <= 2.0:
-                return f"QUICK_WIN_{self.issue_id}_{slug}.md"
-            return f"FEATURE_{self.issue_id}_{slug}.md"
-        return f"FEATURE_{self.issue_id}_PHASE_{self.phase_number}_{slug}.md"
+                return f"{warning}QUICK_WIN_{self.issue_id}_{slug}.md"
+            return f"{warning}FEATURE_{self.issue_id}_{slug}.md"
+        return f"{warning}FEATURE_{self.issue_id}_PHASE_{self.phase_number}_{slug}.md"
 
     @staticmethod
     def _slugify(text: str) -> str:

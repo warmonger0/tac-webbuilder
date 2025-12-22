@@ -51,8 +51,9 @@
 → Read `.claude/commands/references/recent_work.md` [~1,000 tokens]
 
 **Major architectural milestones:**
+- **Session 28**: Tool call tracking complete (all 10 ADW phases, GitHub API monitoring)
 - **Session 23**: Progressive loading system (75% context reduction, logic gates)
-- **Session 22**: Tool call tracking infrastructure (pattern learning)
+- **Session 22**: Tool call tracking infrastructure (ToolCallTracker module, 3/10 phases)
 - **Session 19**: ADW loop prevention (Issue #168 - verification control)
 - **Sessions 15-16**: WebSocket migration (6/6 components, <2s latency)
 - **Sessions 7-14**: Observability foundation (pattern analysis, cost tracking)

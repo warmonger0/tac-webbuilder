@@ -1,6 +1,6 @@
 # Observability & Analytics Quick Reference
 
-## What's New (Sessions 7-14)
+## What's New (Sessions 7-28)
 **Major enhancements to observability and analytics:**
 - **Session 7:** Daily Pattern Analysis CLI + `pattern_approvals` table
 - **Session 8A:** Plans Panel backend + `planned_features` table for roadmap tracking
@@ -10,6 +10,8 @@
 - **Session 12:** Closed-Loop ROI Tracking (pattern detection → approval → implementation → actual savings)
 - **Session 13:** Confidence Updating System (auto-update confidence scores based on outcomes)
 - **Session 14:** Auto-Archiving System (session documentation cleanup)
+- **Session 22:** Tool Call Tracking Infrastructure (ToolCallTracker module, 3/10 phases)
+- **Session 28:** Tool Call Tracking Complete (all 10 ADW phases, GitHub API monitoring)
 
 **Key CLI Tools:**
 ```bash
@@ -66,7 +68,7 @@ python scripts/confidence_updater.py --auto           # Update confidence scores
 **Key View:** `v_high_value_patterns` - Patterns with >70 confidence, >$0.50/month savings
 
 ### 3. Cost Tracking (ROI Measurement)
-**Tables:** `cost_savings_log`, `tool_calls`
+**Tables:** `cost_savings_log`, `tool_calls`, `task_logs.tool_calls`
 **Purpose:** Track optimization impact and measure savings
 
 **Optimization Types:**
@@ -81,6 +83,13 @@ python scripts/confidence_updater.py --auto           # Update confidence scores
 - `baseline_cost` - Original cost
 - `actual_cost` - Optimized cost
 - `optimization_type` - Category
+
+**Tool Call Tracking (Session 22-28):**
+- **All 10 ADW phases** now track subprocess tool calls via ToolCallTracker
+- Captures: tool_name, timestamps, duration_ms, success/failure, error_messages, parameters
+- Data logged to `task_logs.tool_calls` JSONB column (GIN indexed)
+- Enables pattern analysis, performance metrics, cost attribution
+- ~15+ tool types tracked: git operations, build tools, test tools, system commands, GitHub CLI
 
 **Key View:** `v_cost_savings_summary` - Aggregated savings by type
 

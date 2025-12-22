@@ -15,6 +15,7 @@ AI Developer Workflow - Automated development via isolated git worktrees + Claud
 - **Lint Phase:** TypeScript/ESLint validation prevents deploying broken code
 - **Ship Phase:** Automatic PR approval and merge (in ZTE workflows)
 - **Cleanup Phase:** Automatic worktree removal and artifact organization
+- **Tool Call Tracking (Session 28):** All 10 phases track subprocess tool calls for analytics
 - **External Tools:** Enabled by default for 70-95% token reduction
 - **Optimized Plan:** Optional flag for faster planning workflow
 - **Flag Support:** --skip-e2e, --skip-resolution, --no-external, --use-optimized-plan
