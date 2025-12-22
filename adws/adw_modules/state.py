@@ -48,7 +48,9 @@ class ADWState:
             # Phase output metadata
             "baseline_errors", "external_build_results", "external_lint_results",
             "external_test_results", "review_results", "integration_checklist",
-            "integration_checklist_markdown"
+            "integration_checklist_markdown",
+            # Multi-stage analysis results (Phase 1 extensions)
+            "component_analysis", "dry_findings", "context_analysis", "multi_stage_metadata"
         }
 
         # Validate no forbidden fields (SSoT enforcement)
@@ -138,6 +140,11 @@ class ADWState:
             start_time=self.data.get("start_time"),
             nl_input=self.data.get("nl_input"),
             github_url=self.data.get("github_url"),
+            # Multi-stage analysis results (Phase 1 extensions)
+            component_analysis=self.data.get("component_analysis"),
+            dry_findings=self.data.get("dry_findings"),
+            context_analysis=self.data.get("context_analysis"),
+            multi_stage_metadata=self.data.get("multi_stage_metadata"),
         )
 
         # Start with validated core fields

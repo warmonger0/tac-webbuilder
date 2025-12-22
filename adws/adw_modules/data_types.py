@@ -249,6 +249,12 @@ class ADWStateData(BaseModel):
     nl_input: Optional[str] = None  # Natural language input from user
     github_url: Optional[str] = None  # GitHub issue URL
 
+    # Multi-stage analysis results (Phase 1 extensions)
+    component_analysis: Optional["ComponentAnalysis"] = None
+    dry_findings: Optional[List["DRYFinding"]] = None
+    context_analysis: Optional["ContextAnalysis"] = None
+    multi_stage_metadata: Optional[dict] = None  # Flexible field for future extensions
+
     # NOTE: 'status' and 'current_phase' removed - Database is SSoT for coordination
     # Use PhaseQueueRepository to read/write workflow status and current phase
 
@@ -293,12 +299,107 @@ class DocumentationResult(BaseModel):
 
 class ADWExtractionResult(BaseModel):
     """Result from extracting ADW information from text."""
-    
+
     workflow_command: Optional[str] = None  # e.g., "adw_plan_iso" (without slash)
     adw_id: Optional[str] = None  # 8-character ADW ID
     model_set: Optional[ModelSet] = "base"  # Model set to use, defaults to "base"
-    
+
     @property
     def has_workflow(self) -> bool:
         """Check if a workflow command was extracted."""
         return self.workflow_command is not None
+
+
+# Component types for ComponentAnalysis
+class ComponentType(str, Enum):
+    """Types of software components."""
+
+    FRONTEND = "frontend"
+    BACKEND = "backend"
+    DATABASE = "database"
+    API = "api"
+    UTILITY = "utility"
+    TEST = "test"
+
+
+class ComponentAnalysis(BaseModel):
+    """Component-level analysis with complexity and dependencies."""
+
+    component_type: ComponentType
+    complexity_score: float = Field(ge=0.0, le=1.0)  # Must be between 0.0 and 1.0
+    dependencies: List[str] = Field(default_factory=list)
+    lines_of_code: int = Field(ge=0)
+    file_count: int = Field(ge=0)
+    reasoning: str
+
+    @property
+    def is_frontend(self) -> bool:
+        """Check if component is frontend type."""
+        return self.component_type == ComponentType.FRONTEND
+
+    @property
+    def is_backend(self) -> bool:
+        """Check if component is backend type."""
+        return self.component_type == ComponentType.BACKEND
+
+
+# DRY violation severity levels
+class DRYSeverity(str, Enum):
+    """Severity levels for DRY violations."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class DRYFinding(BaseModel):
+    """DRY (Don't Repeat Yourself) violation finding."""
+
+    severity: DRYSeverity
+    pattern_description: str
+    occurrences: int = Field(gt=0)  # Must be at least 1
+    locations: List[str]  # Format: "file.py:line"
+    suggested_refactor: Optional[str] = None
+    estimated_savings_loc: int = Field(ge=0)
+
+    @property
+    def is_critical(self) -> bool:
+        """Check if severity is critical."""
+        return self.severity == DRYSeverity.CRITICAL
+
+    @property
+    def is_high(self) -> bool:
+        """Check if severity is high."""
+        return self.severity == DRYSeverity.HIGH
+
+
+# Analysis scope levels
+class AnalysisScope(str, Enum):
+    """Scope levels for contextual analysis."""
+
+    FILE = "file"
+    MODULE = "module"
+    SUBSYSTEM = "subsystem"
+    SYSTEM = "system"
+
+
+class ContextAnalysis(BaseModel):
+    """Contextual impact analysis for code changes."""
+
+    scope: AnalysisScope
+    affected_files: List[str] = Field(default_factory=list)
+    integration_points: List[str] = Field(default_factory=list)
+    risk_assessment: str
+    test_coverage_required: bool
+    estimated_impact_loc: int = Field(ge=0)
+
+    @property
+    def is_system_wide(self) -> bool:
+        """Check if scope is system-wide."""
+        return self.scope == AnalysisScope.SYSTEM
+
+    @property
+    def requires_integration_tests(self) -> bool:
+        """Check if integration tests are needed based on scope."""
+        return self.scope in (AnalysisScope.SUBSYSTEM, AnalysisScope.SYSTEM)
