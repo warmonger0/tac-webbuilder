@@ -135,6 +135,21 @@
   - Latest comment is exactly "adw"
 - **Usage:** `uv run adw_triggers/trigger_cron.py`
 
+## Robustness & Validation
+
+### Phase Script Validation (Since Session 23)
+- **StateValidator:** Uses lazy imports with graceful fallback
+- **Database-optional:** Phase scripts validate via filesystem (adw_state.json, plan files)
+- **Benefit:** Phase scripts work without psycopg2 dependency
+- **Architecture:** Phase validation separated from database updates (PhaseCoordinator responsibility)
+
+### Loop Detection (Since Session 23)
+- **Method:** Simple deterministic 🔁 marker counting (not agent-name heuristics)
+- **Threshold:** MAX_LOOP_MARKERS=12 (workflow-wide safety net)
+- **Markers added:** Phase retry messages, test retry messages
+- **Benefit:** No false positives from verbose phases with multiple agent comments
+- **Philosophy:** Cascading resolution handles escalation (external 3x → LLM 3x → phase retry 3x)
+
 ## Workflow Selection
 
 ### Via Issue Body Keywords
