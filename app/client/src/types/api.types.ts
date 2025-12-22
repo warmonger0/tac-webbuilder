@@ -120,6 +120,7 @@ export interface SubmitRequestData {
   project_path?: string;
   auto_post: boolean;
   phases?: Phase[];  // NEW: multi-phase data
+  workflow?: string; // ADW workflow to use (e.g., 'adw_sdlc_complete_iso')
 }
 
 export interface PredictedPattern {

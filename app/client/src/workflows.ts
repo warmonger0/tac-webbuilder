@@ -85,10 +85,24 @@ export const workflows: WorkflowTemplate[] = [
 
   // === Complete SDLC Workflows ===
   {
-    name: "Complete SDLC",
+    name: "Complete SDLC (11 Phases)",
+    script_name: "adw_sdlc_complete_iso",
+    description: "Full Software Development Life Cycle with ALL 11 phases: Analyze, Plan, Validate, Build, Lint, Test, Review, Document, Ship, Cleanup, Verify",
+    use_case: "Use for complete feature development from scratch. Requires manual PR approval before merging. RECOMMENDED for most tasks.",
+    category: "full-sdlc"
+  },
+  {
+    name: "Skip Planning (Build → Ship)",
+    script_name: "adw_sdlc_from_build_iso",
+    description: "Complete SDLC starting from Build phase - skips Analyze and Plan. Runs 8 phases: Build, Lint, Test, Review, Document, Ship, Cleanup, Verify",
+    use_case: "Use when you already have a detailed implementation plan and want to skip planning phases. Requires existing worktree and plan file.",
+    category: "full-sdlc"
+  },
+  {
+    name: "Complete SDLC (Legacy)",
     script_name: "adw_sdlc_iso",
-    description: "Full Software Development Life Cycle: plan, build, test, review, and document",
-    use_case: "Use for complete feature development. Requires manual PR approval before merging",
+    description: "Legacy workflow (missing Lint phase) - use adw_sdlc_complete_iso instead",
+    use_case: "DEPRECATED: Use Complete SDLC (11 Phases) instead",
     category: "full-sdlc"
   },
   {

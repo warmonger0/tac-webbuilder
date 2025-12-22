@@ -9,6 +9,7 @@ import { FileUploadSection } from './request-form/FileUploadSection';
 import { ContextAnalysisButton } from './context-review/ContextAnalysisButton';
 import { ContextReviewPanel } from './context-review/ContextReviewPanel';
 import { ErrorBanner } from './common/ErrorBanner';
+import { getAllWorkflows } from '../workflows';
 
 export function RequestFormCore() {
   const [contextReviewId, setContextReviewId] = useState<number | null>(null);
@@ -20,6 +21,8 @@ export function RequestFormCore() {
     setProjectPath,
     autoPost,
     setAutoPost,
+    selectedWorkflow,
+    setSelectedWorkflow,
 
     // UI state
     isLoading,
@@ -120,6 +123,31 @@ export function RequestFormCore() {
                 onChange={(e) => setProjectPath(e.target.value)}
                 className="w-full p-3 bg-slate-800 border border-slate-600 text-white placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
+            </div>
+
+            {/* Workflow Selector */}
+            <div>
+              <label
+                htmlFor="workflow-selector"
+                className="block text-sm font-medium text-slate-300 mb-2"
+              >
+                ADW Workflow
+              </label>
+              <select
+                id="workflow-selector"
+                value={selectedWorkflow}
+                onChange={(e) => setSelectedWorkflow(e.target.value)}
+                className="w-full p-3 bg-slate-800 border border-slate-600 text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+              >
+                {getAllWorkflows().map(workflow => (
+                  <option key={workflow.script_name} value={workflow.script_name}>
+                    {workflow.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-400 mt-1">
+                Choose which workflow to run when this issue is created
+              </p>
             </div>
 
             {/* Context Analysis Section */}

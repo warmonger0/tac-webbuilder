@@ -11,6 +11,7 @@ import { PreflightChecksResponse, systemClient } from '../api/systemClient';
 import { PreflightCheckModal } from './PreflightCheckModal';
 import { apiConfig } from '../config/api';
 import { useGlobalWebSocket } from '../contexts/GlobalWebSocketContext';
+import { getWorkflowsByCategory } from '../workflows';
 
 // ============================================================================
 // Utility Functions
@@ -229,6 +230,7 @@ interface FeatureListSectionProps {
   onGeneratePlan?: (id: number) => void;
   generatingPlanId?: number | null;
   generatedPlans?: Map<number, PlanSummary>;
+  onWorkflowChange?: (featureId: number, workflowType: string) => void;
 }
 
 function FeatureListSection({
@@ -243,7 +245,8 @@ function FeatureListSection({
   startingAutomationId,
   onGeneratePlan,
   generatingPlanId,
-  generatedPlans
+  generatedPlans,
+  onWorkflowChange
 }: FeatureListSectionProps) {
   const displayedFeatures = showAllCompleted !== undefined && !showAllCompleted
     ? features.slice(0, 15)
@@ -268,6 +271,7 @@ function FeatureListSection({
                 onGeneratePlan={onGeneratePlan}
                 isGeneratingPlan={generatingPlanId === feature.id}
                 generatedPlan={generatedPlans?.get(feature.id)}
+                onWorkflowChange={onWorkflowChange}
               />
             ))}
             {showAllCompleted !== undefined && onToggleShowAll && features.length > 15 && (
@@ -436,7 +440,8 @@ function FeatureItem({
   isStartingAutomation,
   onGeneratePlan,
   isGeneratingPlan,
-  generatedPlan
+  generatedPlan,
+  onWorkflowChange
 }: {
   feature: PlannedFeature;
   onStartAutomation?: (id: number) => void;
@@ -444,11 +449,24 @@ function FeatureItem({
   onGeneratePlan?: (id: number) => void;
   isGeneratingPlan?: boolean;
   generatedPlan?: PlanSummary;
+  onWorkflowChange?: (featureId: number, workflowType: string) => void;
 }) {
   const [showPlan, setShowPlan] = useState(false);
+  const [selectedWorkflow, setSelectedWorkflow] = useState(feature.workflow_type || 'adw_sdlc_complete_iso');
   const isCompleted = feature.status === 'completed';
   const isInProgress = feature.status === 'in_progress';
   const isPlanned = feature.status === 'planned';
+
+  // Get available workflows for dropdown
+  const availableWorkflows = useMemo(() => getWorkflowsByCategory('full-sdlc'), []);
+
+  // Handle workflow change
+  const handleWorkflowChange = (newWorkflow: string) => {
+    setSelectedWorkflow(newWorkflow);
+    if (onWorkflowChange) {
+      onWorkflowChange(feature.id, newWorkflow);
+    }
+  };
 
   return (
     <div className="flex items-start">
@@ -483,37 +501,65 @@ function FeatureItem({
         />
         {/* Action buttons for planned/in-progress features */}
         {(isPlanned || isInProgress) && (
-          <div className="mt-2 flex gap-2 flex-wrap">
-            {/* Generate Plan button */}
-            {onGeneratePlan && (
-              <button
-                onClick={() => onGeneratePlan(feature.id)}
-                disabled={isGeneratingPlan}
-                className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {isGeneratingPlan ? '⏳ Generating...' : '📋 Generate Plan'}
-              </button>
+          <div className="mt-2 space-y-2">
+            {/* Workflow Selector */}
+            {onStartAutomation && (
+              <div className="flex flex-col gap-1">
+                <label htmlFor={`workflow-selector-${feature.id}`} className="text-xs font-medium text-gray-700">
+                  Workflow:
+                </label>
+                <select
+                  id={`workflow-selector-${feature.id}`}
+                  value={selectedWorkflow}
+                  onChange={(e) => handleWorkflowChange(e.target.value)}
+                  disabled={isStartingAutomation}
+                  className="px-3 py-2 border border-gray-300 rounded text-sm bg-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed max-w-md"
+                  title={availableWorkflows.find(w => w.script_name === selectedWorkflow)?.use_case || ''}
+                >
+                  {availableWorkflows.map(workflow => (
+                    <option key={workflow.script_name} value={workflow.script_name}>
+                      {workflow.name} - {workflow.description.substring(0, 80)}...
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 italic">
+                  {availableWorkflows.find(w => w.script_name === selectedWorkflow)?.use_case || ''}
+                </p>
+              </div>
             )}
 
-            {/* Start/Retry Automation button */}
-            {onStartAutomation && (
-              <button
-                onClick={() => onStartAutomation(feature.id)}
-                disabled={isStartingAutomation}
-                className={`px-3 py-1 text-white text-sm rounded disabled:bg-gray-400 disabled:cursor-not-allowed ${
-                  isPlanned
-                    ? 'bg-blue-600 hover:bg-blue-700'
-                    : 'bg-orange-600 hover:bg-orange-700'
-                }`}
-              >
-                {isStartingAutomation
-                  ? '⏳ Running checks...'
-                  : isPlanned
-                    ? '🚀 Start Automation'
-                    : '🔄 Retry Automation'
-                }
-              </button>
-            )}
+            <div className="flex gap-2 flex-wrap">
+              {/* Generate Plan button */}
+              {onGeneratePlan && (
+                <button
+                  onClick={() => onGeneratePlan(feature.id)}
+                  disabled={isGeneratingPlan}
+                  className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingPlan ? '⏳ Generating...' : '📋 Generate Plan'}
+                </button>
+              )}
+
+              {/* Start/Retry Automation button */}
+              {onStartAutomation && (
+                <button
+                  onClick={() => onStartAutomation(feature.id)}
+                  disabled={isStartingAutomation}
+                  className={`px-3 py-1 text-white text-sm rounded disabled:bg-gray-400 disabled:cursor-not-allowed ${
+                    isPlanned
+                      ? 'bg-blue-600 hover:bg-blue-700'
+                      : 'bg-orange-600 hover:bg-orange-700'
+                  }`}
+                >
+                  {isStartingAutomation
+                    ? '⏳ Running checks...'
+                    : isPlanned
+                      ? '🚀 Start Automation'
+                      : '🔄 Retry Automation'
+                  }
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -715,6 +761,22 @@ export function PlansPanel() {
     generatePlanMutation.mutate(featureId);
   };
 
+  // Handle workflow type change - update feature immediately
+  const handleWorkflowChange = async (featureId: number, workflowType: string) => {
+    try {
+      await plannedFeaturesClient.update(featureId, { workflow_type: workflowType });
+      // Invalidate queries to refetch updated data
+      queryClient.invalidateQueries({ queryKey: ['planned-features'] });
+    } catch (error) {
+      console.error('Failed to update workflow type:', error);
+      setAutomationMessage({
+        type: 'error',
+        text: `❌ Failed to update workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+      setTimeout(() => setAutomationMessage(null), 5000);
+    }
+  };
+
   // Run pre-flight checks before starting automation
   const handleStartAutomation = async (featureId: number) => {
     const feature = features?.find(f => f.id === featureId);
@@ -869,6 +931,7 @@ export function PlansPanel() {
         onGeneratePlan={handleGeneratePlan}
         generatingPlanId={generatePlanMutation.isPending ? generatePlanMutation.variables : null}
         generatedPlans={generatedPlans}
+        onWorkflowChange={handleWorkflowChange}
       />
 
       <FeatureListSection
@@ -888,6 +951,7 @@ export function PlansPanel() {
         onGeneratePlan={handleGeneratePlan}
         generatingPlanId={generatePlanMutation.isPending ? generatePlanMutation.variables : null}
         generatedPlans={generatedPlans}
+        onWorkflowChange={handleWorkflowChange}
       />
 
       <FeatureListSection

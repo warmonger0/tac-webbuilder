@@ -15,6 +15,8 @@ export interface UseRequestFormReturn {
   setProjectPath: (value: string) => void;
   autoPost: boolean;
   setAutoPost: (value: boolean) => void;
+  selectedWorkflow: string;
+  setSelectedWorkflow: (value: string) => void;
 
   // UI state
   isLoading: boolean;
@@ -70,6 +72,7 @@ export function useRequestForm(): UseRequestFormReturn {
   const [nlInput, setNlInput] = useState('');
   const [projectPath, setProjectPath] = useState('');
   const [autoPost, setAutoPost] = useState(false);
+  const [selectedWorkflow, setSelectedWorkflow] = useState('adw_sdlc_complete_iso');
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
@@ -253,6 +256,7 @@ export function useRequestForm(): UseRequestFormReturn {
         nl_input: nlInput,
         project_path: projectPath || undefined,
         auto_post: autoPost,
+        workflow: selectedWorkflow,
       });
 
       setRequestId(response.request_id);
@@ -342,6 +346,8 @@ export function useRequestForm(): UseRequestFormReturn {
     setProjectPath,
     autoPost,
     setAutoPost,
+    selectedWorkflow,
+    setSelectedWorkflow,
 
     // UI state
     isLoading,

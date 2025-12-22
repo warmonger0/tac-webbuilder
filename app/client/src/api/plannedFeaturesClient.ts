@@ -51,6 +51,7 @@ export interface PlannedFeature {
   tags: string[];
   completion_notes?: string;
   generated_plan?: PlanSummary;
+  workflow_type?: string;
   created_at?: string;
   updated_at?: string;
   started_at?: string;
@@ -80,6 +81,7 @@ export interface PlannedFeatureUpdate {
   github_issue_number?: number;
   tags?: string[];
   completion_notes?: string;
+  workflow_type?: string;
 }
 
 export interface PlannedFeaturesStats {
