@@ -47,6 +47,7 @@ from adw_modules.utils import setup_logger, check_env_vars
 from adw_modules.doc_cleanup import cleanup_adw_documentation
 from adw_modules.worktree_ops import remove_worktree
 from adw_modules.observability import log_phase_completion, get_phase_number
+from adw_modules.tool_call_tracker import ToolCallTracker
 
 # Agent name constant
 AGENT_CLEANUP = "cleanup"
@@ -110,180 +111,181 @@ def main():
         )
     )
 
-    # Step 1: Run cleanup
-    logger.info("Starting documentation cleanup...")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(
-            adw_id,
-            AGENT_CLEANUP,
-            "📁 Organizing documentation files...\n"
-            "- Moving specs to archived issues\n"
-            "- Moving implementation plans\n"
-            "- Moving summaries and related docs\n"
-            "- Removing worktree and freeing resources"
+    with ToolCallTracker(adw_id=adw_id, issue_number=int(issue_number), phase_name="Cleanup") as tracker:
+        # Step 1: Run cleanup
+        logger.info("Starting documentation cleanup...")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(
+                adw_id,
+                AGENT_CLEANUP,
+                "📁 Organizing documentation files...\n"
+                "- Moving specs to archived issues\n"
+                "- Moving implementation plans\n"
+                "- Moving summaries and related docs\n"
+                "- Removing worktree and freeing resources"
+            )
         )
-    )
 
-    try:
-        cleanup_result = cleanup_adw_documentation(
-            issue_number=issue_number,
+        try:
+            cleanup_result = cleanup_adw_documentation(
+                issue_number=issue_number,
+                adw_id=adw_id,
+                state=state,
+                logger=logger,
+                dry_run=False
+            )
+
+            if cleanup_result["success"]:
+                if cleanup_result["files_moved"] > 0:
+                    logger.info(f"✅ Cleaned up {cleanup_result['files_moved']} documentation files")
+
+                    # Build detailed summary
+                    summary_msg = f"✅ **Documentation cleanup completed**\n\n"
+                    summary_msg += f"📊 **Summary:**\n{cleanup_result['summary']}\n"
+
+                    if cleanup_result.get("moves"):
+                        summary_msg += f"\n📝 **Files organized:**\n"
+                        for move in cleanup_result["moves"][:10]:  # Show first 10
+                            src_name = os.path.basename(move["src"])
+                            summary_msg += f"- `{src_name}` → `{move['dest']}`\n"
+
+                        if len(cleanup_result["moves"]) > 10:
+                            summary_msg += f"\n... and {len(cleanup_result['moves']) - 10} more files\n"
+
+                    if cleanup_result.get("errors"):
+                        summary_msg += f"\n⚠️ **Warnings:** {len(cleanup_result['errors'])} file(s) could not be moved\n"
+
+                    make_issue_comment(
+                        issue_number,
+                        format_issue_message(adw_id, AGENT_CLEANUP, summary_msg)
+                    )
+                else:
+                    logger.info("ℹ️ No documentation files needed cleanup")
+                    make_issue_comment(
+                        issue_number,
+                        format_issue_message(
+                            adw_id,
+                            AGENT_CLEANUP,
+                            "ℹ️ No documentation files needed cleanup\n"
+                            "All files are already organized"
+                        )
+                    )
+            else:
+                logger.warning(f"Cleanup completed with errors: {cleanup_result['errors']}")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id,
+                        AGENT_CLEANUP,
+                        f"⚠️ **Documentation cleanup completed with warnings**\n\n"
+                        f"{cleanup_result['summary']}\n\n"
+                        f"Errors: {', '.join(cleanup_result['errors'][:3])}"
+                    )
+                )
+
+        except Exception as e:
+            # Never fail the cleanup workflow
+            error_msg = f"Documentation cleanup error (non-fatal): {e}"
+            logger.error(error_msg)
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    AGENT_CLEANUP,
+                    f"⚠️ **Documentation cleanup encountered an error**\n\n"
+                    f"Error: {str(e)}\n\n"
+                    f"Manual cleanup may be needed"
+                )
+            )
+
+        # Step 2: Remove worktree
+        logger.info("Removing worktree...")
+        try:
+            worktree_path = state.get("worktree_path")
+            if worktree_path:
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id,
+                        AGENT_CLEANUP,
+                        f"🗑️ Removing worktree at `{worktree_path}`..."
+                    )
+                )
+
+                success, error = remove_worktree(adw_id, logger, tracker=tracker)
+                if success:
+                    logger.info(f"✅ Worktree removed: {worktree_path}")
+                    make_issue_comment(
+                        issue_number,
+                        format_issue_message(
+                            adw_id,
+                            AGENT_CLEANUP,
+                            f"✅ Worktree removed successfully\n"
+                            f"Freed resources: Backend port, Frontend port, Disk space"
+                        )
+                    )
+                else:
+                    logger.warning(f"Failed to remove worktree: {error}")
+                    make_issue_comment(
+                        issue_number,
+                        format_issue_message(
+                            adw_id,
+                            AGENT_CLEANUP,
+                            f"⚠️ Failed to remove worktree: {error}\n"
+                            f"You can manually remove it with: `./scripts/purge_tree.sh {adw_id}`"
+                        )
+                    )
+            else:
+                logger.info("No worktree path in state - skipping worktree removal")
+        except Exception as e:
+            # Never fail cleanup due to worktree removal errors
+            logger.error(f"Error removing worktree (non-fatal): {e}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    AGENT_CLEANUP,
+                    f"⚠️ Error removing worktree: {str(e)}\n"
+                    f"Manual cleanup: `./scripts/purge_tree.sh {adw_id}`"
+                )
+            )
+
+        # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
+        try:
+            validate_phase_completion('cleanup', int(issue_number), logger)
+            ensure_database_state(int(issue_number), 'cleaned_up', 'cleanup', logger)
+        except Exception as e:
+            logger.error(f"Phase validation failed: {e}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", f"❌ Cleanup phase validation failed: {e}")
+            )
+            sys.exit(1)
+
+        # OBSERVABILITY: Log phase completion
+        from datetime import datetime
+        start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+        log_phase_completion(
             adw_id=adw_id,
-            state=state,
-            logger=logger,
-            dry_run=False
+            issue_number=int(issue_number),
+            phase_name="Cleanup",
+            phase_number=get_phase_number("Cleanup"),
+            success=True,
+            workflow_template="adw_cleanup_iso",
+            started_at=start_time,
         )
 
-        if cleanup_result["success"]:
-            if cleanup_result["files_moved"] > 0:
-                logger.info(f"✅ Cleaned up {cleanup_result['files_moved']} documentation files")
+        # Step 3: Save final state
+        state.save("adw_cleanup_iso")
 
-                # Build detailed summary
-                summary_msg = f"✅ **Documentation cleanup completed**\n\n"
-                summary_msg += f"📊 **Summary:**\n{cleanup_result['summary']}\n"
-
-                if cleanup_result.get("moves"):
-                    summary_msg += f"\n📝 **Files organized:**\n"
-                    for move in cleanup_result["moves"][:10]:  # Show first 10
-                        src_name = os.path.basename(move["src"])
-                        summary_msg += f"- `{src_name}` → `{move['dest']}`\n"
-
-                    if len(cleanup_result["moves"]) > 10:
-                        summary_msg += f"\n... and {len(cleanup_result['moves']) - 10} more files\n"
-
-                if cleanup_result.get("errors"):
-                    summary_msg += f"\n⚠️ **Warnings:** {len(cleanup_result['errors'])} file(s) could not be moved\n"
-
-                make_issue_comment(
-                    issue_number,
-                    format_issue_message(adw_id, AGENT_CLEANUP, summary_msg)
-                )
-            else:
-                logger.info("ℹ️ No documentation files needed cleanup")
-                make_issue_comment(
-                    issue_number,
-                    format_issue_message(
-                        adw_id,
-                        AGENT_CLEANUP,
-                        "ℹ️ No documentation files needed cleanup\n"
-                        "All files are already organized"
-                    )
-                )
-        else:
-            logger.warning(f"Cleanup completed with errors: {cleanup_result['errors']}")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(
-                    adw_id,
-                    AGENT_CLEANUP,
-                    f"⚠️ **Documentation cleanup completed with warnings**\n\n"
-                    f"{cleanup_result['summary']}\n\n"
-                    f"Errors: {', '.join(cleanup_result['errors'][:3])}"
-                )
-            )
-
-    except Exception as e:
-        # Never fail the cleanup workflow
-        error_msg = f"Documentation cleanup error (non-fatal): {e}"
-        logger.error(error_msg)
+        # Post final state summary
         make_issue_comment(
             issue_number,
-            format_issue_message(
-                adw_id,
-                AGENT_CLEANUP,
-                f"⚠️ **Documentation cleanup encountered an error**\n\n"
-                f"Error: {str(e)}\n\n"
-                f"Manual cleanup may be needed"
-            )
+            f"{adw_id}_ops: 📋 Final cleanup state:\n```json\n{json.dumps(state.data, indent=2)}\n```"
         )
 
-    # Step 2: Remove worktree
-    logger.info("Removing worktree...")
-    try:
-        worktree_path = state.get("worktree_path")
-        if worktree_path:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(
-                    adw_id,
-                    AGENT_CLEANUP,
-                    f"🗑️ Removing worktree at `{worktree_path}`..."
-                )
-            )
-
-            success, error = remove_worktree(adw_id, logger)
-            if success:
-                logger.info(f"✅ Worktree removed: {worktree_path}")
-                make_issue_comment(
-                    issue_number,
-                    format_issue_message(
-                        adw_id,
-                        AGENT_CLEANUP,
-                        f"✅ Worktree removed successfully\n"
-                        f"Freed resources: Backend port, Frontend port, Disk space"
-                    )
-                )
-            else:
-                logger.warning(f"Failed to remove worktree: {error}")
-                make_issue_comment(
-                    issue_number,
-                    format_issue_message(
-                        adw_id,
-                        AGENT_CLEANUP,
-                        f"⚠️ Failed to remove worktree: {error}\n"
-                        f"You can manually remove it with: `./scripts/purge_tree.sh {adw_id}`"
-                    )
-                )
-        else:
-            logger.info("No worktree path in state - skipping worktree removal")
-    except Exception as e:
-        # Never fail cleanup due to worktree removal errors
-        logger.error(f"Error removing worktree (non-fatal): {e}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(
-                adw_id,
-                AGENT_CLEANUP,
-                f"⚠️ Error removing worktree: {str(e)}\n"
-                f"Manual cleanup: `./scripts/purge_tree.sh {adw_id}`"
-            )
-        )
-
-    # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
-    try:
-        validate_phase_completion('cleanup', int(issue_number), logger)
-        ensure_database_state(int(issue_number), 'cleaned_up', 'cleanup', logger)
-    except Exception as e:
-        logger.error(f"Phase validation failed: {e}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", f"❌ Cleanup phase validation failed: {e}")
-        )
-        sys.exit(1)
-
-    # OBSERVABILITY: Log phase completion
-    from datetime import datetime
-    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
-    log_phase_completion(
-        adw_id=adw_id,
-        issue_number=int(issue_number),
-        phase_name="Cleanup",
-        phase_number=get_phase_number("Cleanup"),
-        success=True,
-        workflow_template="adw_cleanup_iso",
-        started_at=start_time,
-    )
-
-    # Step 3: Save final state
-    state.save("adw_cleanup_iso")
-
-    # Post final state summary
-    make_issue_comment(
-        issue_number,
-        f"{adw_id}_ops: 📋 Final cleanup state:\n```json\n{json.dumps(state.data, indent=2)}\n```"
-    )
-
-    logger.info("Cleanup workflow completed successfully")
+        logger.info("Cleanup workflow completed successfully")
 
 
 if __name__ == "__main__":

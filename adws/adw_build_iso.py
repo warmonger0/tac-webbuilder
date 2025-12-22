@@ -50,13 +50,15 @@ from adw_modules.utils import setup_logger, check_env_vars
 from adw_modules.data_types import GitHubIssue
 from adw_modules.worktree_ops import validate_worktree
 from adw_modules.observability import log_phase_completion, get_phase_number
+from adw_modules.tool_call_tracker import ToolCallTracker
 
 
 def run_external_build(
     issue_number: str,
     adw_id: str,
     logger: logging.Logger,
-    state: ADWState
+    state: ADWState,
+    tracker=None
 ) -> Tuple[bool, Dict[str, Any]]:
     """
     Run build checks using external build ADW workflow.
@@ -78,7 +80,10 @@ def run_external_build(
     cmd = ["uv", "run", str(build_external_script), issue_number, adw_id]
 
     logger.info(f"Executing: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    if tracker:
+        result = tracker.track_bash("external_build_check", cmd, capture_output=True)
+    else:
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
     # Reload state to get external build results
     reloaded_state = ADWState.load(adw_id)
@@ -200,227 +205,229 @@ def main():
         )
         sys.exit(1)
     
-    # Checkout the branch in the worktree
-    branch_name = state.get("branch_name")
-    result = subprocess.run(["git", "checkout", branch_name], capture_output=True, text=True, cwd=worktree_path)
-    if result.returncode != 0:
-        logger.error(f"Failed to checkout branch {branch_name} in worktree: {result.stderr}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", f"❌ Failed to checkout branch {branch_name} in worktree")
-        )
-        sys.exit(1)
-    logger.info(f"Checked out branch in worktree: {branch_name}")
-    
-    # Get the plan file from state
-    plan_file = state.get("plan_file")
-    logger.info(f"Using plan file: {plan_file}")
-    
-    # Get port information for display
-    backend_port = state.get("backend_port", "9100")
-    frontend_port = state.get("frontend_port", "9200")
-    
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, "ops", f"✅ Starting isolated implementation phase\n"
-                           f"🏠 Worktree: {worktree_path}\n"
-                           f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}\n"
-                           f"🔧 Build Mode: {'External Tools (Context Optimized)' if use_external else 'Inline Execution'}")
-    )
-    
-    # Implement the plan (executing in worktree)
-    logger.info("Implementing solution in worktree")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Implementing solution in isolated environment")
-    )
-    
-    implement_response = implement_plan(plan_file, adw_id, logger, working_dir=worktree_path)
-    
-    if not implement_response.success:
-        logger.error(f"Error implementing solution: {implement_response.output}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error implementing solution: {implement_response.output}")
-        )
-        sys.exit(1)
-    
-    logger.debug(f"Implementation response: {implement_response.output}")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Solution implemented")
-    )
-
-    # Run build check if using external tools
-    if use_external:
-        logger.info("🔧 Running external build check for type validation")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "build_checker", "🔧 Running build checks via external tools (70-95% token reduction)...")
-        )
-
-        # Run external build check
-        build_success, build_results = run_external_build(issue_number, adw_id, logger, state)
-
-        if "error" in build_results:
-            # External tool failed
-            logger.error(f"External build tool error: {build_results['error']}")
+    # Create ToolCallTracker context for Build phase
+    with ToolCallTracker(adw_id=adw_id, issue_number=int(issue_number), phase_name="Build") as tracker:
+        # Checkout the branch in the worktree
+        branch_name = state.get("branch_name")
+        result = tracker.track_bash("git_checkout_branch", ["git", "checkout", branch_name], cwd=worktree_path, capture_output=True)
+        if result.returncode != 0:
+            logger.error(f"Failed to checkout branch {branch_name} in worktree: {result.stderr}")
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "build_checker", f"❌ External build tool error: {build_results['error']}")
+                format_issue_message(adw_id, "ops", f"❌ Failed to checkout branch {branch_name} in worktree")
             )
-        else:
-            # Process external build results
-            summary = build_results.get("summary", {})
-            errors = build_results.get("errors", [])
+            sys.exit(1)
+        logger.info(f"Checked out branch in worktree: {branch_name}")
+    
+        # Get the plan file from state
+        plan_file = state.get("plan_file")
+        logger.info(f"Using plan file: {plan_file}")
 
-            total_errors = summary.get("total_errors", 0)
-            type_errors = summary.get("type_errors", 0)
-            build_errors = summary.get("build_errors", 0)
+        # Get port information for display
+        backend_port = state.get("backend_port", "9100")
+        frontend_port = state.get("frontend_port", "9200")
 
-            # Load baseline from Validate phase (if it ran)
-            baseline_errors_data = state.get("baseline_errors", {})
-            baseline_frontend = baseline_errors_data.get("frontend", {})
-            baseline_error_details = baseline_frontend.get("error_details", [])
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"✅ Starting isolated implementation phase\n"
+                               f"🏠 Worktree: {worktree_path}\n"
+                               f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}\n"
+                               f"🔧 Build Mode: {'External Tools (Context Optimized)' if use_external else 'Inline Execution'}")
+        )
 
-            # Calculate differential errors
-            if baseline_error_details:
-                logger.info("📊 Baseline detected - calculating differential errors")
+        # Implement the plan (executing in worktree)
+        logger.info("Implementing solution in worktree")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Implementing solution in isolated environment")
+        )
 
-                # Create sets of errors for comparison (file:line:message)
-                baseline_error_set = {
-                    (e.get("file", ""), e.get("line", 0), e.get("message", ""))
-                    for e in baseline_error_details
-                }
-                final_error_set = {
-                    (e.get("file", ""), e.get("line", 0), e.get("message", ""))
-                    for e in errors
-                }
+        implement_response = implement_plan(plan_file, adw_id, logger, working_dir=worktree_path)
 
-                # Calculate new and fixed errors
-                new_errors_tuples = final_error_set - baseline_error_set
-                fixed_errors_tuples = baseline_error_set - final_error_set
-
-                # Convert back to error dictionaries
-                new_errors = [e for e in errors if (e.get("file", ""), e.get("line", 0), e.get("message", "")) in new_errors_tuples]
-                num_new_errors = len(new_errors)
-                num_fixed_errors = len(fixed_errors_tuples)
-                num_baseline_errors = len(baseline_error_set)
-
-                logger.info(f"Baseline: {num_baseline_errors}, New: {num_new_errors}, Fixed: {num_fixed_errors}")
-
-                # Override build_success based on new errors only
-                build_success = (num_new_errors == 0)
-
-                # Update total_errors to reflect only new errors
-                total_errors = num_new_errors
-            else:
-                logger.info("No baseline detected - all errors are considered new")
-                new_errors = errors
-                num_new_errors = len(errors)
-                num_fixed_errors = 0
-                num_baseline_errors = 0
-
-            # Format results comment with differential information
-            if build_success:
-                comment = f"✅ Build check passed! No NEW errors introduced.\n"
-                if num_baseline_errors > 0:
-                    comment += f"\n**Differential Error Analysis:**\n"
-                    comment += f"- Baseline (inherited): {num_baseline_errors} errors (ignored)\n"
-                    comment += f"- New errors: 0 ✅\n"
-                    if num_fixed_errors > 0:
-                        comment += f"- Fixed errors: {num_fixed_errors} 🎉\n"
-                comment += f"\n⚡ Context savings: ~93% (using external tools)"
-            else:
-                comment = f"❌ Build check failed: {num_new_errors} NEW error(s) introduced\n\n"
-                if num_baseline_errors > 0:
-                    comment += f"**Differential Error Analysis:**\n"
-                    comment += f"- Baseline (inherited): {num_baseline_errors} errors (ignored)\n"
-                    comment += f"- New errors: {num_new_errors} ❌\n"
-                    if num_fixed_errors > 0:
-                        comment += f"- Fixed errors: {num_fixed_errors} ✨\n"
-                    comment += f"\n"
-                comment += "**New Errors (blocking):**\n"
-                for error in new_errors[:10]:  # Limit to first 10
-                    file_path = error.get("file", "unknown")
-                    line = error.get("line", "?")
-                    col = error.get("column", "?")
-                    msg = error.get("message", "unknown error")
-                    comment += f"- `{file_path}:{line}:{col}` - {msg}\n"
-
-                if len(new_errors) > 10:
-                    comment += f"\n... and {len(new_errors) - 10} more errors\n"
-
-                comment += f"\n⚡ Context savings: ~83% (compact error reporting)"
-                comment += f"\n\n⚠️ Fix NEW build errors before committing"
-
+        if not implement_response.success:
+            logger.error(f"Error implementing solution: {implement_response.output}")
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "build_checker", comment)
+                format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error implementing solution: {implement_response.output}")
             )
-            logger.info(f"External build check: {'✅ Success' if build_success else f'❌ {total_errors} errors'}")
+            sys.exit(1)
 
-            # If build failed, stop here
-            if not build_success:
-                logger.error("Build check failed - stopping workflow")
-                sys.exit(1)
+        logger.debug(f"Implementation response: {implement_response.output}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Solution implemented")
+        )
 
-    # Fetch issue data for commit message generation
-    logger.info("Fetching issue data for commit message")
-    issue = fetch_issue(issue_number, repo_path)
+        # Run build check if using external tools
+        if use_external:
+            logger.info("🔧 Running external build check for type validation")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "build_checker", "🔧 Running build checks via external tools (70-95% token reduction)...")
+            )
+
+            # Run external build check
+            build_success, build_results = run_external_build(issue_number, adw_id, logger, state, tracker)
+
+            if "error" in build_results:
+                # External tool failed
+                logger.error(f"External build tool error: {build_results['error']}")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "build_checker", f"❌ External build tool error: {build_results['error']}")
+                )
+            else:
+                # Process external build results
+                summary = build_results.get("summary", {})
+                errors = build_results.get("errors", [])
+
+                total_errors = summary.get("total_errors", 0)
+                type_errors = summary.get("type_errors", 0)
+                build_errors = summary.get("build_errors", 0)
+
+                # Load baseline from Validate phase (if it ran)
+                baseline_errors_data = state.get("baseline_errors", {})
+                baseline_frontend = baseline_errors_data.get("frontend", {})
+                baseline_error_details = baseline_frontend.get("error_details", [])
+
+                # Calculate differential errors
+                if baseline_error_details:
+                    logger.info("📊 Baseline detected - calculating differential errors")
+
+                    # Create sets of errors for comparison (file:line:message)
+                    baseline_error_set = {
+                        (e.get("file", ""), e.get("line", 0), e.get("message", ""))
+                        for e in baseline_error_details
+                    }
+                    final_error_set = {
+                        (e.get("file", ""), e.get("line", 0), e.get("message", ""))
+                        for e in errors
+                    }
+
+                    # Calculate new and fixed errors
+                    new_errors_tuples = final_error_set - baseline_error_set
+                    fixed_errors_tuples = baseline_error_set - final_error_set
+
+                    # Convert back to error dictionaries
+                    new_errors = [e for e in errors if (e.get("file", ""), e.get("line", 0), e.get("message", "")) in new_errors_tuples]
+                    num_new_errors = len(new_errors)
+                    num_fixed_errors = len(fixed_errors_tuples)
+                    num_baseline_errors = len(baseline_error_set)
+
+                    logger.info(f"Baseline: {num_baseline_errors}, New: {num_new_errors}, Fixed: {num_fixed_errors}")
+
+                    # Override build_success based on new errors only
+                    build_success = (num_new_errors == 0)
+
+                    # Update total_errors to reflect only new errors
+                    total_errors = num_new_errors
+                else:
+                    logger.info("No baseline detected - all errors are considered new")
+                    new_errors = errors
+                    num_new_errors = len(errors)
+                    num_fixed_errors = 0
+                    num_baseline_errors = 0
+
+                # Format results comment with differential information
+                if build_success:
+                    comment = f"✅ Build check passed! No NEW errors introduced.\n"
+                    if num_baseline_errors > 0:
+                        comment += f"\n**Differential Error Analysis:**\n"
+                        comment += f"- Baseline (inherited): {num_baseline_errors} errors (ignored)\n"
+                        comment += f"- New errors: 0 ✅\n"
+                        if num_fixed_errors > 0:
+                            comment += f"- Fixed errors: {num_fixed_errors} 🎉\n"
+                    comment += f"\n⚡ Context savings: ~93% (using external tools)"
+                else:
+                    comment = f"❌ Build check failed: {num_new_errors} NEW error(s) introduced\n\n"
+                    if num_baseline_errors > 0:
+                        comment += f"**Differential Error Analysis:**\n"
+                        comment += f"- Baseline (inherited): {num_baseline_errors} errors (ignored)\n"
+                        comment += f"- New errors: {num_new_errors} ❌\n"
+                        if num_fixed_errors > 0:
+                            comment += f"- Fixed errors: {num_fixed_errors} ✨\n"
+                        comment += f"\n"
+                    comment += "**New Errors (blocking):**\n"
+                    for error in new_errors[:10]:  # Limit to first 10
+                        file_path = error.get("file", "unknown")
+                        line = error.get("line", "?")
+                        col = error.get("column", "?")
+                        msg = error.get("message", "unknown error")
+                        comment += f"- `{file_path}:{line}:{col}` - {msg}\n"
+
+                    if len(new_errors) > 10:
+                        comment += f"\n... and {len(new_errors) - 10} more errors\n"
+
+                    comment += f"\n⚡ Context savings: ~83% (compact error reporting)"
+                    comment += f"\n\n⚠️ Fix NEW build errors before committing"
+
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "build_checker", comment)
+                )
+                logger.info(f"External build check: {'✅ Success' if build_success else f'❌ {total_errors} errors'}")
+
+                # If build failed, stop here
+                if not build_success:
+                    logger.error("Build check failed - stopping workflow")
+                    sys.exit(1)
+
+        # Fetch issue data for commit message generation
+        logger.info("Fetching issue data for commit message")
+        issue = fetch_issue(issue_number, repo_path)
     
-    # Get issue classification from state or classify if needed
-    issue_command = state.get("issue_class")
-    if not issue_command:
-        logger.info("No issue classification in state, running classify_issue")
-        from adw_modules.workflow_ops import classify_issue
-        issue_command, error = classify_issue(issue, adw_id, logger)
+        # Get issue classification from state or classify if needed
+        issue_command = state.get("issue_class")
+        if not issue_command:
+            logger.info("No issue classification in state, running classify_issue")
+            from adw_modules.workflow_ops import classify_issue
+            issue_command, error = classify_issue(issue, adw_id, logger)
+            if error:
+                logger.error(f"Error classifying issue: {error}")
+                # Default to feature if classification fails
+                issue_command = "/feature"
+                logger.warning("Defaulting to /feature after classification error")
+            else:
+                # Save the classification for future use
+                state.update(issue_class=issue_command)
+                state.save("adw_build_iso")
+
+        # Create commit message
+        logger.info("Creating implementation commit")
+        commit_msg, error = create_commit(AGENT_IMPLEMENTOR, issue, issue_command, adw_id, logger, worktree_path)
+
         if error:
-            logger.error(f"Error classifying issue: {error}")
-            # Default to feature if classification fails
-            issue_command = "/feature"
-            logger.warning("Defaulting to /feature after classification error")
-        else:
-            # Save the classification for future use
-            state.update(issue_class=issue_command)
-            state.save("adw_build_iso")
-    
-    # Create commit message
-    logger.info("Creating implementation commit")
-    commit_msg, error = create_commit(AGENT_IMPLEMENTOR, issue, issue_command, adw_id, logger, worktree_path)
-    
-    if error:
-        logger.error(f"Error creating commit message: {error}")
+            logger.error(f"Error creating commit message: {error}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error creating commit message: {error}")
+            )
+            sys.exit(1)
+
+        # Commit the implementation (in worktree)
+        success, error = commit_changes(commit_msg, cwd=worktree_path)
+
+        if not success:
+            logger.error(f"Error committing implementation: {error}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error committing implementation: {error}")
+            )
+            sys.exit(1)
+
+        logger.info(f"Committed implementation: {commit_msg}")
         make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error creating commit message: {error}")
+            issue_number, format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Implementation committed")
         )
-        sys.exit(1)
-    
-    # Commit the implementation (in worktree)
-    success, error = commit_changes(commit_msg, cwd=worktree_path)
-    
-    if not success:
-        logger.error(f"Error committing implementation: {error}")
+
+        # Finalize git operations (push and PR)
+        # Note: This will work from the worktree context
+        finalize_git_operations(state, logger, cwd=worktree_path)
+
+        logger.info("Isolated implementation phase completed successfully")
         make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error committing implementation: {error}")
+            issue_number, format_issue_message(adw_id, "ops", "✅ Isolated implementation phase completed")
         )
-        sys.exit(1)
-    
-    logger.info(f"Committed implementation: {commit_msg}")
-    make_issue_comment(
-        issue_number, format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Implementation committed")
-    )
-    
-    # Finalize git operations (push and PR)
-    # Note: This will work from the worktree context
-    finalize_git_operations(state, logger, cwd=worktree_path)
-    
-    logger.info("Isolated implementation phase completed successfully")
-    make_issue_comment(
-        issue_number, format_issue_message(adw_id, "ops", "✅ Isolated implementation phase completed")
-    )
 
     # Save final state
     state.save("adw_build_iso")

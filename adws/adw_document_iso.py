@@ -59,6 +59,7 @@ from adw_modules.data_types import (
 )
 from adw_modules.agent import execute_template
 from adw_modules.worktree_ops import validate_worktree
+from adw_modules.tool_call_tracker import ToolCallTracker
 
 # Agent name constant
 AGENT_DOCUMENTER = "documenter"
@@ -66,25 +67,29 @@ AGENT_DOCUMENTER = "documenter"
 DOCS_PATH = "app_docs/"
 
 
-def check_for_changes(logger: logging.Logger, cwd: Optional[str] = None) -> bool:
+def check_for_changes(logger: logging.Logger, cwd: Optional[str] = None, tracker: Optional[ToolCallTracker] = None) -> bool:
     """Check if there are any changes between current branch and origin/main.
 
     Args:
         logger: Logger instance
         cwd: Working directory to run git commands in
+        tracker: Optional ToolCallTracker for tracking subprocess calls
 
     Returns:
         bool: True if changes exist, False if no changes
     """
     try:
         # Check for changes against origin/main
-        result = subprocess.run(
-            ["git", "diff", "origin/main", "--stat"],
-            capture_output=True,
-            text=True,
-            check=True,
-            cwd=cwd,
-        )
+        if tracker:
+            result = tracker.track_bash("git_diff_stat", ["git", "diff", "origin/main", "--stat"], cwd=cwd)
+        else:
+            result = subprocess.run(
+                ["git", "diff", "origin/main", "--stat"],
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=cwd,
+            )
 
         # If output is empty or only whitespace, no changes
         has_changes = bool(result.stdout.strip())
@@ -109,6 +114,7 @@ def generate_documentation(
     spec_file: str,
     working_dir: Optional[str] = None,
     state: Optional[ADWState] = None,
+    tracker: Optional[ToolCallTracker] = None,
 ) -> Optional[DocumentationResult]:
     """Generate documentation using the /document command.
 
@@ -119,6 +125,7 @@ def generate_documentation(
         spec_file: Path to the spec file
         working_dir: Working directory for the agent
         state: ADW state object
+        tracker: Optional ToolCallTracker for tracking subprocess calls
 
     Returns:
         DocumentationResult if successful, None if failed
@@ -130,13 +137,16 @@ def generate_documentation(
     changed_files = []
 
     try:
-        result = subprocess.run(
-            ["git", "diff", "origin/main", "--name-only"],
-            capture_output=True,
-            text=True,
-            cwd=worktree_path,
-            timeout=5
-        )
+        if tracker:
+            result = tracker.track_bash("git_diff_name_only", ["git", "diff", "origin/main", "--name-only"], cwd=worktree_path)
+        else:
+            result = subprocess.run(
+                ["git", "diff", "origin/main", "--name-only"],
+                capture_output=True,
+                text=True,
+                cwd=worktree_path,
+                timeout=5
+            )
         if result.returncode == 0 and result.stdout.strip():
             changed_files = result.stdout.strip().split('\n')
             logger.info(f"Pre-computed {len(changed_files)} changed files for documentation")
@@ -147,13 +157,16 @@ def generate_documentation(
     changed_files_stats = {}
     for file in changed_files:
         try:
-            stat_result = subprocess.run(
-                ["git", "diff", "origin/main", "--numstat", "--", file],
-                capture_output=True,
-                text=True,
-                cwd=worktree_path,
-                timeout=5
-            )
+            if tracker:
+                stat_result = tracker.track_bash("git_diff_numstat", ["git", "diff", "origin/main", "--numstat", "--", file], cwd=worktree_path)
+            else:
+                stat_result = subprocess.run(
+                    ["git", "diff", "origin/main", "--numstat", "--", file],
+                    capture_output=True,
+                    text=True,
+                    cwd=worktree_path,
+                    timeout=5
+                )
             if stat_result.returncode == 0 and stat_result.stdout:
                 parts = stat_result.stdout.split()
                 if len(parts) >= 2:
@@ -440,174 +453,176 @@ def main():
         ),
     )
 
-    # Check if there are any changes to document (in worktree)
-    if not check_for_changes(logger, cwd=worktree_path):
-        logger.info("No changes to document - skipping documentation generation")
+    # Wrap main execution with ToolCallTracker
+    with ToolCallTracker(adw_id=adw_id, issue_number=int(issue_number), phase_name="Document") as tracker:
+        # Check if there are any changes to document (in worktree)
+        if not check_for_changes(logger, cwd=worktree_path, tracker=tracker):
+            logger.info("No changes to document - skipping documentation generation")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    "ops",
+                    "ℹ️ No changes detected between current branch and origin/main - skipping documentation",
+                ),
+            )
+            return
+
+        # Find spec file from current branch (in worktree)
+        logger.info("Looking for spec file in worktree")
+        spec_file = find_spec_file(state, logger)
+
+        if not spec_file:
+            error_msg = "Could not find spec file for documentation"
+            logger.error(error_msg)
+            make_issue_comment(
+                issue_number, format_issue_message(adw_id, "ops", f"❌ {error_msg}")
+            )
+            sys.exit(1)
+
+        logger.info(f"Found spec file: {spec_file}")
         make_issue_comment(
             issue_number,
-            format_issue_message(
-                adw_id,
-                "ops",
-                "ℹ️ No changes detected between current branch and origin/main - skipping documentation",
-            ),
+            format_issue_message(adw_id, "ops", f"📋 Found spec file: {spec_file}"),
         )
-        return
 
-    # Find spec file from current branch (in worktree)
-    logger.info("Looking for spec file in worktree")
-    spec_file = find_spec_file(state, logger)
-
-    if not spec_file:
-        error_msg = "Could not find spec file for documentation"
-        logger.error(error_msg)
-        make_issue_comment(
-            issue_number, format_issue_message(adw_id, "ops", f"❌ {error_msg}")
-        )
-        sys.exit(1)
-
-    logger.info(f"Found spec file: {spec_file}")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, "ops", f"📋 Found spec file: {spec_file}"),
-    )
-
-    # Generate documentation (executing in worktree)
-    logger.info("Generating documentation")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(
-            adw_id,
-            AGENT_DOCUMENTER,
-            "📝 Generating documentation in isolated environment...",
-        ),
-    )
-
-    doc_result = generate_documentation(
-        issue_number, adw_id, logger, spec_file, working_dir=worktree_path, state=state
-    )
-
-    if not doc_result:
-        # Error already logged and posted to issue
-        sys.exit(1)
-
-    if doc_result.documentation_created:
-        logger.info(f"Documentation created at: {doc_result.documentation_path}")
+        # Generate documentation (executing in worktree)
+        logger.info("Generating documentation")
         make_issue_comment(
             issue_number,
             format_issue_message(
                 adw_id,
                 AGENT_DOCUMENTER,
-                f"✅ Documentation generated successfully\n📁 Location: {doc_result.documentation_path}",
+                "📝 Generating documentation in isolated environment...",
             ),
         )
-    else:
-        logger.info("No documentation changes were needed")
+
+        doc_result = generate_documentation(
+            issue_number, adw_id, logger, spec_file, working_dir=worktree_path, state=state, tracker=tracker
+        )
+
+        if not doc_result:
+            # Error already logged and posted to issue
+            sys.exit(1)
+
+        if doc_result.documentation_created:
+            logger.info(f"Documentation created at: {doc_result.documentation_path}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    AGENT_DOCUMENTER,
+                    f"✅ Documentation generated successfully\n📁 Location: {doc_result.documentation_path}",
+                ),
+            )
+        else:
+            logger.info("No documentation changes were needed")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id, AGENT_DOCUMENTER, "ℹ️ No documentation changes were needed"
+                ),
+            )
+
+        # Get repo information
+        try:
+            github_repo_url = get_repo_url()
+            repo_path = extract_repo_path(github_repo_url)
+        except ValueError as e:
+            logger.error(f"Error getting repository URL: {e}")
+            sys.exit(1)
+
+        # Fetch issue data for commit message generation
+        logger.info("Fetching issue data for commit message")
+        issue = fetch_issue(issue_number, repo_path)
+
+        # Get issue classification from state
+        issue_command = state.get("issue_class", "/feature")
+
+        # Create commit message
+        logger.info("Creating documentation commit")
+        commit_msg, error = create_commit(
+            AGENT_DOCUMENTER, issue, issue_command, adw_id, logger, worktree_path
+        )
+
+        if error:
+            logger.error(f"Error creating commit message: {error}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id, AGENT_DOCUMENTER, f"❌ Error creating commit message: {error}"
+                ),
+            )
+            sys.exit(1)
+
+        # Commit the documentation (in worktree)
+        success, error = commit_changes(commit_msg, cwd=worktree_path)
+
+        if not success:
+            logger.error(f"Error committing documentation: {error}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    AGENT_DOCUMENTER,
+                    f"❌ Error committing documentation: {error}",
+                ),
+            )
+            sys.exit(1)
+
+        logger.info(f"Committed documentation: {commit_msg}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_DOCUMENTER, "✅ Documentation committed"),
+        )
+
+        # Track Agentic KPIs before finalizing - this never fails the workflow
+        track_agentic_kpis(issue_number, adw_id, state, logger, worktree_path)
+
+        # Finalize git operations (push and PR)
+        # Note: This will work from the worktree context
+        finalize_git_operations(state, logger, cwd=worktree_path)
+
+        logger.info("Isolated documentation phase completed successfully")
         make_issue_comment(
             issue_number,
             format_issue_message(
-                adw_id, AGENT_DOCUMENTER, "ℹ️ No documentation changes were needed"
+                adw_id, "ops", "✅ Isolated documentation phase completed"
             ),
         )
 
-    # Get repo information
-    try:
-        github_repo_url = get_repo_url()
-        repo_path = extract_repo_path(github_repo_url)
-    except ValueError as e:
-        logger.error(f"Error getting repository URL: {e}")
-        sys.exit(1)
+        # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
+        try:
+            validate_phase_completion('document', int(issue_number), logger)
+            ensure_database_state(int(issue_number), 'documented', 'document', logger)
+        except Exception as e:
+            logger.error(f"Phase validation failed: {e}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "documenter", f"❌ Document phase validation failed: {e}")
+            )
+            sys.exit(1)
 
-    # Fetch issue data for commit message generation
-    logger.info("Fetching issue data for commit message")
-    issue = fetch_issue(issue_number, repo_path)
+        # OBSERVABILITY: Log phase completion
+        start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+        log_phase_completion(
+            adw_id=adw_id,
+            issue_number=int(issue_number),
+            phase_name="Document",
+            phase_number=get_phase_number("Document"),
+            success=True,
+            workflow_template="adw_document_iso",
+            started_at=start_time,
+        )
 
-    # Get issue classification from state
-    issue_command = state.get("issue_class", "/feature")
+        # Save final state
+        state.save("adw_document_iso")
 
-    # Create commit message
-    logger.info("Creating documentation commit")
-    commit_msg, error = create_commit(
-        AGENT_DOCUMENTER, issue, issue_command, adw_id, logger, worktree_path
-    )
-
-    if error:
-        logger.error(f"Error creating commit message: {error}")
+        # Post final state summary to issue
         make_issue_comment(
             issue_number,
-            format_issue_message(
-                adw_id, AGENT_DOCUMENTER, f"❌ Error creating commit message: {error}"
-            ),
+            f"{adw_id}_ops: 📋 Final documentation state:\n```json\n{json.dumps(state.data, indent=2)}\n```",
         )
-        sys.exit(1)
-
-    # Commit the documentation (in worktree)
-    success, error = commit_changes(commit_msg, cwd=worktree_path)
-
-    if not success:
-        logger.error(f"Error committing documentation: {error}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(
-                adw_id,
-                AGENT_DOCUMENTER,
-                f"❌ Error committing documentation: {error}",
-            ),
-        )
-        sys.exit(1)
-
-    logger.info(f"Committed documentation: {commit_msg}")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, AGENT_DOCUMENTER, "✅ Documentation committed"),
-    )
-
-    # Track Agentic KPIs before finalizing - this never fails the workflow
-    track_agentic_kpis(issue_number, adw_id, state, logger, worktree_path)
-
-    # Finalize git operations (push and PR)
-    # Note: This will work from the worktree context
-    finalize_git_operations(state, logger, cwd=worktree_path)
-
-    logger.info("Isolated documentation phase completed successfully")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(
-            adw_id, "ops", "✅ Isolated documentation phase completed"
-        ),
-    )
-
-    # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
-    try:
-        validate_phase_completion('document', int(issue_number), logger)
-        ensure_database_state(int(issue_number), 'documented', 'document', logger)
-    except Exception as e:
-        logger.error(f"Phase validation failed: {e}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "documenter", f"❌ Document phase validation failed: {e}")
-        )
-        sys.exit(1)
-
-    # OBSERVABILITY: Log phase completion
-    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
-    log_phase_completion(
-        adw_id=adw_id,
-        issue_number=int(issue_number),
-        phase_name="Document",
-        phase_number=get_phase_number("Document"),
-        success=True,
-        workflow_template="adw_document_iso",
-        started_at=start_time,
-    )
-
-    # Save final state
-    state.save("adw_document_iso")
-
-    # Post final state summary to issue
-    make_issue_comment(
-        issue_number,
-        f"{adw_id}_ops: 📋 Final documentation state:\n```json\n{json.dumps(state.data, indent=2)}\n```",
-    )
 
 
 if __name__ == "__main__":

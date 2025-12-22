@@ -159,12 +159,13 @@ def get_worktree_path(adw_id: str) -> str:
     return os.path.join(project_root, "trees", adw_id)
 
 
-def remove_worktree(adw_id: str, logger: logging.Logger) -> Tuple[bool, Optional[str]]:
+def remove_worktree(adw_id: str, logger: logging.Logger, tracker: Optional["ToolCallTracker"] = None) -> Tuple[bool, Optional[str]]:
     """Remove a worktree and clean up.
 
     Args:
         adw_id: The ADW ID for the worktree to remove
         logger: Logger instance
+        tracker: Optional ToolCallTracker for recording subprocess calls
 
     Returns:
         Tuple of (success, error_message)
@@ -180,7 +181,14 @@ def remove_worktree(adw_id: str, logger: logging.Logger) -> Tuple[bool, Optional
 
     # First remove via git
     cmd = ["git", "worktree", "remove", worktree_path, "--force"]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    if tracker:
+        result = tracker.track_bash(
+            tool_name="git_worktree_remove",
+            command=cmd,
+            cwd=os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        )
+    else:
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
         # Try to clean up manually if git command failed

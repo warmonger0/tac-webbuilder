@@ -46,6 +46,7 @@ from adw_modules.workflow_ops import format_issue_message
 from adw_modules.utils import setup_logger, check_env_vars
 from adw_modules.worktree_ops import validate_worktree
 from adw_modules.observability import log_phase_completion, get_phase_number
+from adw_modules.tool_call_tracker import ToolCallTracker
 
 # Hybrid lint loop configuration
 MAX_EXTERNAL_ATTEMPTS = 3  # Number of external auto-fix attempts before LLM fallback
@@ -57,7 +58,8 @@ def run_external_lint(
     logger: logging.Logger,
     state: ADWState,
     target: str = "both",
-    fix_mode: bool = False
+    fix_mode: bool = False,
+    tracker=None
 ) -> Tuple[bool, Dict[str, Any]]:
     """
     Run linting using external lint ADW workflow.
@@ -81,7 +83,10 @@ def run_external_lint(
         cmd.append("--fix-mode")
 
     logger.info(f"Executing: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    if tracker:
+        result = tracker.track_bash("external_lint_check", cmd, capture_output=True)
+    else:
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
     # Reload state to get external lint results
     reloaded_state = ADWState.load(adw_id)
@@ -192,149 +197,151 @@ def main():
                            f"🔨 Auto-fix: {'Enabled' if fix_mode else 'Disabled'}")
     )
 
-    # Run lint check
-    if use_external:
-        logger.info("🔧 Running hybrid lint loop (external + LLM fallback)")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "lint_checker", f"🔧 Starting hybrid lint loop (up to {MAX_EXTERNAL_ATTEMPTS} external attempts + LLM fallback)...")
-        )
-
-        # Hybrid lint loop: Try external auto-fix multiple times
-        lint_success = False
-        lint_results = {}
-        initial_error_count = None
-
-        for attempt in range(1, MAX_EXTERNAL_ATTEMPTS + 1):
-            logger.info(f"External lint attempt {attempt}/{MAX_EXTERNAL_ATTEMPTS}")
+    # Create ToolCallTracker context for Lint phase
+    with ToolCallTracker(adw_id=adw_id, issue_number=int(issue_number), phase_name="Lint") as tracker:
+        # Run lint check
+        if use_external:
+            logger.info("🔧 Running hybrid lint loop (external + LLM fallback)")
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "lint_checker", f"🔄 External lint attempt {attempt}/{MAX_EXTERNAL_ATTEMPTS}...")
+                format_issue_message(adw_id, "lint_checker", f"🔧 Starting hybrid lint loop (up to {MAX_EXTERNAL_ATTEMPTS} external attempts + LLM fallback)...")
             )
-
-            # Run external lint check with auto-fix enabled
-            lint_success, lint_results = run_external_lint(issue_number, adw_id, logger, state, target, fix_mode=True)
-
-            if "error" in lint_results:
-                # External tool failed completely
-                logger.error(f"External lint tool error on attempt {attempt}: {lint_results['error']}")
-                break
-
-            # Track error reduction
-            summary = lint_results.get("summary", {})
-            current_errors = summary.get("total_errors", 0)
-
-            if initial_error_count is None:
-                initial_error_count = current_errors
-                logger.info(f"Initial error count: {initial_error_count}")
-
-            # Check if we've fixed all errors
-            if lint_success:
-                logger.info(f"✅ All errors fixed after {attempt} attempt(s)!")
+    
+            # Hybrid lint loop: Try external auto-fix multiple times
+            lint_success = False
+            lint_results = {}
+            initial_error_count = None
+    
+            for attempt in range(1, MAX_EXTERNAL_ATTEMPTS + 1):
+                logger.info(f"External lint attempt {attempt}/{MAX_EXTERNAL_ATTEMPTS}")
                 make_issue_comment(
                     issue_number,
-                    format_issue_message(adw_id, "lint_checker", f"✅ All lint errors resolved after {attempt} external attempt(s)!")
+                    format_issue_message(adw_id, "lint_checker", f"🔄 External lint attempt {attempt}/{MAX_EXTERNAL_ATTEMPTS}...")
                 )
-                break
-
-            # Log progress
-            logger.info(f"Attempt {attempt}: {current_errors} error(s) remaining (reduced by {initial_error_count - current_errors})")
+    
+                # Run external lint check with auto-fix enabled
+                lint_success, lint_results = run_external_lint(issue_number, adw_id, logger, state, target, fix_mode=True)
+    
+                if "error" in lint_results:
+                    # External tool failed completely
+                    logger.error(f"External lint tool error on attempt {attempt}: {lint_results['error']}")
+                    break
+    
+                # Track error reduction
+                summary = lint_results.get("summary", {})
+                current_errors = summary.get("total_errors", 0)
+    
+                if initial_error_count is None:
+                    initial_error_count = current_errors
+                    logger.info(f"Initial error count: {initial_error_count}")
+    
+                # Check if we've fixed all errors
+                if lint_success:
+                    logger.info(f"✅ All errors fixed after {attempt} attempt(s)!")
+                    make_issue_comment(
+                        issue_number,
+                        format_issue_message(adw_id, "lint_checker", f"✅ All lint errors resolved after {attempt} external attempt(s)!")
+                    )
+                    break
+    
+                # Log progress
+                logger.info(f"Attempt {attempt}: {current_errors} error(s) remaining (reduced by {initial_error_count - current_errors})")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "lint_checker", f"📊 Attempt {attempt}: {current_errors} error(s) remaining")
+                )
+    
+                # Commit auto-fixes after each attempt
+                result = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    capture_output=True,
+                    text=True,
+                    cwd=worktree_path
+                )
+    
+                if result.stdout.strip():
+                    fixable_count = summary.get("fixable_count", 0)
+                    commit_msg = f"style: Auto-fix lint errors (attempt {attempt})\n\nFixed errors using ruff/eslint auto-fix.\nAttempt {attempt}/{MAX_EXTERNAL_ATTEMPTS}\n\n🤖 Generated by ADW {adw_id}"
+    
+                    success, error = commit_changes(commit_msg, cwd=worktree_path)
+                    if success:
+                        logger.info(f"Committed auto-fixes from attempt {attempt}")
+                    else:
+                        logger.warning(f"Failed to commit auto-fixes: {error}")
+    
+            # After external loop: Report results and optionally use LLM fallback
+            summary = lint_results.get("summary", {})
+            errors = lint_results.get("errors", [])
+            total_errors = summary.get("total_errors", 0)
+            style_errors = summary.get("style_errors", 0)
+            quality_errors = summary.get("quality_errors", 0)
+    
+            # LLM Fallback for remaining errors
+            if not lint_success and total_errors > 0 and total_errors < 50:  # Only use LLM if <50 errors (manageable context)
+                logger.info(f"🤖 Kicking {total_errors} remaining error(s) to LLM for nuanced fixes")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "lint_checker",
+                        f"🤖 External loop reduced errors from {initial_error_count} → {total_errors}\n"
+                        f"Now attempting LLM-based fixes for remaining {total_errors} nuanced error(s)...")
+                )
+    
+                # TODO: Implement LLM fallback using Claude Code
+                # For now, log that we would use LLM here
+                logger.warning("LLM fallback not yet implemented - would handle remaining errors here")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "lint_checker",
+                        f"⚠️ LLM fallback not yet implemented\n"
+                        f"External loop successfully reduced errors: {initial_error_count if initial_error_count else total_errors} → {total_errors}\n"
+                        f"Continuing workflow (errors logged for future attention)")
+                )
+    
+            # Format final results comment
+            if lint_success:
+                comment = f"✅ Lint check passed! All errors resolved.\n"
+                comment += f"🔄 External attempts: {attempt if 'attempt' in locals() else 'N/A'}\n"
+                comment += f"⚡ Context savings: ~93% (hybrid approach)"
+            else:
+                errors_fixed = (initial_error_count - total_errors) if initial_error_count else 0
+                comment = f"📊 Hybrid lint loop results:\n"
+                comment += f"   - Initial errors: {initial_error_count if initial_error_count else total_errors}\n"
+                comment += f"   - Remaining errors: {total_errors}\n"
+                comment += f"   - Errors fixed: {errors_fixed}\n"
+                comment += f"   - Success rate: {(errors_fixed / initial_error_count * 100) if initial_error_count and initial_error_count > 0 else 0:.1f}%\n\n"
+                comment += "**Remaining Errors (sample):**\n"
+                for error in errors[:5]:  # Show first 5
+                    file_path = error.get("file", "unknown")
+                    line = error.get("line", "?")
+                    rule = error.get("rule", "?")
+                    msg = error.get("message", "unknown error")
+                    comment += f"  `{file_path}:{line}` - [{rule}] {msg}\n"
+    
+                if len(errors) > 5:
+                    comment += f"\n... and {len(errors) - 5} more errors\n"
+    
+                comment += f"\n⚠️ Workflow will continue (errors logged, not blocking)"
+    
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "lint_checker", f"📊 Attempt {attempt}: {current_errors} error(s) remaining")
+                format_issue_message(adw_id, "lint_checker", comment)
             )
-
-            # Commit auto-fixes after each attempt
-            result = subprocess.run(
-                ["git", "status", "--porcelain"],
-                capture_output=True,
-                text=True,
-                cwd=worktree_path
-            )
-
-            if result.stdout.strip():
-                fixable_count = summary.get("fixable_count", 0)
-                commit_msg = f"style: Auto-fix lint errors (attempt {attempt})\n\nFixed errors using ruff/eslint auto-fix.\nAttempt {attempt}/{MAX_EXTERNAL_ATTEMPTS}\n\n🤖 Generated by ADW {adw_id}"
-
-                success, error = commit_changes(commit_msg, cwd=worktree_path)
-                if success:
-                    logger.info(f"Committed auto-fixes from attempt {attempt}")
-                else:
-                    logger.warning(f"Failed to commit auto-fixes: {error}")
-
-        # After external loop: Report results and optionally use LLM fallback
-        summary = lint_results.get("summary", {})
-        errors = lint_results.get("errors", [])
-        total_errors = summary.get("total_errors", 0)
-        style_errors = summary.get("style_errors", 0)
-        quality_errors = summary.get("quality_errors", 0)
-
-        # LLM Fallback for remaining errors
-        if not lint_success and total_errors > 0 and total_errors < 50:  # Only use LLM if <50 errors (manageable context)
-            logger.info(f"🤖 Kicking {total_errors} remaining error(s) to LLM for nuanced fixes")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "lint_checker",
-                    f"🤖 External loop reduced errors from {initial_error_count} → {total_errors}\n"
-                    f"Now attempting LLM-based fixes for remaining {total_errors} nuanced error(s)...")
-            )
-
-            # TODO: Implement LLM fallback using Claude Code
-            # For now, log that we would use LLM here
-            logger.warning("LLM fallback not yet implemented - would handle remaining errors here")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "lint_checker",
-                    f"⚠️ LLM fallback not yet implemented\n"
-                    f"External loop successfully reduced errors: {initial_error_count if initial_error_count else total_errors} → {total_errors}\n"
-                    f"Continuing workflow (errors logged for future attention)")
-            )
-
-        # Format final results comment
-        if lint_success:
-            comment = f"✅ Lint check passed! All errors resolved.\n"
-            comment += f"🔄 External attempts: {attempt if 'attempt' in locals() else 'N/A'}\n"
-            comment += f"⚡ Context savings: ~93% (hybrid approach)"
+            logger.info(f"Hybrid lint loop: {'✅ Success' if lint_success else f'⚠️ {total_errors} errors remaining (not blocking)'}")
+    
         else:
-            errors_fixed = (initial_error_count - total_errors) if initial_error_count else 0
-            comment = f"📊 Hybrid lint loop results:\n"
-            comment += f"   - Initial errors: {initial_error_count if initial_error_count else total_errors}\n"
-            comment += f"   - Remaining errors: {total_errors}\n"
-            comment += f"   - Errors fixed: {errors_fixed}\n"
-            comment += f"   - Success rate: {(errors_fixed / initial_error_count * 100) if initial_error_count and initial_error_count > 0 else 0:.1f}%\n\n"
-            comment += "**Remaining Errors (sample):**\n"
-            for error in errors[:5]:  # Show first 5
-                file_path = error.get("file", "unknown")
-                line = error.get("line", "?")
-                rule = error.get("rule", "?")
-                msg = error.get("message", "unknown error")
-                comment += f"  `{file_path}:{line}` - [{rule}] {msg}\n"
-
-            if len(errors) > 5:
-                comment += f"\n... and {len(errors) - 5} more errors\n"
-
-            comment += f"\n⚠️ Workflow will continue (errors logged, not blocking)"
-
+            # Inline execution (not implemented - would use claude code directly)
+            logger.warning("Inline lint execution not yet implemented")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "lint_checker", "⚠️ Inline lint execution not yet implemented. Use external tools (default).")
+            )
+            sys.exit(1)
+    
+        logger.info("Lint phase completed")
         make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "lint_checker", comment)
+            issue_number, format_issue_message(adw_id, "ops", "✅ Lint phase completed")
         )
-        logger.info(f"Hybrid lint loop: {'✅ Success' if lint_success else f'⚠️ {total_errors} errors remaining (not blocking)'}")
-
-    else:
-        # Inline execution (not implemented - would use claude code directly)
-        logger.warning("Inline lint execution not yet implemented")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "lint_checker", "⚠️ Inline lint execution not yet implemented. Use external tools (default).")
-        )
-        sys.exit(1)
-
-    logger.info("Lint phase completed")
-    make_issue_comment(
-        issue_number, format_issue_message(adw_id, "ops", "✅ Lint phase completed")
-    )
-
+    
     # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
     try:
         validate_phase_completion('lint', int(issue_number), logger)

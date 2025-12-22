@@ -33,6 +33,7 @@ from typing import Optional, List, Tuple
 import subprocess
 from dotenv import load_dotenv
 
+from adw_modules.tool_call_tracker import ToolCallTracker
 from adw_modules.state import ADWState
 from utils.idempotency import (
     check_and_skip_if_complete,
@@ -82,6 +83,7 @@ def run_review(
     logger: logging.Logger,
     working_dir: Optional[str] = None,
     state: Optional['ADWState'] = None,
+    tracker: Optional[ToolCallTracker] = None,
 ) -> ReviewResult:
     """Run the review using the /review command."""
     from adw_modules.workflow_ops import create_context_file
@@ -91,13 +93,16 @@ def run_review(
     changed_files = []
 
     try:
-        result = subprocess.run(
-            ["git", "diff", "origin/main", "--name-only"],
-            capture_output=True,
-            text=True,
-            cwd=worktree_path,
-            timeout=5
-        )
+        if tracker:
+            result = tracker.track_bash("git_diff_changed_files", ["git", "diff", "origin/main", "--name-only"], cwd=worktree_path)
+        else:
+            result = subprocess.run(
+                ["git", "diff", "origin/main", "--name-only"],
+                capture_output=True,
+                text=True,
+                cwd=worktree_path,
+                timeout=5
+            )
         if result.returncode == 0 and result.stdout.strip():
             changed_files = result.stdout.strip().split('\n')
             logger.info(f"Pre-computed {len(changed_files)} changed files")
@@ -303,7 +308,8 @@ def validate_review_data_integrity(
     review_result: ReviewResult,
     worktree_path: str,
     backend_port: str,
-    logger: logging.Logger
+    logger: logging.Logger,
+    tracker: Optional[ToolCallTracker] = None,
 ) -> Tuple[bool, Optional[str]]:
     """Validate that review results show expected data, not silent failures.
 
@@ -375,12 +381,15 @@ def validate_review_data_integrity(
                 log_path = os.path.join(worktree_path, "app/server/server.log")
                 if os.path.exists(log_path):
                     try:
-                        result = subprocess.run(
-                            ["tail", "-100", log_path],
-                            capture_output=True,
-                            text=True,
-                            timeout=2
-                        )
+                        if tracker:
+                            result = tracker.track_bash("tail_backend_logs", ["tail", "-100", log_path], cwd=None)
+                        else:
+                            result = subprocess.run(
+                                ["tail", "-100", log_path],
+                                capture_output=True,
+                                text=True,
+                                timeout=2
+                            )
                         log_tail = result.stdout
 
                         # Look for error patterns
@@ -540,252 +549,255 @@ def main():
         logger.info(f"{'='*60}")
         sys.exit(0)
 
-    # Validate worktree exists
-    valid, error = validate_worktree(adw_id, state)
-    if not valid:
-        logger.error(f"Worktree validation failed: {error}")
-        logger.error("Run adw_plan_iso.py or adw_patch_iso.py first")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", f"❌ Worktree validation failed: {error}\n"
-                               "Run adw_plan_iso.py or adw_patch_iso.py first")
-        )
-        sys.exit(1)
-    
-    # Get worktree path for explicit context
-    worktree_path = state.get("worktree_path")
-    logger.info(f"Using worktree at: {worktree_path}")
-    
-    # Get port information for display
-    backend_port = state.get("backend_port", "9100")
-    frontend_port = state.get("frontend_port", "9200")
-    
-    make_issue_comment(
-        issue_number, 
-        format_issue_message(adw_id, "ops", f"✅ Starting isolated review phase\n"
-                           f"🏠 Worktree: {worktree_path}\n"
-                           f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}\n"
-                           f"🔧 Issue Resolution: {'Disabled' if skip_resolution else 'Enabled'}")
-    )
-    
-    # Find spec file from current branch (in worktree)
-    logger.info("Looking for spec file in worktree")
-    spec_file = find_spec_file(state, logger)
-    
-    if not spec_file:
-        error_msg = "Could not find spec file for review"
-        logger.error(error_msg)
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", f"❌ {error_msg}")
-        )
-        sys.exit(1)
-    
-    logger.info(f"Found spec file: {spec_file}")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, "ops", f"📋 Found spec file: {spec_file}")
-    )
-
-    # Prepare application for review using deterministic Python function
-    logger.info("Preparing application for review (using Python, no AI)")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, "ops", "🚀 Preparing application for review (deterministic Python)...")
-    )
-
-    app_success, app_info = prepare_application_for_review(worktree_path, logger)
-    if not app_success:
-        error_msg = f"Failed to prepare application: {app_info.get('error', 'Unknown error')}"
-        logger.error(error_msg)
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", f"❌ {error_msg}")
-        )
-        sys.exit(1)
-
-    logger.info(f"✅ Application ready - Backend: {app_info['backend_url']}, Frontend: {app_info['frontend_url']}")
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, "ops", f"✅ Application ready for review\n"
-                           f"   Backend:  {app_info['backend_url']}\n"
-                           f"   Frontend: {app_info['frontend_url']}")
-    )
-
-    # Run review with retry logic
-    review_attempt = 0
-    review_result = None
-    
-    while review_attempt < MAX_REVIEW_RETRY_ATTEMPTS:
-        review_attempt += 1
-        
-        # Run the review (executing in worktree)
-        logger.info(f"Running review (attempt {review_attempt}/{MAX_REVIEW_RETRY_ATTEMPTS})")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(
-                adw_id,
-                AGENT_REVIEWER,
-                f"🔍 Reviewing implementation against spec (attempt {review_attempt}/{MAX_REVIEW_RETRY_ATTEMPTS})..."
+    # Wrap main execution in ToolCallTracker context manager
+    with ToolCallTracker(adw_id=adw_id, issue_number=int(issue_number), phase_name="Review") as tracker:
+        # Validate worktree exists
+        valid, error = validate_worktree(adw_id, state)
+        if not valid:
+            logger.error(f"Worktree validation failed: {error}")
+            logger.error("Run adw_plan_iso.py or adw_patch_iso.py first")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", f"❌ Worktree validation failed: {error}\n"
+                                   "Run adw_plan_iso.py or adw_patch_iso.py first")
             )
-        )
-        
-        review_result = run_review(spec_file, adw_id, logger, working_dir=worktree_path, state=state)
-        
-        # Check if we have blocker issues
-        blocker_issues = [
-            issue for issue in review_result.review_issues 
-            if issue.issue_severity == "blocker"
-        ]
-        
-        # If no blockers or skip resolution, we're done
-        if not blocker_issues or skip_resolution:
-            break
-        
-        # We have blockers and need to resolve them
-        resolve_blocker_issues(blocker_issues, issue_number, adw_id, worktree_path, logger)
-        
-        # If this was the last attempt, break regardless
-        if review_attempt >= MAX_REVIEW_RETRY_ATTEMPTS - 1:
-            break
-        
-        # Otherwise, we'll retry the review
-        logger.info("Retrying review after resolving blockers")
+            sys.exit(1)
+
+        # Get worktree path for explicit context
+        worktree_path = state.get("worktree_path")
+        logger.info(f"Using worktree at: {worktree_path}")
+
+        # Get port information for display
+        backend_port = state.get("backend_port", "9100")
+        frontend_port = state.get("frontend_port", "9200")
+
         make_issue_comment(
             issue_number,
-            format_issue_message(
-                adw_id,
-                AGENT_REVIEWER,
-                "🔄 Retrying review after resolving blockers..."
-            )
-        )
-    
-    # Post review results
-    if review_result:
-        # CRITICAL FIX: Validate data integrity before accepting review
-        logger.info("Validating review data integrity...")
-        is_valid, integrity_error = validate_review_data_integrity(
-            review_result,
-            worktree_path,
-            backend_port,
-            logger
+            format_issue_message(adw_id, "ops", f"✅ Starting isolated review phase\n"
+                               f"🏠 Worktree: {worktree_path}\n"
+                               f"🔌 Ports - Backend: {backend_port}, Frontend: {frontend_port}\n"
+                               f"🔧 Issue Resolution: {'Disabled' if skip_resolution else 'Enabled'}")
         )
 
-        if not is_valid:
-            # Data integrity check failed!
-            logger.error(f"Review data integrity validation failed: {integrity_error}")
+        # Find spec file from current branch (in worktree)
+        logger.info("Looking for spec file in worktree")
+        spec_file = find_spec_file(state, logger)
+
+        if not spec_file:
+            error_msg = "Could not find spec file for review"
+            logger.error(error_msg)
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", f"❌ {error_msg}")
+            )
+            sys.exit(1)
+
+        logger.info(f"Found spec file: {spec_file}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"📋 Found spec file: {spec_file}")
+        )
+
+        # Prepare application for review using deterministic Python function
+        logger.info("Preparing application for review (using Python, no AI)")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", "🚀 Preparing application for review (deterministic Python)...")
+        )
+
+        app_success, app_info = prepare_application_for_review(worktree_path, logger)
+        if not app_success:
+            error_msg = f"Failed to prepare application: {app_info.get('error', 'Unknown error')}"
+            logger.error(error_msg)
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", f"❌ {error_msg}")
+            )
+            sys.exit(1)
+
+        logger.info(f"✅ Application ready - Backend: {app_info['backend_url']}, Frontend: {app_info['frontend_url']}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"✅ Application ready for review\n"
+                               f"   Backend:  {app_info['backend_url']}\n"
+                               f"   Frontend: {app_info['frontend_url']}")
+        )
+
+        # Run review with retry logic
+        review_attempt = 0
+        review_result = None
+
+        while review_attempt < MAX_REVIEW_RETRY_ATTEMPTS:
+            review_attempt += 1
+
+            # Run the review (executing in worktree)
+            logger.info(f"Running review (attempt {review_attempt}/{MAX_REVIEW_RETRY_ATTEMPTS})")
             make_issue_comment(
                 issue_number,
                 format_issue_message(
                     adw_id,
                     AGENT_REVIEWER,
-                    f"❌ **Review Data Integrity Failure**\n\n{integrity_error}\n\n"
-                    f"**Resolution Required:**\n"
-                    f"1. Check backend logs for query errors\n"
-                    f"2. Verify database schema matches code expectations\n"
-                    f"3. Fix underlying issue before re-running review\n\n"
-                    f"This review will NOT be accepted as successful."
+                    f"🔍 Reviewing implementation against spec (attempt {review_attempt}/{MAX_REVIEW_RETRY_ATTEMPTS})..."
                 )
+            )
+
+            review_result = run_review(spec_file, adw_id, logger, working_dir=worktree_path, state=state, tracker=tracker)
+
+            # Check if we have blocker issues
+            blocker_issues = [
+                issue for issue in review_result.review_issues
+                if issue.issue_severity == "blocker"
+            ]
+
+            # If no blockers or skip resolution, we're done
+            if not blocker_issues or skip_resolution:
+                break
+
+            # We have blockers and need to resolve them
+            resolve_blocker_issues(blocker_issues, issue_number, adw_id, worktree_path, logger)
+
+            # If this was the last attempt, break regardless
+            if review_attempt >= MAX_REVIEW_RETRY_ATTEMPTS - 1:
+                break
+
+            # Otherwise, we'll retry the review
+            logger.info("Retrying review after resolving blockers")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    AGENT_REVIEWER,
+                    "🔄 Retrying review after resolving blockers..."
+                )
+            )
+
+        # Post review results
+        if review_result:
+            # CRITICAL FIX: Validate data integrity before accepting review
+            logger.info("Validating review data integrity...")
+            is_valid, integrity_error = validate_review_data_integrity(
+                review_result,
+                worktree_path,
+                backend_port,
+                logger,
+                tracker=tracker
+            )
+
+            if not is_valid:
+                # Data integrity check failed!
+                logger.error(f"Review data integrity validation failed: {integrity_error}")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(
+                        adw_id,
+                        AGENT_REVIEWER,
+                        f"❌ **Review Data Integrity Failure**\n\n{integrity_error}\n\n"
+                        f"**Resolution Required:**\n"
+                        f"1. Check backend logs for query errors\n"
+                        f"2. Verify database schema matches code expectations\n"
+                        f"3. Fix underlying issue before re-running review\n\n"
+                        f"This review will NOT be accepted as successful."
+                    )
+                )
+                sys.exit(1)
+
+            logger.info("✅ Review data integrity validation passed")
+
+            # Upload screenshots to R2 and update URLs
+            upload_review_screenshots(review_result, adw_id, worktree_path, logger)
+
+            # Build and post the summary comment
+            summary = build_review_summary(review_result)
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_REVIEWER, summary)
+            )
+
+        # Get repo information
+        try:
+            github_repo_url = get_repo_url()
+            repo_path = extract_repo_path(github_repo_url)
+        except ValueError as e:
+            logger.error(f"Error getting repository URL: {e}")
+            sys.exit(1)
+
+        # Fetch issue data for commit message generation
+        logger.info("Fetching issue data for commit message")
+        issue = fetch_issue(issue_number, repo_path)
+
+        # Get issue classification from state
+        issue_command = state.get("issue_class", "/feature")
+
+        # Create commit message
+        logger.info("Creating review commit")
+        commit_msg, error = create_commit(AGENT_REVIEWER, issue, issue_command, adw_id, logger, worktree_path)
+
+        if error:
+            logger.error(f"Error creating commit message: {error}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_REVIEWER, f"❌ Error creating commit message: {error}")
             )
             sys.exit(1)
 
-        logger.info("✅ Review data integrity validation passed")
+        # Commit the review results (in worktree)
+        success, error = commit_changes(commit_msg, cwd=worktree_path)
 
-        # Upload screenshots to R2 and update URLs
-        upload_review_screenshots(review_result, adw_id, worktree_path, logger)
+        if not success:
+            logger.error(f"Error committing review: {error}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_REVIEWER, f"❌ Error committing review: {error}")
+            )
+            sys.exit(1)
 
-        # Build and post the summary comment
-        summary = build_review_summary(review_result)
+        logger.info(f"Committed review: {commit_msg}")
+        make_issue_comment(
+            issue_number, format_issue_message(adw_id, AGENT_REVIEWER, "✅ Review committed")
+        )
+
+        # Finalize git operations (push and PR)
+        # Note: This will work from the worktree context
+        finalize_git_operations(state, logger, cwd=worktree_path)
+
+        logger.info("Isolated review phase completed successfully")
+        make_issue_comment(
+            issue_number, format_issue_message(adw_id, "ops", "✅ Isolated review phase completed")
+        )
+
+        # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
+        try:
+            validate_phase_completion('review', int(issue_number), logger)
+            ensure_database_state(int(issue_number), 'reviewed', 'review', logger)
+        except Exception as e:
+            logger.error(f"Phase validation failed: {e}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "reviewer", f"❌ Review phase validation failed: {e}")
+            )
+            sys.exit(1)
+
+        # OBSERVABILITY: Log phase completion
+        from datetime import datetime
+        start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+        log_phase_completion(
+            adw_id=adw_id,
+            issue_number=int(issue_number),
+            phase_name="Review",
+            phase_number=get_phase_number("Review"),
+            success=True,
+            workflow_template="adw_review_iso",
+            started_at=start_time,
+        )
+
+        # Save final state
+        state.save("adw_review_iso")
+
+        # Post final state summary to issue
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, AGENT_REVIEWER, summary)
+            f"{adw_id}_ops: 📋 Final review state:\n```json\n{json.dumps(state.data, indent=2)}\n```"
         )
-    
-    # Get repo information
-    try:
-        github_repo_url = get_repo_url()
-        repo_path = extract_repo_path(github_repo_url)
-    except ValueError as e:
-        logger.error(f"Error getting repository URL: {e}")
-        sys.exit(1)
-    
-    # Fetch issue data for commit message generation
-    logger.info("Fetching issue data for commit message")
-    issue = fetch_issue(issue_number, repo_path)
-    
-    # Get issue classification from state
-    issue_command = state.get("issue_class", "/feature")
-    
-    # Create commit message
-    logger.info("Creating review commit")
-    commit_msg, error = create_commit(AGENT_REVIEWER, issue, issue_command, adw_id, logger, worktree_path)
-    
-    if error:
-        logger.error(f"Error creating commit message: {error}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, AGENT_REVIEWER, f"❌ Error creating commit message: {error}")
-        )
-        sys.exit(1)
-    
-    # Commit the review results (in worktree)
-    success, error = commit_changes(commit_msg, cwd=worktree_path)
-    
-    if not success:
-        logger.error(f"Error committing review: {error}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, AGENT_REVIEWER, f"❌ Error committing review: {error}")
-        )
-        sys.exit(1)
-    
-    logger.info(f"Committed review: {commit_msg}")
-    make_issue_comment(
-        issue_number, format_issue_message(adw_id, AGENT_REVIEWER, "✅ Review committed")
-    )
-    
-    # Finalize git operations (push and PR)
-    # Note: This will work from the worktree context
-    finalize_git_operations(state, logger, cwd=worktree_path)
-    
-    logger.info("Isolated review phase completed successfully")
-    make_issue_comment(
-        issue_number, format_issue_message(adw_id, "ops", "✅ Isolated review phase completed")
-    )
-
-    # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
-    try:
-        validate_phase_completion('review', int(issue_number), logger)
-        ensure_database_state(int(issue_number), 'reviewed', 'review', logger)
-    except Exception as e:
-        logger.error(f"Phase validation failed: {e}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "reviewer", f"❌ Review phase validation failed: {e}")
-        )
-        sys.exit(1)
-
-    # OBSERVABILITY: Log phase completion
-    from datetime import datetime
-    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
-    log_phase_completion(
-        adw_id=adw_id,
-        issue_number=int(issue_number),
-        phase_name="Review",
-        phase_number=get_phase_number("Review"),
-        success=True,
-        workflow_template="adw_review_iso",
-        started_at=start_time,
-    )
-
-    # Save final state
-    state.save("adw_review_iso")
-    
-    # Post final state summary to issue
-    make_issue_comment(
-        issue_number,
-        f"{adw_id}_ops: 📋 Final review state:\n```json\n{json.dumps(state.data, indent=2)}\n```"
-    )
 
 
 if __name__ == "__main__":

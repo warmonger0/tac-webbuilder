@@ -36,12 +36,14 @@ from adw_modules.github import make_issue_comment
 from adw_modules.workflow_ops import format_issue_message
 from adw_modules.utils import setup_logger
 from adw_modules.observability import log_phase_completion, get_phase_number
+from adw_modules.tool_call_tracker import ToolCallTracker
 
 
 def run_baseline_validation(
     adw_id: str,
     issue_number: str,
-    logger
+    logger,
+    tracker=None
 ) -> Dict[str, Any]:
     """
     Run baseline validation on unmodified worktree.
@@ -75,7 +77,16 @@ def run_baseline_validation(
 
     logger.info(f"Executing baseline check: {' '.join(cmd)}")
     start_time = time.time()
-    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if tracker:
+        result = tracker.track_bash(
+            "baseline_build_check",
+            cmd,
+            capture_output=True
+        )
+    else:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
     duration = time.time() - start_time
 
     # Reload state to get build results
@@ -95,7 +106,7 @@ def run_baseline_validation(
             "error_details": build_results.get("errors", [])
         },
         "validation_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "worktree_base_commit": get_worktree_base_commit(worktree_path),
+        "worktree_base_commit": get_worktree_base_commit(worktree_path, tracker),
         "duration_seconds": duration
     }
 
@@ -104,15 +115,23 @@ def run_baseline_validation(
     return baseline
 
 
-def get_worktree_base_commit(worktree_path: str) -> str:
+def get_worktree_base_commit(worktree_path: str, tracker=None) -> str:
     """Get the base commit hash of the worktree."""
     import subprocess
-    result = subprocess.run(
-        ["git", "rev-parse", "--short", "HEAD"],
-        cwd=worktree_path,
-        capture_output=True,
-        text=True
-    )
+    if tracker:
+        result = tracker.track_bash(
+            "git_rev_parse",
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=worktree_path,
+            capture_output=True
+        )
+    else:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True
+        )
     return result.stdout.strip()
 
 
@@ -191,61 +210,63 @@ def main():
         )
     )
 
-    # Run baseline validation
-    baseline = run_baseline_validation(adw_id, issue_number, logger)
+    # Create ToolCallTracker context for Validate phase
+    with ToolCallTracker(adw_id=adw_id, issue_number=int(issue_number), phase_name="Validate") as tracker:
+        # Run baseline validation
+        baseline = run_baseline_validation(adw_id, issue_number, logger, tracker)
 
-    if "error" in baseline:
-        logger.error(f"Validation failed: {baseline['error']}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(
-                adw_id,
-                "validator",
-                f"⚠️ Validation encountered an issue: {baseline['error']}\n\n"
-                f"Continuing to Build phase without baseline data."
+        if "error" in baseline:
+            logger.error(f"Validation failed: {baseline['error']}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    adw_id,
+                    "validator",
+                    f"⚠️ Validation encountered an issue: {baseline['error']}\n\n"
+                    f"Continuing to Build phase without baseline data."
+                )
             )
-        )
-        # Don't fail - just continue without baseline
-        sys.exit(0)
+            # Don't fail - just continue without baseline
+            sys.exit(0)
 
-    # Store baseline in state
-    state = ADWState.load(adw_id)
-    state.update(baseline_errors=baseline)
-    logger.info("Baseline errors stored in state")
+        # Store baseline in state
+        state = ADWState.load(adw_id)
+        state.update(baseline_errors=baseline)
+        logger.info("Baseline errors stored in state")
 
-    # Post validation report
-    report = format_baseline_report(baseline)
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, "validator", report)
-    )
-
-    logger.info("Validation phase completed successfully")
-
-    # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
-    try:
-        validate_phase_completion('validate', int(issue_number), logger)
-        ensure_database_state(int(issue_number), 'validated', 'validate', logger)
-    except Exception as e:
-        logger.error(f"Phase validation failed: {e}")
+        # Post validation report
+        report = format_baseline_report(baseline)
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, "validator", f"❌ Validate phase validation failed: {e}")
+            format_issue_message(adw_id, "validator", report)
         )
-        sys.exit(1)
 
-    # OBSERVABILITY: Log phase completion
-    from datetime import datetime
-    start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
-    log_phase_completion(
-        adw_id=adw_id,
-        issue_number=int(issue_number),
-        phase_name="Validate",
-        phase_number=get_phase_number("Validate"),
-        success=True,
-        workflow_template="adw_validate_iso",
-        started_at=start_time,
-    )
+        logger.info("Validation phase completed successfully")
+
+        # IDEMPOTENCY VALIDATION: Ensure phase outputs are valid
+        try:
+            validate_phase_completion('validate', int(issue_number), logger)
+            ensure_database_state(int(issue_number), 'validated', 'validate', logger)
+        except Exception as e:
+            logger.error(f"Phase validation failed: {e}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "validator", f"❌ Validate phase validation failed: {e}")
+            )
+            sys.exit(1)
+
+        # OBSERVABILITY: Log phase completion
+        from datetime import datetime
+        start_time = datetime.fromisoformat(state.get("start_time")) if state.get("start_time") else None
+        log_phase_completion(
+            adw_id=adw_id,
+            issue_number=int(issue_number),
+            phase_name="Validate",
+            phase_number=get_phase_number("Validate"),
+            success=True,
+            workflow_template="adw_validate_iso",
+            started_at=start_time,
+        )
 
     sys.exit(0)
 

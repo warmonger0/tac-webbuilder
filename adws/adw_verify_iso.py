@@ -52,6 +52,7 @@ from adw_modules.github import make_issue_comment, get_repo_url, extract_repo_pa
 from adw_modules.workflow_ops import format_issue_message
 from adw_modules.utils import setup_logger
 from adw_modules.observability import log_phase_completion, get_phase_number
+from adw_modules.tool_call_tracker import ToolCallTracker
 
 # Agent name constant
 AGENT_VERIFIER = "verifier"
@@ -272,7 +273,8 @@ def run_smoke_tests(
     backend_port: int,
     frontend_port: int,
     issue_number: str,
-    logger: logging.Logger
+    logger: logging.Logger,
+    tracker: Optional[ToolCallTracker] = None
 ) -> List[str]:
     """
     Run smoke tests for critical paths.
@@ -283,6 +285,7 @@ def run_smoke_tests(
         frontend_port: Frontend port number
         issue_number: GitHub issue number
         logger: Logger instance
+        tracker: Optional ToolCallTracker instance
 
     Returns:
         List of smoke test failures
@@ -293,12 +296,19 @@ def run_smoke_tests(
 
     # Test 1: Backend health check
     try:
-        result = subprocess.run(
-            ['curl', '-f', '-s', f'http://localhost:{backend_port}/health'],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        if tracker:
+            result = tracker.track_bash(
+                "backend_health_check",
+                ['curl', '-f', '-s', f'http://localhost:{backend_port}/health'],
+                capture_output=True
+            )
+        else:
+            result = subprocess.run(
+                ['curl', '-f', '-s', f'http://localhost:{backend_port}/health'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
 
         if result.returncode != 0:
             failures.append(
@@ -315,12 +325,19 @@ def run_smoke_tests(
 
     # Test 2: Frontend accessibility
     try:
-        result = subprocess.run(
-            ['curl', '-f', '-s', f'http://localhost:{frontend_port}'],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        if tracker:
+            result = tracker.track_bash(
+                "frontend_accessibility_check",
+                ['curl', '-f', '-s', f'http://localhost:{frontend_port}'],
+                capture_output=True
+            )
+        else:
+            result = subprocess.run(
+                ['curl', '-f', '-s', f'http://localhost:{frontend_port}'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
 
         if result.returncode != 0:
             failures.append(
@@ -342,7 +359,8 @@ def create_followup_issue(
     original_issue: str,
     verification_result: VerificationResult,
     adw_id: str,
-    logger: logging.Logger
+    logger: logging.Logger,
+    tracker: Optional[ToolCallTracker] = None
 ) -> Optional[str]:
     """
     Create GitHub follow-up issue for verification failures.
@@ -352,6 +370,7 @@ def create_followup_issue(
         verification_result: Verification results
         adw_id: ADW identifier
         logger: Logger instance
+        tracker: Optional ToolCallTracker instance
 
     Returns:
         New issue number if created, None otherwise
@@ -426,18 +445,31 @@ def create_followup_issue(
         repo_path = extract_repo_path(repo_url)
 
         # Create issue using gh CLI
-        result = subprocess.run(
-            [
-                "gh", "issue", "create",
-                "--repo", repo_path,
-                "--title", title,
-                "--body", body,
-                "--label", "bug,auto-verify,post-deployment"
-            ],
-            capture_output=True,
-            text=True,
-            check=False
-        )
+        if tracker:
+            result = tracker.track_bash(
+                "create_followup_issue",
+                [
+                    "gh", "issue", "create",
+                    "--repo", repo_path,
+                    "--title", title,
+                    "--body", body,
+                    "--label", "bug,auto-verify,post-deployment"
+                ],
+                capture_output=True
+            )
+        else:
+            result = subprocess.run(
+                [
+                    "gh", "issue", "create",
+                    "--repo", repo_path,
+                    "--title", title,
+                    "--body", body,
+                    "--label", "bug,auto-verify,post-deployment"
+                ],
+                capture_output=True,
+                text=True,
+                check=False
+            )
 
         if result.returncode == 0:
             # Extract issue number from output (format: "https://github.com/owner/repo/issues/123")
@@ -475,7 +507,8 @@ def create_followup_issue(
 def run_verify_phase(
     issue_number: str,
     adw_id: str,
-    logger: logging.Logger
+    logger: logging.Logger,
+    tracker: Optional[ToolCallTracker] = None
 ) -> int:
     """
     Run verification phase for ADW workflow.
@@ -484,20 +517,12 @@ def run_verify_phase(
         issue_number: GitHub issue number
         adw_id: ADW identifier
         logger: Logger instance
+        tracker: Optional ToolCallTracker instance
 
     Returns:
         Exit code (0 = success, 1 = verification failed but issue created)
     """
     logger.info(f"[Verify] Starting verification for issue #{issue_number}")
-
-    # IDEMPOTENCY CHECK: Skip if verify phase already complete
-    if check_and_skip_if_complete('verify', int(issue_number), logger):
-        logger.info(f"{'='*60}")
-        logger.info(f"Verify phase already complete for issue {issue_number}")
-        state = ADWState.load(adw_id, logger)
-        logger.info(f"Verification results: {state.get('verification_results', {})}")
-        logger.info(f"{'='*60}")
-        return 0
 
     # Post initial status
     make_issue_comment(
@@ -592,7 +617,7 @@ def run_verify_phase(
 
     # Check 3: Smoke tests
     logger.info("[Verify] Step 3/3: Running smoke tests...")
-    smoke_failures = run_smoke_tests(adw_id, backend_port, frontend_port, issue_number, logger)
+    smoke_failures = run_smoke_tests(adw_id, backend_port, frontend_port, issue_number, logger, tracker)
     for failure in smoke_failures:
         result.add_smoke_test_failure(failure)
 
@@ -603,7 +628,7 @@ def run_verify_phase(
 
     # Create follow-up issue if verification failed
     if not result.passed:
-        followup_issue = create_followup_issue(issue_number, result, adw_id, logger)
+        followup_issue = create_followup_issue(issue_number, result, adw_id, logger, tracker)
 
         if followup_issue:
             logger.info(
@@ -689,10 +714,18 @@ def main():
     logger = setup_logger(adw_id, "adw_verify_iso")
     logger.info(f"ADW Verify Iso starting - ID: {adw_id}, Issue: {issue_number}")
 
+    # IDEMPOTENCY CHECK: Skip if verify phase already complete
+    if check_and_skip_if_complete('verify', int(issue_number), logger):
+        logger.info(f"{'='*60}")
+        logger.info(f"Verify phase already complete for issue {issue_number}")
+        logger.info(f"{'='*60}")
+        sys.exit(0)
+
     try:
-        exit_code = run_verify_phase(issue_number, adw_id, logger)
-        logger.info(f"Verify phase completed with exit code: {exit_code}")
-        sys.exit(exit_code)
+        with ToolCallTracker(adw_id=adw_id, issue_number=int(issue_number), phase_name="Verify") as tracker:
+            exit_code = run_verify_phase(issue_number, adw_id, logger, tracker)
+            logger.info(f"Verify phase completed with exit code: {exit_code}")
+            sys.exit(exit_code)
     except Exception as e:
         logger.error(f"Verify phase failed with exception: {e}", exc_info=True)
         try:
