@@ -33,10 +33,14 @@
 - Apply verification-based loop control: Re-run tests after each fix to verify actual progress
 - Exit conditions: No progress detected OR max attempts reached OR circuit breaker triggered
 
-**GitHub Comment Loop Detection (Issue #168):**
-- `MAX_RECENT_COMMENTS_TO_CHECK = 15` - Window size for pattern detection
-- `MAX_SAME_AGENT_REPEATS = 8` - Maximum times same agent can post in comment window
-- Circuit breaker: Detects when agent claims "✅ Resolved" but tests still fail
+**GitHub Comment Loop Detection (Issue #168, Updated Post-#271):**
+- `MAX_RECENT_COMMENTS_TO_CHECK = 20` - Window size for pattern detection
+- `MAX_PHASE_RETRY_ATTEMPTS = 3` - Maximum retry attempts per phase before considering it a loop
+- `MAX_IDENTICAL_ERROR_REPEATS = 4` - If identical error appears 4+ times = stuck loop
+- Circuit breaker uses two strategies:
+  1. **Phase retry counting**: Tracks "🔄 Retrying {Phase} phase (attempt X/Y)" messages
+  2. **Identical error detection**: Hashes error messages to detect true stuck behavior
+- Does NOT penalize verbose agent reporting (agents can post detailed progress without false positives)
 
 ### Cascading Resolution Strategies (Session 26 - Issues #254/255)
 

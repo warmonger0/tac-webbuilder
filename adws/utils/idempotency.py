@@ -302,7 +302,8 @@ def ensure_database_state(
 ) -> None:
     """Ensure database has correct state for phase.
 
-    This updates the database SSoT if state is incorrect.
+    This updates the database SSoT if state is incorrect. Database updates
+    are optional - if database is unavailable, this will log a warning and return.
 
     Args:
         issue_number: GitHub issue number
@@ -312,6 +313,7 @@ def ensure_database_state(
         **extra_fields: Additional fields to update
     """
     try:
+        # Lazy import - only if database modules are available
         from app.server.repositories.phase_queue_repository import PhaseQueueRepository
 
         repo = PhaseQueueRepository()
@@ -323,8 +325,8 @@ def ensure_database_state(
         workflow = workflows[0] if workflows else None
 
         if not workflow:
-            logger.error(f"Workflow not found in database for issue {issue_number}")
-            raise ValueError(f"Workflow not found for issue {issue_number}")
+            logger.warning(f"Workflow not found in database for issue {issue_number} - skipping database update")
+            return
 
         # Check if update needed
         needs_update = False
@@ -371,9 +373,12 @@ def ensure_database_state(
         else:
             logger.debug(f"✓ Database state already correct for issue {issue_number}")
 
+    except ImportError as e:
+        # Database modules not available (psycopg2 not installed) - skip database update
+        logger.warning(f"Database not available ({str(e)}) - skipping database update")
     except Exception as e:
-        logger.error(f"Failed to update database state: {e}")
-        raise
+        # Database query/update failed - log but don't fail the phase
+        logger.warning(f"Failed to update database state: {e} - continuing without database update")
 
 
 def log_idempotency_check(phase: str, is_complete: bool, logger: logging.Logger) -> None:

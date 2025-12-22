@@ -50,16 +50,21 @@ from adw_modules.rate_limit import RateLimitError
 from adw_modules.phase_tracker import PhaseTracker
 
 # Circuit breaker: Detect repetitive patterns indicating a loop
-MAX_RECENT_COMMENTS_TO_CHECK = 15  # Look at last N comments
-MAX_SAME_AGENT_REPEATS = 8  # If same agent posts 8+ times in last N comments = loop
+MAX_RECENT_COMMENTS_TO_CHECK = 20  # Look at last N comments (increased from 15)
+MAX_PHASE_RETRY_ATTEMPTS = 3  # Maximum retry attempts per phase before considering it a loop
+MAX_IDENTICAL_ERROR_REPEATS = 4  # If same error appears 4+ times = stuck loop
 
 
 def check_for_loop(issue_number: str, logger, adw_id: str = None) -> None:
     """
     Circuit breaker to detect and prevent infinite loops.
-    Detects loops by checking for repetitive patterns in recent comments:
-    - Same agent posting repeatedly (e.g., test_resolver multiple times)
-    - Same phase repeating without progress
+
+    Detects loops by checking for:
+    1. Phase retry attempts exceeding MAX_PHASE_RETRY_ATTEMPTS
+    2. Identical error messages repeating MAX_IDENTICAL_ERROR_REPEATS times
+
+    Does NOT count verbose agent reporting as a loop (agents can post detailed
+    progress updates without triggering false positives).
 
     Args:
         issue_number: GitHub issue number
@@ -70,6 +75,9 @@ def check_for_loop(issue_number: str, logger, adw_id: str = None) -> None:
         SystemExit: If loop detected (exits with code 1)
     """
     try:
+        import re
+        import hashlib
+
         repo_url = get_repo_url()
         repo_path = extract_repo_path(repo_url)
         issue = fetch_issue(issue_number, repo_path)
@@ -83,68 +91,76 @@ def check_for_loop(issue_number: str, logger, adw_id: str = None) -> None:
 
         logger.info(f"Issue #{issue_number} has {len(issue.comments)} total comments, checking last {len(recent_comments)}")
 
-        # Count agent repetitions in recent comments
-        agent_counts = {}
-        adw_comment_count = 0
+        # Strategy 1: Track phase retry attempts
+        phase_retry_counts = {}
 
         for comment in recent_comments:
             body = comment.body
 
-            # Count this ADW's comments if adw_id provided
-            if adw_id and f"{adw_id}_" in body:
-                adw_comment_count += 1
+            # Match retry messages like "🔄 Retrying Test phase (attempt 2/3)"
+            retry_match = re.search(r'🔄 Retrying (\w+) phase \(attempt (\d+)/\d+\)', body)
+            if retry_match:
+                phase_name = retry_match.group(1)
+                attempt_num = int(retry_match.group(2))
+                phase_retry_counts[phase_name] = max(phase_retry_counts.get(phase_name, 0), attempt_num)
 
-            # Extract agent name from comments like "[ADW-AGENTS] abc123_test_resolver_iter2_0:"
-            if "[ADW-AGENTS]" in body and "_" in body:
-                # Parse agent name (e.g., "test_resolver", "test_runner", "ops")
-                try:
-                    # Format is usually: [ADW-AGENTS] {adw_id}_{agent_name}: or {adw_id}_{agent_name}:
-                    parts = body.split(":", 1)[0]  # Get everything before first colon
-                    if "_" in parts:
-                        # Get the last part after underscore (agent name, possibly with iteration)
-                        agent_part = parts.split("_")[-1]
-                        # Remove iteration numbers (e.g., iter2, iter3)
-                        agent_base = agent_part.split("iter")[0].rstrip("_0123456789")
-
-                        if agent_base:
-                            agent_counts[agent_base] = agent_counts.get(agent_base, 0) + 1
-                except:
-                    pass
-
-        # Check for same agent repeating too much
-        for agent, count in agent_counts.items():
-            if count >= MAX_SAME_AGENT_REPEATS:
+        # Check if any phase exceeded max retries
+        for phase, retry_count in phase_retry_counts.items():
+            if retry_count > MAX_PHASE_RETRY_ATTEMPTS:
                 error_msg = (
                     f"🛑 **Loop Detected - Aborting**\n\n"
-                    f"Agent `{agent}` has posted **{count} times** in the last {len(recent_comments)} comments.\n"
-                    f"This indicates a retry loop where the same operation is repeating without progress.\n\n"
+                    f"Phase `{phase}` has been retried **{retry_count} times**, exceeding the limit of {MAX_PHASE_RETRY_ATTEMPTS}.\n"
+                    f"This indicates the phase is stuck and not making progress.\n\n"
                     f"**Recent Activity Pattern:**\n"
                     f"- Total comments on issue: {len(issue.comments)}\n"
-                    f"- `{agent}` repetitions in last {len(recent_comments)}: {count}\n"
-                    f"- Threshold: {MAX_SAME_AGENT_REPEATS}\n\n"
+                    f"- {phase} phase retry attempts: {retry_count}/{MAX_PHASE_RETRY_ATTEMPTS}\n\n"
                     f"**Action Required:**\n"
-                    f"- Manual review and cleanup needed\n"
-                    f"- Check for stuck test failures\n"
-                    f"- Review error logs for root cause\n"
+                    f"- Manual review needed to identify root cause\n"
+                    f"- Check phase execution logs for errors\n"
+                    f"- Fix underlying issue before retrying\n"
                     f"- Consider creating a fresh issue if problem persists"
                 )
-                logger.error(f"Loop detected: Agent '{agent}' posted {count} times in last {len(recent_comments)} comments")
+                logger.error(f"Loop detected: Phase '{phase}' exceeded max retries ({retry_count}/{MAX_PHASE_RETRY_ATTEMPTS})")
                 make_issue_comment(issue_number, error_msg)
                 sys.exit(1)
 
-        # Check if this specific ADW has too many comments recently
-        if adw_id and adw_comment_count >= 20:
-            error_msg = (
-                f"🛑 **Loop Detected - Aborting**\n\n"
-                f"ADW `{adw_id}` has posted **{adw_comment_count} times** in the last {len(recent_comments)} comments.\n"
-                f"This indicates a retry loop within this workflow.\n\n"
-                f"**Action Required:** Manual intervention needed."
-            )
-            logger.error(f"Loop detected: ADW {adw_id} posted {adw_comment_count} times in last {len(recent_comments)} comments")
-            make_issue_comment(issue_number, error_msg)
-            sys.exit(1)
+        # Strategy 2: Detect identical error messages repeating
+        error_signatures = {}
 
-        logger.info(f"No loop detected. Agent counts in last {len(recent_comments)} comments: {agent_counts}")
+        for comment in recent_comments:
+            body = comment.body
+
+            # Look for error markers
+            if "❌" in body or "ERROR" in body.upper() or "FAIL" in body.upper():
+                # Extract error message (normalize whitespace and remove timestamps)
+                error_text = re.sub(r'\d{4}-\d{2}-\d{2}', '', body)  # Remove dates
+                error_text = re.sub(r'\d{2}:\d{2}:\d{2}', '', error_text)  # Remove times
+                error_text = ' '.join(error_text.split())  # Normalize whitespace
+
+                # Hash the normalized error message
+                error_hash = hashlib.md5(error_text.encode()).hexdigest()[:8]
+                error_signatures[error_hash] = error_signatures.get(error_hash, 0) + 1
+
+        # Check for identical errors repeating
+        for error_hash, count in error_signatures.items():
+            if count >= MAX_IDENTICAL_ERROR_REPEATS:
+                error_msg = (
+                    f"🛑 **Loop Detected - Aborting**\n\n"
+                    f"An identical error message has appeared **{count} times** in recent comments.\n"
+                    f"This indicates a stuck loop where the same error keeps occurring.\n\n"
+                    f"**Recent Activity Pattern:**\n"
+                    f"- Total comments on issue: {len(issue.comments)}\n"
+                    f"- Identical error repetitions: {count}/{MAX_IDENTICAL_ERROR_REPEATS}\n\n"
+                    f"**Action Required:**\n"
+                    f"- Review error logs to identify the recurring error\n"
+                    f"- Fix the underlying cause before retrying\n"
+                    f"- The same error will keep appearing unless root cause is addressed"
+                )
+                logger.error(f"Loop detected: Identical error repeated {count} times")
+                make_issue_comment(issue_number, error_msg)
+                sys.exit(1)
+
+        logger.info(f"No loop detected. Phase retries: {phase_retry_counts}, Unique errors: {len(error_signatures)}")
 
     except Exception as e:
         # Don't fail on circuit breaker errors - log and continue

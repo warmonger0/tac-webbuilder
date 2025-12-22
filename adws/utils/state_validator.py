@@ -102,6 +102,9 @@ class StateValidator:
     def validate_inputs(self, issue_number: int) -> ValidationResult:
         """Validate phase inputs before execution.
 
+        Uses file-based validation by default. Database validation is optional
+        and only used when database is available (no psycopg2 dependency required).
+
         Args:
             issue_number: GitHub issue number
 
@@ -111,9 +114,10 @@ class StateValidator:
         errors = []
         warnings = []
 
-        # Get workflow state from database (SSoT for coordination)
+        # Try to get workflow state from database (optional - will fall back to file-based)
+        workflow = None
         try:
-            # Set up database imports using helper function
+            # Lazy import - only if database modules are available
             from adw_modules.utils import setup_database_imports
             setup_database_imports()
 
@@ -127,15 +131,15 @@ class StateValidator:
             all_phases = repo.get_all()
             workflows = [p for p in all_phases if p.issue_number == issue_number]
 
-            if not workflows:
-                errors.append(f"Workflow not found for issue {issue_number}")
-                return ValidationResult(False, errors, warnings)
-
-            # Use the first workflow (there should only be one per issue)
-            workflow = workflows[0]
+            if workflows:
+                # Use the first workflow (there should only be one per issue)
+                workflow = workflows[0]
+        except ImportError as e:
+            # Database modules not available (psycopg2 not installed) - use file-based validation
+            warnings.append(f"Database not available ({str(e)}) - using file-based validation")
         except Exception as e:
-            errors.append(f"Failed to query database: {str(e)}")
-            return ValidationResult(False, errors, warnings)
+            # Database query failed - fall back to file-based validation
+            warnings.append(f"Database query failed: {str(e)} - using file-based validation")
 
         # Get execution metadata from file (SSoT for metadata)
         state = {}
@@ -167,6 +171,9 @@ class StateValidator:
     def validate_outputs(self, issue_number: int) -> ValidationResult:
         """Validate phase outputs after execution.
 
+        Uses file-based validation by default. Database validation is optional
+        and only used when database is available (no psycopg2 dependency required).
+
         Args:
             issue_number: GitHub issue number
 
@@ -176,9 +183,10 @@ class StateValidator:
         errors = []
         warnings = []
 
-        # Get workflow state
+        # Try to get workflow state from database (optional - will fall back to file-based)
+        workflow = None
         try:
-            # Set up database imports using helper function
+            # Lazy import - only if database modules are available
             from adw_modules.utils import setup_database_imports
             setup_database_imports()
 
@@ -187,18 +195,15 @@ class StateValidator:
             # Get all phases for this issue (feature_id == issue_number in ADW context)
             workflows = repo.get_all_by_feature_id(issue_number)
 
-            if not workflows:
-                # No database record - this is a standalone ADW run
-                # Fall back to file-based validation without database SSoT
-                warnings.append(f"No database record for issue {issue_number} - using file-based validation (standalone mode)")
-                workflow = None
-            else:
+            if workflows:
                 # Use the first workflow (there should only be one per issue)
                 workflow = workflows[0]
+        except ImportError as e:
+            # Database modules not available (psycopg2 not installed) - use file-based validation
+            warnings.append(f"Database not available ({str(e)}) - using file-based validation")
         except Exception as e:
-            # Database query failed - fall back to file-based validation
+            # Database query failed for other reason - fall back to file-based validation
             warnings.append(f"Database query failed: {str(e)} - using file-based validation")
-            workflow = None
 
         # Get execution metadata
         state = {}
