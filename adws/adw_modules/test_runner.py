@@ -120,9 +120,14 @@ class TestRunner:
 
         # Execute pytest
         try:
+            # Set up environment with PYTHONPATH for worktree imports
+            env = os.environ.copy()
+            env['PYTHONPATH'] = str(self.project_root)
+
             result = subprocess.run(
                 cmd,
                 cwd=pytest_path,
+                env=env,
                 capture_output=True,
                 text=True,
                 timeout=300  # 5 minute timeout

@@ -29,12 +29,8 @@ import os
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.insert(0, parent_dir)
 
-from adws.utils.state_validator import StateValidator
-from adws.adw_modules.state import ADWState
-from adws.adw_modules.utils import setup_database_imports
-
-# Setup database imports for app.server access
-setup_database_imports()
+# Note: Imports moved to function level to avoid circular dependencies
+# and to support lazy database setup only when needed
 
 
 def is_phase_complete(phase: str, issue_number: int, logger: logging.Logger) -> bool:
@@ -49,6 +45,9 @@ def is_phase_complete(phase: str, issue_number: int, logger: logging.Logger) -> 
         True if phase outputs exist and are valid, False otherwise
     """
     try:
+        # Lazy import to avoid circular dependencies
+        from adws.utils.state_validator import StateValidator
+
         logger.debug(f"Checking if {phase} phase is complete for issue {issue_number}")
 
         # Use StateValidator to check outputs
@@ -124,6 +123,13 @@ def get_or_create_state(issue_number: int, adw_id: Optional[str], logger: loggin
         State dictionary
     """
     try:
+        # Lazy imports to avoid circular dependencies
+        from adws.adw_modules.state import ADWState
+        from adws.adw_modules.utils import setup_database_imports
+
+        # Setup database imports only when needed
+        setup_database_imports()
+
         if adw_id:
             state = ADWState.load(adw_id, logger)
             if state:
