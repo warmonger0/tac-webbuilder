@@ -101,6 +101,11 @@ def run_external_lint(
         logger.debug(f"Stderr: {result.stderr}")
         return False, {"error": "No lint results returned from external tool"}
 
+    # CRITICAL FIX: Merge external_lint_results back into the parent state object
+    # This prevents the parent state.save() from overwriting the external lint results
+    state.data["external_lint_results"] = lint_results
+    logger.debug(f"Merged external_lint_results into parent state: {len(lint_results.get('errors', []))} errors")
+
     success = lint_results.get("success", False)
     logger.info(f"External lint check completed: {'✅ Success' if success else '❌ Errors detected'}")
 

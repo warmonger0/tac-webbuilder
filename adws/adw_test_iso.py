@@ -325,6 +325,11 @@ def run_external_tests(
             ]
         }
 
+    # CRITICAL FIX: Merge external_test_results back into the parent state object
+    # This prevents the parent state.save() from overwriting the external test results
+    state.data["external_test_results"] = test_results
+    logger.debug(f"Merged external_test_results into parent state: {test_results.get('summary', {}).get('total', 0)} tests")
+
     success = test_results.get("success", False)
     logger.info(f"External tests completed: {'✅ Success' if success else '❌ Failures detected'}")
 

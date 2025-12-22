@@ -98,6 +98,11 @@ def run_external_build(
         logger.debug(f"Stderr: {result.stderr}")
         return False, {"error": "No build results returned from external tool"}
 
+    # CRITICAL FIX: Merge external_build_results back into the parent state object
+    # This prevents the parent state.save() from overwriting the external build results
+    state.data["external_build_results"] = build_results
+    logger.debug(f"Merged external_build_results into parent state: {len(build_results.get('errors', []))} errors")
+
     success = build_results.get("success", False)
     logger.info(f"External build check completed: {'✅ Success' if success else '❌ Errors detected'}")
 
