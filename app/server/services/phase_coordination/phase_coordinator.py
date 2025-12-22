@@ -17,7 +17,6 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Tuple
 
 from services.phase_queue_service import PhaseQueueService
 
@@ -66,7 +65,7 @@ class PhaseCoordinator:
         self._task: asyncio.Task | None = None
 
         # Loop prevention tracking: {queue_id: (attempt_count, last_failure_time)}
-        self.phase_attempt_history: Dict[str, Tuple[int, datetime]] = {}
+        self.phase_attempt_history: dict[str, tuple[int, datetime]] = {}
 
         # Initialize helper components (use database factory)
         self.detector = WorkflowCompletionDetector()

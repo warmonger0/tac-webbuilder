@@ -32,8 +32,8 @@ from services.websocket_manager import get_connection_manager
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "scripts"))
 
 try:
-    from plan_phases import PhaseAnalyzer
     from generate_prompt import PromptGenerator
+    from plan_phases import PhaseAnalyzer
 except ImportError:
     PhaseAnalyzer = None  # Handle gracefully if script not available
     PromptGenerator = None
