@@ -35,11 +35,13 @@
 
 **GitHub Comment Loop Detection (Issue #168, Updated Post-#271):**
 - `MAX_RECENT_COMMENTS_TO_CHECK = 20` - Window size for pattern detection
-- `MAX_PHASE_RETRY_ATTEMPTS = 3` - Maximum retry attempts per phase before considering it a loop
-- `MAX_IDENTICAL_ERROR_REPEATS = 4` - If identical error appears 4+ times = stuck loop
-- Circuit breaker uses two strategies:
-  1. **Phase retry counting**: Tracks "🔄 Retrying {Phase} phase (attempt X/Y)" messages
-  2. **Identical error detection**: Hashes error messages to detect true stuck behavior
+- `MAX_LOOP_MARKERS = 12` - Workflow-wide catch-all: if 🔁 appears 12+ times = stuck loop
+- Loop markers (🔁) added to ALL retry attempt messages:
+  - External tool retries (tests, lints, builds)
+  - LLM resolution retries
+  - Phase retries
+- Simple and deterministic: just count 🔁 emojis in recent comments
+- Existing cascading resolution logic (external 3x → LLM 3x → phase retry 3x) handles smart escalation
 - Does NOT penalize verbose agent reporting (agents can post detailed progress without false positives)
 
 ### Cascading Resolution Strategies (Session 26 - Issues #254/255)

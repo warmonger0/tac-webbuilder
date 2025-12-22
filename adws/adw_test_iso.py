@@ -99,21 +99,25 @@ MAX_TEST_RETRY_ATTEMPTS = 3
 MAX_E2E_TEST_RETRY_ATTEMPTS = 3  # E2E ui tests
 
 # Circuit breaker: Detect repetitive patterns indicating a loop
-MAX_RECENT_COMMENTS_TO_CHECK = 15  # Look at last N comments
-MAX_SAME_AGENT_REPEATS = 8  # If same agent posts 8+ times in last N comments = loop
+MAX_RECENT_COMMENTS_TO_CHECK = 20  # Look at last N comments
+MAX_LOOP_MARKERS = 12  # If 🔁 appears 12+ times in recent comments = stuck loop (workflow-wide catch-all)
 
 
 def check_for_loop(issue_number: str, logger: logging.Logger, adw_id: str = None) -> None:
     """
     Circuit breaker to detect and prevent infinite loops.
-    Detects loops by checking for repetitive patterns in recent comments:
-    - Same agent posting repeatedly (e.g., test_resolver multiple times)
-    - Same phase repeating without progress
+
+    Detects loops by counting 🔁 loop markers in recent comments.
+    Loop markers are added to retry attempt messages by the cascading
+    resolution logic (external tools → LLM → phase retry).
+
+    Simple and deterministic: if 🔁 appears >= MAX_LOOP_MARKERS times
+    in recent comments, abort the workflow.
 
     Args:
         issue_number: GitHub issue number
         logger: Logger instance
-        adw_id: Optional ADW ID to check for repetition
+        adw_id: Optional ADW ID (unused, kept for compatibility)
 
     Raises:
         SystemExit: If loop detected (exits with code 1)
@@ -132,68 +136,28 @@ def check_for_loop(issue_number: str, logger: logging.Logger, adw_id: str = None
 
         logger.info(f"Issue #{issue_number} has {len(issue.comments)} total comments, checking last {len(recent_comments)}")
 
-        # Count agent repetitions in recent comments
-        agent_counts = {}
-        adw_comment_count = 0
+        # Count loop markers (🔁) in recent comments
+        loop_marker_count = sum(1 for comment in recent_comments if "🔁" in comment.body)
 
-        for comment in recent_comments:
-            body = comment.body
-
-            # Count this ADW's comments if adw_id provided
-            if adw_id and f"{adw_id}_" in body:
-                adw_comment_count += 1
-
-            # Extract agent name from comments like "[ADW-AGENTS] abc123_test_resolver_iter2_0:"
-            if "[ADW-AGENTS]" in body and "_" in body:
-                # Parse agent name (e.g., "test_resolver", "test_runner", "ops")
-                try:
-                    # Format is usually: [ADW-AGENTS] {adw_id}_{agent_name}: or {adw_id}_{agent_name}:
-                    parts = body.split(":", 1)[0]  # Get everything before first colon
-                    if "_" in parts:
-                        # Get the last part after underscore (agent name, possibly with iteration)
-                        agent_part = parts.split("_")[-1]
-                        # Remove iteration numbers (e.g., iter2, iter3)
-                        agent_base = agent_part.split("iter")[0].rstrip("_0123456789")
-
-                        if agent_base:
-                            agent_counts[agent_base] = agent_counts.get(agent_base, 0) + 1
-                except:
-                    pass
-
-        # Check for same agent repeating too much
-        for agent, count in agent_counts.items():
-            if count >= MAX_SAME_AGENT_REPEATS:
-                error_msg = (
-                    f"🛑 **Loop Detected - Aborting**\n\n"
-                    f"Agent `{agent}` has posted **{count} times** in the last {len(recent_comments)} comments.\n"
-                    f"This indicates a retry loop where the same operation is repeating without progress.\n\n"
-                    f"**Recent Activity Pattern:**\n"
-                    f"- Total comments on issue: {len(issue.comments)}\n"
-                    f"- `{agent}` repetitions in last {len(recent_comments)}: {count}\n"
-                    f"- Threshold: {MAX_SAME_AGENT_REPEATS}\n\n"
-                    f"**Action Required:**\n"
-                    f"- Manual review and cleanup needed\n"
-                    f"- Check for stuck test failures\n"
-                    f"- Review error logs for root cause\n"
-                    f"- Consider creating a fresh issue if problem persists"
-                )
-                logger.error(f"Loop detected: Agent '{agent}' posted {count} times in last {len(recent_comments)} comments")
-                make_issue_comment(issue_number, error_msg)
-                sys.exit(1)
-
-        # Check if this specific ADW has too many comments recently
-        if adw_id and adw_comment_count >= 20:
+        if loop_marker_count >= MAX_LOOP_MARKERS:
             error_msg = (
                 f"🛑 **Loop Detected - Aborting**\n\n"
-                f"ADW `{adw_id}` has posted **{adw_comment_count} times** in the last {len(recent_comments)} comments.\n"
-                f"This indicates a retry loop within this workflow.\n\n"
-                f"**Action Required:** Manual intervention needed."
+                f"Found **{loop_marker_count} retry markers (🔁)** in the last {len(recent_comments)} comments.\n"
+                f"This indicates a stuck retry loop that is not making progress.\n\n"
+                f"**Recent Activity Pattern:**\n"
+                f"- Total comments on issue: {len(issue.comments)}\n"
+                f"- Loop markers in last {len(recent_comments)}: {loop_marker_count}/{MAX_LOOP_MARKERS}\n\n"
+                f"**Action Required:**\n"
+                f"- Manual review needed to identify root cause\n"
+                f"- Check logs for recurring errors\n"
+                f"- Fix underlying issue before retrying\n"
+                f"- Consider creating a fresh issue if problem persists"
             )
-            logger.error(f"Loop detected: ADW {adw_id} posted {adw_comment_count} times in last {len(recent_comments)} comments")
+            logger.error(f"Loop detected: Found {loop_marker_count} loop markers in last {len(recent_comments)} comments")
             make_issue_comment(issue_number, error_msg)
             sys.exit(1)
 
-        logger.info(f"No loop detected. Agent counts in last {len(recent_comments)} comments: {agent_counts}")
+        logger.info(f"No loop detected. Loop markers in last {len(recent_comments)} comments: {loop_marker_count}/{MAX_LOOP_MARKERS}")
 
     except Exception as e:
         # Don't fail on circuit breaker errors - log and continue
@@ -709,7 +673,7 @@ def run_external_tests_with_resolution(
                 format_issue_message(
                     adw_id,
                     "ops",
-                    f"🔄 Retrying test infrastructure (attempt {attempt + 1}/{max_attempts})..."
+                    f"🔄 Retrying test infrastructure (attempt {attempt + 1}/{max_attempts}) 🔁"
                 )
             )
             continue
@@ -748,7 +712,7 @@ def run_external_tests_with_resolution(
                 format_issue_message(
                     adw_id,
                     "ops",
-                    f"🔄 Re-running external tests to verify fixes (attempt {attempt + 1}/{max_attempts})..."
+                    f"🔄 Re-running external tests to verify fixes (attempt {attempt + 1}/{max_attempts}) 🔁"
                 )
             )
             continue
