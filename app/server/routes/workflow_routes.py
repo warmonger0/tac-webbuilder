@@ -47,6 +47,7 @@ class PhaseUpdateResponse(BaseModel):
     success: bool
     message: str
     broadcasted: bool  # Whether WebSocket broadcast succeeded
+    next_phase_triggered: bool = False  # Whether next phase was automatically triggered
 
 # Router will be created with dependencies injected from server.py
 router = APIRouter(prefix="", tags=["Workflows"])
@@ -235,6 +236,7 @@ async def _update_phase_handler(request: PhaseUpdateRequest, websocket_manager) 
 
         # Update state file with execution metadata only (if provided)
         # NOTE: Status and current_phase are NOT stored in state file (database is SSoT)
+        state = None
         if request.metadata:
             from adw_modules.state import ADWState
             from adw_modules.utils import setup_logger
@@ -251,6 +253,49 @@ async def _update_phase_handler(request: PhaseUpdateRequest, websocket_manager) 
                     logger.info(f"[PHASE_UPDATE] Updated execution metadata in state file for {request.adw_id}")
             else:
                 logger.warning(f"[PHASE_UPDATE] State file not found for {request.adw_id}, skipping metadata update")
+
+        # AUTOMATIC PHASE CONTINUATION
+        # Trigger next phase when current phase completes successfully
+        next_phase_triggered = False
+        if request.status == "completed":
+            from core.phase_continuation import should_continue_workflow, trigger_next_phase
+            from adw_modules.state import ADWState
+            from adw_modules.utils import setup_logger
+
+            # Load state if not already loaded
+            if not state:
+                state_logger = setup_logger(request.adw_id, "phase_continuation")
+                state = ADWState.load(request.adw_id, state_logger)
+
+            if state and should_continue_workflow(request.status, request.current_phase):
+                workflow_template = state.get("workflow_template")
+                github_issue_number = state.get("github_issue_number")
+
+                if workflow_template and github_issue_number:
+                    # Extract workflow flags from state
+                    workflow_flags = {
+                        "skip_e2e": state.get("skip_e2e", False),
+                        "skip_resolution": state.get("skip_resolution", False),
+                        "no_external": state.get("no_external", False),
+                    }
+
+                    logger.info(f"[PHASE_CONTINUATION] Attempting to trigger next phase after {request.current_phase}")
+                    next_phase_triggered = trigger_next_phase(
+                        adw_id=request.adw_id,
+                        issue_number=str(github_issue_number),
+                        workflow_template=workflow_template,
+                        current_phase=request.current_phase,
+                        workflow_flags=workflow_flags
+                    )
+
+                    if next_phase_triggered:
+                        logger.info(f"[PHASE_CONTINUATION] ✅ Next phase triggered successfully for {request.adw_id}")
+                    else:
+                        logger.info(f"[PHASE_CONTINUATION] No next phase to trigger (workflow may be complete)")
+                else:
+                    logger.warning(f"[PHASE_CONTINUATION] Missing workflow_template or github_issue_number in state")
+            else:
+                logger.debug(f"[PHASE_CONTINUATION] Skipping continuation (status={request.status}, phase={request.current_phase})")
 
         # Immediately broadcast via WebSocket
         broadcasted = False
@@ -274,7 +319,8 @@ async def _update_phase_handler(request: PhaseUpdateRequest, websocket_manager) 
         return PhaseUpdateResponse(
             success=True,
             message=f"Phase update processed for {request.adw_id}",
-            broadcasted=broadcasted
+            broadcasted=broadcasted,
+            next_phase_triggered=next_phase_triggered
         )
 
     except Exception as e:
