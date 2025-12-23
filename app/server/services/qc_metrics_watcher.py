@@ -12,6 +12,7 @@ Watches for:
 """
 
 import asyncio
+import contextlib
 import logging
 import time
 from pathlib import Path
@@ -98,10 +99,8 @@ class QCMetricsWatcher:
 
         if self.watcher_task:
             self.watcher_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self.watcher_task
-            except asyncio.CancelledError:
-                pass
 
         logger.info("[QC_WATCHER] Stopped")
 

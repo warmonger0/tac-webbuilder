@@ -135,7 +135,6 @@ class PhaseCoordinator:
             feature_id = event_data.get("feature_id")
             phase_number = event_data.get("phase_number")
             status = event_data.get("status")
-            adw_id = event_data.get("adw_id")
 
             logger.info(
                 f"[EVENT] Workflow completion event received: "
@@ -159,14 +158,13 @@ class PhaseCoordinator:
                         f"[LOOP PREVENTION] Phase {phase_number} (queue_id={queue_id}) failed "
                         f"on first attempt (1/{self.MAX_PHASE_LAUNCH_ATTEMPTS})"
                     )
-            elif status == "completed":
+            elif status == "completed" and queue_id in self.phase_attempt_history:
                 # Success - clear attempt history for this phase
-                if queue_id in self.phase_attempt_history:
-                    del self.phase_attempt_history[queue_id]
-                    logger.info(
-                        f"[LOOP PREVENTION] Phase {phase_number} (queue_id={queue_id}) "
-                        f"completed successfully. Attempt history cleared."
-                    )
+                del self.phase_attempt_history[queue_id]
+                logger.info(
+                    f"[LOOP PREVENTION] Phase {phase_number} (queue_id={queue_id}) "
+                    f"completed successfully. Attempt history cleared."
+                )
 
             # Check if all phases for this feature are complete
             await self._check_feature_completion(feature_id)
@@ -728,7 +726,7 @@ class PhaseCoordinator:
                 os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
                 # Open log file without context manager so it stays open for subprocess
-                log_handle = open(log_file, "w")
+                log_handle = open(log_file, "w")  # noqa: SIM115
                 subprocess.Popen(
                     cmd,
                     cwd=repo_root,

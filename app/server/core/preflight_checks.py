@@ -27,7 +27,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def run_preflight_checks(
+def run_preflight_checks(  # noqa: C901
     skip_tests: bool = False,
     issue_number: int | None = None,
     run_dry_run: bool = False,
@@ -320,7 +320,7 @@ def run_preflight_checks(
     return result
 
 
-def check_critical_tests() -> dict[str, Any]:
+def check_critical_tests() -> dict[str, Any]:  # noqa: C901
     """
     Run critical test subset to detect blocking issues.
 
@@ -887,7 +887,7 @@ def check_pattern_analysis_system() -> dict[str, Any]:
             service = PatternReviewService()
 
             # Quick sanity check - can we query pattern_approvals?
-            patterns = service.get_pending_patterns(limit=1)
+            _ = service.get_pending_patterns(limit=1)
 
             return {
                 "passed": True,
@@ -911,7 +911,7 @@ def check_pattern_analysis_system() -> dict[str, Any]:
         }
 
 
-def check_issue_already_resolved(issue_number: int) -> dict[str, Any]:
+def check_issue_already_resolved(issue_number: int) -> dict[str, Any]:  # noqa: C901
     """
     Check if a GitHub issue is already resolved to prevent duplicate work.
 

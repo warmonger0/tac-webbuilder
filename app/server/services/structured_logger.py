@@ -125,15 +125,14 @@ class StructuredLogger:
             if self.enable_file:
                 # Determine log file
                 adw_id = None
-                if isinstance(event, (WorkflowLogEvent, PhaseLogEvent)):
+                if isinstance(event, WorkflowLogEvent | PhaseLogEvent):
                     adw_id = event.adw_id
 
                 log_file = self._get_log_file(adw_id)
 
                 # Thread-safe write
-                with self._write_lock:
-                    with open(log_file, "a", encoding="utf-8") as f:
-                        f.write(event_json + "\n")
+                with self._write_lock, open(log_file, "a", encoding="utf-8") as f:
+                    f.write(event_json + "\n")
 
             return True
 

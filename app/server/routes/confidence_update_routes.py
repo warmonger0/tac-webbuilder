@@ -65,7 +65,7 @@ async def update_pattern_confidence(
         raise
     except Exception as e:
         logger.error(f"[API] Error updating confidence: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to update confidence: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update confidence: {str(e)}") from e
 
 
 @router.post("/api/confidence/update-all")
@@ -118,7 +118,7 @@ async def update_all_patterns(
 
     except Exception as e:
         logger.error(f"[API] Error updating all patterns: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to update patterns: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update patterns: {str(e)}") from e
 
 
 @router.get("/api/confidence/history/{pattern_id}")
@@ -162,7 +162,7 @@ async def get_confidence_history(
 
     except Exception as e:
         logger.error(f"[API] Error fetching confidence history: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}") from e
 
 
 @router.get("/api/confidence/recommendations")
@@ -227,4 +227,4 @@ async def get_status_change_recommendations() -> dict:
 
     except Exception as e:
         logger.error(f"[API] Error generating recommendations: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}") from e

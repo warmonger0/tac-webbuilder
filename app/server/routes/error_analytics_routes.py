@@ -56,7 +56,7 @@ async def get_error_summary(
 
     except Exception as e:
         logger.error(f"[ErrorAnalyticsRoutes] Error in get_error_summary: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate error summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate error summary: {str(e)}") from e
 
 
 @router.get("/api/error-analytics/by-phase", response_model=PhaseErrorBreakdown)
@@ -84,7 +84,7 @@ async def get_phase_errors(
 
     except Exception as e:
         logger.error(f"[ErrorAnalyticsRoutes] Error in get_phase_errors: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to analyze phase errors: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze phase errors: {str(e)}") from e
 
 
 @router.get("/api/error-analytics/patterns", response_model=list[ErrorPattern])
@@ -112,7 +112,7 @@ async def get_error_patterns(
 
     except Exception as e:
         logger.error(f"[ErrorAnalyticsRoutes] Error in get_error_patterns: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to detect error patterns: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to detect error patterns: {str(e)}") from e
 
 
 @router.get("/api/error-analytics/trends", response_model=ErrorTrends)
@@ -140,7 +140,7 @@ async def get_failure_trends(
 
     except Exception as e:
         logger.error(f"[ErrorAnalyticsRoutes] Error in get_failure_trends: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to analyze error trends: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze error trends: {str(e)}") from e
 
 
 @router.get("/api/error-analytics/recommendations", response_model=list[DebugRecommendation])
@@ -168,4 +168,4 @@ async def get_debugging_recommendations(
 
     except Exception as e:
         logger.error(f"[ErrorAnalyticsRoutes] Error in get_debugging_recommendations: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}") from e

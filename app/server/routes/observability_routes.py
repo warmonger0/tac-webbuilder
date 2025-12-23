@@ -43,7 +43,7 @@ class WebhookLogRequest(BaseModel):
     event_data: dict = Field(default_factory=dict, description="Additional event data")
 
 
-def init_observability_routes(
+def init_observability_routes(  # noqa: C901
     task_log_repository: TaskLogRepository | None = None,
     user_prompt_repository: UserPromptRepository | None = None,
 ):
@@ -72,7 +72,7 @@ def init_observability_routes(
             return prompt_repo.create(prompt)
         except Exception as e:
             logger.error(f"Error creating user prompt log: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create user prompt log")
+            raise HTTPException(status_code=500, detail="Failed to create user prompt log") from e
 
     @router.get("/user-prompts", response_model=list[UserPrompt])
     async def get_user_prompts(
@@ -109,7 +109,7 @@ def init_observability_routes(
             return prompt_repo.get_all(filters)
         except Exception as e:
             logger.error(f"Error retrieving user prompts: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve user prompts")
+            raise HTTPException(status_code=500, detail="Failed to retrieve user prompts") from e
 
     @router.get("/user-prompts/with-progress", response_model=list[UserPromptWithProgress])
     async def get_user_prompts_with_progress(
@@ -140,7 +140,7 @@ def init_observability_routes(
             return prompt_repo.get_with_progress(filters)
         except Exception as e:
             logger.error(f"Error retrieving user prompts with progress: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve user prompts with progress")
+            raise HTTPException(status_code=500, detail="Failed to retrieve user prompts with progress") from e
 
     @router.get("/user-prompts/{request_id}", response_model=UserPrompt)
     async def get_user_prompt_by_id(request_id: str) -> UserPrompt:
@@ -165,7 +165,7 @@ def init_observability_routes(
             raise
         except Exception as e:
             logger.error(f"Error retrieving user prompt {request_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve user prompt")
+            raise HTTPException(status_code=500, detail="Failed to retrieve user prompt") from e
 
     # =========================================================================
     # Webhook Event Routes
@@ -252,7 +252,7 @@ def init_observability_routes(
             return task_repo.create(task_log)
         except Exception as e:
             logger.error(f"Error creating task log: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create task log")
+            raise HTTPException(status_code=500, detail="Failed to create task log") from e
 
     @router.get("/task-logs", response_model=list[TaskLog])
     async def get_task_logs(
@@ -289,7 +289,7 @@ def init_observability_routes(
             return task_repo.get_all(filters)
         except Exception as e:
             logger.error(f"Error retrieving task logs: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve task logs")
+            raise HTTPException(status_code=500, detail="Failed to retrieve task logs") from e
 
     @router.get("/task-logs/issue/{issue_number}", response_model=list[TaskLog])
     async def get_task_logs_by_issue(issue_number: int) -> list[TaskLog]:
@@ -306,7 +306,7 @@ def init_observability_routes(
             return task_repo.get_by_issue(issue_number)
         except Exception as e:
             logger.error(f"Error retrieving task logs for issue #{issue_number}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve task logs for issue")
+            raise HTTPException(status_code=500, detail="Failed to retrieve task logs for issue") from e
 
     @router.get("/task-logs/adw/{adw_id}", response_model=list[TaskLog])
     async def get_task_logs_by_adw(adw_id: str) -> list[TaskLog]:
@@ -323,7 +323,7 @@ def init_observability_routes(
             return task_repo.get_by_adw_id(adw_id)
         except Exception as e:
             logger.error(f"Error retrieving task logs for ADW {adw_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve task logs for ADW")
+            raise HTTPException(status_code=500, detail="Failed to retrieve task logs for ADW") from e
 
     @router.get("/task-logs/issue/{issue_number}/latest", response_model=TaskLog)
     async def get_latest_task_log(issue_number: int) -> TaskLog:
@@ -348,7 +348,7 @@ def init_observability_routes(
             raise
         except Exception as e:
             logger.error(f"Error retrieving latest task log for issue #{issue_number}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve latest task log")
+            raise HTTPException(status_code=500, detail="Failed to retrieve latest task log") from e
 
     # =========================================================================
     # Progress Routes
@@ -377,6 +377,6 @@ def init_observability_routes(
             raise
         except Exception as e:
             logger.error(f"Error retrieving progress for issue #{issue_number}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve issue progress")
+            raise HTTPException(status_code=500, detail="Failed to retrieve issue progress") from e
 
     return router

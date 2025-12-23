@@ -517,8 +517,8 @@ class QCMetricsService:
         total_size = 0
 
         # Define thresholds
-        MAX_FILE_SIZE_KB = 500  # 500 KB
-        MAX_FILE_LINES = 1000   # 1000 lines
+        max_file_size_kb = 500  # 500 KB
+        max_file_lines = 1000   # 1000 lines
 
         # Check all code files (excluding venv/node_modules BEFORE enumeration)
         for ext in ['*.py', '*.ts', '*.tsx', '*.js', '*.jsx']:
@@ -534,7 +534,7 @@ class QCMetricsService:
                 size_kb = file.stat().st_size / 1024
                 total_size += size_kb
 
-                if size_kb > MAX_FILE_SIZE_KB:
+                if size_kb > max_file_size_kb:
                     oversized_files.append({
                         'file': str(file.relative_to(self.project_root)),
                         'size_kb': round(size_kb, 2)
@@ -545,7 +545,7 @@ class QCMetricsService:
                     with open(file, encoding='utf-8') as f:
                         line_count = sum(1 for _ in f)
 
-                    if line_count > MAX_FILE_LINES:
+                    if line_count > max_file_lines:
                         long_files.append({
                             'file': str(file.relative_to(self.project_root)),
                             'lines': line_count

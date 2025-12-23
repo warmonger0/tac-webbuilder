@@ -54,7 +54,7 @@ async def record_execution(execution: PatternExecution) -> dict:
 
     except Exception as e:
         logger.error(f"[API] Error recording execution: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to record execution: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to record execution: {str(e)}") from e
 
 
 @router.get("/api/roi-tracking/pattern/{pattern_id}")
@@ -85,7 +85,7 @@ async def get_pattern_roi(pattern_id: str) -> PatternROISummary:
         raise
     except Exception as e:
         logger.error(f"[API] Error retrieving pattern ROI: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve pattern ROI: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve pattern ROI: {str(e)}") from e
 
 
 @router.get("/api/roi-tracking/summary")
@@ -105,7 +105,7 @@ async def get_all_roi_summaries() -> list[PatternROISummary]:
 
     except Exception as e:
         logger.error(f"[API] Error retrieving ROI summaries: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve ROI summaries: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve ROI summaries: {str(e)}") from e
 
 
 @router.get("/api/roi-tracking/report/{pattern_id}")
@@ -139,7 +139,7 @@ async def get_roi_report(pattern_id: str) -> ROIReport:
         raise
     except Exception as e:
         logger.error(f"[API] Error generating ROI report: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate ROI report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate ROI report: {str(e)}") from e
 
 
 @router.get("/api/roi-tracking/top-performers")
@@ -162,7 +162,7 @@ async def get_top_performers(limit: int = Query(10, ge=1, le=50)) -> list[Patter
 
     except Exception as e:
         logger.error(f"[API] Error retrieving top performers: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve top performers: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve top performers: {str(e)}") from e
 
 
 @router.get("/api/roi-tracking/underperformers")
@@ -188,7 +188,7 @@ async def get_underperformers(limit: int = Query(10, ge=1, le=50)) -> list[Patte
         raise HTTPException(
             status_code=500,
             detail=f"Failed to retrieve underperformers: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/api/roi-tracking/effectiveness/{pattern_id}")
@@ -235,4 +235,4 @@ async def get_effectiveness(pattern_id: str) -> dict:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to calculate effectiveness: {str(e)}"
-        )
+        ) from e

@@ -67,7 +67,7 @@ async def get_latency_summary(
 
     except Exception as e:
         logger.error(f"[LatencyAnalyticsRoutes] Error in get_latency_summary: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get latency summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get latency summary: {str(e)}") from e
 
 
 @router.get("/api/latency-analytics/by-phase", response_model=PhaseLatencyBreakdownResponse)
@@ -106,7 +106,7 @@ async def get_phase_latencies(
 
     except Exception as e:
         logger.error(f"[LatencyAnalyticsRoutes] Error in get_phase_latencies: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to analyze phase latencies: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze phase latencies: {str(e)}") from e
 
 
 @router.get("/api/latency-analytics/bottlenecks", response_model=list[BottleneckResponse])
@@ -142,7 +142,7 @@ async def get_bottlenecks(
 
     except Exception as e:
         logger.error(f"[LatencyAnalyticsRoutes] Error in get_bottlenecks: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to find bottlenecks: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to find bottlenecks: {str(e)}") from e
 
 
 @router.get("/api/latency-analytics/trends", response_model=TrendDataResponse)
@@ -178,7 +178,7 @@ async def get_latency_trends(
 
     except Exception as e:
         logger.error(f"[LatencyAnalyticsRoutes] Error in get_latency_trends: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to analyze latency trends: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze latency trends: {str(e)}") from e
 
 
 @router.get("/api/latency-analytics/recommendations", response_model=list[OptimizationRecommendationResponse])
@@ -210,4 +210,4 @@ async def get_optimization_recommendations(
 
     except Exception as e:
         logger.error(f"[LatencyAnalyticsRoutes] Error in get_optimization_recommendations: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}") from e

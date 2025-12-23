@@ -81,7 +81,7 @@ async def get_review_statistics():
         )
     except Exception as e:
         logger.error(f"Error fetching review statistics: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/pending", response_model=list[PatternReviewResponse])
@@ -118,7 +118,7 @@ async def get_pending_patterns(limit: int = 20):
         ]
     except Exception as e:
         logger.error(f"Error fetching pending patterns: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/{pattern_id}", response_model=PatternReviewResponse)
@@ -157,7 +157,7 @@ async def get_pattern_details(pattern_id: str):
         raise
     except Exception as e:
         logger.error(f"Error fetching pattern {pattern_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/{pattern_id}/approve", response_model=PatternReviewResponse)
@@ -203,7 +203,7 @@ async def approve_pattern(pattern_id: str, request: ApproveRequest):
         raise
     except Exception as e:
         logger.error(f"Error approving pattern {pattern_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/{pattern_id}/reject", response_model=PatternReviewResponse)
@@ -249,7 +249,7 @@ async def reject_pattern(pattern_id: str, request: RejectRequest):
         raise
     except Exception as e:
         logger.error(f"Error rejecting pattern {pattern_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/{pattern_id}/comment")
@@ -298,4 +298,4 @@ async def add_comment(pattern_id: str, request: CommentRequest):
         raise
     except Exception as e:
         logger.error(f"Error adding comment to pattern {pattern_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

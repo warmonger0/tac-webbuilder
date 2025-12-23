@@ -138,10 +138,10 @@ async def get_git_status() -> GitStatusResponse:
 
     except subprocess.CalledProcessError as e:
         logger.error(f"Git status command failed: {e.stderr}")
-        raise HTTPException(status_code=500, detail=f"Git command failed: {e.stderr}")
+        raise HTTPException(status_code=500, detail=f"Git command failed: {e.stderr}") from e
     except Exception as e:
         logger.error(f"Error getting git status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/git/commit", response_model=GitCommitResponse)
@@ -160,7 +160,7 @@ async def commit_changes(request: GitCommitRequest) -> GitCommitResponse:
         if request.files:
             # Stage specific files
             for file_path in request.files:
-                add_result = subprocess.run(
+                subprocess.run(
                     ["git", "add", file_path],
                     capture_output=True,
                     text=True,
@@ -168,7 +168,7 @@ async def commit_changes(request: GitCommitRequest) -> GitCommitResponse:
                 )
         else:
             # Stage all changes
-            add_result = subprocess.run(
+            subprocess.run(
                 ["git", "add", "."],
                 capture_output=True,
                 text=True,
@@ -176,7 +176,7 @@ async def commit_changes(request: GitCommitRequest) -> GitCommitResponse:
             )
 
         # Create commit
-        commit_result = subprocess.run(
+        subprocess.run(
             ["git", "commit", "-m", request.message],
             capture_output=True,
             text=True,
@@ -223,7 +223,7 @@ async def commit_changes(request: GitCommitRequest) -> GitCommitResponse:
                 files_committed=0
             )
 
-        raise HTTPException(status_code=400, detail=f"Git commit failed: {error_msg}")
+        raise HTTPException(status_code=400, detail=f"Git commit failed: {error_msg}") from e
     except Exception as e:
         logger.error(f"Error committing changes: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

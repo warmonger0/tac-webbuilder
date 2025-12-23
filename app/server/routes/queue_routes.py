@@ -776,7 +776,7 @@ def _launch_workflow(next_phase) -> tuple[str, bool]:
     return adw_id, True
 
 
-def init_webhook_routes(phase_queue_service, github_poster, websocket_manager=None):
+def init_webhook_routes(phase_queue_service, github_poster, websocket_manager=None):  # noqa: C901
     """
     Initialize webhook routes with service dependencies.
 

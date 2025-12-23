@@ -366,7 +366,6 @@ class PhaseQueueRepository:
         try:
             with self.adapter.get_connection() as conn:
                 ph = self.adapter.placeholder()
-                now_fn = self.adapter.now_function()
 
                 cursor = conn.cursor()
                 cursor.execute(

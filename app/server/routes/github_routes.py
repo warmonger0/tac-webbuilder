@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["GitHub Integration"])
 
 
-def init_github_routes(github_issue_service):
+def init_github_routes(github_issue_service):  # noqa: C901
     """
     Initialize GitHub routes with service dependencies.
 

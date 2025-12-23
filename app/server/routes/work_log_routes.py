@@ -39,10 +39,10 @@ def init_work_log_routes(repository: WorkLogRepository | None = None):
             return repo.create(entry)
         except ValueError as e:
             logger.warning(f"Validation error creating work log: {e}")
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:
             logger.error(f"Error creating work log entry: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create work log entry")
+            raise HTTPException(status_code=500, detail="Failed to create work log entry") from e
 
     @router.get("", response_model=WorkLogListResponse)
     async def get_work_log_entries(
@@ -73,7 +73,7 @@ def init_work_log_routes(repository: WorkLogRepository | None = None):
             import traceback
             logger.error(f"Error retrieving work log entries: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve work log entries")
+            raise HTTPException(status_code=500, detail="Failed to retrieve work log entries") from e
 
     @router.get("/session/{session_id}", response_model=list[WorkLogEntry])
     async def get_session_work_logs(session_id: str) -> list[WorkLogEntry]:
@@ -90,7 +90,7 @@ def init_work_log_routes(repository: WorkLogRepository | None = None):
             return repo.get_by_session(session_id)
         except Exception as e:
             logger.error(f"Error retrieving work logs for session {session_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to retrieve session work logs")
+            raise HTTPException(status_code=500, detail="Failed to retrieve session work logs") from e
 
     @router.delete("/{entry_id}", status_code=204)
     async def delete_work_log_entry(entry_id: int):
@@ -115,6 +115,6 @@ def init_work_log_routes(repository: WorkLogRepository | None = None):
             raise
         except Exception as e:
             logger.error(f"Error deleting work log entry {entry_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to delete work log entry")
+            raise HTTPException(status_code=500, detail="Failed to delete work log entry") from e
 
     return router

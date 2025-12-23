@@ -354,7 +354,8 @@ def resync_all_completed_workflows(force: bool = False) -> tuple[int, list[dict]
     """
     try:
         # Get all completed workflows
-        with _db_adapter.get_connection() as conn:
+        db_adapter = _get_adapter()
+        with db_adapter.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT adw_id, status FROM workflow_history WHERE status IN ('completed', 'failed')"

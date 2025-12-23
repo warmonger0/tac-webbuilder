@@ -175,7 +175,7 @@ github_issue_service = GitHubIssueService(
     phase_queue_service=phase_queue_service
 )
 # Initialize QC metrics watcher (Panel 7 performance optimization)
-from services.qc_metrics_watcher import get_qc_watcher
+from services.qc_metrics_watcher import get_qc_watcher  # noqa: E402
 
 qc_watcher = get_qc_watcher(websocket_manager=manager)
 

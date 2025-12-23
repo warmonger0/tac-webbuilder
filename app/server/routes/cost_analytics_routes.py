@@ -65,7 +65,7 @@ async def get_phase_breakdown(
 
     except Exception as e:
         logger.error(f"[CostAnalyticsRoutes] Error in get_phase_breakdown: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to analyze phase costs: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze phase costs: {str(e)}") from e
 
 
 @router.get("/api/cost-analytics/by-workflow-type", response_model=WorkflowBreakdownResponse)
@@ -104,7 +104,7 @@ async def get_workflow_breakdown(
 
     except Exception as e:
         logger.error(f"[CostAnalyticsRoutes] Error in get_workflow_breakdown: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to analyze workflow costs: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze workflow costs: {str(e)}") from e
 
 
 @router.get("/api/cost-analytics/trends", response_model=TrendAnalysisResponse)
@@ -137,7 +137,7 @@ async def get_cost_trends(
 
     except Exception as e:
         logger.error(f"[CostAnalyticsRoutes] Error in get_cost_trends: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to analyze cost trends: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze cost trends: {str(e)}") from e
 
 
 @router.get("/api/cost-analytics/optimizations", response_model=list[OptimizationOpportunityResponse])
@@ -170,4 +170,4 @@ async def get_optimization_opportunities(
 
     except Exception as e:
         logger.error(f"[CostAnalyticsRoutes] Error in get_optimization_opportunities: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to identify optimization opportunities: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to identify optimization opportunities: {str(e)}") from e

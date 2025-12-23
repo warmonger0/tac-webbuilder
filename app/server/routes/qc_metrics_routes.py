@@ -94,7 +94,7 @@ async def get_qc_metrics() -> dict:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to compute QC metrics: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/refresh", response_model=dict)
@@ -131,7 +131,7 @@ async def refresh_qc_metrics() -> dict:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to refresh QC metrics: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/coverage", response_model=dict)
@@ -164,7 +164,7 @@ async def get_coverage_only() -> dict:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get coverage metrics: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/linting", response_model=dict)
@@ -201,4 +201,4 @@ async def get_linting_only() -> dict:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get linting metrics: {str(e)}"
-        )
+        ) from e

@@ -73,7 +73,7 @@ async def get_sync_statistics():
         return SyncStatistics(**stats)
     except Exception as e:
         logger.error(f"Error fetching sync statistics: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/run", response_model=SyncResultResponse)
@@ -119,7 +119,7 @@ async def run_pattern_sync(
 
     except Exception as e:
         logger.error(f"Error running pattern sync: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/high-priority", response_model=SyncResultResponse)
@@ -146,7 +146,7 @@ async def sync_high_priority_patterns(dry_run: bool = False):
         return SyncResultResponse(**result.to_dict())
     except Exception as e:
         logger.error(f"Error syncing high-priority patterns: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/all", response_model=SyncResultResponse)
@@ -168,4 +168,4 @@ async def sync_all_patterns(dry_run: bool = False):
         return SyncResultResponse(**result.to_dict())
     except Exception as e:
         logger.error(f"Error syncing all patterns: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

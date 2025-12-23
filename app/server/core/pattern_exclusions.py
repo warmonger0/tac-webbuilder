@@ -41,10 +41,8 @@ def is_normal_orchestration_pattern(tool_sequence: list[str]) -> tuple[bool, str
 
     # Category 2: Command → Inspect Patterns (Bash → Read)
     # LLM needs to inspect results after running commands
-    if 'Bash' in seq and 'Read' in seq:
-        # Allow up to 2 Bash, 2 Read in a sequence
-        if seq.count('Bash') <= 2 and seq.count('Read') <= 2:
-            return True, "Normal verification: Bash → Read inspection pattern"
+    if 'Bash' in seq and 'Read' in seq and seq.count('Bash') <= 2 and seq.count('Read') <= 2:
+        return True, "Normal verification: Bash → Read inspection pattern"
 
     # Category 3: Multi-Read Patterns (Context Gathering)
     # Reading multiple files is normal when understanding codebase

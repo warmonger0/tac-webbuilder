@@ -185,7 +185,7 @@ async def get_planned_features(
         return features
     except Exception as e:
         logger.error(f"[GET /api/planned-features] Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/stats")
@@ -209,7 +209,7 @@ async def get_statistics():
         return stats
     except Exception as e:
         logger.error(f"[GET /api/planned-features/stats] Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/recent-completions")
@@ -238,7 +238,7 @@ async def get_recent_completions(
         logger.error(
             f"[GET /api/planned-features/recent-completions] Error: {e}"
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/{feature_id}", response_model=PlannedFeature)
@@ -271,7 +271,7 @@ async def get_planned_feature(feature_id: int):
         raise
     except Exception as e:
         logger.error(f"[GET /api/planned-features/{feature_id}] Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/", response_model=PlannedFeature, status_code=201)
@@ -310,10 +310,10 @@ async def create_planned_feature(feature_data: PlannedFeatureCreate):
         return feature
     except ValueError as e:
         logger.error(f"[POST /api/planned-features] Validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"[POST /api/planned-features] Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.patch("/{feature_id}", response_model=PlannedFeature)
@@ -372,10 +372,10 @@ async def update_planned_feature(feature_id: int, update_data: PlannedFeatureUpd
         logger.error(
             f"[PATCH /api/planned-features/{feature_id}] Validation error: {e}"
         )
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"[PATCH /api/planned-features/{feature_id}] Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.delete("/{feature_id}", status_code=204)
@@ -416,7 +416,7 @@ async def delete_planned_feature(feature_id: int):
         raise
     except Exception as e:
         logger.error(f"[DELETE /api/planned-features/{feature_id}] Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/{feature_id}/start-automation")
@@ -489,7 +489,7 @@ async def start_automation(feature_id: int):
                 raise HTTPException(
                     status_code=500,
                     detail=f"Failed to create GitHub issue: {str(e)}"
-                )
+                ) from e
 
         # Analyze feature and generate phase breakdown
         logger.info(
@@ -592,7 +592,7 @@ async def start_automation(feature_id: int):
         )
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/{feature_id}/generate-plan")
@@ -714,7 +714,7 @@ async def generate_plan(feature_id: int):
         )
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 def _generate_phase_prompt(feature, phase, prompt_generator) -> str:
@@ -729,11 +729,6 @@ def _generate_phase_prompt(feature, phase, prompt_generator) -> str:
     Returns:
         Complete markdown prompt content
     """
-    from utils.codebase_analyzer import CodebaseAnalyzer
-
-    # Get codebase context for this phase's files
-    analyzer = CodebaseAnalyzer()
-
     # Create a filtered context based on phase files
     context = {
         "backend_files": [],

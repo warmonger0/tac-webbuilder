@@ -212,7 +212,7 @@ class PlannedFeaturesService:
         # Fetch and return the created feature
         return self.get_by_id(feature_id)
 
-    def update(
+    def update(  # noqa: C901
         self, feature_id: int, update_data: PlannedFeatureUpdate
     ) -> PlannedFeature:
         """

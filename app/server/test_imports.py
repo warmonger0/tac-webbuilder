@@ -13,7 +13,7 @@ print("Testing imports...")
 
 # Test 1: Import SQLiteAdapter
 try:
-    from database.sqlite_adapter import SQLiteAdapter
+    from database.sqlite_adapter import SQLiteAdapter  # noqa: F401
     print("✓ Successfully imported SQLiteAdapter from database.sqlite_adapter")
 except ImportError as e:
     print(f"✗ Failed to import SQLiteAdapter: {e}")

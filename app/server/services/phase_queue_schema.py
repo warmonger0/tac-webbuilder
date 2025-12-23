@@ -28,10 +28,7 @@ def init_phase_queue_db():
         cursor = conn.cursor()
 
         # Database-specific timestamp defaults
-        if db_type == "postgresql":
-            timestamp_default = "NOW()"
-        else:  # sqlite
-            timestamp_default = "CURRENT_TIMESTAMP"
+        timestamp_default = "NOW()" if db_type == "postgresql" else "CURRENT_TIMESTAMP"
 
         # Create phase_queue table
         if db_type == "postgresql":

@@ -2,6 +2,7 @@
 GitHub CLI integration for posting issues.
 """
 
+import contextlib
 import logging
 import os
 
@@ -376,10 +377,8 @@ class GitHubPoster:
 
         except httpx.HTTPStatusError as e:
             error_detail = ""
-            try:
+            with contextlib.suppress(Exception):
                 error_detail = f": {e.response.json().get('message', '')}"
-            except Exception:
-                pass
             raise RuntimeError(
                 f"GitHub REST API returned {e.response.status_code}{error_detail}"
             ) from e
