@@ -82,9 +82,9 @@ class GitHubUser(BaseModel):
 class GitHubLabel(BaseModel):
     """GitHub label model."""
 
-    id: str
+    id: Optional[str] = None  # Not always returned by REST API
     name: str
-    color: str
+    color: Optional[str] = None  # Not always returned by REST API
     description: Optional[str] = None
 
 

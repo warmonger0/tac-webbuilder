@@ -147,14 +147,31 @@ class StateValidator:
 
         if workflow and workflow.adw_id:
             worktree_path = self._get_worktree_path(workflow.adw_id)
-            if worktree_path:
-                state_file = Path(worktree_path) / 'adw_state.json'
-                if state_file.exists():
-                    try:
-                        with open(state_file) as f:
-                            state = json.load(f)
-                    except Exception as e:
-                        warnings.append(f"Failed to load state file: {str(e)}")
+
+            # CRITICAL FIX (Issue #279): Load state from agents/ directory, NOT trees/
+            # ADWState.save() writes to agents/{adw_id}/adw_state.json (see state.py:99)
+            # Using ADWState.load() ensures we read from the SAME location
+            try:
+                from adw_modules.state import ADWState
+                from adw_modules.utils import setup_logger
+
+                logger = setup_logger(workflow.adw_id, "state_validator")
+                state_obj = ADWState.load(workflow.adw_id, logger)
+                if state_obj:
+                    state = state_obj.data
+            except Exception as e:
+                warnings.append(f"Failed to load state via ADWState.load(): {str(e)}")
+
+                # Fallback: Try loading from worktree (legacy support)
+                if worktree_path:
+                    state_file = Path(worktree_path) / 'adw_state.json'
+                    if state_file.exists():
+                        try:
+                            with open(state_file) as f:
+                                state = json.load(f)
+                                warnings.append("Loaded state from worktree (legacy location)")
+                        except Exception as e2:
+                            warnings.append(f"Failed to load state from worktree: {str(e2)}")
 
         # Validate phase-specific requirements
         validation_method = getattr(self, f'_validate_{self.phase}_inputs', None)
@@ -254,14 +271,30 @@ class StateValidator:
                             except Exception:
                                 continue
 
+        # CRITICAL FIX (Issue #279): If we have adw_id, load state from agents/ directory
+        # ADWState.save() writes to agents/{adw_id}/adw_state.json, NOT trees/
+        if adw_id and not state:
+            try:
+                from adw_modules.state import ADWState
+                from adw_modules.utils import setup_logger
+
+                temp_logger = setup_logger(adw_id, "state_validator")
+                state_obj = ADWState.load(adw_id, temp_logger)
+                if state_obj:
+                    state = state_obj.data
+            except Exception as e:
+                warnings.append(f"Failed to load state via ADWState.load(): {str(e)}")
+
+        # Fallback: Try loading from worktree (legacy support)
         if worktree_path and not state:
             state_file = Path(worktree_path) / 'adw_state.json'
             if state_file.exists():
                 try:
                     with open(state_file) as f:
                         state = json.load(f)
+                        warnings.append("Loaded state from worktree (legacy location)")
                 except Exception as e:
-                    warnings.append(f"Failed to load state file: {str(e)}")
+                    warnings.append(f"Failed to load state from worktree: {str(e)}")
 
         # Validate phase-specific outputs
         validation_method = getattr(self, f'_validate_{self.phase}_outputs', None)
