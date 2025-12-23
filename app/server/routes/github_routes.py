@@ -4,6 +4,7 @@ GitHub integration endpoints for issue creation and preview.
 import json
 import logging
 from datetime import UTC, datetime
+from pathlib import Path
 
 from core.data_models import (
     ConfirmResponse,
@@ -104,6 +105,24 @@ def init_github_routes(github_issue_service):
                         updates["completed_at"] = datetime.now(UTC).isoformat()
                         needs_update = True
                         logger.info(f"[WEBHOOK] Marking feature {feature.id} as completed (issue #{issue_number} closed)")
+
+                        # CRITICAL: Update workflow state files to mark as completed
+                        # This prevents adw_monitor from showing closed issues as "paused"
+                        agents_dir = Path("agents")
+                        if agents_dir.exists():
+                            for agent_dir in agents_dir.iterdir():
+                                if agent_dir.is_dir():
+                                    state_file = agent_dir / "adw_state.json"
+                                    if state_file.exists():
+                                        try:
+                                            state_data = json.loads(state_file.read_text())
+                                            if str(state_data.get("issue_number")) == str(issue_number):
+                                                state_data["status"] = "completed"
+                                                state_data["completed_at"] = datetime.now(UTC).isoformat()
+                                                state_file.write_text(json.dumps(state_data, indent=2))
+                                                logger.info(f"[WEBHOOK] Updated workflow state for {agent_dir.name}")
+                                        except Exception as e:
+                                            logger.warning(f"[WEBHOOK] Failed to update state file {state_file}: {e}")
 
                 elif action == "reopened":
                     if feature.status == "completed":

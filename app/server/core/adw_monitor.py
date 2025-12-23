@@ -290,27 +290,11 @@ def determine_status(adw_id: str, state: dict[str, Any]) -> str:
 
     # Check if worktree exists but no process
     if worktree_exists(adw_id):
-        # OPTIMIZATION: Before marking as "paused", check if GitHub issue is closed
-        # This prevents closed issues from showing up as "current workflow"
-        # Only check for paused workflows to minimize API calls
-        issue_number = state.get("issue_number")
-        if issue_number:
-            try:
-                result = subprocess.run(
-                    ["gh", "issue", "view", str(issue_number), "--json", "state"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                if result.returncode == 0:
-                    issue_data = json.loads(result.stdout)
-                    if issue_data.get("state") == "CLOSED":
-                        logger.debug(f"Issue #{issue_number} is CLOSED - marking workflow as completed")
-                        return "completed"
-            except subprocess.TimeoutExpired:
-                logger.debug(f"GitHub issue check timed out for #{issue_number}")
-            except Exception as e:
-                logger.debug(f"Could not check GitHub issue #{issue_number}: {e}")
+        # NOTE: We used to check GitHub issue status here, but that caused massive
+        # rate limit exhaustion (polling 198 workflows × checking GitHub API).
+        # Now we rely ONLY on webhooks to update workflow status when issues close.
+        # The webhook handler will update the state file with status="completed"
+        # when it receives an issue closed event.
 
         # Check last activity
         last_activity = get_last_activity_timestamp(adw_id)
