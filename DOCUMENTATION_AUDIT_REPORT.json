@@ -1,0 +1,588 @@
+{
+  "audit_date": "2025-12-23",
+  "project": "tac-webbuilder",
+  "overall_compliance_score": 78,
+  "summary": {
+    "total_issues": 47,
+    "critical": 5,
+    "high": 12,
+    "medium": 18,
+    "low": 12
+  },
+  "categories": [
+    {
+      "name": "Documentation Coverage",
+      "score": 82,
+      "total_issues": 11,
+      "severity_breakdown": {
+        "critical": 1,
+        "high": 3,
+        "medium": 5,
+        "low": 2
+      },
+      "findings": [
+        {
+          "severity": "critical",
+          "title": "Missing app/server/README.md",
+          "description": "Backend directory lacks a README file. Only README_TEST_FIXES.md exists.",
+          "location": "/app/server/",
+          "impact": "Developers cannot quickly understand backend architecture and setup",
+          "recommendation": "Create comprehensive README.md covering setup, architecture, and testing"
+        },
+        {
+          "severity": "high",
+          "title": "Missing app/client/README.md",
+          "description": "Frontend directory lacks a README file.",
+          "location": "/app/client/",
+          "impact": "Developers cannot quickly understand frontend architecture and setup",
+          "recommendation": "Create comprehensive README.md covering component structure, state management, and testing"
+        },
+        {
+          "severity": "high",
+          "title": "Missing API route documentation in individual route files",
+          "description": "Only 19 of 24 route files have OpenAPI metadata (summary, description, tags)",
+          "location": "/app/server/routes/",
+          "impact": "API documentation incomplete for ~21% of endpoints",
+          "recommendation": "Add OpenAPI metadata to all route decorators for auto-generated docs"
+        },
+        {
+          "severity": "high",
+          "title": "Core module documentation missing",
+          "description": "43 files in app/server/core/ lack inline docstrings and module-level docs",
+          "location": "/app/server/core/",
+          "impact": "Complex business logic difficult to understand without code reading",
+          "recommendation": "Add module docstrings and function-level documentation"
+        },
+        {
+          "severity": "medium",
+          "title": "Service layer documentation incomplete",
+          "description": "Service modules lack comprehensive documentation",
+          "location": "/app/server/services/",
+          "impact": "Business logic layer difficult to understand",
+          "recommendation": "Add docstrings to all service classes and methods"
+        },
+        {
+          "severity": "medium",
+          "title": "Repository layer documentation incomplete",
+          "description": "Repository modules lack comprehensive documentation",
+          "location": "/app/server/repositories/",
+          "impact": "Database access patterns difficult to understand",
+          "recommendation": "Add docstrings to all repository classes and methods"
+        },
+        {
+          "severity": "medium",
+          "title": "Component documentation lacking",
+          "description": "58+ React components in app/client/src/components/ lack JSDoc comments",
+          "location": "/app/client/src/components/",
+          "impact": "Component props and behavior unclear to developers",
+          "recommendation": "Add JSDoc comments to all exported components"
+        },
+        {
+          "severity": "medium",
+          "title": "Hook documentation incomplete",
+          "description": "Custom hooks lack comprehensive usage examples",
+          "location": "/app/client/src/hooks/",
+          "impact": "Developers may misuse WebSocket hooks",
+          "recommendation": "Add usage examples to hook files"
+        },
+        {
+          "severity": "medium",
+          "title": "Outdated architecture diagrams",
+          "description": "No visual architecture diagrams found in documentation",
+          "location": "/docs/architecture/",
+          "impact": "System overview difficult to grasp quickly",
+          "recommendation": "Create Mermaid diagrams showing system architecture, data flow, and ADW workflow"
+        },
+        {
+          "severity": "low",
+          "title": "Migration guide documentation incomplete",
+          "description": "Database migration process not fully documented",
+          "location": "/docs/",
+          "impact": "Minor - developers must read migration code",
+          "recommendation": "Document migration best practices and rollback procedures"
+        },
+        {
+          "severity": "low",
+          "title": "Test documentation scattered",
+          "description": "Test documentation exists but scattered across multiple files",
+          "location": "/app/server/tests/, /app/client/src/__tests__/",
+          "impact": "Minor - testing strategy unclear",
+          "recommendation": "Consolidate testing documentation into single guide"
+        }
+      ]
+    },
+    {
+      "name": "Claude Code Integration",
+      "score": 85,
+      "total_issues": 8,
+      "severity_breakdown": {
+        "critical": 2,
+        "high": 2,
+        "medium": 3,
+        "low": 1
+      },
+      "findings": [
+        {
+          "severity": "critical",
+          "title": "Git commit messages contain AI attribution",
+          "description": "Recent commits contain forbidden 'Generated with Claude Code' and 'Co-Authored-By: Claude' text",
+          "location": "Git history (last 50 commits)",
+          "impact": "Violates CODE_STANDARDS.md Section 1 - unprofessional commit history",
+          "recommendation": "Rewrite commit messages in git history, update commit generator templates"
+        },
+        {
+          "severity": "critical",
+          "title": "CLAUDE.md logic gates not fully enforced",
+          "description": "Progressive loading and logic gates documented but not programmatically enforced",
+          "location": "/CLAUDE.md",
+          "impact": "Logic gates rely on manual compliance, may be skipped",
+          "recommendation": "Implement pre-commit hooks to enforce critical logic gates"
+        },
+        {
+          "severity": "high",
+          "title": "Slash command documentation incomplete",
+          "description": "75 slash commands exist but several lack comprehensive usage examples",
+          "location": "/.claude/commands/",
+          "impact": "Claude Code users may not leverage full command capabilities",
+          "recommendation": "Add example usage blocks to all slash commands"
+        },
+        {
+          "severity": "high",
+          "title": "CODE_STANDARDS.md compliance not automated",
+          "description": "No automated checks verify compliance with CODE_STANDARDS.md",
+          "location": "/.claude/CODE_STANDARDS.md",
+          "impact": "Standards may be violated unknowingly",
+          "recommendation": "Create verification script in /scripts/ to check compliance"
+        },
+        {
+          "severity": "medium",
+          "title": "QUICK_REF.md outdated port information",
+          "description": "QUICK_REF.md shows port 8000 but README.md shows 8002",
+          "location": "/.claude/QUICK_REF.md:10, /README.md:91",
+          "impact": "Conflicting documentation causes confusion",
+          "recommendation": "Update QUICK_REF.md to consistently use 8002 for backend API"
+        },
+        {
+          "severity": "medium",
+          "title": "quick_start/ documentation missing database setup",
+          "description": "Backend quick start lacks PostgreSQL setup instructions",
+          "location": "/.claude/commands/quick_start/backend.md",
+          "impact": "New developers may miss critical database setup",
+          "recommendation": "Add PostgreSQL setup section to backend.md"
+        },
+        {
+          "severity": "medium",
+          "title": "references/ documentation not cross-linked",
+          "description": "Reference docs lack cross-references to related documentation",
+          "location": "/.claude/commands/references/",
+          "impact": "Developers may miss related documentation",
+          "recommendation": "Add 'See Also' sections linking related docs"
+        },
+        {
+          "severity": "low",
+          "title": "Claude Code version not documented",
+          "description": "No documentation of required Claude Code CLI version",
+          "location": "/README.md, /adws/README.md",
+          "impact": "Minor - may cause version compatibility issues",
+          "recommendation": "Document minimum Claude Code version in prerequisites"
+        }
+      ]
+    },
+    {
+      "name": "API Documentation",
+      "score": 72,
+      "total_issues": 9,
+      "severity_breakdown": {
+        "critical": 0,
+        "high": 3,
+        "medium": 4,
+        "low": 2
+      },
+      "findings": [
+        {
+          "severity": "high",
+          "title": "No OpenAPI/Swagger UI endpoint",
+          "description": "FastAPI docs endpoints not configured or documented",
+          "location": "/app/server/server.py",
+          "impact": "Developers cannot explore API interactively",
+          "recommendation": "Configure FastAPI(docs_url='/docs', redoc_url='/redoc') and document in README"
+        },
+        {
+          "severity": "high",
+          "title": "94 API endpoints lack comprehensive examples",
+          "description": "94 routes found but many lack request/response examples",
+          "location": "/app/server/routes/",
+          "impact": "API integration difficult without examples",
+          "recommendation": "Add example request/response bodies to all route decorators"
+        },
+        {
+          "severity": "high",
+          "title": "WebSocket endpoints not documented",
+          "description": "WebSocket routes lack event schema documentation",
+          "location": "/app/server/routes/websocket_routes.py",
+          "impact": "Frontend developers must read source code to understand events",
+          "recommendation": "Document all WebSocket event types and payloads"
+        },
+        {
+          "severity": "medium",
+          "title": "Error response formats not standardized",
+          "description": "No documented standard error response schema",
+          "location": "/docs/api/",
+          "impact": "Clients must handle varying error formats",
+          "recommendation": "Create standard error response model and document it"
+        },
+        {
+          "severity": "medium",
+          "title": "Authentication/authorization not documented",
+          "description": "GitHub PAT usage not clearly documented for API endpoints",
+          "location": "/docs/api/, /README.md",
+          "impact": "Security model unclear to developers",
+          "recommendation": "Document authentication requirements for each endpoint"
+        },
+        {
+          "severity": "medium",
+          "title": "Rate limiting not documented",
+          "description": "API rate limits not documented (if any exist)",
+          "location": "/docs/api/",
+          "impact": "Clients may unknowingly exceed limits",
+          "recommendation": "Document rate limits or state none exist"
+        },
+        {
+          "severity": "medium",
+          "title": "API versioning strategy unclear",
+          "description": "Current routes use /api/v1/ but versioning policy not documented",
+          "location": "/docs/api/",
+          "impact": "Breaking changes may surprise API consumers",
+          "recommendation": "Document API versioning and deprecation policy"
+        },
+        {
+          "severity": "low",
+          "title": "Pagination parameters not standardized",
+          "description": "No documented standard for pagination across list endpoints",
+          "location": "/docs/api/",
+          "impact": "Minor - inconsistent pagination patterns",
+          "recommendation": "Document standard pagination parameters (limit, offset, cursor)"
+        },
+        {
+          "severity": "low",
+          "title": "CORS policy not documented",
+          "description": "CORS configuration exists but not documented for consumers",
+          "location": "/docs/api/",
+          "impact": "Minor - frontend developers may hit CORS issues",
+          "recommendation": "Document allowed origins and CORS policy"
+        }
+      ]
+    },
+    {
+      "name": "Developer Experience",
+      "score": 80,
+      "total_issues": 10,
+      "severity_breakdown": {
+        "critical": 1,
+        "high": 2,
+        "medium": 4,
+        "low": 3
+      },
+      "findings": [
+        {
+          "severity": "critical",
+          "title": "Missing standard repository files",
+          "description": "No CONTRIBUTING.md, LICENSE, or CHANGELOG.md at root",
+          "location": "/",
+          "impact": "Open source contribution unclear, licensing ambiguous",
+          "recommendation": "Add CONTRIBUTING.md, LICENSE, and CHANGELOG.md"
+        },
+        {
+          "severity": "high",
+          "title": "Setup instructions reference broken scripts",
+          "description": "README references ./scripts/start.sh which QUICK_REF says is broken",
+          "location": "/README.md:72, /.claude/QUICK_REF.md:22",
+          "impact": "New developers follow broken setup instructions",
+          "recommendation": "Update README to reference start_full_clean.sh"
+        },
+        {
+          "severity": "high",
+          "title": "Environment variable documentation scattered",
+          "description": ".env, .ports.env, .env.webhook.secrets documented in multiple places with conflicts",
+          "location": "/README.md, /docs/configuration.md, /.env.sample",
+          "impact": "Configuration errors from incomplete information",
+          "recommendation": "Create single comprehensive environment variables reference"
+        },
+        {
+          "severity": "medium",
+          "title": "Error messages lack actionable guidance",
+          "description": "371 logging statements found but many lack actionable error guidance",
+          "location": "/app/server/routes/",
+          "impact": "Debugging difficult without clear guidance",
+          "recommendation": "Enhance error messages with troubleshooting steps"
+        },
+        {
+          "severity": "medium",
+          "title": "Development vs production setup not clearly separated",
+          "description": "README mixes dev and prod instructions",
+          "location": "/README.md",
+          "impact": "Confusion about proper deployment",
+          "recommendation": "Separate development and production setup sections"
+        },
+        {
+          "severity": "medium",
+          "title": "Troubleshooting guide incomplete",
+          "description": "docs/troubleshooting.md exists but lacks common issues",
+          "location": "/docs/troubleshooting.md",
+          "impact": "Developers must search or ask for help",
+          "recommendation": "Add FAQ section with top 20 common issues"
+        },
+        {
+          "severity": "medium",
+          "title": "No quick debugging guide",
+          "description": "No centralized guide for debugging common issues",
+          "location": "/docs/",
+          "impact": "Time lost debugging common issues",
+          "recommendation": "Create debugging guide with VSCode launch configs"
+        },
+        {
+          "severity": "low",
+          "title": "Testing documentation not beginner-friendly",
+          "description": "Test commands documented but writing new tests not explained",
+          "location": "/app/server/tests/README.md",
+          "impact": "Minor - new contributors may struggle with tests",
+          "recommendation": "Add 'Writing Your First Test' tutorial"
+        },
+        {
+          "severity": "low",
+          "title": "IDE setup not documented",
+          "description": "No documentation for VSCode, PyCharm, or other IDE setup",
+          "location": "/docs/",
+          "impact": "Minor - developers miss useful IDE features",
+          "recommendation": "Add IDE setup guides with recommended extensions"
+        },
+        {
+          "severity": "low",
+          "title": "Code style guide not explicit",
+          "description": "Linting configured but code style preferences not documented",
+          "location": "/docs/",
+          "impact": "Minor - inconsistent code style in contributions",
+          "recommendation": "Document code style conventions (naming, organization, etc.)"
+        }
+      ]
+    },
+    {
+      "name": "Architecture Documentation",
+      "score": 75,
+      "total_issues": 9,
+      "severity_breakdown": {
+        "critical": 1,
+        "high": 2,
+        "medium": 4,
+        "low": 2
+      },
+      "findings": [
+        {
+          "severity": "critical",
+          "title": "System architecture diagram missing",
+          "description": "No high-level architecture diagram showing component relationships",
+          "location": "/docs/architecture/",
+          "impact": "New developers cannot grasp system architecture",
+          "recommendation": "Create Mermaid diagram showing: Frontend -> Backend API -> Database, ADW System, WebSocket, GitHub Integration"
+        },
+        {
+          "severity": "high",
+          "title": "ADW workflow documentation incomplete",
+          "description": "10-phase SDLC workflow described but detailed phase interactions not documented",
+          "location": "/adws/README.md, /docs/adw/",
+          "impact": "Understanding ADW system requires reading source code",
+          "recommendation": "Create sequence diagrams for each workflow phase"
+        },
+        {
+          "severity": "high",
+          "title": "Database schema not documented",
+          "description": "PostgreSQL schema not documented beyond migration files",
+          "location": "/docs/architecture/",
+          "impact": "Database relationships unclear to developers",
+          "recommendation": "Generate and document ERD diagram with relationships"
+        },
+        {
+          "severity": "medium",
+          "title": "Port allocation system not fully explained",
+          "description": "Dual backend (8001/8002) + dynamic ADW ports (9100-9299) not clearly explained",
+          "location": "/docs/architecture/, /.claude/QUICK_REF.md",
+          "impact": "Port conflicts and confusion about architecture",
+          "recommendation": "Create port allocation diagram and expand QUICK_REF.md explanation"
+        },
+        {
+          "severity": "medium",
+          "title": "State persistence mechanisms not documented",
+          "description": "ADW state files, localStorage, database persistence not comprehensively explained",
+          "location": "/docs/architecture/",
+          "impact": "State management difficult to understand",
+          "recommendation": "Document all state persistence mechanisms in one place"
+        },
+        {
+          "severity": "medium",
+          "title": "WebSocket architecture not fully documented",
+          "description": "5 specialized hooks described but connection management not explained",
+          "location": "/docs/architecture/",
+          "impact": "WebSocket behavior unclear during disconnections",
+          "recommendation": "Document connection lifecycle, reconnection strategy, fallback behavior"
+        },
+        {
+          "severity": "medium",
+          "title": "Security architecture not documented",
+          "description": "SQL injection protection documented but overall security architecture missing",
+          "location": "/docs/architecture/",
+          "impact": "Security model unclear to contributors",
+          "recommendation": "Create security architecture document covering authentication, authorization, injection prevention"
+        },
+        {
+          "severity": "low",
+          "title": "Technology decision rationale missing",
+          "description": "Tech stack listed but decision rationale not documented",
+          "location": "/docs/architecture/",
+          "impact": "Minor - unclear why specific technologies chosen",
+          "recommendation": "Add ADR (Architecture Decision Records) documenting key decisions"
+        },
+        {
+          "severity": "low",
+          "title": "Deployment architecture not documented",
+          "description": "No documentation of production deployment architecture",
+          "location": "/docs/architecture/",
+          "impact": "Minor - deployment strategy unclear",
+          "recommendation": "Document production deployment architecture and scaling considerations"
+        }
+      ]
+    }
+  ],
+  "top_10_critical_issues": [
+    {
+      "rank": 1,
+      "severity": "critical",
+      "category": "Claude Code Integration",
+      "title": "Git commit messages contain AI attribution",
+      "location": "Git history",
+      "recommendation": "Immediately audit and rewrite commit messages, update commit generator"
+    },
+    {
+      "rank": 2,
+      "severity": "critical",
+      "category": "Developer Experience",
+      "title": "Missing standard repository files (CONTRIBUTING.md, LICENSE, CHANGELOG.md)",
+      "location": "/",
+      "recommendation": "Add required files for professional open source project"
+    },
+    {
+      "rank": 3,
+      "severity": "critical",
+      "category": "Documentation Coverage",
+      "title": "Missing app/server/README.md",
+      "location": "/app/server/",
+      "recommendation": "Create comprehensive backend README"
+    },
+    {
+      "rank": 4,
+      "severity": "critical",
+      "category": "Architecture Documentation",
+      "title": "System architecture diagram missing",
+      "location": "/docs/architecture/",
+      "recommendation": "Create high-level Mermaid architecture diagram"
+    },
+    {
+      "rank": 5,
+      "severity": "critical",
+      "category": "Claude Code Integration",
+      "title": "CLAUDE.md logic gates not programmatically enforced",
+      "location": "/CLAUDE.md",
+      "recommendation": "Implement pre-commit hooks for critical logic gates"
+    },
+    {
+      "rank": 6,
+      "severity": "high",
+      "category": "Documentation Coverage",
+      "title": "Missing app/client/README.md",
+      "location": "/app/client/",
+      "recommendation": "Create comprehensive frontend README"
+    },
+    {
+      "rank": 7,
+      "severity": "high",
+      "category": "API Documentation",
+      "title": "No OpenAPI/Swagger UI endpoint",
+      "location": "/app/server/server.py",
+      "recommendation": "Enable FastAPI auto-generated docs at /docs and /redoc"
+    },
+    {
+      "rank": 8,
+      "severity": "high",
+      "category": "Developer Experience",
+      "title": "Setup instructions reference broken scripts",
+      "location": "/README.md:72",
+      "recommendation": "Update README to reference correct startup script (start_full_clean.sh)"
+    },
+    {
+      "rank": 9,
+      "severity": "high",
+      "category": "Documentation Coverage",
+      "title": "Missing API route documentation (21% of endpoints)",
+      "location": "/app/server/routes/",
+      "recommendation": "Add OpenAPI metadata to all route decorators"
+    },
+    {
+      "rank": 10,
+      "severity": "high",
+      "category": "Architecture Documentation",
+      "title": "Database schema not documented",
+      "location": "/docs/architecture/",
+      "recommendation": "Generate and document ERD with table relationships"
+    }
+  ],
+  "strengths": [
+    "Comprehensive Claude Code integration with progressive loading system (CLAUDE.md, QUICK_REF.md, CODE_STANDARDS.md)",
+    "Well-organized .claude/ directory with 75 slash commands and tiered documentation",
+    "Strong ADW system documentation (adws/README.md) with robustness system details",
+    "Extensive troubleshooting guide (docs/troubleshooting.md) covering common issues",
+    "Good test infrastructure with 878 backend tests and 149 frontend tests",
+    "Comprehensive observability and analytics documentation",
+    "Well-documented security (SQL injection protection) in README and code",
+    "Strong API endpoint coverage with 94 documented routes across 17 files",
+    "Good error handling with 371 logging statements and 108 custom exceptions",
+    "Excellent session history documentation tracking project evolution"
+  ],
+  "recommendations": {
+    "immediate_actions": [
+      "Audit and rewrite git commit messages to remove AI attribution",
+      "Create CONTRIBUTING.md, LICENSE, and CHANGELOG.md files",
+      "Create app/server/README.md and app/client/README.md",
+      "Fix README.md to reference correct startup script",
+      "Enable FastAPI /docs endpoint and document it"
+    ],
+    "short_term_actions": [
+      "Add OpenAPI metadata to all 24 route files",
+      "Create system architecture Mermaid diagram",
+      "Document database schema with ERD",
+      "Consolidate environment variable documentation",
+      "Add usage examples to all slash commands"
+    ],
+    "long_term_actions": [
+      "Implement automated CODE_STANDARDS.md compliance checking",
+      "Create comprehensive API documentation with request/response examples",
+      "Add JSDoc comments to all React components",
+      "Create debugging guide with VSCode configurations",
+      "Document WebSocket architecture and connection lifecycle",
+      "Create ADR (Architecture Decision Records) for key technical decisions"
+    ]
+  },
+  "metrics": {
+    "total_markdown_files": 765,
+    "total_slash_commands": 75,
+    "total_api_endpoints": 94,
+    "routes_with_openapi_metadata": 19,
+    "routes_missing_openapi_metadata": 5,
+    "total_tests_backend": 878,
+    "total_tests_frontend": 149,
+    "logging_statements": 371,
+    "custom_exceptions": 108,
+    "typescript_source_files": 130,
+    "documentation_files_in_claude_dir": 75,
+    "documentation_files_in_docs_dir": 550,
+    "readme_files_found": 30
+  }
+}

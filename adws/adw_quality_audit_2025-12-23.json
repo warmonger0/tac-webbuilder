@@ -1,0 +1,516 @@
+{
+  "audit_metadata": {
+    "audit_date": "2025-12-23",
+    "total_python_files": 722,
+    "workflow_files": 25,
+    "module_files": 35,
+    "test_files": 24,
+    "adws_directory": "/Users/Warmonger0/tac/tac-webbuilder/adws"
+  },
+  "categories": [
+    {
+      "name": "Test Coverage",
+      "total_issues": 24,
+      "severity_breakdown": {
+        "critical": 12,
+        "high": 8,
+        "medium": 4,
+        "low": 0
+      },
+      "metrics": {
+        "test_coverage_percentage": 31.4,
+        "modules_with_tests": 11,
+        "modules_without_tests": 24,
+        "critical_untested_modules": [
+          "rate_limit.py",
+          "git_ops.py",
+          "github.py",
+          "worktree_ops.py",
+          "workflow_ops.py",
+          "preflight_checks.py",
+          "phase_tracker.py",
+          "commit_generator.py",
+          "cleanup_operations.py",
+          "failure_cleanup.py",
+          "plan_executor.py",
+          "plan_parser.py"
+        ]
+      },
+      "top_issues": [
+        {
+          "severity": "critical",
+          "file": "adw_modules/rate_limit.py",
+          "line": "N/A",
+          "description": "Rate limiting module has no tests - critical for preventing API exhaustion"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_modules/git_ops.py",
+          "line": "N/A",
+          "description": "Git operations module untested - critical for workflow integrity"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_modules/github.py",
+          "line": "N/A",
+          "description": "GitHub API module untested - critical for workflow integration"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_modules/worktree_ops.py",
+          "line": "N/A",
+          "description": "Worktree operations untested - critical for isolation"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_modules/workflow_ops.py",
+          "line": "N/A",
+          "description": "Core workflow operations untested"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_modules/preflight_checks.py",
+          "line": "N/A",
+          "description": "Preflight validation untested - missing safety net"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_modules/phase_tracker.py",
+          "line": "N/A",
+          "description": "Phase tracking untested - affects workflow orchestration"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_modules/commit_generator.py",
+          "line": "N/A",
+          "description": "Commit generation untested - quality/standards risk"
+        },
+        {
+          "severity": "high",
+          "file": "adw_modules/cleanup_operations.py",
+          "line": "N/A",
+          "description": "Cleanup operations untested - resource leak risk"
+        },
+        {
+          "severity": "high",
+          "file": "adw_modules/failure_cleanup.py",
+          "line": "N/A",
+          "description": "Failure cleanup untested - error recovery risk"
+        }
+      ],
+      "compliance_score": 31.4
+    },
+    {
+      "name": "Linting & Type Safety",
+      "total_issues": 1667,
+      "severity_breakdown": {
+        "critical": 402,
+        "high": 55,
+        "medium": 270,
+        "low": 940
+      },
+      "metrics": {
+        "files_with_violations": 107,
+        "mypy_available": false,
+        "ruff_violations": 1667,
+        "most_common_violations": {
+          "F541": 223,
+          "F401": 135,
+          "UP006": 295,
+          "UP045": 294,
+          "W293": 249
+        }
+      },
+      "top_issues": [
+        {
+          "severity": "critical",
+          "file": "adw_build_iso.py",
+          "line": 27,
+          "description": "F401: `os` imported but unused"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_build_iso.py",
+          "line": 31,
+          "description": "F401: `typing.Optional` imported but unused"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_build_iso.py",
+          "line": 41,
+          "description": "F401: `adw_modules.git_ops.get_current_branch` imported but unused"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_build_iso.py",
+          "line": 290,
+          "description": "F841: Local variable `type_errors` assigned but never used"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_build_iso.py",
+          "line": 291,
+          "description": "F841: Local variable `build_errors` assigned but never used"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_build_iso.py",
+          "line": 338,
+          "description": "F541: f-string without any placeholders (223 total instances)"
+        },
+        {
+          "severity": "high",
+          "file": "adw_build_iso.py",
+          "line": 112,
+          "description": "C901: `main` is too complex (27 > 15) - needs refactoring"
+        },
+        {
+          "severity": "high",
+          "file": "Multiple files",
+          "line": "N/A",
+          "description": "E722: Bare except clauses (24 instances) - masks error details"
+        },
+        {
+          "severity": "medium",
+          "file": "Multiple files",
+          "line": "N/A",
+          "description": "W293: Blank line contains whitespace (249 instances)"
+        },
+        {
+          "severity": "medium",
+          "file": "Multiple files",
+          "line": "N/A",
+          "description": "UP006: Using deprecated typing imports (295 instances)"
+        }
+      ],
+      "compliance_score": 0
+    },
+    {
+      "name": "Architecture Compliance",
+      "total_issues": 15,
+      "severity_breakdown": {
+        "critical": 3,
+        "high": 6,
+        "medium": 4,
+        "low": 2
+      },
+      "metrics": {
+        "modules_count": 35,
+        "workflows_count": 25,
+        "triggers_count": 3,
+        "classes_count": 79,
+        "functions_count": 214,
+        "try_blocks": 124,
+        "except_blocks": 143
+      },
+      "top_issues": [
+        {
+          "severity": "critical",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "Rate limit checking not enforced in all workflows - only 1 file uses ensure_rate_limit_available()"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_build_iso.py",
+          "line": 112,
+          "description": "Main function too complex (C901) - violates separation of concerns"
+        },
+        {
+          "severity": "high",
+          "file": "Multiple workflows",
+          "line": "N/A",
+          "description": "Inconsistent error handling - 24 bare except clauses hide error context"
+        },
+        {
+          "severity": "high",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "State management split across file and database - potential SSoT violations"
+        },
+        {
+          "severity": "high",
+          "file": "Multiple modules",
+          "line": "N/A",
+          "description": "402 unused imports indicate poor code hygiene and maintenance"
+        },
+        {
+          "severity": "medium",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "Worktree isolation used in 16 files but no comprehensive test coverage"
+        },
+        {
+          "severity": "medium",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "223 f-strings without placeholders - should use regular strings"
+        },
+        {
+          "severity": "medium",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "No centralized error recovery - cleanup logic scattered across modules"
+        },
+        {
+          "severity": "low",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "588 'other' files suggest organizational issues or test artifacts"
+        },
+        {
+          "severity": "low",
+          "file": "adw_plan_iso_optimized.py",
+          "line": "N/A",
+          "description": "Inconsistent naming - doesn't follow _iso.py pattern"
+        }
+      ],
+      "compliance_score": 62
+    },
+    {
+      "name": "Naming Conventions",
+      "total_issues": 2,
+      "severity_breakdown": {
+        "critical": 0,
+        "high": 0,
+        "medium": 1,
+        "low": 1
+      },
+      "metrics": {
+        "workflows_iso_pattern": 20,
+        "workflows_workflow_pattern": 2,
+        "workflows_external_pattern": 2,
+        "workflows_other_pattern": 1,
+        "snake_case_violations": 0
+      },
+      "top_issues": [
+        {
+          "severity": "medium",
+          "file": "adw_plan_iso_optimized.py",
+          "line": "N/A",
+          "description": "Workflow doesn't follow standard suffix convention (_iso, _workflow, _external)"
+        },
+        {
+          "severity": "low",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "Mixed workflow patterns (_iso vs _workflow vs _external) - consider standardization"
+        }
+      ],
+      "compliance_score": 96
+    },
+    {
+      "name": "Documentation Compliance",
+      "total_issues": 11,
+      "severity_breakdown": {
+        "critical": 0,
+        "high": 6,
+        "medium": 5,
+        "low": 0
+      },
+      "metrics": {
+        "modules_with_docstrings": 35,
+        "documentation_files": 20,
+        "readme_files": 7,
+        "modules_without_tests_or_docs": 0
+      },
+      "top_issues": [
+        {
+          "severity": "high",
+          "file": "adw_modules/git_ops.py",
+          "line": "N/A",
+          "description": "Critical module without test documentation"
+        },
+        {
+          "severity": "high",
+          "file": "adw_modules/github.py",
+          "line": "N/A",
+          "description": "Critical module without test documentation"
+        },
+        {
+          "severity": "high",
+          "file": "adw_modules/rate_limit.py",
+          "line": "N/A",
+          "description": "Critical module without usage examples in tests"
+        },
+        {
+          "severity": "high",
+          "file": "adw_modules/worktree_ops.py",
+          "line": "N/A",
+          "description": "Complex module without integration test documentation"
+        },
+        {
+          "severity": "medium",
+          "file": "adws/tests/",
+          "line": "N/A",
+          "description": "Multiple README files (7) - documentation fragmentation"
+        },
+        {
+          "severity": "medium",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "No central architecture documentation for ADW modules"
+        }
+      ],
+      "compliance_score": 71
+    },
+    {
+      "name": "Reliability & Safety",
+      "total_issues": 18,
+      "severity_breakdown": {
+        "critical": 5,
+        "high": 8,
+        "medium": 3,
+        "low": 2
+      },
+      "metrics": {
+        "retry_mechanisms_found": 3,
+        "max_retry_configs": {
+          "MAX_TEST_RETRY_ATTEMPTS": 3,
+          "MAX_E2E_TEST_RETRY_ATTEMPTS": 3,
+          "MAX_EXTERNAL_ATTEMPTS": 3,
+          "MAX_REVIEW_RETRY_ATTEMPTS": 3
+        },
+        "rate_limit_usage": 1,
+        "error_handlers": 143
+      },
+      "top_issues": [
+        {
+          "severity": "critical",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "Rate limiting only used in 1 file - workflows risk API exhaustion"
+        },
+        {
+          "severity": "critical",
+          "file": "Multiple workflows",
+          "line": "N/A",
+          "description": "24 bare except clauses - can mask critical failures and prevent proper cleanup"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_modules/rate_limit.py",
+          "line": "N/A",
+          "description": "No tests for rate limit enforcement - can't verify safety net works"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_modules/failure_cleanup.py",
+          "line": "N/A",
+          "description": "Failure cleanup module untested - cleanup on error unverified"
+        },
+        {
+          "severity": "critical",
+          "file": "adw_modules/preflight_checks.py",
+          "line": "N/A",
+          "description": "Preflight checks untested - safety validations unverified"
+        },
+        {
+          "severity": "high",
+          "file": "Multiple workflows",
+          "line": "N/A",
+          "description": "Retry logic inconsistent across workflows - no standard retry module"
+        },
+        {
+          "severity": "high",
+          "file": "adw_modules/worktree_ops.py",
+          "line": "N/A",
+          "description": "Worktree cleanup untested - risk of orphaned worktrees"
+        },
+        {
+          "severity": "high",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "No circuit breaker pattern - workflows can loop indefinitely"
+        },
+        {
+          "severity": "medium",
+          "file": "adw_build_iso.py",
+          "line": 290,
+          "description": "Error variables assigned but never used - errors silently ignored"
+        },
+        {
+          "severity": "medium",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "No centralized error logging - error tracking fragmented"
+        }
+      ],
+      "compliance_score": 45
+    },
+    {
+      "name": "File Structure",
+      "total_issues": 4,
+      "severity_breakdown": {
+        "critical": 0,
+        "high": 1,
+        "medium": 2,
+        "low": 1
+      },
+      "metrics": {
+        "total_files": 722,
+        "workflows": 25,
+        "modules": 35,
+        "tests": 24,
+        "triggers": 3,
+        "other": 588,
+        "root_level_files": 42
+      },
+      "top_issues": [
+        {
+          "severity": "high",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "588 'other' files (81% of total) - suggests test artifacts, generated code, or organizational issues"
+        },
+        {
+          "severity": "medium",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "42 root-level files - too many scripts in root, needs better organization"
+        },
+        {
+          "severity": "medium",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "Two separate test directories (tests/ and adw_tests/) - fragmented test organization"
+        },
+        {
+          "severity": "low",
+          "file": "adws/",
+          "line": "N/A",
+          "description": "No clear separation between public and internal modules"
+        }
+      ],
+      "compliance_score": 65
+    }
+  ],
+  "overall_summary": {
+    "total_issues": 1741,
+    "critical_issues": 422,
+    "high_issues": 84,
+    "medium_issues": 289,
+    "low_issues": 946,
+    "overall_compliance_score": 53,
+    "risk_level": "HIGH",
+    "immediate_actions_required": [
+      "Add tests for critical untested modules: rate_limit.py, git_ops.py, github.py, worktree_ops.py",
+      "Enforce rate limiting in all workflows making GitHub API calls",
+      "Fix 402 critical linting violations (unused imports, unused variables)",
+      "Replace 24 bare except clauses with specific exception handling",
+      "Add mypy type checking to CI/CD pipeline"
+    ],
+    "recommendations": [
+      "Increase test coverage from 31.4% to minimum 70% for modules",
+      "Refactor complex functions (C901 violations) into smaller, testable units",
+      "Standardize error handling patterns across workflows",
+      "Create centralized retry/circuit breaker module",
+      "Consolidate test directories into single structure",
+      "Clean up 588 'other' files - identify and organize or remove",
+      "Implement comprehensive integration tests for workflow orchestration",
+      "Add pre-commit hooks to enforce linting standards",
+      "Document architecture and module responsibilities",
+      "Standardize workflow naming conventions"
+    ]
+  }
+}

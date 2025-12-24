@@ -56,10 +56,13 @@ class LintingMetrics:
     """Linting issues across the codebase."""
     backend_issues: int
     frontend_issues: int
+    adws_issues: int
     backend_errors: int
     backend_warnings: int
     frontend_errors: int
     frontend_warnings: int
+    adws_errors: int
+    adws_warnings: int
     total_issues: int
 
 

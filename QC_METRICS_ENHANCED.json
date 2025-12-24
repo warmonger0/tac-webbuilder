@@ -1,0 +1,225 @@
+{
+  "coverage": {
+    "overall_coverage": 35.2,
+    "backend_coverage": 60,
+    "frontend_coverage": 14.3,
+    "adws_coverage": 31.4,
+    "total_tests": 1027
+  },
+  "naming": {
+    "total_files_checked": 0,
+    "compliant_files": 0,
+    "violations": [],
+    "compliance_rate": 95
+  },
+  "file_structure": {
+    "total_files": 0,
+    "oversized_files": [],
+    "long_files": [
+      {
+        "file": "app/client/src/components/AdwMonitorCard.tsx",
+        "lines": 914
+      }
+    ],
+    "avg_file_size_kb": 0.0
+  },
+  "linting": {
+    "backend_issues": 111,
+    "frontend_issues": 196,
+    "adws_issues": 1667,
+    "backend_errors": 6,
+    "backend_warnings": 105,
+    "frontend_errors": 59,
+    "frontend_warnings": 137,
+    "adws_errors": 402,
+    "adws_warnings": 1265,
+    "total_issues": 1974
+  },
+  "overall_score": 67,
+  "last_updated": "2025-12-23T19:22:04.635772",
+  "audit_metadata": {
+    "total_issues": 2464,
+    "critical_issues": 434,
+    "high_issues": 208,
+    "medium_issues": 553,
+    "low_issues": 1269,
+    "project_health": "MODERATE - Strong foundations with significant technical debt requiring systematic remediation"
+  },
+  "critical_issues": [
+    {
+      "rank": 1,
+      "severity": "critical",
+      "domain": "Backend",
+      "issue": "Undefined variable _db_adapter in sync_manager.py",
+      "file": "/Users/Warmonger0/tac/tac-webbuilder/app/server/core/workflow_history_utils/sync_manager.py",
+      "line": 357,
+      "impact": "Runtime NameError crash in production",
+      "effort": "Low (5 min fix)",
+      "recommendation": "Define _db_adapter or fix variable reference"
+    },
+    {
+      "rank": 2,
+      "severity": "critical",
+      "domain": "Frontend",
+      "issue": "Test infrastructure broken - 57 test failures",
+      "file": "app/client/src/__tests__/",
+      "impact": "Cannot verify code changes, blocks further testing",
+      "effort": "Medium (2-3 hours)",
+      "recommendation": "Mock GlobalWebSocketContext and fetch API in test setup"
+    },
+    {
+      "rank": 3,
+      "severity": "critical",
+      "domain": "ADW",
+      "issue": "1,667 linting violations across 107 files",
+      "file": "adws/",
+      "impact": "Code quality degradation, harder to maintain",
+      "effort": "High (1-2 days with automated fixes)",
+      "recommendation": "Run 'ruff check --fix' and address remaining issues"
+    },
+    {
+      "rank": 4,
+      "severity": "critical",
+      "domain": "Scripts",
+      "issue": "No 'set -u' in any shell scripts",
+      "file": "scripts/*.sh (46 files)",
+      "impact": "Silent failures from undefined variables",
+      "effort": "Medium (add to all scripts, test for side effects)",
+      "recommendation": "Add 'set -euo pipefail' to all shell scripts"
+    },
+    {
+      "rank": 5,
+      "severity": "critical",
+      "domain": "Scripts",
+      "issue": "Unsafe .env parsing vulnerable to command injection",
+      "file": "scripts/delete_pr.sh:26, scripts/clear_issue_comments.sh:19",
+      "impact": "Security vulnerability if .env is malicious",
+      "effort": "Low (10 min fix)",
+      "recommendation": "Replace with: set -a; source .env; set +a"
+    },
+    {
+      "rank": 6,
+      "severity": "critical",
+      "domain": "Frontend",
+      "issue": "AdwMonitorCard component is 914 lines with complexity 42",
+      "file": "/Users/Warmonger0/tac/tac-webbuilder/app/client/src/components/AdwMonitorCard.tsx",
+      "impact": "Unmaintainable, untestable, performance issues",
+      "effort": "High (1-2 days to decompose)",
+      "recommendation": "Decompose into smaller sub-components"
+    },
+    {
+      "rank": 7,
+      "severity": "critical",
+      "domain": "Database",
+      "issue": "Missing foreign key constraints on phase_queue.feature_id",
+      "file": "app/server/db/migrations/007_add_phase_queue_postgres.sql",
+      "impact": "Orphaned records, data integrity issues",
+      "effort": "Medium (create migration, test thoroughly)",
+      "recommendation": "Add FK with ON DELETE CASCADE/SET NULL"
+    },
+    {
+      "rank": 8,
+      "severity": "critical",
+      "domain": "Backend",
+      "issue": "18 of 20 route modules lack tests",
+      "file": "app/server/routes/",
+      "impact": "API surface area unverified, regression risk",
+      "effort": "Very High (2-3 weeks for comprehensive tests)",
+      "recommendation": "Prioritize critical routes: github_routes, observability_routes"
+    },
+    {
+      "rank": 9,
+      "severity": "critical",
+      "domain": "Documentation",
+      "issue": "Git commits contain AI attribution",
+      "file": "Git history (10 recent commits)",
+      "impact": "Violates CODE_STANDARDS.md, unprofessional",
+      "effort": "Low (configure commit template)",
+      "recommendation": "Remove from future commits, update commit_generator.py"
+    },
+    {
+      "rank": 10,
+      "severity": "critical",
+      "domain": "ADW",
+      "issue": "Rate limiting module untested and not enforced in workflows",
+      "file": "/Users/Warmonger0/tac/tac-webbuilder/adws/adw_modules/rate_limit.py",
+      "impact": "API quota exhaustion risk, workflow failures",
+      "effort": "Medium (add tests, enforce in workflows)",
+      "recommendation": "Add unit tests and integrate into all GitHub API workflows"
+    }
+  ],
+  "strengths": [
+    "Excellent security practices (98/100 score)",
+    "Strong loop prevention mechanisms (95/100 score)",
+    "Comprehensive ADW documentation (54KB README)",
+    "Good Claude Code integration (75 slash commands)",
+    "1,027 total tests across the project",
+    "Well-organized .claude/ directory structure",
+    "Proper environment variable usage (no secrets in git)",
+    "Good use of parameterized queries (SQL injection protection)"
+  ],
+  "weaknesses": [
+    "Low frontend test coverage (14.3%)",
+    "1,667 ADW linting violations",
+    "Large, complex components (914 line component)",
+    "No 'set -u' in shell scripts",
+    "Missing foreign key constraints",
+    "Inconsistent error handling (24 bare except clauses)",
+    "Code duplication (334 duplicate blocks)",
+    "AI attribution in commits (violates standards)"
+  ],
+  "remediation_phases": {
+    "phase_1_immediate": {
+      "duration": "1 week",
+      "priority": "P0 - Critical",
+      "tasks": [
+        "Fix undefined _db_adapter variable",
+        "Fix unsafe .env parsing in scripts",
+        "Add 'set -euo pipefail' to shell scripts",
+        "Mock test infrastructure (WebSocket, fetch)",
+        "Run 'ruff check --fix' on ADW codebase",
+        "Remove AI attribution from commit template"
+      ]
+    },
+    "phase_2_high_priority": {
+      "duration": "2-3 weeks",
+      "priority": "P1 - High",
+      "tasks": [
+        "Add tests for github_routes.py and sql_security.py",
+        "Decompose 6 largest frontend components (>500 lines)",
+        "Fix 402 critical ADW linting violations",
+        "Add foreign key constraints to phase_queue",
+        "Replace 42 'any' types with proper TypeScript interfaces",
+        "Add rate limiting to all GitHub API workflows"
+      ]
+    },
+    "phase_3_medium_priority": {
+      "duration": "1 month",
+      "priority": "P2 - Medium",
+      "tasks": [
+        "Increase backend test coverage to 75%",
+        "Increase frontend test coverage to 40%",
+        "Fix 70 B904 exception handling issues",
+        "Implement React.memo and list virtualization",
+        "Add migration rollback support",
+        "Reorganize frontend components by feature",
+        "Add composite database indexes",
+        "Install and configure mypy for ADW"
+      ]
+    },
+    "phase_4_long_term": {
+      "duration": "2-3 months",
+      "priority": "P3 - Long-term",
+      "tasks": [
+        "Achieve 80%+ test coverage across all codebases",
+        "Implement dependency injection in backend",
+        "Add comprehensive API documentation",
+        "Migrate to SQLAlchemy ORM",
+        "Create shared utility libraries for scripts",
+        "Add ARIA labels for accessibility compliance",
+        "Implement CI/CD quality gates",
+        "Add performance monitoring and optimization"
+      ]
+    }
+  }
+}

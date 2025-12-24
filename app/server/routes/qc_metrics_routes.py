@@ -6,7 +6,9 @@ Provides endpoints for:
 - Overall quality score
 """
 
+import json
 import logging
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from services.qc_metrics_service import QCMetricsService
@@ -20,6 +22,10 @@ qc_service = QCMetricsService()
 
 # Cache for QC metrics (expensive to compute)
 _qc_metrics_cache: dict | None = None
+
+# Path to enhanced metrics file
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+ENHANCED_METRICS_PATH = PROJECT_ROOT / "QC_METRICS_ENHANCED.json"
 
 
 @router.get("", response_model=dict)
@@ -80,9 +86,17 @@ async def get_qc_metrics() -> dict:
             logger.info("Returning cached QC metrics")
             return _qc_metrics_cache
 
-        # Compute fresh metrics
+        # Try to load enhanced metrics from audit first
+        if ENHANCED_METRICS_PATH.exists():
+            logger.info(f"Loading enhanced metrics from {ENHANCED_METRICS_PATH}")
+            with open(ENHANCED_METRICS_PATH) as f:
+                metrics = json.load(f)
+                _qc_metrics_cache = metrics
+                return metrics
+
+        # Fall back to computing fresh metrics using async method
         logger.info("Computing fresh QC metrics (this may take 10-30 seconds)...")
-        metrics = qc_service.get_all_metrics()
+        metrics = await qc_service.get_all_metrics_async()
 
         # Cache the result
         _qc_metrics_cache = metrics
@@ -117,8 +131,8 @@ async def refresh_qc_metrics() -> dict:
         # Clear cache
         _qc_metrics_cache = None
 
-        # Compute fresh metrics
-        metrics = qc_service.get_all_metrics()
+        # Compute fresh metrics using async method
+        metrics = await qc_service.get_all_metrics_async()
 
         # Cache the result
         _qc_metrics_cache = metrics
@@ -151,7 +165,7 @@ async def get_coverage_only() -> dict:
     ```
     """
     try:
-        coverage = qc_service.get_coverage_metrics()
+        coverage = await qc_service.get_coverage_metrics()
         return {
             'overall_coverage': coverage.overall_coverage,
             'backend_coverage': coverage.backend_coverage,
@@ -201,4 +215,90 @@ async def get_linting_only() -> dict:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get linting metrics: {str(e)}"
+        )
+
+
+@router.get("/audit", response_model=dict)
+async def get_audit_data() -> dict:
+    """
+    Get comprehensive audit data from the quality audit.
+
+    This loads the enhanced metrics from the comprehensive codebase audit
+    that was performed across 7 dimensions.
+
+    Returns detailed metrics including:
+    - Overall compliance score and project health
+    - Test coverage breakdown with actual percentages from audit
+    - Complete linting violations count
+    - Critical issues requiring immediate attention
+    - Strengths and weaknesses identified
+    - Remediation roadmap
+
+    Returns the enhanced metrics from QC_METRICS_ENHANCED.json if available,
+    otherwise returns error.
+    """
+    try:
+        if not ENHANCED_METRICS_PATH.exists():
+            raise HTTPException(
+                status_code=404,
+                detail="Audit data not found. Run 'python scripts/update_qc_panel_from_audit.py' to generate it."
+            )
+
+        logger.info(f"Loading audit data from {ENHANCED_METRICS_PATH}")
+        with open(ENHANCED_METRICS_PATH) as f:
+            audit_data = json.load(f)
+
+        return audit_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error loading audit data: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load audit data: {str(e)}"
+        )
+
+
+@router.post("/use-audit-data", response_model=dict)
+async def use_audit_data() -> dict:
+    """
+    Force the QC panel to use audit data instead of real-time metrics.
+
+    This clears the cache and loads the comprehensive audit data from
+    QC_METRICS_ENHANCED.json for display in Panel 7.
+
+    Use this after running the comprehensive audit to show detailed findings.
+    """
+    global _qc_metrics_cache
+
+    try:
+        if not ENHANCED_METRICS_PATH.exists():
+            raise HTTPException(
+                status_code=404,
+                detail="Audit data not found. Run 'python scripts/update_qc_panel_from_audit.py' to generate it."
+            )
+
+        logger.info("Forcing use of audit data for QC metrics")
+
+        # Clear cache
+        _qc_metrics_cache = None
+
+        # Load enhanced metrics
+        with open(ENHANCED_METRICS_PATH) as f:
+            metrics = json.load(f)
+
+        # Cache the audit data
+        _qc_metrics_cache = metrics
+
+        logger.info("QC metrics now using comprehensive audit data")
+        return metrics
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error loading audit data: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load audit data: {str(e)}"
         )
