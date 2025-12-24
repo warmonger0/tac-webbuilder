@@ -135,7 +135,15 @@ def fetch_issue(issue_number: str, repo_path: str) -> GitHubIssue:
                     "state": issue_data["state"],
                     "author": {"login": issue_data["user"]["login"]},
                     "assignees": [{"login": a["login"]} for a in issue_data.get("assignees", [])],
-                    "labels": [{"name": l["name"]} for l in issue_data.get("labels", [])],
+                    "labels": [
+                        {
+                            "name": l["name"],
+                            "id": str(l.get("id")) if l.get("id") else None,
+                            "color": l.get("color"),
+                            "description": l.get("description")
+                        }
+                        for l in issue_data.get("labels", [])
+                    ],
                     "milestone": issue_data.get("milestone"),
                     "comments": [],  # REST API doesn't include comments in issue endpoint
                     "createdAt": issue_data["created_at"],
